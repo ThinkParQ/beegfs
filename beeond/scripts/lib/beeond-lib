@@ -1,0 +1,379 @@
+#!/bin/bash
+
+# This file contains some functions used across all of the BeeOND scripts.
+
+BEEOND_FILENAME_PREFIX=".beeond_"
+BEEOND_COPY_FILE_LIST="${BEEOND_FILENAME_PREFIX}files_copy"
+BEEOND_COPY_SCAN_LIST="${BEEOND_FILENAME_PREFIX}scan_list" # List of dirs that have to be scanned.
+BEEOND_COPY_DIR_LIST="${BEEOND_FILENAME_PREFIX}dirs_copy"
+BEEOND_START_FILE_LIST="${BEEOND_FILENAME_PREFIX}files_start"
+BEEOND_END_FILE_LIST="${BEEOND_FILENAME_PREFIX}files_end"
+BEEOND_END_UPDATED_FILE_LIST="${BEEOND_FILENAME_PREFIX}files_end_updated"
+BEEOND_START_DIR_LIST="${BEEOND_FILENAME_PREFIX}dirs_start"
+BEEOND_END_DIR_LIST="${BEEOND_FILENAME_PREFIX}dirs_end"
+BEEOND_SESSION_FILE="${BEEOND_FILENAME_PREFIX}session"
+
+BEEOND_BATCH_SIZE=20
+
+beeond_print_error()
+{
+   echo "ERROR: ${1}" >&2
+   echo ""
+}
+
+beeond_print_error_and_exit()
+{
+   beeond_print_error "${1}" >&2
+   exit 1
+}
+
+beeond_print_info()
+{
+   local MESSAGE="${1}"
+   if [ "${QUIET}" != "true" ]
+   then
+      echo "INFO: ${MESSAGE}"
+   fi
+}
+
+# Saves the session info file which contains the paths of the global store and the node file.
+beeond_save_session_info()
+{
+   local NODEFILE="${1}"
+   local GLOBAL_PATH="${2}"
+
+   printf "NodeFile=%q\nGlobalPath=%q\n" "${NODEFILE}" "${GLOBAL_PATH}" \
+         > "${LOCAL_PATH}/${BEEOND_SESSION_FILE}"
+
+   if [ ! $? -eq 0 ]
+   then
+      beeond_print_error_and_exit "Could not write to session file."
+   fi
+}
+
+# Generate the list of files in the beeond folder.
+beeond_generate_file_list()
+{
+   local LOCAL_PATH="${1}"
+   local LISTFILE="${2}"
+   local REFERENCE_FILE="${3}"
+
+
+   pushd "${LOCAL_PATH}"
+   if [ "${REFERENCE_FILE}" = "" ]
+   then     # No reference file - just generate the full list (e.g. on startup).
+
+      beeond_print_info "Generating file list ${LISTFILE}..."
+
+      find . ! -path ./${BEEOND_FILENAME_PREFIX}\* \( -type f -or -type l \)\
+            -exec bash -c 'printf "%q\n" "$0"' {} \; \
+            | grep -v ^\\$ | sort > "${LISTFILE}"
+
+      # The grep statement filters out file names with newlines in them. While they are technically
+      # legal they would cause problems later on due to the way the script run by parallel handles
+      # the arguments.
+
+   else     # Reference file given: Compare timestamps.
+
+      beeond_print_info \
+            "Generating file list ${LISTFILE}. Timestamp reference: ${REFERENCE_FILE}..."
+
+      find . ! -path ./${BEEOND_FILENAME_PREFIX}\* -type f -or -type l \
+            \( -cnewer ${REFERENCE_FILE} -or -newer ${REFERENCE_FILE} \) \
+            -exec bash -c 'printf "%q\n" "$0"' {} \; \
+            | grep -v ^\\$ | sort > "${LISTFILE}"
+
+   fi
+   popd
+}
+
+# Generate list of directories - this is necessary in case directories were created during the
+# session and need to be created on the global store as well.
+beeond_generate_directory_list()
+{
+   local LOCAL_PATH="${1}"
+   local LISTFILE="${2}"
+
+   beeond_print_info "Generating directory list file ${LISTFILE}..."
+
+   pushd "${LOCAL_PATH}"
+   find . ! -path . -type d \
+         -exec bash -c 'printf "%q\n" "$0"' {} \; \
+         | grep -v ^\\$ | sort > "${LISTFILE}"
+   popd
+}
+
+# Generate copy file list. If we do a parallel copy, we can't just list the paths to all the files
+# to be copied, because we have to "flatten" the folder hierarchy (e.g. when the user says
+# "copy dir/subfir/file_a anotherdir/file_b target_dir" we want to end up with
+# target_dir/file_a and target_dir/file_b. To achieve this, we just save an explicit target path
+# to each source file. We also have to keep a list of directories we encounter because we want to
+# create them before we start copying.
+beeond_generate_copy_lists()
+{
+   local TARGET="${1}"
+   local NODE_LIST="${2}"
+   local CONCURRENCY="${3}"
+   shift 3
+
+   # Note: We do relative path expansion here, (and not directly in the do_... functions)
+   # because this is the first time we iterate over the source list.
+
+   # Expand target path.
+   if [ ! "${TARGET:0:1}" = "/" ]
+   then
+      TARGET="${PWD}/${TARGET}"
+   fi
+
+   # Delete possibly left over file lists.
+   rm -f "${TARGET}/${BEEOND_COPY_SCAN_LIST}" \
+         "${TARGET}/${BEEOND_COPY_DIR_LIST}" \
+         "${TARGET}/${BEEOND_COPY_FILE_LIST}"
+
+   # Generate lists: A list of files which can be used directly, and a list of directories which
+   # have to be scanned first.
+   for ENTRY in "$@"
+   do
+      # Expand path if it's relative.
+      if [ ! "${ENTRY:0:1}" = "/" ]
+      then
+         ENTRY="${PWD}/${ENTRY}"
+      fi
+
+      beeond_print_info "Path to scan: ${ENTRY}"
+      if [ -d "${ENTRY}" ]; then
+         printf "%q\n" "${ENTRY}" >> "${TARGET}/${BEEOND_COPY_SCAN_LIST}"
+      elif [ -f "${ENTRY}" ]; then
+         printf "%q\n" >> "${TARGET}/${BEEOND_COPY_FILE_LIST}"
+      else
+         beeond_print_error_and_exit "File or directory does not exist: ${ENTRY}"
+      fi
+   done
+
+   beeond_print_info "Scanning sources..."
+
+   < "${TARGET}/${BEEOND_COPY_SCAN_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read DIR; do \
+               cd \"\${DIR}\"; \
+               find . -type d -exec bash -c \\\'printf \"%s/%q\n\" \"\$0\" \"\$1\"\' \"\`basename \"\${DIR}\"\`\" \{\} \; \
+               | grep -v ^\\$; \
+            done;
+         " \
+   | sort > "${TARGET}/${BEEOND_COPY_DIR_LIST}"
+
+   < "${TARGET}/${BEEOND_COPY_SCAN_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read DIR; do \
+               cd \"\${DIR}\"; \
+               find . \( -type f -or -type l \) -exec bash -c \
+                  \\\'printf \"%q %q\n\" \"\${PWD}/\$0\" \"${TARGET}/\`basename \"\${PWD}\"\`/\$0\"\' \{\} \; \
+               | grep -v ^\\$; \
+            done; \
+         " \
+   | sort > "${TARGET}/${BEEOND_COPY_FILE_LIST}"
+}
+
+# Parallel copy of the files from a previously generated file list to the target directory.
+# First, the directory structure is generated, then the files are copied into it.
+beeond_parallel_copy()
+{
+   local TARGET="${1}"
+   local NODE_LIST="${2}"
+   local CONCURRENCY="${3}"
+
+   # Expand target path.
+   if [ ! "${TARGET:0:1}" = "/" ]
+   then
+      TARGET="${PWD}/${TARGET}" # TODO make sure TARGET is not empty, otherwise we copy to /
+   fi
+
+   beeond_print_info "Generating target directory structure..."
+
+   < "${TARGET}/${BEEOND_COPY_DIR_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read DIR; do \
+               mkdir -pv \"${TARGET}/\${DIR}\"; \
+            done; \
+         "
+
+   beeond_print_info "Copying files..."
+
+   < "${TARGET}/${BEEOND_COPY_FILE_LIST}" \
+      ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+         --controlmaster --will-cite \
+      " \
+         while read -a LINE; do \
+            cp -av \"\${LINE[0]}\" \"\${LINE[1]}\"; \
+         done; \
+      "
+
+   # Delete temporary files.
+#  rm "${TARGET}/${BEEOND_COPY_SCAN_LIST}" \
+#        "${TARGET}/${BEEOND_COPY_DIR_LIST}" \
+#        "${TARGET}/${BEEOND_COPY_FILE_LIST}"
+}
+
+# Remove all files from the global store that have been deleted during the session.
+beeond_remove_removed_files()
+{
+   local GLOBAL_PATH="${1}"
+   local LOCAL_PATH="${2}"
+   local NODE_LIST="${3}"
+   local CONCURRENCY="${4}"
+
+   beeond_print_info "Deleting files:"
+   comm -23 ${LOCAL_PATH}/${BEEOND_START_FILE_LIST} ${LOCAL_PATH}/${BEEOND_END_FILE_LIST} | \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read FILE; do \
+               rm -v \"${GLOBAL_PATH}/\${FILE}\"; \
+            done; \
+         "
+
+   beeond_print_info "Deleting directories:"
+   comm -23 ${LOCAL_PATH}/${BEEOND_START_DIR_LIST} ${LOCAL_PATH}/${BEEOND_END_DIR_LIST} | \
+         tac | \
+         xargs -I{} rmdir -v "${GLOBAL_PATH}/{}"
+   # Not being done in parallel to avoid deleting a subdirectory before its parent (this is also
+   # the reason the list is inverted (tac)).
+}
+
+# Copy back all files to the global store that have been updated during the session.
+beeond_copy_updated_files()
+{
+   local GLOBAL_PATH="${1}"
+   local LOCAL_PATH="${2}"
+   local NODE_LIST="${3}"
+   local CONCURRENCY="${4}"
+
+   beeond_print_info "Creating new directories:"
+
+   < "${LOCAL_PATH}/${BEEOND_END_DIR_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read DIR; do \
+               mkdir -pv \"${GLOBAL_PATH}/\${DIR}\"; \
+            done; \
+         "
+
+   beeond_print_info "Copying back changed files:"
+
+   < "${LOCAL_PATH}/${BEEOND_END_UPDATED_FILE_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read FILE; do \
+               cp -uv \"${LOCAL_PATH}/\${FILE}\" \"${GLOBAL_PATH}/\${FILE}\"; \
+            done; \
+         "
+
+   # Copy files into moved directories. (When a directory is renamed, the files in it don't have
+   # their timestamp updated. Therefore, we need to check all the new directories again).
+
+   beeond_print_info "Copying back changed files (moved dirs):"
+
+   comm -13 "${LOCAL_PATH}/${BEEOND_START_DIR_LIST}" "${LOCAL_PATH}/${BEEOND_END_DIR_LIST}" | \
+         cut -b3- | \
+            ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" \
+               -N${BEEOND_BATCH_SIZE} --controlmaster --will-cite \
+            " \
+               while read FILE; do \
+                  cp -uv \"${LOCAL_PATH}/\${FILE}\" \"\`dirname \"${GLOBAL_PATH}/\${FILE}\"\`\"; \
+               done; \
+            "
+
+   # Note: This does not work if a directory is deleted, and then another one is renamed to the name
+   #       of the deleted directory. This must be detected using the directory's ctime, which is
+   #       currently not updated by beegfs (TODO - beegfs-meta).
+
+}
+
+# Stage in process: Copy all files from the global store to the local store.
+beeond_stage_in()
+{
+   local GLOBAL_PATH="${1}"
+   local LOCAL_PATH="${2}"
+   local NODE_LIST="${3}"
+   local CONCURRENCY="${4}"
+
+   # Generate list of files that have to be copied.
+   beeond_generate_file_list "${GLOBAL_PATH}" "${LOCAL_PATH}/${BEEOND_START_FILE_LIST}"
+   beeond_generate_directory_list "${GLOBAL_PATH}" "${LOCAL_PATH}/${BEEOND_START_DIR_LIST}"
+
+   beeond_print_info "Creating directory structure..."
+   < "${LOCAL_PATH}/${BEEOND_START_DIR_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read DIR; do \
+               mkdir -pv \"${LOCAL_PATH}/\${DIR}\"; \
+               touch --reference=\"${GLOBAL_PATH}/\${DIR}\" \"${LOCAL_PATH}/\${DIR}\"; \
+            done; \
+         "
+
+   beeond_print_info "Copying files to local directory..."
+   < "${LOCAL_PATH}/${BEEOND_START_FILE_LIST}" \
+         ${PARALLEL} -S ${NODE_LIST} -j${CONCURRENCY} --pipe --recend "\n" -N${BEEOND_BATCH_SIZE} \
+            --controlmaster --will-cite \
+         " \
+            while read FILE; do \
+               cp -av \"${GLOBAL_PATH}/\${FILE}\" \"\`dirname \"${LOCAL_PATH}/\${FILE}\"\`\"/; \
+            done;
+         "
+
+   if [ $? -ne 0 ]
+   then
+      beeond_print_error "Stage-in copy did not succeed. Data is incompletely staged in."
+   fi
+
+   # Generate list of files and dirs that were actually copied to keep track if the user deletes
+   # files during a session. (re-generate list here, so that if something went wrong during the
+   # stage-in copy, we don't start deleting stuff from the global store by accident).
+   beeond_generate_file_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_START_FILE_LIST}"
+   beeond_generate_directory_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_START_DIR_LIST}"
+}
+
+# Stage out process: remove all the files that have been removed during the beeond session,
+# and copy back the files which have been changed.
+beeond_stage_out()
+{
+   local GLOBAL_PATH="${1}"
+   local LOCAL_PATH="${2}"
+   local NODE_LIST="${3}"
+   local CONCURRENCY="${4}"
+
+   beeond_print_info "Nodes for parallel stage out: ${NODELIST}."
+
+   beeond_generate_file_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_FILE_LIST}"
+   beeond_generate_file_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_UPDATED_FILE_LIST}" \
+         ${BEEOND_START_FILE_LIST}
+
+   beeond_generate_directory_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_DIR_LIST}"
+
+   beeond_remove_removed_files "${GLOBAL_PATH}" "${LOCAL_PATH}" "${NODE_LIST}" ${CONCURRENCY}
+
+   beeond_copy_updated_files "${GLOBAL_PATH}" "${LOCAL_PATH}" "${NODE_LIST}" ${CONCURRENCY}
+}
+
+# Parallel copy process: copy all files and directories (recursively) into the target directory.
+beeond_copy()
+{
+   local NODE_LIST="${1}"
+   local CONCURRENCY="${2}"
+   shift 2
+
+   beeond_print_info "Nodes for parallel copy: ${NODE_LIST}; Concurrency: ${CONCURRENCY}"
+
+   beeond_generate_copy_lists "${@:$#}" "${NODE_LIST}" "${CONCURRENCY}" "${@:1:$#-1}"
+   beeond_parallel_copy "${@:$#}" "${NODE_LIST}" "${CONCURRENCY}"
+
+}

@@ -1,0 +1,125 @@
+#include <common/net/message/control/GenericResponseMsg.h>
+#include <common/net/message/session/opening/OpenFileRespMsg.h>
+#include <common/toolkit/SessionTk.h>
+#include <common/storage/striping/Raid0Pattern.h>
+#include <net/msghelpers/MsgHelperOpen.h>
+#include <program/Program.h>
+#include <session/EntryLock.h>
+#include <session/SessionStore.h>
+#include "OpenFileMsgEx.h"
+
+FileIDLock OpenFileMsgEx::lock(EntryLockStore& store)
+{
+   return {&store, getEntryInfo()->getEntryID()};
+}
+
+bool OpenFileMsgEx::processIncoming(ResponseContext& ctx)
+{
+#ifdef BEEGFS_DEBUG
+   const char* logContext = "OpenFileMsg incoming";
+
+   LOG_DEBUG(logContext, Log_DEBUG, "Received a OpenFileMsg from: " + ctx.peerName() );
+
+   EntryInfo* entryInfo = getEntryInfo();
+
+   LOG_DEBUG(logContext, Log_SPAM, "ParentInfo: " + entryInfo->getParentEntryID() +
+      " EntryID: " + entryInfo->getEntryID() + " FileName: " + entryInfo->getFileName() );
+
+   LOG_DEBUG(logContext, Log_DEBUG,
+      "BuddyMirrored: " + std::string(entryInfo->getIsBuddyMirrored() ? "Yes" : "No") +
+      " Secondary: " +
+      std::string(hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond) ? "Yes" : "No") );
+#endif // BEEGFS_DEBUG
+
+   return BaseType::processIncoming(ctx);
+}
+
+std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(ResponseContext& ctx,
+   bool isSecondary)
+{
+   App* app = Program::getApp();
+
+   EntryInfo* entryInfo = this->getEntryInfo();
+   bool useQuota = isMsgHeaderFeatureFlagSet(OPENFILEMSG_FLAG_USE_QUOTA);
+   MetaFileHandle inode;
+
+   PathInfo pathInfo;
+   StripePattern* pattern;
+   unsigned sessionFileID;
+   SessionStore* sessions = entryInfo->getIsBuddyMirrored()
+      ? app->getMirroredSessions()
+      : app->getSessions();
+
+   FhgfsOpsErr openRes = MsgHelperOpen::openFile(
+      entryInfo, getAccessFlags(), useQuota, getMsgHeaderUserID(), inode);
+
+   if (openRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
+      fixInodeTimestamp(*inode, fileTimestamps, entryInfo);
+
+   // update operation counters
+   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_OPEN,
+      getMsgHeaderUserID());
+
+   if (openRes != FhgfsOpsErr_SUCCESS)
+   { // error occurred
+      Raid0Pattern dummyPattern(1, {});
+
+      // generate response
+      if(unlikely(openRes == FhgfsOpsErr_COMMUNICATION))
+      {
+         return boost::make_unique<OpenFileResponseState>();
+      }
+      else
+      { // normal response
+
+         /* TODO: if we have the secondary node here, we might not need to send fileHandleID, pattern and
+         // pathInfo in response, because primary already has this information (and in fact partially
+         // sent it to secondary */
+         return boost::make_unique<OpenFileResponseState>(openRes, std::string(), dummyPattern,
+               pathInfo, 0);
+      }
+   }
+
+   // success => insert session
+   SessionFile* sessionFile = new SessionFile(std::move(inode), getAccessFlags(), entryInfo);
+
+   Session* session = sessions->referenceSession(getClientNumID(), true);
+
+   pattern = sessionFile->getInode()->getStripePattern();
+
+   if (!isSecondary)
+   {
+      sessionFileID = session->getFiles()->addSession(sessionFile);
+      fileHandleID = SessionTk::generateFileHandleID(sessionFileID, entryInfo->getEntryID() );
+
+      setSessionFileID(sessionFileID);
+      setFileHandleID(fileHandleID.c_str());
+   }
+   else
+   {
+      fileHandleID = getFileHandleID();
+      sessionFileID = getSessionFileID();
+
+      bool addRes = session->getFiles()->addSession(sessionFile, sessionFileID);
+
+      if (!addRes)
+      {
+         const char* logContext = "OpenFileMsgEx (executeLocally)";
+         LogContext(logContext).log(Log_NOTICE,
+            "Couldn't add sessionFile on secondary buddy; sessionID: " + getClientNumID().str()
+               + "; sessionFileID: " + StringTk::uintToStr(sessionFileID));
+      }
+   }
+
+   sessions->releaseSession(session);
+
+   sessionFile->getInode()->getPathInfo(&pathInfo);
+
+   return boost::make_unique<OpenFileResponseState>(openRes, fileHandleID, *pattern, pathInfo,
+         sessionFile->getInode()->getFileVersion());
+}
+
+bool OpenFileMsgEx::forwardToSecondary(ResponseContext& ctx)
+{
+   return sendToSecondary(ctx, *this, NETMSGTYPE_OpenFileResp) == FhgfsOpsErr_SUCCESS;
+}

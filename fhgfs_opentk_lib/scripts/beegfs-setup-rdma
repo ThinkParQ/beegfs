@@ -1,0 +1,258 @@
+#!/bin/bash
+
+# License: BeeGFS EULA
+
+OPENTK_LIB_PATH=/opt/beegfs/lib/
+
+LIBOPENTK=libbeegfs-opentk.so
+LIBOPENTK_IB=libbeegfs-opentk-enabledIB.so
+LIBOPENTK_noIB=libbeegfs-opentk-disabledIB.so
+WITH_IB=0
+FORCE_IB=0
+FORCE_NO_IB=0
+FORCE_IB_BYCONF=0
+
+beegfs_opentk_lib_build_path="/opt/beegfs/src/beegfs_opentk_lib/build"
+
+BEEGFS_OPENTK_CONF=/etc/beegfs/beegfs-libopentk.conf
+
+
+print_usage()
+{
+	echo
+	echo "DESCRIPTION: This tool checks for configured Infiniband hardware and drivers"
+	echo "on the current system and updates the symlink to the BeeGFS communication"
+	echo "library (opentk lib) to either a pre-compiled version with or without RDMA"
+	echo "support."
+	echo "The opentk lib is used by all BeeGFS userspace tools (e.g. beegfs-ctl) and"
+	echo "daemons (e.g. beegfs-storage), but not by the BeeGFS client kernel module."
+	echo
+	echo "SYMLINK PATH: ${OPENTK_LIB_PATH}${LIBOPENTK}"
+	echo
+	echo "USAGE: `basename $0` [options]"
+	echo
+	echo "   (default) - If no command line argument is given, auto-detect Infiniband"
+	echo "               support (based on installed libraries and existing"
+	echo "               /dev/infiniband) and update the corresponding symlink."
+	echo
+	echo "   -i on/off - Enable or disable RDMA support without running auto-detection."
+	echo
+	echo "   -h        - Print this help."
+	echo
+	echo "   -H        - Print the build help for beegfs-opentk-lib. Useful to query"
+	echo "               arguments for a rebuild."
+	echo
+	echo "   -r        - Rebuild beegfs-opentk-lib using the IB libraries installed on the"
+	echo "               system. (Usually not required.)"
+	echo "               To rebuild the library, librdmacm-dev and libibverbs-dev must be"
+	echo "               installed on the system."
+	echo 
+	echo "   -R        - Remove the symlink."
+	echo
+}
+
+# check if OFED libraries required for LIBOPENTK_IB are installed
+check_installed_ib()
+{
+	# check if user manually set IB enabled/disabled
+
+	if [ $FORCE_NO_IB -eq 1 -o $FORCE_IB -eq 1 ]; then
+		return
+	fi
+
+	# start IB auto-detection...
+
+	WITH_IB=0 # disabled by default until all dependencies are found
+
+	echo "Running Infiniband auto-detection..."
+
+	if [ ! -d /sys/class/infiniband ]; then
+		echo "/sys/class/infiniband missing, no Infiniband driver loaded."
+		echo '=> Disabling BeeGFS Infiniband support.'
+		return
+	fi
+
+	num_entries=`/bin/ls /sys/class/infiniband | wc -l`
+	if [ $num_entries -eq 0 ]; then
+		echo "/sys/class/infiniband has no entries: Drivers did not detect IB hardware."
+		echo '=> Disabling BeeGFS Infiniband support.'
+		return
+	fi
+
+	# so $LIBOPENTK_noIB is fine and the only difference to $LIBOPENTK_IB 
+	# are OFED libraries, so we now can easily test if those are installed.
+	ldd $LIBOPENTK_IB | grep "not found"
+	if [ $? -eq 0 ]; then
+		echo "Required Infiniband libraries missing."
+		echo '=> Disabling BeeGFS Infiniband support.'
+		return
+	fi
+
+	# programs linked against OFED work if /dev/infiniband exists, but
+	# OFED libs spam the console with errors in that case. Stupid of course,
+	# but a good reason for us to disable IB support by default then.
+	if [ ! -e /dev/infiniband/rdma_cm ]; then
+		echo "/dev/infiniband/rdma_cm missing. Is the rdma_ucm module loaded?"
+		echo '=> Disabling BeeGFS Infiniband support.'
+		return
+	fi
+
+	if [ ! -d /etc/libibverbs.d ]; then
+		echo "/etc/libibverbs.d missing."
+		echo '=> Disabling BeeGFS Infiniband support.'
+		return
+	fi
+
+	has_ibv_devinfo=`which ibv_devinfo`
+	if [ -n "$has_ibv_devinfo" ]; then
+		ibv_dev_ret=`ibv_devinfo 2>&1`
+		if [ $? -ne 0 ]; then
+			echo
+			echo "ibv_devinfo retured an error."
+			echo '=> Disabling BeeGFS Infiniband support.'
+			echo ibv_devinfo error:
+			echo $ibv_dev_ret
+			return
+		fi
+	else
+		echo
+		echo "Warning: ibv_devinfo not installed: Cannot check for user space IB libraries."
+	fi
+
+	WITH_IB=1
+	return
+}
+
+sanity_check()
+{
+	# has our library WITHOUT IB all required dependencies?
+	ldd $LIBOPENTK_noIB | grep "not found"
+	if [ $? -eq 0 ]; then
+		echo "Missing library for $LIBOPENTK_noIB. This must be fixed first." >&2
+		exit 1
+	fi
+
+	if [ ! -f $LIBOPENTK_noIB ]; then
+		echo "Missing library: $LIBOPENTK_noIB" >&2
+		exit 1
+	fi
+
+	if [ ! -f $LIBOPENTK_IB ]; then
+		echo "Missing library: $LIBOPENTK_IB" >&2
+		exit 1
+	fi
+}
+
+rebuild_opentk_lib_ib_and_exit()
+{
+	# rebuild opentk_lib against IB libraries on the system
+	# afterwards, remove object files, so that package uninstall works	
+	pushd $beegfs_opentk_lib_build_path >/dev/null && \
+	make BEEGFS_OPENTK_IBVERBS=1 package_lib && \
+	make install && \
+	make clean && \
+	popd >/dev/null
+	exit $?
+}
+
+remove_symlink_and_exit()
+{
+	pushd $OPENTK_LIB_PATH >/dev/null && \
+	rm -f $LIBOPENTK && \
+	popd >/dev/null
+	exit $?
+}
+
+read_config_file()
+{
+	[ -f "$BEEGFS_OPENTK_CONF" ] && source $BEEGFS_OPENTK_CONF
+
+	if [ $FORCE_IB -eq 1 ]; then
+		FORCE_IB_BYCONF=1
+	fi
+}
+
+
+############## END OF FUNCTION DEFINITIONS #################
+
+
+# reading the config file should be done before parsing command line
+# options, so that command line takes precedence
+read_config_file
+
+while getopts "hHi:rR" opt; do
+        case $opt in
+	h)
+		print_usage
+		exit 0
+		;;
+	H)
+		# get opentk_lib build help
+		make -C $beegfs_opentk_lib_build_path help
+		exit 0
+		;;
+	i)
+		if [ "$OPTARG" = "yes" -o "$OPTARG" = "YES" -o "$OPTARG" = "on" \
+		     -o "$OPTARG" = "ON" -o "$OPTARG" = "1" ]; then
+			echo "Enabling IB support as requested."
+			FORCE_IB=1
+		elif [ "$OPTARG" = "no" -o "$OPTARG" = "NO" -o "$OPTARG" = "off" \
+		     -o "$OPTARG" = "OFF" -o "$OPTARG" = "0" ]; then
+			echo "Disabling IB support as requested."
+			FORCE_NO_IB=1
+		else
+			echo "Invalid argument: -i $OPTARG"
+			print_usage
+			exit 1
+		fi
+		;;
+	r)
+		rebuild_opentk_lib_ib_and_exit
+		;;
+	R)
+		remove_symlink_and_exit
+		;;
+        *)
+                echo "Invalid option: -$OPTARG" >&2
+                print_usage
+                exit 1
+                ;;
+        esac
+done
+
+
+
+if [ $FORCE_NO_IB -eq 1 ]; then
+	# user disabled IB manually
+	WITH_IB=0
+	FORCE_IB=0
+elif [ $FORCE_IB_BYCONF -eq 1 ]; then
+	echo "Note: Config file enforces enabled IB support."
+fi
+
+# change to opentk lib dir...
+
+cd $OPENTK_LIB_PATH || exit 1
+
+# run sanity check and IB auto-detection...
+
+sanity_check
+check_installed_ib
+
+# set symlink...
+
+set -e
+
+echo
+
+if [ $WITH_IB -eq 1 -o $FORCE_IB -eq 1 ]; then
+	# with IB
+	echo "Setting symlink in `pwd`: $LIBOPENTK -> $LIBOPENTK_IB"
+	ln -f -s $LIBOPENTK_IB $LIBOPENTK
+else
+	# without IB
+	echo "Setting symlink in `pwd`: $LIBOPENTK -> $LIBOPENTK_noIB"
+	ln -f -s $LIBOPENTK_noIB $LIBOPENTK
+fi
+
+

@@ -1,0 +1,432 @@
+#!/bin/bash
+
+# NOTE: We expclicitly use "bash" here, as rc.status is not shell compliant
+# and will complain with the message below, if "/bin/sh" is given
+#
+# /etc/rc.status: line 43: test: -eq: unary operator expected                                                   
+# /etc/rc.status: line 44: test: -eq: unary operator expected
+#
+
+set -e
+
+#
+### BEGIN INIT INFO
+# Provides:          beegfs-client
+# Required-Start:
+# Required-Stop:
+# Should-Start:      $network $local_fs $syslog $time beegfs-helperd beegfs-mgmtd beegfs-meta beegfs-storage openib openibd rdma opensmd opensm $named slapd autofs ypbind nscd nslcd sshd
+# Should-Stop:       $network $local_fs $syslog $time beegfs-helperd beegfs-mgmtd beegfs-meta beegfs-storage openib openibd rdma opensmd opensm $named slapd autofs ypbind nscd nslcd sshd
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# chkconfig:         35 99 5
+# Short-Description: BeeGFS Client
+# Description:       Start BeeGFS Client
+### END INIT INFO
+
+SERVICE_NAME="BeeGFS Client"
+
+# Check for missing binaries (stale symlinks should not happen)
+# Note: Special treatment of stop for LSB conformance
+CLIENT_MOD=beegfs
+CLIENT_OPENTK_MOD=beegfs-client-opentk
+
+SYSCONFIG_FILE=/etc/default/beegfs-client
+BEEGFS_MOUNT_CONF="/etc/beegfs/beegfs-mounts.conf"
+FORCE_AUTO_BUILD="/var/lib/beegfs/client/force-auto-build"
+SUBSYS=/var/lock/subsys/beegfs-client
+
+AUTOBUILD_CONF="/etc/beegfs/beegfs-client-autobuild.conf"
+AUTOBUILD_CONF_SAVED="/var/lib/beegfs/client/beegfs-client-autobuild.conf.old"
+
+CLIENT_SRC_PATH="/opt/beegfs/src/client"
+
+SELINUX_OPT=""
+
+DEFAULT_FS_TYPE="beegfs"
+BUILD_FSTYPE_FILE="beegfs.fstype"
+
+# we add "/usr/sbin" & co because "su" doesn't automatically add them
+# on some systems.
+EXTRA_PATH="/sbin:/usr/sbin/:/bin:/usr/bin:/usr/local/bin:/usr/local/sbin"
+PATH="$EXTRA_PATH:$PATH"
+
+# source function library
+. /etc/beegfs/lib/init-multi-mode.beegfs-client
+
+# Return values acc. to LSB for all commands but status:
+# 0       - success
+# 1       - generic or unspecified error
+# 2       - invalid or excess argument(s)
+# 3       - unimplemented feature (e.g. "reload")
+# 4       - user had insufficient privileges
+# 5       - program is not installed
+# 6       - program is not configured
+# 7       - program is not running
+# 8--199  - reserved (8--99 LSB, 100--149 distrib, 150--199 appl)
+# 
+# Note that starting an already running service, stopping
+# or restarting a not-running service as well as the restart
+# with force-reload (in case signaling is not supported) are
+# considered a success.
+
+handle_selinux()
+{
+   selinuxenabled 2>/dev/null || return
+
+   # we do not support SELINUX right now and it only causes trouble, so
+   # we try to deactivate it
+   SELINUX_OPT="fscontext=system_u:object_r:tmp_t:s0"
+
+   echo
+   echo "WARNING: SELINUX IS ENABLED. BeeGFS might not work!"
+   echo "         Before you consider to contact BeeGFS support, please try to"
+   echo "         disable selinux (Usually in /etc/selinux/config)!"
+   echo
+}
+
+
+rmmod_beegfs()
+{
+   for module in `lsmod  |egrep "^beegfs" | sed -e 's/\s.*$//g'`; do rmmod $module; done
+}
+
+# Build beegfs. The autobuild will install modules to 
+# /lib/modules/`uname -r`/updates/fs/beegfs_autobuild
+# if the build was successful and it will also run depmod.
+build_beegfs()
+{
+   echo "- BeeGFS module autobuild"
+
+   mkdir -p `dirname $SUBSYS`
+
+   # locked section (to avoid build problems when this script is called from
+   # multiple processes concurrently)
+   (
+      # (note: fd 16 is a more or less arbitrary number)
+      flock 16 || echo "WARNING: flock for build failed (continuing without lock...)" >&2
+
+
+      for dir in ${CLIENT_SRC_PATH}/*; do
+
+          set +e
+          echo $dir | grep opentk >/dev/null 2>&1
+          [ $? -ne 0 ] || continue  # we ignore opentk
+
+          # ingore paths with missing Makfile
+          [ -f ${dir}/build/Makefile ] || continue
+
+
+          if [ -f ${dir}/build/${BUILD_FSTYPE_FILE} ]; then
+              fstype=`cat ${dir}/build/${BUILD_FSTYPE_FILE}`
+              TARGET_PARAM="TARGET=${fstype}"
+          else
+              TARGET_PARAM=""
+          fi
+
+          set -e
+
+          make -C ${dir}/build auto_rebuild_configured ${TARGET_PARAM} --silent
+          make -C ${dir}/build clean --silent # always clean up
+
+      done
+
+      set -e # ensure -e here (continue conditions above didn't restore it)
+
+      install -D $AUTOBUILD_CONF $AUTOBUILD_CONF_SAVED
+   ) 16>$SUBSYS.init-autobuild
+
+
+   # we do not want to delete the $FORCE_AUTO_BUILD file here yet,
+   # as we do not test here, if the modules we just built will load at all
+}
+
+# Test if the user updated the build config. If so, we touch
+# the $FORCE_AUTO_BUILD, which will trigger a rebuild
+test_updated_autobuild_conf()
+{
+   set +e
+   RC=0
+   # diskless installations might not have those files
+   if [ -e $AUTOBUILD_CONF -a -e $AUTOBUILD_CONF_SAVED ]; then
+      diff $AUTOBUILD_CONF $AUTOBUILD_CONF_SAVED >/dev/null 2>&1
+      RC=$?
+   fi
+   [ $RC -eq 0 ] || touch $FORCE_AUTO_BUILD
+   set -e
+}
+
+# Test and warn if user specified OFED_INCLUDE_PATH but appears to use in-tree
+# drivers or other way around.
+warn_on_ofed_mismatch()
+{
+   set +e
+
+   grep '^buildArgs.*BEEGFS_OPENTK_IBVERBS=1' $AUTOBUILD_CONF > /dev/null 2>&1
+   if [ $? -ne 0 ]; then
+      set -e
+      return # ibverbs not enabled
+   fi
+
+   modinfo ib_core > /dev/null 2>&1
+   if [ $? -ne 0 ]; then
+      # "modinfo ib_core" not working => cancel (because the user
+      # might have special mechanisms to load ib modules).
+      set -e
+      return
+   fi
+
+   # ibverbs enabled => check if include path set or not
+
+   grep '^buildArgs.*OFED_INCLUDE_PATH' $AUTOBUILD_CONF > /dev/null 2>&1
+   if [ $? -eq 0 ]; then
+      # ofed include path specified => warn if in-tree modules used
+      modinfo ib_core | grep 'filename:.*updates/' > /dev/null 2>&1
+      if [ $? -ne 0 ]; then
+         echo "WARNING: You probably should not specify OFED_INCLUDE_PATH in $AUTOBUILD_CONF"
+      fi
+   else
+      # no ofed include path specified => warn if out-of-tree modules
+      modinfo ib_core | grep 'filename:.*updates/' > /dev/null 2>&1
+      if [ $? -eq 0 ]; then
+         echo "WARNING: You probably need to specify" \
+            "OFED_INCLUDE_PATH in $AUTOBUILD_CONF"
+      fi
+   fi
+
+   set -e
+}
+
+source ${SYSCONFIG_FILE}
+if [ "${MULTI_MODE}" = "YES" -o "${MULTI_MODE}" = "yes" ]; then
+   set +e	
+   init_multi_mode $1 $2
+   exit $?
+fi
+
+RETVAL=0
+case "$1" in
+   start)
+      if [ -f "${SYSCONFIG_FILE}" ]; then
+         if [ "${START_SERVICE}" = "NO" -o "${START_SERVICE}" = "no" ]; then
+            echo "${SERVICE_NAME} not set to be started"
+            exit 0
+         fi
+      fi
+
+      set +e
+      handle_selinux
+      set -e
+
+      echo "Starting ${SERVICE_NAME}: "
+
+      test_updated_autobuild_conf
+
+      set +e
+      echo "- Loading BeeGFS modules"
+      if [ -f "$FORCE_AUTO_BUILD" ]; then
+         # a new version was installed or the user updated the 
+         # auto-build config, so we force a rebuild
+         rmmod_beegfs
+         rc=1
+      else
+         modprobe $CLIENT_MOD
+         rc=$?
+      fi
+
+      if [ $rc -ne 0 ]; then
+         set -e
+         build_beegfs
+         modprobe $CLIENT_MOD || (warn_on_ofed_mismatch && false)
+         rm -f $FORCE_AUTO_BUILD
+      fi
+      set -e
+
+      echo "- Mounting directories from $BEEGFS_MOUNT_CONF"
+
+      mkdir -p `dirname $SUBSYS`
+      touch $SUBSYS
+
+      OLDIFS="$IFS"
+      IFS=$'\n'
+      file=`tr -d '\r' < $BEEGFS_MOUNT_CONF` # read all lines at once and remove CR from dos files
+      for line in $file; do
+         if [ -z "$line" ]; then
+            continue # ignore empty line
+         fi
+      
+         mnt=`echo $line | awk '{print $1}'`
+         cfg=`echo $line | awk '{print $2}'`
+         fstype=`echo $line | awk '{print $3}'`
+         extra_mount_opts=`echo $line | awk '{print $4}'`
+
+         if [ -z "$mnt" -o -z "$cfg" ]; then
+            echo "Invalid config line: \"$line\""
+            continue
+         fi
+
+         if [ -z "$fstype" ]; then
+            fstype=${DEFAULT_FS_TYPE}
+         fi
+
+         set +e
+
+         mount -t ${fstype} | grep "${mnt} " >/dev/null 2>&1
+         if [ $? -eq 0 ]; then
+            # already mounted
+            set -e
+            continue
+         fi
+
+         set -e
+
+         # mkdir required for admon-based installation
+         if [ ! -e ${mnt} ]; then
+            mkdir -p ${mnt}
+         fi
+
+         mount -t ${fstype} beegfs_nodev ${mnt} \
+            -ocfgFile=${cfg},_netdev,${SELINUX_OPT},${extra_mount_opts}
+      done
+
+      RETVAL=$?
+      IFS="$OLDIFS"
+      ;;
+   stop)
+      echo "Shutting down ${SERVICE_NAME}: "
+
+      RETVAL=$?
+      echo "- Unmounting directories from $BEEGFS_MOUNT_CONF"
+      OLDIFS="$IFS"
+      IFS=$'\n'
+      file=`cat $BEEGFS_MOUNT_CONF` # we have to read all lines at once
+      for line in $file; do
+         if [ -z "$line" ]; then
+            continue # ignore empty line
+         fi
+
+         mnt=`echo $line | awk '{print $1}'`
+         cfg=`echo $line | awk '{print $2}'`
+         if [ -z "$mnt" -o -z "$cfg" ]; then
+            echo "Invalid config line: \"$line\""
+            continue
+         fi
+
+         set +e
+         res=`umount ${mnt} 2>&1`
+         if [ $? -ne 0 ]; then
+            # umount failed, ignore the failure if not mounted at all
+            echo $res | grep "not mounted" >/dev/null 2>&1
+            if [ $? -ne 0 ]; then
+               # Is mounted, abort.
+               echo "umount failed: $res"
+               exit 1
+            fi
+         fi
+         set -e
+
+      done
+      IFS="$OLDIFS"
+
+      echo "- Unloading modules"
+      set +e
+      res=`rmmod_beegfs`
+      if [ $? -ne 0 ]; then
+         # rmmod failed, ignore it if the module is not loaded at all
+         echo $res | grep "does not exist in" >/dev/null 2>&1
+            if [ $? -ne 0 ]; then
+            # Is loaded, check if a BeeGFS is still mounted (all from the list are unmounted, so 
+            # it must be a BeeGFS, which was manually mounted)
+            STILL_MOUNTED=$(mount -t beegfs | wc -l)
+            if [ ${STILL_MOUNTED} -eq 0 ]; then
+               # no more BeeGFS instances, no reason why rmmod should be failing, abort
+               echo "rmmod failed: $res"
+               exit 1
+            else
+               # BeeGFS instances mounted, so failure to rmmod is normal
+               echo "WARNING: Unloading BeeGFS modules failed. There are still mounted BeeGFS" \
+                  "instances, which do not seem to be managed by the init-script mechanism" \
+                  "(beegfs-mounts.conf)."
+         fi
+         fi
+      fi
+      RETVAL=$?
+      set -e
+
+      if [ $RETVAL -eq 0 ]; then rm -f $SUBSYS; fi
+      # Remember status and be verbose
+      ;;
+   restart)
+      ## Stop the service and regardless of whether it was
+      ## running or not, start it again.
+      $0 stop
+      $0 start
+      RETVAL=$?
+      # Remember status and be quiet
+      ;;
+   rebuild)
+      # Just rebuild modules. The user needs to call "restart" to make use
+      # of those new modules.
+      build_beegfs
+         RETVAL=$?
+      if [ $RETVAL -eq 0 ]; then
+         rm -f $FORCE_AUTO_BUILD
+      fi
+      ;;
+   try-restart|condrestart)
+      ## Do a restart only if the service was active before.
+      ## Note: try-restart is now part of LSB (as of 1.9).
+      ## RH has a similar command named condrestart.
+      set +e
+      $0 status
+      if test $? = 0
+      then
+         set -e
+         $0 restart
+         RETVAL=$?
+      else
+         set -e
+         RETVAL=7
+      fi
+      ;;
+   status)
+      # Return value is slightly different for the status command:
+      # 0 - service up and running
+      # 1 - service dead, but /var/run/  pid  file exists
+      # 2 - service dead, but /var/lock/ lock file exists
+      # 3 - service not running (unused)
+      # 4 - service status unknown :-(
+      # 5--199 reserved (5--99 LSB, 100--149 distro, 150--199 appl.)
+      set +e
+
+      echo -n "Checking for service $SERVICE_NAME: "
+
+      lsmod | grep $CLIENT_MOD | grep -v $CLIENT_OPENTK_MOD >/dev/null 2>&1
+      if [ $? -eq 0 ]
+      then
+         echo "is running..."
+
+         mount -t beegfs | grep beegfs >/dev/null 2>&1
+         if [ $? -eq 0 ]; then
+            mount -t beegfs | cut "-d " -f1-3
+            echo
+            RETVAL=0
+         else
+            echo ">> No active beegfs mounts detected."
+            echo
+            RETVAL=4
+         fi
+      else
+         echo "is stopped."
+         echo
+         RETVAL=3
+      fi
+
+      set -e	
+      ;;
+   *)
+      echo "Usage: $0 {start|stop|status|restart|rebuild|condrestart|try-restart}"
+      exit 3
+      ;;
+   esac
+exit $RETVAL
+

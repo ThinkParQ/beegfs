@@ -1,0 +1,1357 @@
+#!/bin/bash
+
+CURRENTTIME=`date +%Y%m%d-%H%M%S`
+
+MGMTD_BIN=beegfs-mgmtd
+META_BIN=beegfs-meta
+STORAGE_BIN=beegfs-storage
+HELPERD_BIN=beegfs-helperd
+CLIENT_BIN=beegfs-client # not really a binary, but name of config, init, etc.
+CTL_BIN=beegfs-ctl
+
+DEFAULT_LOG_PATH=/var/log
+LOG_PATH=${DEFAULT_LOG_PATH}
+STORAGE_LOG=${STORAGE_BIN}_${CURRENTTIME}.log
+META_LOG=${META_BIN}_${CURRENTTIME}.log
+MGMTD_LOG=${MGMTD_BIN}_${CURRENTTIME}.log
+CLIENT_LOG=${CLIENT_BIN}_${CURRENTTIME}.log
+
+STORAGE_CFG_NAME=${STORAGE_BIN}.conf
+META_CFG_NAME=${META_BIN}.conf
+MGMTD_CFG_NAME=${MGMTD_BIN}.conf
+CLIENT_CFG_NAME=${CLIENT_BIN}.conf
+HELPERD_CFG_NAME=${HELPERD_BIN}.conf
+
+META_NUMID_FILE=nodeNumID
+TARGET_NUMID_FILE=targetNumID
+
+PREFERRED_MDS_FILE=/tmp/preferredMds.fod
+PREFERRED_TARGET_FILE=/tmp/preferredTarget.fod
+
+DEFAULT_STATUSFILE=/tmp/beeond.tmp
+STATUSFILE=${DEFAULT_STATUSFILE}
+
+NUM_META_SERVER=1
+NUM_STORAGE_SERVER=0
+
+BEEGFS_BIN_PATH=/opt/beegfs/sbin
+
+DEFAULT_PORT_SHIFT=1000
+
+SSH="ssh"
+SSH_PARAMS="-qq -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no"
+DEFAULT_PDSH_PATH=`which pdsh 2>/dev/null`
+PDSH=${DEFAULT_PDSH_PATH}
+PDSH_RCMD="ssh"
+
+# source helper script
+ABSOLUTE_PATH="`dirname \`readlink -e $0\``" # using readlink, because somone might be calling this
+                                             # script using a symlink
+if [ -e "${ABSOLUTE_PATH}/../lib/beegfs-ondemand-stoplocal" ]
+then
+   BEEOND_STOPLOCAL="${ABSOLUTE_PATH}/../lib/beegfs-ondemand-stoplocal"
+else
+   BEEOND_STOPLOCAL="${ABSOLUTE_PATH}/../scripts/lib/beegfs-ondemand-stoplocal"
+fi
+
+source ${BEEOND_STOPLOCAL}
+
+# print usage
+print_usage_and_exit()
+{
+   echo ""
+   echo "BeeOND - BeeGFS OnDemand (http://www.beegfs.com)"
+   echo ""
+   echo "DESCRIPTION:"
+   echo "   Script to set up or shut down an BeeGFS setup on the fly."
+   echo ""
+   echo "   Creates a new BeeGFS file system on a set of hosts. All necessary services"
+   echo "   are automatically started and the file system is mounted. In the same way,"
+   echo "   the file system can be unmounted again and the services will be shut down."
+   echo "   Optionally, the contents of the file system can be deleted."
+   echo ""
+   echo "   This script can be used e.g. to automatically create a temporary scratch file"
+   echo "   system for cluster nodes during a compute job, and to remove it after the job"
+   echo "   is finished."
+   echo ""
+   echo "USAGE: `basename $0` <action> <options>"
+   echo ""
+   echo "ACTIONS:"
+   echo "   The first argument to `basename $0` is considered to be an action that the"
+   echo "   script should perform."
+   echo ""
+   echo "   The following actions are available:"
+   echo ""
+   echo "   start:"
+   echo "      Start the file system on a number of nodes, specified by the node file."
+   echo "      The necessary services will be started and the newly created file system"
+   echo "      will be mounted at the specified mount point. Information about the"
+   echo "      running file system are stored in a status file on each node."
+   echo ""
+   echo "      Mandatory arguments:"
+   echo "         -n FILENAME => Node file with line-separated hostnames."
+   echo "         -d PATH     => Path for BeeGFS data on servers."
+   echo "         -c PATH     => Mount point for BeeGFS clients."
+   echo ""
+   echo "      Optional arguments:"
+   echo "         -i FILENAME => Status information file name."
+   echo "                        Default: ${DEFAULT_STATUSFILE}"
+   echo "         -F          => Remove contents of data path before starting services."
+   echo "                        This is useful if the processes and status file of a"
+   echo "                        previous beegfs-ondemand-v2 session are gone, but the"
+   echo "                        data is still there."
+   echo "         -m NUM      => Number of metadata servers to start. Default: 1"
+   echo "         -s NUM      => Number of storage servers to start."
+   echo "                        Default: Number of hosts."
+   echo "         -p NUM      => Network port shift. The standard BeeGFS network port"
+   echo "                        numbers are shifted by this number. Useful in order to"
+   echo "                        have several BeeGFS instances running on the same node."
+   echo "                        Default: ${DEFAULT_PORT_SHIFT}"
+   echo "         -f PATH     => Path to additional BeeGFS config files."
+   echo "         -L PATH     => Log file directory. If necessary, the directory will be"
+   echo "                        created. Default: ${DEFAULT_LOG_PATH}"
+   echo "         -l          => Prefer local storage nodes."
+   echo "         -P          => Use pdsh for parallel startup. If this option is not"
+   echo "                        given, ssh is used to start up the services on the nodes"
+   echo "                        sequentially."
+   echo "         -b PATH     => Path to the pdsh binary. Default: ${DEFAULT_PDSH_PATH}"
+   echo "         -r          => Use tmpfs for beegfs storage and metadata."
+   echo "                        Note: On older Linux versions, tmpfs does not support"
+   echo "                        extended attributes. If you get an error message"
+   echo "                        from beegfs_meta reading \"Failed to store root"
+   echo "                        directory\" you have to provide an additional config"
+   echo "                        file beegfs-meta.conf containing the line"
+   echo "                        storeUseExtendedAttribs = false"
+   echo "         -q          => Suppress INFO messages, only print ERRORs."
+   echo ""
+   echo "   stop:"
+   echo "      Stop the file system on a number of nodes, specified by the node file."
+   echo "      Use the information from the status file to unmount a file system on a"
+   echo "      number of nodes specified by the node file, and shut down the services."
+   echo ""
+   echo "      Mandatory arguments:"
+   echo "         -n FILENAME => Node file."
+   echo ""
+   echo "      Optional arguments:"
+   echo "         -i FILENAME => Status information file name."
+   echo "                        Default: ${DEFAULT_STATUSFILE}"
+   echo "         -d          => Delete BeeGFS data on disks."
+   echo "         -L          => Delete log files after successful shutdown."
+   echo "         -c          => \"Cleanup\": Remove remaining processes and directories"
+   echo "                        of a potentially unsuccessful shutdown of an earlier"
+   echo "                        beegfs-ondemand instance. This switch silences the error"
+   echo "                        message when a status information file is not found on a"
+   echo "                        node or an unmount command fails; instead, a message is"
+   echo "                        printed (if \"INFO\" messages are not suppressed) when a"
+   echo "                        status file DOES exist, because this means there"
+   echo "                        actually was an instance before that is now being"
+   echo "                        cleaned up."
+   echo "         -P          => Use pdsh for parallel shutdown. If this option is not"
+   echo "                        given, ssh is used to unmount the file system and stop"
+   echo "                        the services on all nodes sequentially."
+   echo "         -b PATH     => Path to the pdsh binary. Default: ${DEFAULT_PDSH_PATH}"
+   echo "         -q          => Suppress INFO messages, only print ERRORs."
+   echo ""
+   echo "   stoplocal:"
+   echo "      Stop the file system on the local host only. This is recommended only as"
+   echo "      an emergency measure, e.g. after a host encountered an error during the"
+   echo "      distributed shutdown procedure. Uses the information from the status file"
+   echo "      to unmount the file system and stop the services on the local host only."
+   echo ""
+   echo "      Optional arguments:"
+   echo "         -i FILENAME => Status information file."
+   echo "                        Default: ${DEFAULT_STATUSFILE}"
+   echo "         -d          => Delete BeeGFS data on disks."
+   echo "         -L          => Delete log files after successful shutdown. If the log"
+   echo "                        directory is empty afterwards, it will also be removed."
+   echo "         -c          => \"Cleanup\": Remove remaining processes and directories"
+   echo "                        of a potentially unsuccessful shutdown of an earlier"
+   echo "                        beegfs-ondemand instance. This switch silences the error"
+   echo "                        message when the status information file is not found or"
+   echo "                        the unmount command fails; instead, a message is printed"
+   echo "                        (if \"INFO\" messages are not suppressed) when a status"
+   echo "                        file DOES exist, because this means there actually was"
+   echo "                        an instance before that is now being cleaned up."
+   echo "         -q          => Suppress INFO messages, only print ERRORs."
+   echo "         -u          => ONLY unmount the file system."
+   echo "                        (Cannot be used in combination with \"-s\".)"
+   echo "         -s          => ONLY stop non-client services. (*)"
+   echo "                        (Cannot be used in combination with \"-u\".)"
+   echo ""
+   echo "EXAMPLES:"
+   echo "   Start an beegfs-ondemand on the nodes given in nodefile, using the data"
+   echo "   directory /data/beeond and the client mountpoint /mnt/beeond via pdsh"
+   echo "   for parallel startup:"
+   echo "      `basename $0` start -n nodefile -d /data/beeond -c /mnt/beeond -P"
+   echo ""
+   echo "   Stop the file system:"
+   echo "      `basename $0` stop -n nodefile -P -L -d"
+   echo ""
+   exit 1
+}
+
+### internal functions for general usage ###
+print_error()
+{
+   echo "ERROR: ${1}" >&2
+   echo ""
+}
+
+print_error_and_exit()
+{
+   print_error "${1}"
+   exit 1
+}
+
+print_info()
+{
+   local MESSAGE=${1}
+   if [ "${QUIET}" != "true" ]
+   then
+      echo "INFO: ${MESSAGE}"
+   fi
+}
+
+
+check_pdsh()
+{
+   #an array is passed here, so this makes parameter passing a bit more complex
+   local HOSTARRAY=("$@")
+
+   HOSTS=""
+   for H in ${HOSTARRAY[*]}
+   do
+      HOSTS="${HOSTS},${H}"
+   done # using this loop, of course, there is basically one comma too much,
+   # but pdsh does not care for that so it is fine for us
+
+   print_info "Checking PDSH availability on the following hosts: ${HOSTS:1}"
+
+   # execute cmd
+   test -e "${PDSH}" &&\
+   ${PDSH} -R ${PDSH_RCMD} -S -w ${HOSTS} \
+      "if [ -e ${BEEOND_STOPLOCAL} ]; then true; else return 2; fi"
+   RES=$?
+
+   if [ $RES -eq 2 ]
+   then
+      print_error_and_exit "Unable to find BeeOND helper program on one or more nodes.
+Please make sure BeeOND is installed on all machines."
+   elif [ $RES -ne 0 ]
+   then
+      print_info "pdsh does not seem to work on all nodes. Disabling pdsh and using ssh instead"
+      USE_PDSH=false
+
+      # We have to repeat the reachability check using conventional SSH before continuing.
+      for HOST in ${HOSTARRAY[*]}
+      do
+         check_reachability ${HOST}
+      done
+   fi
+}
+
+execute_ssh_cmd()
+{
+   local HOST="$1"
+   local CMD="$2"
+
+   # error checks
+   if [ "${HOST}" = "" ] || [ "${CMD}" = "" ]
+   then
+      print_error_and_exit "Internal function 'execute_ssh_cmd' was called without a host or \
+without a command"
+   fi
+
+   # execute cmd
+   ${SSH} ${SSH_PARAMS} ${HOST} "${CMD}"
+}
+
+execute_pdsh_cmd()
+{
+   local HOSTARRAY="$1"
+   local CMD="$2"
+   local CONTINUE_ON_ERROR="$3"
+   local TMPTIME=`date +%Y%m%d%H%M%S`
+   local TMPFAILFILE="/tmp/beegfs.pdsh_fail.${TMPTIME}"
+
+   # error checks
+   if [ "$HOSTARRAY[0]" = "" ] || [ "${CMD}" = "" ]
+   then
+      print_error_and_exit "Internal function 'execute_pdsh_cmd' was called without a host or \
+without a command"
+   fi
+
+   #assemble HOSTS as comma seperated list
+   local HOSTS=""
+   for H in ${HOSTARRAY}
+   do
+      HOSTS="${HOSTS},${H}"
+   done # using this loop, of course, there is basically one comma too much,
+   # but pdsh does not care for that so it is fine for us
+
+   # execute cmd
+   ${PDSH} -R ${PDSH_RCMD} -S -w ${HOSTS} "${CMD} || (touch ${TMPFAILFILE} && false)"
+
+   # pdsh returned non-zero, so there must have been an error on at least one node
+   # (-S returns the greates return value of all nodes)
+   if [ $? -ne 0 ]
+   then
+      # the executed line created a file on the failing node
+      # now we have to look on each node for this file if we are interested which node failed
+      # for now, we do not do that; only abort and leave it to the user to investigate pdsh output
+      if [ "${CONTINUE_ON_ERROR}" = "true" ]
+      then
+         print_error "Execution of a command failed. Please see pdsh output for more information."
+         ERROR="true"
+      else
+         print_error_and_exit "Execution of a command failed. Please see pdsh output for more \
+information."
+      fi
+   fi
+}
+
+check_reachability()
+{
+   local HOST=$1
+
+   # error checks
+   if [ "${HOST}" = "" ]
+   then
+      print_error_and_exit "Internal function 'check_reachability' was called without a hostname"
+   fi
+
+   print_info "Checking reachability of host ${HOST}"
+
+   execute_ssh_cmd ${HOST} "test -e ${BEEOND_STOPLOCAL}"
+   RES=$?
+   if [ $RES -eq 255 ]
+   then
+      print_error_and_exit "Host is unreachable via ssh: ${HOST}"
+   elif [ $RES -eq 1 ]
+   then
+      print_error_and_exit "Could not find BeeOND helper program on host: ${HOST}
+Please make sure BeeOND is installed on all machines."
+   elif [ $RES -ne 0 ]
+   then
+      print_error_and_exit "Error contacting host: ${HOST}"
+   fi
+}
+
+check_hostfile()
+{
+   # hostfile set?
+   if [ "${HOSTFILE}" = "" ]
+   then
+      print_error_and_exit "Node file undefined"
+   fi
+
+   # does it exist
+   if [ ! -f ${HOSTFILE} ]
+   then
+      print_error_and_exit "Node file does not exist: ${HOSTFILE}"
+   fi
+}
+
+check_datapath()
+{
+   if [ "${DATA_PATH}" = "" ]
+   then
+      print_error_and_exit "Path for BeeGFS data undefined"
+   fi
+}
+
+check_mountpoint()
+{
+   if [ "${MOUNTPOINT}" = "" ]
+   then
+      print_error_and_exit "Path for client mountpoint undefined"
+   fi
+}
+
+check_statusfile()
+{
+   # checks for every node:
+   # - whether the statusfile already exists (maybe a session is already running)
+   # - whether the statusfile can be created (if not, we can't continue)
+
+   local HOSTARRAY=("$@")
+
+   if [ "${HOSTARRAY[0]}" = "" ]
+   then
+      print_error_and_exit "Internal function 'check_statusfile' was called without a hostname"
+   fi
+
+   local CHECK_CMD="[ ! -e \"${STATUSFILE}\" ]"
+   local TOUCH_CMD="touch \"${STATUSFILE}\""
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      local HOSTS=""
+      for H in ${HOSTARRAY[*]}
+      do
+         HOSTS="${HOSTS},${H}"
+      done
+
+      # see if statusfile already exists
+      if ! ${PDSH} -R ${PDSH_RCMD} -S -w ${HOSTS} "${CHECK_CMD} || (echo \"Statusfile already exists.\" && false)"
+      then
+         print_error_and_exit "Statusfile ${STATUSFILE} on one ore more hosts already exists. \
+Maybe a session is already running or the previous session was not properly \
+shut down."
+      fi
+
+      # touch statusfile on every host, to make sure the file can be accessed
+      if ! ${PDSH} -R ${PDSH_RCMD} -S -w ${HOSTS} "${TOUCH_CMD}"
+      then
+         print_error_and_exit "Could not create status file ${STATUSFILE} on one ore more hosts."
+      fi
+   else
+      for HOST in ${HOSTARRAY[*]}
+      do
+         # see if statusfile already exists
+         if ! ${SSH} ${SSH_PARAMS} ${HOST} "${CHECK_CMD}"
+         then
+            print_error_and_exit "Status file ${STATUSFILE} on host ${HOST} already exists. \
+Maybe a session is already running or the previous session was not properly \
+shut down."
+         fi
+      done
+
+      for HOST in ${HOSTARRAY[*]}
+      do
+         if ! ${SSH} ${SSH_PARAMS} ${HOST} "${TOUCH_CMD}"
+         then
+            print_error_and_exit "Could not create status file ${STATUSFILE} on host ${HOST}"
+         fi
+      done
+   fi
+}
+
+create_log_path()
+{
+   local HOSTARRAY=("$@")
+
+   if [ "${HOSTARRAY[0]}" = "" ]
+   then
+      print_error_and_exit "Internal function 'create_log_path' was called without a host."
+   fi
+
+   # if the path doesn't exist, it's created. If it already exists, nothing happens
+   CMD="mkdir -p \"${LOG_PATH}\""
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      execute_pdsh_cmd "${HOSTARRAY}" "${CMD}" "false"
+   else
+      # no pdsh: do it manually with a loop
+      for HOST in ${HOSTARRAY[*]}
+      do
+         execute_ssh_cmd "${HOST}" "${CMD}"
+         if [ $? -ne 0 ]
+         then
+            print_error_and_exit "Could not create log path ${LOG_PATH} on host ${HOST}"
+         fi
+      done
+   fi
+}
+
+### internal functions for beegfs-ondemand start ###
+
+start_tmpfs()
+{
+   local HOSTS=$1
+   local DATAPATH=$2
+
+   # error checks
+   if [ "${HOSTS}" = "" ] || [ "${DATAPATH}" = "" ]
+   then
+      print_error_and_exit "Internal function 'start_tmpfs' called without all needes parameters"
+   fi
+
+   CMD="mkdir -p ${DATAPATH} && mount -t tmpfs tmpfs ${DATAPATH}"
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      print_info "Starting tempfs on the following hosts: ${HOSTS:0:${#HOSTS}-1}"
+
+      execute_pdsh_cmd ${HOSTS} "${CMD}" "false"
+
+      # this is a bit tricky now, because we need to put all lines for the status file into an array
+      # first and then we can write them to the status file
+      # this is due to the fact that we use ssh in the 'add_to_status_file' function and ssh seems
+      # to break the input channel, and therefore read does not work (will only read one line from
+      # file)
+      i=0
+      PARAMETER_LINES=( )
+      IFS=','
+      for HOST in ${HOSTS}
+      do
+         if [ "${HOST}" = "" ]; then continue; fi
+         PARAMETER_LINES[${i}]="${HOST} tmpfs ${DATAPATH} - -"
+         i=$((${i}+1))
+      done
+      unset IFS
+
+      for i in `seq 0 $((${#PARAMETER_LINES[@]}-1))`
+      do
+         add_to_status_file ${PARAMETER_LINES[${i}]}
+      done
+   else
+      # no pdsh => do it manually with ssh loop
+      print_info "Starting tmpfs mounts"
+
+      # for each host, start server
+      i=1
+      HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+
+      while [ "${HOST}" != "" ]
+      do
+         print_info "Starting tmpfs on host: ${HOST}"
+         execute_ssh_cmd ${HOST} "${CMD}"
+
+         if [ $? -ne 0 ]
+         then
+            print_error_and_exit "Unable to start tmpfs on host: ${HOST}"
+         else
+            add_to_status_file ${HOST} tmpfs ${DATAPATH} "-" "-"
+         fi
+
+         i=$((${i}+1))
+         HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+      done
+   fi
+}
+
+start_meta_servers()
+{
+   local HOSTS=$1 # comma seperated
+   local DATAPATH=$2
+   local MGMTD=$3
+   local PORT_SHIFT=$4 # port shift can be empty!
+   local CFG_PATH=$5 # may be empty
+   local CFG_FILE=${CFG_PATH}/${META_CFG_NAME}
+
+   local LOGFILE=${LOG_PATH}/${META_LOG}
+   local PIDFILE=/var/run/${META_BIN}-${CURRENTTIME}.pid
+
+   # error checks
+   if [ "${HOSTS}" = "" ] || [ "${MGMTD}" = "" ] || [ "${DATAPATH}" = "" ]
+   then
+      print_error_and_exit "Internal function 'start_meta_servers_ssh' was called without all \
+needed parameters"
+   fi
+
+   DATAPATH=${DATAPATH}/${META_BIN}
+
+   PARAMS="sysMgmtdHost=${MGMTD} storeMetaDirectory=${DATAPATH} logStdFile=${LOGFILE} \
+runDaemonized=true pidFile=${PIDFILE}"
+
+   if [ "${PORT_SHIFT}" != "" ]
+   then
+      PARAMS="${PARAMS} connPortShift=${PORT_SHIFT}"
+   fi
+
+   CMD="PARAMS=\"${PARAMS}\"; \
+if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
+   PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi; \
+if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
+   rm -rf ${DATAPATH}; fi; \
+${BEEGFS_BIN_PATH}/${META_BIN} \${PARAMS}"
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      # trailing ',' removed in output
+      print_info "Starting ${META_BIN} processes on the following hosts: ${HOSTS:0:${#HOSTS}-1}"
+      print_info "Metadata server log: ${LOGFILE}"
+
+      execute_pdsh_cmd ${HOSTS} "${CMD}" "false"
+
+      if [ "${PREFER_LOCAL}" = "true" ]
+      then
+         # create the preferred MDS file (actually just a symlink to the node ID file)
+         execute_pdsh_cmd ${HOSTS} "rm -f ${PREFERRED_MDS_FILE}; \
+            ln -s ${DATAPATH}/${META_NUMID_FILE} ${PREFERRED_MDS_FILE}" "false"
+      fi
+
+      # this is a bit tricky now, because we need to put all lines for the status file into an array
+      # first and then we can write them to the status file
+      # this is due to the fact that we use ssh in the 'add_to_status_file' function and ssh seems
+      # to break the input channel, and therefore read does not work (will only read one line from
+      # file)
+      i=0
+      PARAMETER_LINES=( )
+      IFS=','
+      for HOST in ${HOSTS}
+      do
+         if [ "${HOST}" = "" ]; then continue; fi
+         PARAMETER_LINES[${i}]="${HOST} ${META_BIN} ${DATAPATH} ${LOGFILE} ${PIDFILE}"
+         i=$((${i}+1))
+      done
+      unset IFS
+
+      for i in `seq 0 $((${#PARAMETER_LINES[@]}-1))`
+      do
+         add_to_status_file ${PARAMETER_LINES[${i}]}
+      done
+
+   else
+      # no pdsh => do it manually with ssh loop
+      print_info "Starting ${META_BIN} processes"
+      print_info "Metadata server log: ${LOGFILE}"
+
+      # for each host, start server
+      i=1
+      HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+
+      while [ "${HOST}" != "" ]
+      do
+         print_info "Starting ${META_BIN} on host: ${HOST}"
+         execute_ssh_cmd ${HOST} "${CMD}"
+
+         if [ $? -ne 0 ]
+         then
+            print_error_and_exit "Unable to start ${META_BIN} on host: ${HOST}"
+         else
+            add_to_status_file ${HOST} ${META_BIN} ${DATAPATH} ${LOGFILE} ${PIDFILE}
+            if [ "${PREFER_LOCAL}" = "true" ]
+               then
+                  # create the preferred MDS file (actually just a symlink to the node ID file)
+                  execute_ssh_cmd ${HOST} "rm -f ${PREFERRED_MDS_FILE}; \
+                     ln -s ${DATAPATH}/${META_NUMID_FILE} ${PREFERRED_MDS_FILE}"
+            fi
+         fi
+
+         i=$((${i}+1))
+         HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+      done
+   fi
+
+   if [ "${QUIET}" != "true" ]
+   then
+      echo ""
+   fi
+}
+
+start_storage_servers()
+{
+   local HOSTS=$1
+   local DATAPATH=$2
+   local MGMTD=$3
+   local PORT_SHIFT=$4 # port shift can be empty!
+   local CFG_PATH=$5 # may be empty
+   local CFG_FILE=${CFG_PATH}/${STORAGE_CFG_NAME}
+
+   local LOGFILE=${LOG_PATH}/${STORAGE_LOG}
+   local PIDFILE=/var/run/${STORAGE_BIN}-${CURRENTTIME}.pid
+
+   # error checks
+   if [ "${HOSTS}" = "" ] || [ "${MGMTD}" = "" ] || [ "${DATAPATH}" = "" ]
+   then
+      print_error_and_exit "Internal function 'start_storage_servers' was called without all \
+needed parameters"
+   fi
+
+   DATAPATH=${DATAPATH}/${STORAGE_BIN}
+
+   PARAMS="sysMgmtdHost=${MGMTD} storeStorageDirectory=${DATAPATH} logStdFile=${LOGFILE} \
+runDaemonized=true pidFile=${PIDFILE}"
+
+   if [ "${PORT_SHIFT}" != "" ]
+   then
+      PARAMS="${PARAMS} connPortShift=${PORT_SHIFT}"
+   fi
+
+   CMD="PARAMS=\"${PARAMS}\"; \
+if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
+   PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi;
+if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
+   rm -rf ${DATAPATH}; fi; \
+${BEEGFS_BIN_PATH}/${STORAGE_BIN} \${PARAMS}"
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      print_info "Starting ${STORAGE_BIN} processes on the following hosts: ${HOSTS:0:${#HOSTS}-1}"
+      # trailing ',' removed
+      print_info "Storage server log: ${LOGFILE}"
+
+      execute_pdsh_cmd "${HOSTS}" "${CMD}" "false"
+
+      if [ "${PREFER_LOCAL}" = "true" ]
+      then
+         # create the preferred target file (actually just a symlink to the target ID file)
+         execute_pdsh_cmd ${HOSTS} "rm -f ${PREFERRED_TARGET_FILE}; \
+            ln -s ${DATAPATH}/${TARGET_NUMID_FILE} ${PREFERRED_TARGET_FILE}" "false"
+      fi
+
+      # this is a bit tricky now, because we need to put all lines for the status file into an array
+      # first and then we can write them to the status file
+      # this is due to the fact that we use ssh in the 'add_to_status_file' function and ssh seems
+      # to break the input channel, and therefore read does not work (will only read one line from
+      # file)
+      i=0
+      PARAMETER_LINES=( )
+      IFS=','
+      for HOST in ${HOSTS}
+      do
+         if [ "${HOST}" = "" ]; then continue; fi
+         PARAMETER_LINES[${i}]="${HOST} ${STORAGE_BIN} ${DATAPATH} ${LOGFILE} ${PIDFILE}"
+         i=$((${i}+1))
+      done
+      unset IFS
+
+      for i in `seq 0 $((${#PARAMETER_LINES[@]}-1))`
+      do
+         add_to_status_file ${PARAMETER_LINES[${i}]}
+      done
+
+   else
+      # no pdsh => do it manually with ssh loop
+      print_info "Starting ${STORAGE_BIN} processes"
+      print_info "Storage server log: ${LOGFILE}"
+
+      # for each host, start server
+      i=1
+      HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+
+      while [ "${HOST}" != "" ]
+      do
+         print_info "Starting ${STORAGE_BIN} on host: ${HOST}"
+         execute_ssh_cmd ${HOST} "${CMD}"
+
+         if [ $? -ne 0 ]
+         then
+            print_error_and_exit "Unable to start ${STORAGE_BIN} on host: ${HOST}"
+         else
+            add_to_status_file ${HOST} ${STORAGE_BIN} ${DATAPATH} ${LOGFILE} ${PIDFILE}
+            if [ "${PREFER_LOCAL}" = "true" ]
+            then
+               # create the preferred target file (actually just a symlink to the target ID file)
+               execute_ssh_cmd ${HOST} "rm -f ${PREFERRED_TARGET_FILE}; \
+                  ln -s ${DATAPATH}/${TARGET_NUMID_FILE} ${PREFERRED_TARGET_FILE}"
+            fi
+         fi
+
+         i=$((${i}+1))
+         HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+      done
+   fi
+
+   if [ "${QUIET}" != "true" ]
+   then
+      echo ""
+   fi
+}
+
+start_mgmtd()
+{
+   local HOST=$1
+   local DATAPATH=$2
+   local PORT_SHIFT=$3 # port shift can be empty!
+   local CFG_PATH=$4 # may be empty
+   local CFG_FILE=${CFG_PATH}/${MGMTD_CFG_NAME}
+
+   local LOGFILE=${LOG_PATH}/${MGMTD_LOG}
+   local PIDFILE=/var/run/${MGMTD_BIN}-${CURRENTTIME}.pid
+
+   # error checks
+   if [ "${HOST}" = "" ] || [ "${DATAPATH}" = "" ]
+   then
+      print_error_and_exit "Internal function 'start_mgmtd' was called without all needed \
+parameters"
+   fi
+
+   DATAPATH=${DATAPATH}/${MGMTD_BIN}
+
+   # start server
+   print_info "Starting ${MGMTD_BIN} processes"
+   print_info "Management daemon log: ${LOGFILE}"
+
+   print_info "Starting ${MGMTD_BIN} on host: ${HOST}"
+
+   PARAMS="storeMgmtdDirectory=${DATAPATH} logStdFile=${LOGFILE} runDaemonized=true \
+pidFile=${PIDFILE}"
+
+   if [ "${PORT_SHIFT}" != "" ]
+   then
+      PARAMS="${PARAMS} connPortShift=${PORT_SHIFT}"
+   fi
+
+   CMD="PARAMS=\"${PARAMS}\"; \
+if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
+   PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi; \
+if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
+   rm -rf ${DATAPATH}; fi; \
+${BEEGFS_BIN_PATH}/${MGMTD_BIN} \${PARAMS}"
+
+   execute_ssh_cmd ${HOST} "${CMD}"
+
+   if [ $? -ne 0 ]
+   then
+      print_error_and_exit "Unable to start ${MGMTD_BIN} on host: ${HOST}"
+   else
+      add_to_status_file ${HOST} ${MGMTD_BIN} ${DATAPATH} ${LOGFILE} ${PIDFILE}
+   fi
+
+   if [ "${QUIET}" != "true" ]
+   then
+      echo ""
+   fi
+}
+
+start_clients()
+{
+   local HOSTS=$1
+   local MGMTD=$2
+   local MOUNTPOINT=$3
+   local PORT_SHIFT=$4 # port shift can be empty!
+   local CFG_PATH=$5 # may be empty
+   local HELPERD_CFG_FILE=${CFG_PATH}/${HELPERD_CFG_NAME}
+   local CLIENT_CFG_FILE=${CFG_PATH}/${CLIENT_CFG_NAME}
+
+   local LOGFILE=${LOG_PATH}/${CLIENT_LOG}
+   local PIDFILE=/var/run/${HELPERD_BIN}-${CURRENTTIME}.pid
+
+   # error checks
+   if [ "${HOSTS}" = "" ] || [ "${MGMTD}" = "" ] || [ "${MOUNTPOINT}" = "" ]
+   then
+      print_error_and_exit "Internal function 'start_clients_ssh' was called without all \
+needed parameters"
+   fi
+
+   HELPERD_PARAMS="logStdFile=${LOGFILE} runDaemonized=true pidFile=${PIDFILE}"
+
+   if [ "${PORT_SHIFT}" != "" ]
+   then
+      HELPERD_PARAMS="${HELPERD_PARAMS} connPortShift=${PORT_SHIFT}"
+   fi
+
+   HELPERD_CMD="PARAMS=\"${HELPERD_PARAMS}\"; if [ -n \"${CFG_PATH}\" ] && \
+[ -e \"${HELPERD_CFG_FILE}\" ]; then PARAMS=\"\${PARAMS} cfgFile=${HELPERD_CFG_FILE}\"; fi; \
+${BEEGFS_BIN_PATH}/${HELPERD_BIN} \${PARAMS}"
+
+   MODPROBE_CMD="modprobe beegfs"
+   REBUILD_CMD="/etc/init.d/${CLIENT_BIN} rebuild"
+
+   MOUNT_PARAMS="-osysMgmtdHost=${MGMTD}"
+
+   if [ "${PORT_SHIFT}" != "" ]
+   then
+      MOUNT_PARAMS="${MOUNT_PARAMS},connPortShift=${PORT_SHIFT}"
+   fi
+
+   MOUNT_CMD="PARAMS=\"${MOUNT_PARAMS}\"; if [ -n \"${CFG_PATH}\" ] && \
+[ -e \"${CLIENT_CFG_FILE}\" ]; then PARAMS=\"\${PARAMS},cfgFile=${CLIENT_CFG_FILE}\"; fi; \
+if [ \"${PREFER_LOCAL}\" = "true" ] && [ -e \"${PREFERRED_MDS_FILE}\" ]; \
+then PARAMS=\"\${PARAMS},tunePreferredMetaFile=${PREFERRED_MDS_FILE}\"; fi; \
+if [ \"${PREFER_LOCAL}\" = "true" ] && [ -e \"${PREFERRED_TARGET_FILE}\" ]; \
+then PARAMS=\"\${PARAMS},tunePreferredStorageFile=${PREFERRED_TARGET_FILE}\"; fi; \
+mkdir -p ${MOUNTPOINT} && modprobe beegfs && mount -t beegfs beegfs_ondemand ${MOUNTPOINT} \${PARAMS}"
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      # trailing ',' removed in output
+      print_info "Starting ${CLIENT_BIN} processes on the following hosts: ${HOSTS:0:${#HOSTS}-1}"
+      print_info "Client log: ${LOGFILE}"
+
+      execute_pdsh_cmd "${HOSTS}" "${HELPERD_CMD}" "false"
+
+      # this is a bit tricky now, because we need to put all lines for the status file into an array
+      # first and then we can write them to the status file
+      # this is due to the fact that we use ssh in the 'add_to_status_file' function and ssh seems
+      # to break the input channel, and therefore read does not work (will only read one line from
+      # file)
+      i=0
+      PARAMETER_LINES=( )
+      IFS=','
+      for HOST in ${HOSTS}
+      do
+         if [ "${HOST}" = "" ]; then continue; fi
+         # NOTE : - is empty data path
+         PARAMETER_LINES[${i}]="${HOST} ${HELPERD_BIN} - ${LOGFILE} ${PIDFILE}"
+         i=$((${i}+1))
+         # NOTE : mountpoint as data path
+         PARAMETER_LINES[${i}]="${HOST} ${CLIENT_BIN} ${MOUNTPOINT} ${LOGFILE} -"
+         i=$((${i}+1))
+      done
+      unset IFS
+
+      for i in `seq 0 $((${#PARAMETER_LINES[@]}-1))`
+      do
+         add_to_status_file ${PARAMETER_LINES[${i}]}
+      done
+
+      execute_pdsh_cmd "${HOSTS}" "${MODPROBE_CMD} || ${REBUILD_CMD}" "false"
+      execute_pdsh_cmd "${HOSTS}" "${MOUNT_CMD}" "false"
+
+      if [ "${PREFER_LOCAL}" = "true" ] #set target count to 1
+      then
+        CTL_CMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} --setpattern \
+--numtargets=1 --chunksize=512k ${MOUNTPOINT} > /dev/null"
+        execute_pdsh_cmd "${HOSTS}" "${CTL_CMD}" "false"
+      fi
+   else
+      # no pdsh => do it manually with ssh loop
+
+      print_info "Starting ${CLIENT_BIN} processes"
+      print_info "Client log: ${LOGFILE}"
+
+      # for each host, start client
+      i=1
+      HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` # whitespaces trimmed
+
+      while [ "${HOST}" != "" ]
+      do
+         print_info "Starting ${CLIENT_BIN} on host: ${HOST}"
+         execute_ssh_cmd ${HOST} "${HELPERD_CMD}"
+
+         if [ $? -ne 0 ]
+         then
+            print_error_and_exit "Unable to start ${CLIENT_BIN} on host: ${HOST}"
+         else
+            # NOTE : - is empty data path
+            add_to_status_file ${HOST} ${HELPERD_BIN} "-" ${LOGFILE} ${PIDFILE}
+         fi
+
+         execute_ssh_cmd ${HOST} "${MODPROBE_CMD}"
+
+         if [ $? -ne 0 ]
+         then
+            print_info "Module beegfs could not be loaded on host: ${HOST}. Trying to recompile \
+from source."
+            execute_ssh_cmd ${HOST} "${REBUILD_CMD}"
+         fi
+
+         execute_ssh_cmd ${HOST} "${MOUNT_CMD}"
+
+         if [ $? -ne 0 ]
+         then
+            print_error_and_exit "Unable to start BeeGFS client on host: ${HOST}"
+         else
+            # NOTE : mountpoint as data path
+            add_to_status_file ${HOST} ${CLIENT_BIN} ${MOUNTPOINT} ${LOGFILE} -
+
+            if [ "${PREFER_LOCAL}" = "true" ] #set target count to 1
+            then
+                 CTL_CMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
+--setpattern --numtargets=1 --chunksize=512k ${MOUNTPOINT} > /dev/null" 
+                 execute_ssh_cmd ${HOST} "${CTL_CMD}"
+            fi
+
+         fi
+
+         i=$((${i}+1))
+         HOST=`echo ${HOSTS} | cut -f ${i} -d ',' | tr -d " "` #whitespaces trimmed
+      done
+   fi
+
+   if [ "${QUIET}" != "true" ]
+   then
+      echo ""
+   fi
+}
+
+add_to_status_file()
+{
+   local HOST=$1
+   local SERVICE=$2
+   local DATAPATH=$3
+   local LOGFILE=$4
+   local PIDFILE=$5
+
+   # error checks
+   if [ "${HOST}" = "" ] || [ "${SERVICE}" = "" ] || [ "${LOGFILE}" = "" ] || [ "${PIDFILE}" = "" ]
+   then
+      print_error_and_exit "Internal function 'add_to_status_file' was called without all \
+needed parameters"
+   fi
+
+   INFO="${HOST},${SERVICE},${DATAPATH},${LOGFILE},${PIDFILE}"
+   execute_ssh_cmd ${HOST} "echo ${INFO} >> ${STATUSFILE}"
+}
+
+### internal functions for beegfs-ondemand stop ###
+
+# build the argument string for the "stoplocal" function
+make_stoplocal_args()
+{
+   local STOPLOCAL_ARGS=" -q" # quiet
+   if [ "${DELETE_DATA}" = "true" ]
+   then
+      STOPLOCAL_ARGS="${STOPLOCAL_ARGS} -d" # delete data
+   fi
+
+   if [ "${DELETE_LOGS}" = "true" ]
+   then
+      STOPLOCAL_ARGS="${STOPLOCAL_ARGS} -L" # delete logs
+   fi
+
+   if [ "${CLEANUP}" = "true" ]
+   then
+      STOPLOCAL_ARGS="${STOPLOCAL_ARGS} -c" # don't complain about missing files (from properly shut
+   fi                                       # down beegfs-ondemand instances)
+
+   echo "${STOPLOCAL_ARGS}"
+}
+
+stop_procs()
+{
+   local DELETE_DATA=$1
+   local DELETE_LOGS=$2
+
+   # prepare command for remote script
+   STOPSERVERSCMD="source ${BEEOND_STOPLOCAL}; \
+         do_stoplocal -s -i ${STATUSFILE} `make_stoplocal_args`"
+
+   # issue the stop server command via ssh/pdsh
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      local HOSTS=""
+      for H in ${NODES[*]}
+      do
+         HOSTS="${HOSTS},${H}"
+      done
+
+      print_info "Stopping remaining processes on the following hosts: ${HOSTS:1:${#HOSTS}}"
+
+      execute_pdsh_cmd ${HOSTS} "${STOPSERVERSCMD}" "true"
+   else
+      # ssh mode - launch command for each host separately
+      for HOST in ${NODES[*]}
+      do
+         print_info "Stopping remaining processes on host: ${HOST}"
+         execute_ssh_cmd ${HOST} "${STOPSERVERSCMD}"
+      done
+   fi
+
+   # delete the statusfile
+   local DELETESTATUSFILECMD="rm -f ${STATUSFILE}"
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      local HOSTS=""
+      for H in ${NODES[*]}
+      do
+         HOSTS="${HOSTS},${H}"
+      done
+
+      print_info "Deleting status file on hosts: ${HOSTS:1:${#HOSTS}}"
+
+      execute_pdsh_cmd ${HOSTS} "${DELETESTATUSFILECMD}" "true"
+   else
+      # ssh mode - launch command for each host separately
+      for HOST in ${NODES[*]}
+      do
+         print_info "Deleting status file on host: ${HOST}"
+         execute_ssh_cmd ${HOST} "${DELETESTATUSFILECMD}"
+      done
+   fi
+}
+
+unmount_clients()
+{
+   SERVICE="${CLIENT_BIN}"
+
+   # prepare command for remote script
+   local UMOUNTCMD="source ${BEEOND_STOPLOCAL}; \
+      do_stoplocal -u -i ${STATUSFILE} `make_stoplocal_args`"
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      local HOSTS=""
+      for H in ${NODES[*]}
+      do
+         HOSTS="${HOSTS},${H}"
+      done
+      print_info "Unmounting file system on the following hosts: ${HOSTS:1:${#HOSTS}}"
+
+      execute_pdsh_cmd ${HOSTS} "${UMOUNTCMD}" "true"
+   else
+      # ssh mode - launch command for each host separately
+      for HOST in ${NODES[*]}
+      do
+         print_info "Unmounting file system on host: ${HOST}"
+         execute_ssh_cmd $HOST "${UMOUNTCMD}"
+      done
+  fi
+}
+
+### main functions ###
+do_start()
+{
+   CLEAR_DATA="false"
+   USE_PDSH="false"
+   PREFER_LOCAL="false"
+   QUIET="false"
+   USE_TMPFS="false"
+   PORT_SHIFT=${DEFAULT_PORT_SHIFT}
+
+   while getopts ":c:d:f:Fi:m:n:p:lL:Pb:s:qr" opt; do
+      case $opt in
+         n)
+            HOSTFILE=$OPTARG
+         ;;
+         d)
+            DATA_PATH=$OPTARG
+         ;;
+         F)
+            CLEAR_DATA="true"
+         ;;
+         c)
+            MOUNTPOINT=$OPTARG
+         ;;
+         i)
+            STATUSFILE=$OPTARG
+         ;;
+         L)
+            LOG_PATH=$OPTARG
+         ;;
+         m)
+            if ! [[ ${OPTARG} =~ ^[0-9]+$ ]];
+            then
+               print_error_and_exit "number of metadata servers must be numeric";
+            fi
+            NUM_META_SERVER=$OPTARG
+         ;;
+         p)
+            if ! [[ ${OPTARG} =~ ^[0-9]+$ ]];
+            then
+               print_error_and_exit "port shift must be numeric";
+            fi
+            PORT_SHIFT=$OPTARG
+         ;;
+         P)
+            USE_PDSH="true"
+         ;;
+         b)
+            PDSH=$OPTARG
+         ;;
+         s)
+            if ! [[ ${OPTARG} =~ ^[0-9]+$ ]];
+            then
+               print_error_and_exit "number of storage servers must be numeric";
+            fi
+            NUM_STORAGE_SERVER=$OPTARG
+         ;;
+         f)
+            CONFIGPATH=${OPTARG}
+         ;;
+         l)
+            PREFER_LOCAL="true"
+         ;;
+         q)
+            QUIET="true"
+         ;;
+         r)
+            USE_TMPFS="true"
+         ;;
+         \?)
+            echo "ERROR: invalid option: -$OPTARG" >&2
+            print_usage_and_exit
+         ;;
+         :)
+            echo "ERROR: Option -$OPTARG requires an argument" >&2
+            print_usage_and_exit
+         ;;
+      esac
+   done
+
+   check_hostfile
+   check_datapath
+   check_mountpoint
+
+   print_info "Using status information file: ${STATUSFILE}"
+
+   NODECOUNT=`grep -v '^$' ${HOSTFILE} | uniq | wc -l` #ignore empty lines
+   NODES=( `grep -v '^$' ${HOSTFILE} | uniq` ) #store as array and ignore empty lines
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      # check all nodes for reachability and working PDSH
+      check_pdsh ${NODES[*]}
+   else
+      # check reachability of all nodes
+      for HOST in ${NODES[*]}
+      do
+         check_reachability ${HOST}
+      done
+   fi
+
+   check_statusfile ${NODES[*]}
+
+   # if the number of meta servers given is 0 or greater than node count, start it on all hosts
+   if [ ${NUM_META_SERVER} -eq 0 ] || [ ${NUM_META_SERVER} -gt ${NODECOUNT} ]
+   then
+      NUM_META_SERVER=${NODECOUNT}
+      print_info "Number of metadata servers automatically set to ${NUM_META_SERVER}"
+   fi
+
+   # if the number of storage servers given is 0 or greater than node count, start it on hosts
+   if [ ${NUM_STORAGE_SERVER} -eq 0 ] || [ ${NUM_STORAGE_SERVER} -gt ${NODECOUNT} ]
+   then
+      NUM_STORAGE_SERVER=${NODECOUNT}
+      print_info "Number of storage servers automatically set to ${NUM_STORAGE_SERVER}"
+   fi
+
+   # create the log path on all nodes if it doesn't exist yet
+   # without an existing logfile path, the server won't start up
+   create_log_path "${NODES[*]}"
+
+   # take the first host as master host
+   MASTERHOST=${NODES[0]}
+
+   # delete STATUS_FILE
+   execute_ssh_cmd ${MASTERHOST} "rm -f ${STATUSFILE}"
+
+   # make list of all nodes first - needed for clients and tmpfs mounts
+   for NODE in ${NODES[*]}
+   do
+      # will always have a ',' at the end, which we need for splitting with cut
+      ALLNODES="${ALLNODES}${NODE},"
+   done
+
+   # mount tmpfs
+   if [ "${USE_TMPFS}" = "true" ]
+   then
+      start_tmpfs "${ALLNODES}" "${DATA_PATH}"
+   fi
+
+   # MASTERHOST is also mgmtd host
+   MGMTD=${MASTERHOST}
+
+   # port shift and config path may be empty, but that's ok
+   start_mgmtd "${MGMTD}" "${DATA_PATH}" "${PORT_SHIFT}" "${CONFIGPATH}"
+
+   # take the first NUM_STORAGE_SERVER as storage servers
+   STORAGENODES="" # will be a comma seperated list
+   for i in `seq ${NUM_STORAGE_SERVER}`
+   do
+      # will always have a ',' at the end, which we need for splitting with cut
+      STORAGENODES="${STORAGENODES}${NODES[$((i-1))]},"
+   done
+
+   # port shift and config path may be empty, but that's ok
+   start_storage_servers "${STORAGENODES}" "${DATA_PATH}" "${MGMTD}" "${PORT_SHIFT}" "${CONFIGPATH}"
+
+   # take the first NUM_META_SERVER as metadata servers
+   METANODES="" # will be a comma seperated list
+   for i in `seq ${NUM_META_SERVER}`
+   do
+      # will always have a ',' at the end, which we need for splitting with cut
+      METANODES="${METANODES}${NODES[$((i-1))]},"
+   done
+
+   # port shift and config path may be empty, but that's ok
+   start_meta_servers "${METANODES}" "${DATA_PATH}" "${MGMTD}" "${PORT_SHIFT}" "${CONFIGPATH}"
+ 
+  # give the management daemon some time to get all information from servers
+   sleep 8
+
+   # take all hosts as client
+   # port shift and config path may be empty, but that's ok
+   start_clients "${ALLNODES}" "${MGMTD}" "${MOUNTPOINT}" "${PORT_SHIFT}" "${CONFIGPATH}"
+}
+
+do_stop()
+{
+   DELETE_DATA="false"
+   USE_PDSH="false"
+   DELETE_LOGS="false"
+   QUIET="false"
+   CLEANUP="false"
+
+   while getopts "di:n:Pb:Lcq" opt; do
+      case $opt in
+         n)
+            HOSTFILE=$OPTARG
+         ;;
+         i)
+            STATUSFILE=$OPTARG
+         ;;
+         d)
+            DELETE_DATA="true"
+         ;;
+         c)
+            CLEANUP="true"
+         ;;
+         P)
+            USE_PDSH="true"
+         ;;
+         b)
+            PDSH=$OPTARG
+         ;;
+         L)
+            DELETE_LOGS="true"
+         ;;
+         q)
+            QUIET="true"
+         ;;
+         \?)
+            echo "ERROR: invalid option: -$OPTARG" >&2
+            print_usage_and_exit
+         ;;
+         :)
+            echo "ERROR: Option -$OPTARG requires an argument" >&2
+            print_usage_and_exit
+         ;;
+      esac
+   done
+
+   check_hostfile
+
+   print_info "Using status information file: ${STATUSFILE}"
+
+   NODES=( `grep -v '^$' ${HOSTFILE} | uniq` ) #store as array and ignore empty lines
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      # check all nodes for reachability and working PDSH
+      check_pdsh ${NODES[*]}
+   else
+      # check reachability of all nodes
+      for HOST in ${NODES[*]}
+      do
+         check_reachability ${HOST}
+      done
+   fi
+
+   # take the first host as master host
+   MASTERHOST=${NODES[0]}
+
+   # read status file on master host and stop all servers
+   unmount_clients
+
+   # read status file on master host and stop all servers
+   stop_procs ${DELETE_DATA} ${DELETE_LOGS}
+}
+
+# print help if no arguments given
+if [ $# -eq 0 ] ; then
+   print_usage_and_exit
+fi
+
+
+# parse arguments
+ACTION=$1
+
+if [ "${ACTION}" = "start" ]
+then
+   shift
+   do_start $*
+elif [ "${ACTION}" = "stop" ]
+then
+   shift
+   ERROR="false" # store if we encountered an error, so that we can return a statuscode
+                       # (because the stop function does not abort on error)
+   do_stop $*
+   if [ "${ERROR}" = "true" ]
+   then
+      exit 1
+   fi;
+elif [ "${ACTION}" = "stoplocal" ]
+then
+   shift
+   do_stoplocal $*
+   exit $?
+else
+   print_usage_and_exit
+fi

@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+Specification-Title: BeeGFS Admon GUI
+Implementation-Vendor: Fraunhofer ITWM
+Implementation-Version: @VERSION@
+

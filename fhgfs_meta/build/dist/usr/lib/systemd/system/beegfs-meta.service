@@ -1,0 +1,16 @@
+[Unit]
+Description=Start BeeGFS Metadata Server
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service
+After=network-online.target beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service zfs.target
+
+[Service]
+ExecStart=/etc/init.d/beegfs-meta start
+ExecStop=/etc/init.d/beegfs-meta stop
+Type=forking
+# We disable PIDFile= because it doesn't work with multi-mode configurations
+#PIDFile=/var/run/beegfs-meta.pid
+
+[Install]
+WantedBy=multi-user.target

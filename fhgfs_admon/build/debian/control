@@ -1,0 +1,24 @@
+Source: beegfs-admon
+Section: misc
+Priority: optional
+Maintainer: BeeGFS Maintainers <packages@beegfs.com>
+Build-Depends: debhelper (>= 7.0.0), lsb-release, java6-sdk, ant 
+Standards-Version: 3.8.0
+
+Package: beegfs-admon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: beegfs-debian
+Description: BeeGFS admon daemon and java frontend.
+ This package contains the optional BeeGFS admon daemon and java frontend.
+ Admon and java frontend allow to configure and monitor BeeGFS.
+
+
+Package: beegfs-admon-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-admon (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-admon
+ The package contains the debugging symbols for beegfs-admon
+

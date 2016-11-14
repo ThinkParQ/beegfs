@@ -1,0 +1,59 @@
+#!/bin/bash 
+
+set -e
+
+NAME="fhgfs-upgrade"
+
+source ../../fhgfs-version
+
+FHGFS_OPENTK_PATH=${FHGFS_OPENTK_PATH:-`readlink -f ../../fhgfs_opentk_lib`}
+FHGFS_COMMON_PATH=${FHGFS_COMMON_PATH:-`readlink -f ../../fhgfs_common`}
+
+FHGFS_STORAGE_2011_04_UPGRADE_PATH=`readlink -f ../fhgfs_upgrade_storage_to_2011.04`
+FHGFS_META_2011_04_UPGRADE_PATH=`readlink -f ../fhgfs_upgrade_meta_to_2011.04`
+
+FHGFS_STORAGE_2012_10_UPGRADE_PATH=`readlink -f ../fhgfs_upgrade_storage_to_2012.10`
+FHGFS_META_2012_10_UPGRADE_PATH=`readlink -f ../fhgfs_upgrade_meta_to_2012.10`
+
+CHANGELOG="debian/changelog"
+RULES="debian/rules"
+
+sed \
+	-e "s/__NAME__/$NAME/g" 				\
+	-e "s/__VER__/$VER/g"					\
+	-e "s/__RELEASE_STR__/$RELEASE_STR/g"			\
+	-e "s/__DEBIAN_VERSION__/$DEBIAN_VERSION/g"   		\
+	${CHANGELOG}.in > ${CHANGELOG}
+
+sed \
+	-e "s#__FHGFS_OPENTK_PATH__#$FHGFS_OPENTK_PATH#g"		\
+	-e "s#__FHGFS_COMMON_PATH__#$FHGFS_COMMON_PATH#g"	 	\
+        -e "s#__FHGFS_META_2011_04_UPGRADE_PATH__#${FHGFS_META_2011_04_UPGRADE_PATH}#g"           \
+        -e "s#__FHGFS_STORAGE_2011_04_UPGRADE_PATH__#${FHGFS_STORAGE_2011_04_UPGRADE_PATH}#g"     \
+        -e "s#__FHGFS_META_2012_10_UPGRADE_PATH__#${FHGFS_META_2012_10_UPGRADE_PATH}#g"           \
+        -e "s#__FHGFS_STORAGE_2012_10_UPGRADE_PATH__#${FHGFS_STORAGE_2012_10_UPGRADE_PATH}#g"     \
+	-e "s/__FHGFS_VERSION__/$FHGFS_VERSION/g"   			\
+	-e "s/__VER__/$VER/g"						\
+	-e "s/__RELEASE_STR__/$RELEASE_STR/g"				\
+	-e "s/__NAME__/$NAME/g" 					\
+	-e "s/__USER_CXXFLAGS__/$USER_CXXFLAGS/g"			\
+	-e "s/__USER_LDFLAGS__/$USER_LDFLAGS/g"				\
+	${RULES}.in > ${RULES}
+
+chmod +x debian/rules
+
+#cp debian/package.lintian-overrides.in debian/${NAME}.lintian-overrides
+#sed -i -e "s/__NAME__/$NAME/g" debian/${NAME}.lintian-overrides
+
+# build the package and supress lintian warnings. Lintian in Lenny cannot
+# do that itself yet
+# NOTE: package not signed yet! (-us -uc)
+debuild -us -uc 2>&1 | egrep -v "dir-or-file-in-opt | file-in-unusual-dir"
+debuild clean
+
+if [ -z "$DEBIAN_ARCHIVE_DIR" ]; then
+	DEBIAN_ARCHIVE_DIR=`mktemp -d /tmp/debian_archive.XXXXXXXXX`
+fi
+
+mv ../*.build ../*.changes ../*.deb ../*.dsc ../*.tar.gz $DEBIAN_ARCHIVE_DIR/
+echo "Wrote package files to $DEBIAN_ARCHIVE_DIR"

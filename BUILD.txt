@@ -1,0 +1,61 @@
+Quickstart Guide to BeeGFS Package Building
+===========================================
+
+Build dependencies
+------------------
+
+Before building BeeGFS, install the following dependency packages:
+
+* Depedencies for RPM packages (Red Hat):
+  libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config
+  rpm-build xfsprogs-devel cppunit cppunit-devel zlib-devel openssl-devel sqlite
+
+* Dependencies for DEB packages (Debian):
+  gcc g++ autoconf automake devscripts debhelper libtool libattr1-dev 
+  xfslibs-dev lsb-release module-init-tools librdmacm-dev libibverbs-dev 
+  openjdk-7-jdk ant dh-systemd libcppunit-dev zlib1g-dev libssl-dev sqlite
+
+
+Building all packages together
+------------------------------
+
+BeeGFS comes with a shell script that can build all BeeGFS packages for the
+system on which it is executed.
+
+Go to the "beegfs_auto_package" subdir:
+ $ cd beegfs_auto_package
+
+For RPM packages and example, see:
+ $ ./make-rpms.sh -h
+
+For DEB packages and example, see:
+ $ ./make-debs.sh -h
+
+
+Building individual packages
+----------------------------
+
+Every BeeGFS service directory ("beegfs_meta", "beegfs_storage", ...) has a
+subdir named "build", which contains a makefile. Some makefiles contain a "help"
+target, so "make help" can be used in these cases to see build options.
+
+Before building a BeeGFS service, some shared libraries need to be prepared:
+ $ make -j4 -C beegfs_thirdparty/build
+ $ make -j4 -C beegfs_opentk_lib/build
+ $ make -j4 -C beegfs_common/build
+
+Now you can build the actual services, e.g. beegfs_meta:
+$ make -j4 -C beegfs_meta/build
+
+Or you can build a RPM/DEB package for a particular service, e.g. for
+beegfs_meta:
+ $ cd beegfs_meta/build
+ $ ./make-rpm # for a RPM package
+ $ ./make-deb # for a DEB package
+
+
+Share your thoughts
+-------------------
+
+Of course, we are curious about what you are doing with the BeeGFS sources, so
+don't forget to drop us a note...

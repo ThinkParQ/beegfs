@@ -1,0 +1,344 @@
+#!/bin/sh
+
+function init_multi_mode()
+{
+   ACTION=$1
+   CONFIG=$2
+   ERROR=0
+
+   if [ -z $ACTION ]
+   then
+      echo "Usage: $0 {start|stop|status|restart|rebuild|condrestart|try-restart} [CONFIGURATION_NAME]"
+      exit 3
+   fi
+
+   if [ -z $CONFIG ]
+   then
+      case "$ACTION" in
+         rebuild)
+            # Just rebuild modules. The user needs to call "restart" to make use
+            # of those new modules.
+            build_beegfs
+            ERROR=$?
+            if [ $ERROR -eq 0 ]; then
+               rm -f $FORCE_AUTO_BUILD
+            fi
+            ;;
+         restart)
+            do_central_loop stop
+            do_central_loop start
+            ERROR=$?
+            ;;
+         try-restart|condrestart)
+            ## Do a restart only if the service was active before.
+            ## Note: try-restart is now part of LSB (as of 1.9).
+            ## RH has a similar command named condrestart.
+            do_central_loop status
+            if test $? = 0
+            then
+               $0 restart
+               ERROR=$?
+            else
+               ERROR=1
+            fi
+            ;;
+         *)
+            do_central_loop $ACTION
+            ERROR=$?
+            ;;
+         esac
+   else
+      BEEGFS_MOUNT_CONF="/etc/beegfs/${CONFIG}.d/beegfs-mounts.conf"
+
+      if [ -e "/etc/beegfs/${CONFIG}.d" ]
+      then
+         init_multi_mode_single_configuration $ACTION $CONFIG
+         ERROR=$?
+      else
+         echo "Configuration folder /etc/beegfs/${CONFIG}.d doesn't exist."
+         ERROR=1
+      fi
+   fi
+   return $ERROR
+}
+
+do_central_loop()
+{
+   ACTION=$1
+   LOOP_ERROR=0
+
+   for CONFIG_FOLDER in $( ls -d /etc/beegfs/*.d )
+   do
+      if [ -r ${CONFIG_FOLDER}/beegfs-client.conf ]
+      then
+         CONFIG=$( basename $CONFIG_FOLDER .d )
+         BEEGFS_MOUNT_CONF="${CONFIG_FOLDER}/beegfs-mounts.conf"
+
+         init_multi_mode_single_configuration $ACTION $CONFIG
+
+         if [ $? -ne 0 ]
+         then
+            LOOP_ERROR=1
+         fi
+      fi
+   done
+
+   return $LOOP_ERROR
+}
+
+function init_multi_mode_single_configuration()
+{
+   ACTION=$1
+   CONFIG=$2
+
+   if [ -z $ACTION ]
+   then
+      echo "Usage: $0 {start|stop|status|restart|rebuild|condrestart|try-restart} [CONFIGURATION_NAME]"
+      exit 3
+   fi
+
+   RETVAL=0
+   case "$1" in
+      start)
+         if [ -f "${SYSCONFIG_FILE}" ]
+         then
+            source ${SYSCONFIG_FILE}
+            if [ "${START_SERVICE}" = "NO" -o "${START_SERVICE}" = "no" ]
+            then
+               echo "BeeGFS Client not set to be started"
+               return 0
+            fi
+         fi
+
+         handle_selinux
+
+         echo "Starting BeeGFS Client (${CONFIG}): "
+
+         test_updated_autobuild_conf
+         set +e	#methode test_updated_autobuild_conf set -e
+
+         echo "- Loading BeeGFS modules"
+         if [ -f "$FORCE_AUTO_BUILD" ]; then
+            # a new version was installed or the user updated the 
+            # auto-build config, so we force a rebuild
+            rmmod $CLIENT_MOD 2>/dev/null
+            rc=1
+         else
+            modprobe $CLIENT_MOD
+            rc=$?
+         fi
+
+         if [ $rc -ne 0 ]
+         then
+            set -e
+            build_beegfs
+            modprobe $CLIENT_MOD || (warn_on_ofed_mismatch && false)
+            rm -f $FORCE_AUTO_BUILD
+            set +e
+         fi
+
+         echo "- Mounting directories from $BEEGFS_MOUNT_CONF"
+
+         mkdir -p /var/lock/subsys/ >/dev/null 2>&1
+         touch $SUBSYS >/dev/null 2>&1
+
+         if [ $? -ne 0 ]
+         then
+            echo "Couldn't create lock file."
+            return 1
+         fi
+
+         OLDIFS="$IFS"
+         IFS=$'\n'
+
+         if [ -r $BEEGFS_MOUNT_CONF ]
+         then
+            file=`tr -d '\r' < $BEEGFS_MOUNT_CONF` # read all lines at once and remove CR from dos files
+         else
+            echo "Couldn't read configuration file: $BEEGFS_MOUNT_CONF"
+            IFS="$OLDIFS"
+            return 1
+         fi
+
+         for line in $file; do
+            if [ -z "$line" ]; then
+               continue # ignore empty line
+            fi
+
+            mnt=`echo $line | awk '{print $1}'`
+            cfg=`echo $line | awk '{print $2}'`
+            extra_mount_opts=`echo $line | awk '{print $3}'`
+
+            if [ -z "$mnt" -o -z "$cfg" ]; then
+               echo "Invalid config line: \"$line\""
+               RETVAL=1
+               continue
+            fi
+
+            mount -t beegfs | grep "${mnt} " >/dev/null 2>&1 
+            if [ $? -eq 0 ]; then
+               # already mounted
+               continue
+            fi
+
+            # mkdir required for admon
+            if [ ! -e ${mnt} ]
+            then
+               mkdir -p ${mnt}
+               if [ $? -ne 0 ]
+               then
+                  echo "Couldn't create mountpoint folder: ${mnt}"
+                  RETVAL=1
+                  continue
+               fi
+            fi
+
+            mount -t beegfs beegfs_${CONFIG} ${mnt} \
+               -ocfgFile=${cfg},_netdev,${SELINUX_OPT},${extra_mount_opts}
+            if [ $? -ne 0 ]
+            then
+               echo "Couldn't mount ${mnt}."
+               RETVAL=1
+               continue
+            fi
+         done
+
+         IFS="$OLDIFS"
+         ;;
+      stop)
+         echo "Shutting down BeeGFS Client (${CONFIG}): "
+
+         RETVAL=0
+         echo "- Unmounting directories from $BEEGFS_MOUNT_CONF"
+
+         OLDIFS="$IFS"
+         IFS=$'\n'
+
+         if [ -r $BEEGFS_MOUNT_CONF ]
+         then
+            file=`cat $BEEGFS_MOUNT_CONF` # we have to read all lines at once
+         else
+            echo "Couldn't read configuration file: $BEEGFS_MOUNT_CONF"
+            IFS="$OLDIFS"
+            return 1
+         fi
+
+         for line in $file
+         do
+            if [ -z "$line" ]; then
+               continue # ignore empty line
+            fi
+
+            mnt=`echo $line | awk '{print $1}'`
+            cfg=`echo $line | awk '{print $2}'`
+            if [ -z "$mnt" -o -z "$cfg" ]; then
+               echo "Invalid config line: \"$line\""
+               RETVAL=1
+               continue
+            fi
+
+            res=`umount ${mnt} 2>&1`
+            if [ $? -ne 0 ]
+            then
+               # umount failed, ignore the failure if not mounted at all
+               echo $res | grep "not mounted" >/dev/null 2>&1
+               if [ $? -ne 0 ]; then
+                  # Is mounted, abort.
+                  echo "umount failed: $res"
+                  RETVAL=1
+                  continue
+               fi
+            fi
+         done
+
+         IFS="$OLDIFS"
+
+         # tests if other beegfs mounts exists
+         mount -t beegfs | grep beegfs >/dev/null 2>&1		
+         if [ $? -ne 0 ]
+         then
+            echo "- Unloading modules"
+
+            res=`rmmod $CLIENT_MOD 2>&1`
+            if [ $? -ne 0 ]; then
+               # rmmod failed, ignore it if the module is not loaded at all
+               echo $res | grep "does not exist in" >/dev/null 2>&1
+               if [ $? -ne 0 ]; then
+                  # Is loaded, abort
+                  echo "rmmod failed: $res"
+                  RETVAL=1
+               fi
+            fi
+         fi
+
+         if [ $RETVAL -eq 0 ]; then rm -f $SUBSYS; fi
+         # Remember status and be verbose
+         ;;
+      status)
+         # Return value is slightly different for the status command:
+         # 0 - service up and running
+         # 1 - service dead, but /var/run/  pid  file exists
+         # 2 - service dead, but /var/lock/ lock file exists
+         # 3 - service not running (unused)
+         # 4 - service status unknown :-(
+         # 5--199 reserved (5--99 LSB, 100--149 distro, 150--199 appl.)
+
+         echo -n "Checking for service BeeGFS Client (${CONFIG}): "
+         
+         lsmod | grep $CLIENT_MOD >/dev/null 2>&1
+         if [ $? -eq 0 ]
+         then
+            echo "is running..."
+            mount -t beegfs | grep beegfs_${CONFIG} >/dev/null 2>&1
+            if [ $? -eq 0 ]; then
+               mount -t beegfs | grep beegfs_${CONFIG} | cut "-d " -f1-3
+               echo
+               RETVAL=0
+            else
+               echo ">> No mounts for the configuration ${CONFIG} mounted."
+               echo
+               RETVAL=4
+            fi
+         else
+            echo "is stopped."
+            echo
+            RETVAL=3
+         fi
+         ;;
+      restart)
+         ## Stop the service and regardless of whether it was
+         ## running or not, start it again.
+         $0 stop ${CONFIG}
+         $0 start ${CONFIG}
+         RETVAL=$?
+         # Remember status and be quiet
+         ;;
+      rebuild)
+         # Just rebuild modules. The user needs to call "restart" to make use
+         # of those new modules.
+         build_beegfs
+         RETVAL=$?
+         if [ $RETVAL -eq 0 ]; then
+            rm -f $FORCE_AUTO_BUILD
+         fi
+         ;;
+      try-restart|condrestart)
+         ## Do a restart only if the service was active before.
+         ## Note: try-restart is now part of LSB (as of 1.9).
+         ## RH has a similar command named condrestart.
+         $0 status ${CONFIG}
+         if test $? = 0
+         then
+            $0 restart ${CONFIG}
+            RETVAL=$?
+         else
+            RETVAL=7
+         fi
+         ;;
+      *)
+         echo "Usage: $0 {start|stop|status|restart|rebuild|condrestart|try-restart} [CONFIGURATION_NAME]"
+         exit 3
+         ;;
+      esac
+   return $RETVAL
+}

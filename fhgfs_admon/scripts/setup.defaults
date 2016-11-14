@@ -1,0 +1,51 @@
+#!/bin/bash
+
+export dirname=$(dirname "$0")
+
+export version="6.0-beta"
+
+export logFile=/var/log/beegfs-setup.log
+
+export tmpDir=/tmp/beegfs
+export tmpClientWarning=${tmpDir}/beegfs-setup-client-warnings.tmp
+export tmpFile=${tmpDir}/beegfs-setup.tmp
+export sshFailedLogFile=${tmpDir}/beegfs-setup-check-ssh.tmp
+export tmpSetupCheck=${tmpDir}/beegfs_setup_check.tmp
+export tmpStartStopDir=${dirname}/tmp
+
+export confdir=${dirname}/confs
+export infodir=${dirname}/info
+export packdir=${dirname}/rpms
+
+export base_repo_url="http://www.beegfs.com/release/beegfs_${version}"
+
+export modules="beegfs-meta beegfs-storage beegfs-helperd"
+export metaFile=${infodir}/meta_server
+export storageFile=${infodir}/storage_server
+export clientFile=${infodir}/clients
+export managementFile=${infodir}/management
+export ib_hosts_file=${infodir}/ib_nodes
+export licenseFile=""
+export infodirLockfile=${infodir}/lock
+
+export sshParameter="-qq -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no -oBatchMode=yes"
+export scpParameters="-qq -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no -oBatchMode=yes"
+export wgetParameters="-qq --no-check-certificate " 
+
+export metaDir=/opt/beegfs/data/meta
+export metaLogFile=/var/log/beegfs-meta.log
+export storageDir=/opt/beegfs/data/storage
+export storageLogFile=/var/log/beegfs-storage.log
+export clientLogFile=/var/log/beegfs-client.log
+export admonLogFile=/var/log/beegfs-admon.log
+export useSDP=false
+export useRDMA=false
+export helperdPort=8006
+export metaPort=8005
+export storagePort=8003
+export clientPort=8004
+export admonPort=8007
+export httpPort=8000
+
+export OPENTK_IB_SCRIPT=/usr/sbin/beegfs-setup-rdma
+export AUTOBUILD_CONFIG=/etc/beegfs/beegfs-client-autobuild.conf

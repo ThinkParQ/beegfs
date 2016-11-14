@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+### BEGIN INIT INFO
+# Provides:          beegfs-admon
+# Required-Start:
+# Should-Start:      $network
+# Required-Stop:
+# Should-Stop:       $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: BeeGFS Admon
+# Description:       Start BeeGFS Admon
+### END INIT INFO
+
+
+APP_NAME="BeeGFS Admon"
+SERVICE_NAME=beegfs-admon
+
+# source function library
+# we want to have single beegfs-admon package without any dependency
+# so we include this file ourself, but with a different name than
+# in the beegfs-common package
+. /etc/beegfs/lib/start-stop-functions.beegfs-admon
+. /etc/beegfs/lib/init-multi-mode.beegfs-admon

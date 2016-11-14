@@ -1,0 +1,9 @@
+PACK_SUMMARY="BeeGFS Storage Server"
+PACK_NAME="beegfs_storage"
+BINARY_NAME="beegfs_storage"
+
+CMAKE_PATH=/tmp/cmake-2.8.1
+CPACK=${CMAKE_PATH}/bin/cpack
+CMAKE=${CMAKE_PATH}/bin/cmake
+
+PACK_DIR=$(pwd)/packages

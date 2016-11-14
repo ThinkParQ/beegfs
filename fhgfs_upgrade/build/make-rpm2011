@@ -1,0 +1,53 @@
+#!/bin/bash 
+
+NAME=fhgfs-upgrade-to-2011.04
+SPEC_FILE=${NAME}.spec
+
+source ../../fhgfs-version
+
+uname -m | grep x86_64 > /dev/null 2>&1
+if [ $? -eq 0 ]
+then
+   BUILDARCH="x86_64"
+else
+   BUILDARCH="i686"
+fi
+
+set -e
+
+pushd ../ 
+TOOLS_ROOT=`pwd`
+popd 
+BUILD="${TOOLS_ROOT}/build"
+mkdir -p $BUILD/buildroot/{BUILD,RPMS,S{RPMS,PECS,OURCES}}
+
+rm -f $BUILD/buildroot/SOURCES/*.tgz
+
+FHGFS_OPENTK_PATH=${FHGFS_OPENTK_PATH:-`readlink -f ../../fhgfs_opentk_lib`}
+FHGFS_COMMON_PATH=${FHGFS_COMMON_PATH:-`readlink -f ../../fhgfs_common`}
+
+FHGFS_STORAGE_2011_04_UPGRADE_PATH="${TOOLS_ROOT}/fhgfs_upgrade_storage_to_2011.04"
+FHGFS_META_2011_04_UPGRADE_PATH="${TOOLS_ROOT}/fhgfs_upgrade_meta_to_2011.04"
+
+echo "path: $FHGFS_META_2011_04_UPGRADE_PATH"
+
+pushd $TOOLS_ROOT
+tar czf $BUILD/buildroot/SOURCES/${NAME}-${VER}-$RELEASE_STR.tgz   --exclude=buildroot/* *
+cd $BUILD
+sed 	-e "s#%FHGFS_OPENTK_PATH%#$FHGFS_OPENTK_PATH#g" \
+	-e "s#%FHGFS_COMMON_PATH%#$FHGFS_COMMON_PATH#g" \
+	-e "s/%NAME%/$NAME/g" 				\
+	-e "s/%RELEASE_STR%/$RELEASE_STR/g" 		\
+	-e "s/%VER%/$VER/g"   				\
+	-e "s#%FHGFS_META_2011_04_UPGRADE_PATH%#${FHGFS_META_2011_04_UPGRADE_PATH}#g" 		\
+	-e "s#%FHGFS_STORAGE_2011_04_UPGRADE_PATH%#${FHGFS_STORAGE_2011_04_UPGRADE_PATH}#g" 	\
+	-e "s/%BUILDARCH%/$BUILDARCH/g"   		\
+	${SPEC_FILE}.in > ${SPEC_FILE}
+
+rpmbuild --clean -bb ${SPEC_FILE} --define "_topdir $BUILD/buildroot/" --define "__os_install_post %{nil}" --define "__debug_install_post %{nil}"
+
+popd
+
+rm -fr /var/tmp/${NAME}-root/
+rm -f /var/tmp/rpm-tmp.*
+

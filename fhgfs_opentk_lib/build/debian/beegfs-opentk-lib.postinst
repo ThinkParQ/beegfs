@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+# enable or disable IB RDMA support and create the symlink
+beegfs-setup-rdma
+ldconfig
+
+
+#DEBHELPER#

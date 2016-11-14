@@ -1,0 +1,5 @@
+../../../fhgfs_upgrade_meta_to_2012.10/build/fhgfs-upgrade-meta-to-2012.10       /opt/fhgfs/sbin
+../../../fhgfs_upgrade_storage_to_2012.10/build/fhgfs-upgrade-storage-to-2012.10 /opt/fhgfs/sbin
+../../../scripts/getMetaIdMap.sh    /opt/fhgfs/sbin
+../../../scripts/getStorageIdMap.sh /opt/fhgfs/sbin
+../../../scripts/getTargetIdMap.sh  /opt/fhgfs/sbin

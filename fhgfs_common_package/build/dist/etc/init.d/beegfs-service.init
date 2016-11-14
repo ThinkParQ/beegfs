@@ -1,0 +1,100 @@
+SYSCONFIG_FILE=/etc/default/${SERVICE_NAME}
+
+# Check for missing binaries (stale symlinks should not happen)
+# Note: Special treatment of stop for LSB conformance
+APP_BIN=/opt/beegfs/sbin/${SERVICE_NAME}
+test -x $APP_BIN || { echo "$APP_BIN not installed"; 
+   if [ "$1" = "stop" ]; then exit 0;
+   else exit 5; fi; }
+
+source ${SYSCONFIG_FILE}
+if [ "${MULTI_MODE}" = "YES" -o "${MULTI_MODE}" = "yes" ]; then
+   init_multi_mode $1 $2
+   exit $?
+fi
+
+# Check for existence of needed config file and read it
+APP_CONFIG=/etc/beegfs/${SERVICE_NAME}.conf
+test -r $APP_CONFIG || { echo "$APP_CONFIG not existing";
+   if [ "$1" = "stop" ]; then exit 0;
+   else exit 6; fi; }
+
+PIDFILE=/var/run/${SERVICE_NAME}.pid
+DAEMON_ARGS="cfgFile=${APP_CONFIG} pidFile=$PIDFILE"
+
+RETVAL=0
+# Return values acc. to LSB for all commands but status:
+# 0       - success
+# 1       - generic or unspecified error
+# 2       - invalid or excess argument(s)
+# 3       - unimplemented feature (e.g. "reload")
+# 4       - user had insufficient privileges
+# 5       - program is not installed
+# 6       - program is not configured
+# 7       - program is not running
+# 8--199  - reserved (8--99 LSB, 100--149 distrib, 150--199 appl)
+# 
+# Note that starting an already running service, stopping
+# or restarting a not-running service as well as the restart
+# with force-reload (in case signaling is not supported) are
+# considered a success.
+
+case "$1" in
+   start)
+      if [ -f "${SYSCONFIG_FILE}" ]; then
+         if [ "${START_SERVICE}" = "NO" -o "${START_SERVICE}" = "no" ]; then
+            echo "${APP_NAME} not set to be started"
+            exit 0
+         fi
+      fi
+
+      echo -n "Starting ${APP_NAME}: "
+      ## create subfolder for lock files, on Debian systems needed
+      mkdir -p /var/lock/subsys
+
+      ## Start daemon with startproc(8). If this fails
+      ## the return value is set appropriately by startproc.
+      daemon --pidfile $PIDFILE $APP_BIN $DAEMON_ARGS \
+         && touch /var/lock/subsys/${SERVICE_NAME}
+      RETVAL=$?
+      echo
+      ;;
+   stop)
+      echo -n "Shutting down ${APP_NAME}: "
+      ## Stop daemon with killproc(8) and if this fails
+      ## killproc sets the return value according to LSB.
+
+      killproc -p $PIDFILE $APP_BIN && rm -f /var/lock/subsys/${SERVICE_NAME}
+      RETVAL=$?
+      echo
+      ;;
+   restart)
+      ## Stop the service and regardless of whether it was
+      ## running or not, start it again.
+      $0 stop
+      $0 start
+      RETVAL=$?
+      ;;
+   status)
+      echo -n "Checking for service ${APP_NAME}: "
+      ## Check status with checkproc(8), if process is running
+      ## checkproc will return with exit status 0.
+
+      # Return value is slightly different for the status command:
+      # 0 - service up and running
+      # 1 - service dead, but /var/run/  pid  file exists
+      # 2 - service dead, but /var/lock/ lock file exists
+      # 3 - service not running (unused)
+      # 4 - service status unknown :-(
+      # 5--199 reserved (5--99 LSB, 100--149 distro, 150--199 appl.)
+
+      status -p $PIDFILE $APP_BIN
+      RETVAL=$?
+      echo
+      ;;
+   *)
+      echo "Usage: $0 {start|stop|status|restart}"
+      exit 3
+      ;;
+   esac
+exit $RETVAL

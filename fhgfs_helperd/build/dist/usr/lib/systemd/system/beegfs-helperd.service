@@ -1,0 +1,14 @@
+[Unit]
+Description=Start BeeGFS Helperd
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/etc/init.d/beegfs-helperd start
+ExecStop=/etc/init.d/beegfs-helperd stop
+Type=forking
+# We disable PIDFile= because it doesn't work with multi-mode configurations
+#PIDFile=/var/run/beegfs-helperd.pid
+
+[Install]
+WantedBy=multi-user.target

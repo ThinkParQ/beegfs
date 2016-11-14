@@ -1,0 +1,83 @@
+%define release_str %RELEASE_STR%
+%define ver %VER%
+%define buildarch %BUILDARCH%
+%define FHGFS_OPENTK_PATH %FHGFS_OPENTK_PATH%
+%define FHGFS_COMMON_PATH %FHGFS_COMMON_PATH%
+%define FHGFS_META_2012_10_UPGRADE_PATH %FHGFS_META_2012_10_UPGRADE_PATH%
+%define FHGFS_STORAGE_2012_10_UPGRADE_PATH %FHGFS_STORAGE_2012_10_UPGRADE_PATH%
+
+%define FHGFS_VERSION %VER%-%RELEASE_STR%
+
+%define is_fedora %(test -e /etc/fedora-release && echo 1 || echo 0)
+%define is_redhat %(test -e /etc/redhat-release && echo 1 || echo 0)
+%define is_suse %(test -e /etc/SuSE-release && echo 1 || echo 0)
+%define is_mandrake %(test -e /etc/mandrake-release && echo 1 || echo 0)
+
+#%define distver %(release="`rpm -q --queryformat='%{VERSION}' %{dist}-release 2> /dev/null | tr . : | sed s/://g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+
+
+%if %is_mandrake
+%define disttag mdk
+%endif
+
+%if %is_suse
+%define disttag suse
+%define distver %(relpackage="`rpm -qf /etc/SuSE-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %is_fedora
+%define disttag fc
+%endif
+
+%if %is_redhat
+%define disttag el
+%define distver %(relpackage="`rpm -qf /etc/redhat-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %{defined disttag}
+%define release %{disttag}%{distver}
+%else
+%define release generic
+%endif
+
+Summary: FhGFS 2011.04 -> 2012.04 upgrade tools
+Name: %NAME%
+Version: %{ver}.%{release_str}
+Release: %release
+License: FhGFS EULA
+Group: Software/Other
+Source: %NAME%-%{ver}-%{release_str}.tgz
+URL: http://www.fhgfs.com
+Vendor: Fraunhofer ITWM
+BuildRoot: %{_tmppath}/%NAME%-root
+BuildArch: %{buildarch}
+
+%description
+This package provides FhGFS 2011.04 -> 2012.10 upgrade tools
+
+
+%prep
+%setup -c
+
+%build
+cd build
+make -C %{FHGFS_META_2012_10_UPGRADE_PATH}/build -j4
+make -C %{FHGFS_STORAGE_2012_10_UPGRADE_PATH}/build -j4
+	
+%define debug_package %{nil}
+%debug_package %{nil}
+
+%install
+cd build
+
+install -D %{FHGFS_META_2012_10_UPGRADE_PATH}/build/fhgfs-upgrade-meta-to-2012.10 \
+	${RPM_BUILD_ROOT}/opt/fhgfs/sbin/fhgfs-upgrade-meta-to-2012.10
+install -D %{FHGFS_STORAGE_2012_10_UPGRADE_PATH}/build/fhgfs-upgrade-storage-to-2012.10 \
+	${RPM_BUILD_ROOT}/opt/fhgfs/sbin/fhgfs-upgrade-storage-to-2012.10
+install -D ../scripts/getMetaIdMap.sh    ${RPM_BUILD_ROOT}/opt/fhgfs/sbin/getMetaIdMap.sh
+install -D ../scripts/getStorageIdMap.sh ${RPM_BUILD_ROOT}/opt/fhgfs/sbin/getStorageIdMap.sh
+install -D ../scripts/getTargetIdMap.sh   ${RPM_BUILD_ROOT}/opt/fhgfs/sbin/getTargetIdMap.sh
+
+%files
+%defattr(-,root,root)
+/opt/fhgfs/sbin/*

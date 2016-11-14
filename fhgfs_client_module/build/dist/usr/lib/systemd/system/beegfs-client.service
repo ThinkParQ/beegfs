@@ -1,0 +1,21 @@
+[Unit]
+Description=Start BeeGFS Client
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=local-fs.target time-sync.target beegfs-helperd.service beegfs-mgmtd.service \
+#beegfs-meta.service beegfs-storage.service openib.service openibd.service rdma.service \
+#opensmd.service opensm.service nss-lookup.target nss-user-lookup.target slapd.service \
+#autofs.service ypbind.service nscd.service nslcd.service sshd.service
+After=network-online.target local-fs.target time-sync.target beegfs-helperd.service \
+beegfs-mgmtd.service beegfs-meta.service beegfs-storage.service openib.service openibd.service \
+rdma.service opensmd.service opensm.service nss-lookup.target nss-user-lookup.target \
+slapd.service autofs.service ypbind.service nscd.service nslcd.service sshd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/etc/init.d/beegfs-client start
+ExecStop=/etc/init.d/beegfs-client stop
+
+[Install]
+WantedBy=multi-user.target

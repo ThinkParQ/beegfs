@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+### BEGIN INIT INFO
+# Provides:          beegfs-mgmtd
+# Required-Start:
+# Should-Start:      $network openibd openib rdma opensmd opensm
+# Required-Stop:
+# Should-Stop:       $network openibd openib rdma opensmd opensm
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# chkconfig:         35 94 10
+# Short-Description: BeeGFS Management daemon
+# Description:       Start BeeGFS Management daemon
+### END INIT INFO
+
+APP_NAME="BeeGFS Management daemon"
+SERVICE_NAME=beegfs-mgmtd
+
+# source function library
+. /etc/beegfs/lib/start-stop-functions
+. /etc/beegfs/lib/init-multi-mode
+

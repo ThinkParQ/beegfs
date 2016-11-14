@@ -1,0 +1,16 @@
+[Unit]
+Description=Start BeeGFS Storage Server
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=beegfs-mgmtd.service openibd.service openib.service rdma.service opensmd.service opensm.service
+After=network-online.target beegfs-mgmtd.service openibd.service openib.service rdma.service opensmd.service opensm.service zfs.target
+
+[Service]
+ExecStart=/etc/init.d/beegfs-storage start
+ExecStop=/etc/init.d/beegfs-storage stop
+Type=forking
+# We disable PIDFile= because it doesn't work with multi-mode configurations
+#PIDFile=/var/run/beegfs-storage.pid
+
+[Install]
+WantedBy=multi-user.target

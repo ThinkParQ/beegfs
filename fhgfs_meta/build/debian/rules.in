@@ -1,0 +1,100 @@
+#!/usr/bin/make -f
+
+DEB_BUILD_ROOT = debian/__NAME__
+BEEGFS_COMMON_PACKAGE_PATH = __BEEGFS_COMMON_PACKAGE_PATH__
+
+GENERIC_INITSCRIPT = $(BEEGFS_COMMON_PACKAGE_PATH)/build/dist/etc/init.d/beegfs-service.init
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	# nothing to do for us
+	touch configure-stamp
+	
+build: build-stamp
+
+build-stamp: $(QUILT_STAMPFN) configure-stamp 
+	dh_testdir
+
+	make BEEGFS_VERSION='__BEEGFS_VERSION__' 			\
+		BEEGFS_COMMON_PATH='__BEEGFS_COMMON_PATH__'	\
+		BEEGFS_OPENTK_PATH='__BEEGFS_OPENTK_PATH__' 	\
+		BEEGFS_THIRDPARTY_PATH='__BEEGFS_THIRDPARTY_PATH__' \
+		USER_CXXFLAGS='__USER_CXXFLAGS__'		\
+		USER_LDFLAGS='__USER_LDFLAGS__'                 \
+		BEEGFS_DEBUG='__BEEGFS_DEBUG__'			\
+		-j __MAKE_CONCURRENCY__
+
+	touch build-stamp
+
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp 
+
+	make clean
+
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+	
+	# manual installation
+	install -D dist/etc/init.d/__NAME__.init debian/__NAME__.init
+
+	#add the genric part of the init script from the common package
+	cat $(GENERIC_INITSCRIPT) >> debian/__NAME__.init
+
+	#install systemd unit description, debian installs the service file in /lib/systemd/system/
+	install -D -m644 dist/usr/lib/systemd/system/__NAME__.service debian/__NAME__.service
+
+	install -D __NAME__ $(DEB_BUILD_ROOT)/opt/beegfs/sbin/__NAME__
+	install -D dist/sbin/beegfs-setup-meta \
+		${DEB_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-meta
+
+	install -D -m644 dist/etc/default/__NAME__ debian/__NAME__.default
+
+	install -D -m644 dist/etc/__NAME__.conf $(DEB_BUILD_ROOT)/etc/beegfs/__NAME__.conf
+
+# Build architecture-independent files here.
+binary-indep:
+# We have nothing to do by default.
+
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs 
+	dh_installdocs
+	dh_installexamples
+
+	dh_systemd_enable
+	dh_installinit --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
+	dh_installman
+	dh_link
+	dh_strip --dbg-package=__NAME__-dbg
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_lintian
+
+override_dh_strip:
+	dh_strip --dbg-package=__NAME__-dbg
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure override_dh_strip
+

@@ -1,0 +1,18 @@
+# BeeGFS client service configuration.
+
+# Set to "NO" to disable start of the BeeGFS client via the init script.
+START_SERVICE="YES"
+
+# Set to "YES" if you want to start multiple clients with different
+# configuration files on this machine.
+#
+# Create a subdirectory with the ending ".d" in "/etc/beegfs/" for every config
+# file. The subdirectory name will be used to identify a particular client
+# instance for init script start/stop.
+#
+# Note: The original config file in /etc/beegfs will not be used when multi-mode
+# is enabled.
+#
+# Example: /etc/beegfs/scratch.d/beegfs-client.conf
+# $ /etc/init.d/beegfs-client start scratch
+MULTI_MODE="NO"

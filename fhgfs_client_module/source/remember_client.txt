@@ -1,0 +1,22 @@
+//// always keep in mind ////
+- never wait sleeping (e.g. on a mutex, malloc or communication) when holding a spinlock
+	- because if other processes wake up and try to acquire a spinlock, they will not be
+		preemptible and hence we will never wake up to unlock the mutex
+	- that means we also cannot use the normal fhgfs logger while holding a spinlock
+- work will be freed by the workers, so each work has to be alloced seperately
+- StringTk::strToInt64 returns unsigned (because simple_strtoll was undefined in some kernel
+	versions)
+- NicList is unsorted (relies on appropriate server-side NicList order)
+- userspace pointers can only be used within the user-process context, not by other kernel threads
+- vector-impls store value pointers (not the elemStruct pointers). hence, if there should be
+	a method like "setNewValue()" for lists, the vector wouldn't notice
+	- of course, we could change to elem-pointers if we need to fix that
+- ibverbs (OFED documentation quotes):
+	- "Because low-level drivers are reentrant, upper level protocol consumers are not required
+		to perform any serialization."
+	- "Upper level protocol consumers may not sleep in a callback."
+- mutexes and reference counts:
+	- successful kernel mutex lock doesn't guarantee that unlock is fully completed and the 
+		mutex is no longer accessed by another thread, so mutex deletion based on successful
+		mutex acquire is not possible.
+	- see here for more technical background info: https://lwn.net/Articles/575460/

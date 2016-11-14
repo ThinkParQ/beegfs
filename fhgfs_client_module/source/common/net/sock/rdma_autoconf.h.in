@@ -1,0 +1,12 @@
+
+/*
+ *  __OFED_INCLUDE_PATH__ is replaced in Makefile by sed
+ * by the given OFED_INCLUDE_PATH (shell). 
+ */
+#ifdef BEEGFS_OPENTK_IBVERBS
+
+#include <__OFED_INCLUDE_PATH__rdma/ib_verbs.h>
+#include <__OFED_INCLUDE_PATH__rdma/rdma_cm.h>
+#include <__OFED_INCLUDE_PATH__rdma/ib_cm.h>
+
+#endif // BEEGFS_OPENTK_IBVERBS

@@ -1,0 +1,56 @@
+#!/bin/sh
+
+# License: BeeGFS EULA
+
+print_usage()
+{
+	echo
+	echo "DESCRIPTION: Show free space information and available number of inodes for"
+	echo "individual BeeGFS metadata servers and storage targets."
+	echo "(This is a wrapper for beegfs-ctl.)"
+	echo
+	echo "USAGE: `basename $0` [options]"
+	echo
+	echo "   (default) - If no command line argument is given, list servers and targets"
+	echo "               based on the default client config file."
+	echo
+	echo "   -h        - Print this help."
+	echo
+	echo "   -p <path> - Show servers and targets for the given BeeGFS mount point."
+	echo
+}
+
+
+################# end of function definitions ####################
+
+
+# parse command line arguments
+
+while getopts "hp:" opt; do
+        case $opt in
+	h)
+		print_usage
+		exit 0
+		;;
+	p)
+		BEEGFS_PATH_ARG="--mount=$OPTARG"
+		;;
+	*)
+		echo "Invalid option: -$OPTARG" >&2
+		print_usage
+		exit 1
+		;;
+	esac
+done
+
+# show metadata server space info
+
+echo "METADATA SERVERS:"
+beegfs-ctl --listtargets --hidenodeid --pools --spaceinfo --nodetype=meta $BEEGFS_PATH_ARG
+
+echo
+
+# show storage server space info
+
+echo "STORAGE TARGETS:"
+beegfs-ctl --listtargets --hidenodeid --pools --spaceinfo --nodetype=storage $BEEGFS_PATH_ARG
