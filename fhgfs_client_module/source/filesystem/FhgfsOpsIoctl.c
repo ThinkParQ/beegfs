@@ -577,7 +577,7 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
       .preferredMetaTargets = NULL
    };
 
-#ifdef KERNEL_HAS_FILE_F_VFSMNT
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)
    struct vfsmount* mnt = file->f_vfsmnt;
 #else
    struct vfsmount* mnt = file->f_path.mnt;
@@ -694,7 +694,7 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, bool 
    int retVal = 0;
    FhgfsOpsErr mkRes;
 
-   #ifdef KERNEL_HAS_FILE_F_VFSMNT
+   #if LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)
       struct vfsmount* mnt = file->f_vfsmnt;
    #else
       struct vfsmount* mnt = file->f_path.mnt;

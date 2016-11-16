@@ -46,7 +46,7 @@ extern loff_t FhgfsOps_llseek(struct file *file, loff_t offset, int origin);
 extern int FhgfsOps_opendirIncremental(struct inode* inode, struct file* file);
 extern int FhgfsOps_releasedir(struct inode* inode, struct file* file);
 
-#ifdef KERNEL_HAS_ITERATE_DIR
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
 extern int FhgfsOps_iterateIncremental(struct file* file, struct dir_context* ctx);
 #else
 extern int FhgfsOps_readdirIncremental(struct file* file, void* buf, filldir_t filldir);
@@ -60,7 +60,7 @@ extern int FhgfsOps_release(struct inode* inode, struct file* file);
 
 #ifdef KERNEL_HAS_FSYNC_RANGE /* added in vanilla 3.1 */
    int FhgfsOps_fsync(struct file* file, loff_t start, loff_t end, int datasync);
-#elif !defined(KERNEL_HAS_FSYNC_DENTRY)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35)
    int FhgfsOps_fsync(struct file* file, int datasync);
 #else
    /* LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,34) */
@@ -80,11 +80,11 @@ extern ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size,
 extern ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
    loff_t* offsetPointer);
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
    extern ssize_t FhgfsOps_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos);
    extern ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
    loff_t pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
    extern ssize_t FhgfsOps_aio_read(struct kiocb *iocb, const struct iovec *iov,
       unsigned long nr_segs, loff_t pos);
    extern ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const struct iovec *iov,
@@ -96,7 +96,7 @@ extern ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t 
 
 extern int FhgfsOps_mmap(struct file *, struct vm_area_struct *);
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
    extern int FhgfsOps_prepare_write(struct file *file, struct page *page, unsigned from,
       unsigned to);
    extern int FhgfsOps_commit_write(struct file *file, struct page *page, unsigned from,

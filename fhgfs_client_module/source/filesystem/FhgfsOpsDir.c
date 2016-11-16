@@ -55,7 +55,7 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    #endif // LINUX_VERSION_CODE
 
 
-   #ifdef LOOKUP_RCU
+   #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)
       /* note: 2.6.38 introduced rcu-walk mode, which is inappropriate for us, because we need the
          parentDentry and need to sleep for communication. ECHILD below tells vfs to call this again
          in old ref-walk mode. (see Documentation/filesystems/vfs.txt:d_revalidate) */
@@ -232,7 +232,7 @@ out:
  *
  * @return !=0 to delete dentry, 0 to keep it
  */
-#ifndef KERNEL_HAS_D_DELETE_CONST_ARG
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,37)
    int FhgfsOps_deleteDentry(struct dentry* dentry)
 #else
    int FhgfsOps_deleteDentry(const struct dentry* dentry)

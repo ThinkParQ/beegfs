@@ -33,12 +33,12 @@
 
 #define INITIAL_FIND_PAGES (256) // search initially for this number of pages
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
       loff_t pos);
 static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
       loff_t pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
 static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iovec *iov,
       unsigned long nr_segs, loff_t pos);
 static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec *iov,
@@ -68,7 +68,7 @@ struct file_operations fhgfs_file_buffered_ops =
    .compat_ioctl     = FhgfsOpsIoctl_compatIoctl,
 #endif // CONFIG_COMPAT
 
-#ifdef KERNEL_HAS_ITER_FILE_SPLICE_WRITE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)
    .splice_read  = generic_file_splice_read,
    .splice_write = iter_file_splice_write,
 #else
@@ -76,7 +76,7 @@ struct file_operations fhgfs_file_buffered_ops =
    .splice_write = generic_file_splice_write,
 #endif // LINUX_VERSION_CODE
 
-#if defined(KERNEL_HAS_WRITE_ITER)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)
    .read_iter           = FhgfsOps_buffered_read_iter,
    .write_iter          = FhgfsOps_buffered_write_iter, // replacement for aio_write
 #else
@@ -84,7 +84,7 @@ struct file_operations fhgfs_file_buffered_ops =
    .aio_write           = FhgfsOps_buffered_aio_write,
 #endif // LINUX_VERSION_CODE
 
-#ifdef KERNEL_HAS_GENERIC_FILE_SENDFILE
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,22)
    .sendfile   = generic_file_sendfile, // removed in 2.6.23 (now handled via splice)
 #endif // LINUX_VERSION_CODE
 };
@@ -96,7 +96,7 @@ struct file_operations fhgfs_file_pagecache_ops =
 {
    .open                = FhgfsOps_open,
    .release             = FhgfsOps_release,
-#if defined(KERNEL_HAS_WRITE_ITER)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)
    .read_iter           = FhgfsOps_read_iter, // replacement for aio_read
    .write_iter          = FhgfsOps_write_iter, // replacement for aio_write
 #else
@@ -115,7 +115,7 @@ struct file_operations fhgfs_file_pagecache_ops =
    .compat_ioctl        = FhgfsOpsIoctl_compatIoctl,
 #endif // CONFIG_COMPAT
 
-#ifdef KERNEL_HAS_ITER_FILE_SPLICE_WRITE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)
    .splice_read  = generic_file_splice_read,
    .splice_write = iter_file_splice_write,
 #else
@@ -123,7 +123,7 @@ struct file_operations fhgfs_file_pagecache_ops =
    .splice_write = generic_file_splice_write,
 #endif // LINUX_VERSION_CODE
 
-#ifdef KERNEL_HAS_GENERIC_FILE_SENDFILE
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,22)
    .sendfile   = generic_file_sendfile, // removed in 2.6.23 (now handled via splice)
 #endif // LINUX_VERSION_CODE
 };
@@ -132,7 +132,7 @@ struct file_operations fhgfs_dir_ops =
 {
    .open             = FhgfsOps_opendirIncremental,
    .release          = FhgfsOps_releasedir,
-#ifdef KERNEL_HAS_ITERATE_DIR
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
    .iterate       = FhgfsOps_iterateIncremental, // linux 3.11 renamed readdir to iterate
 #else
    .readdir       = FhgfsOps_readdirIncremental, // linux 3.11 renamed readdir to iterate
@@ -160,7 +160,7 @@ struct address_space_operations fhgfs_address_ops =
    .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
    .prepare_write = FhgfsOps_prepare_write,
    .commit_write  = FhgfsOps_commit_write,
 #else
@@ -183,7 +183,7 @@ struct address_space_operations fhgfs_address_pagecache_ops =
    .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
    .prepare_write = FhgfsOps_prepare_write,
    .commit_write  = FhgfsOps_commit_write,
 #else
@@ -344,7 +344,7 @@ int FhgfsOps_opendirIncremental(struct inode* inode, struct file* file)
    return retVal;
 }
 
-#ifdef KERNEL_HAS_ITERATE_DIR
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
 int FhgfsOps_iterateIncremental(struct file* file, struct dir_context* ctx)
 #else
 int FhgfsOps_readdirIncremental(struct file* file, void* buf, filldir_t filldir)
@@ -369,7 +369,7 @@ int FhgfsOps_readdirIncremental(struct file* file, void* buf, filldir_t filldir)
    StrCpyVec* dirContentIDs = FsDirInfo_getEntryIDs(dirInfo);
    Int64CpyVec* serverOffsets = FsDirInfo_getServerOffsets(dirInfo);
 
-   #ifdef KERNEL_HAS_ITERATE_DIR
+   #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
       loff_t* pos = &(ctx->pos); // used by dir_emit()
    #else
       loff_t* pos = &(file->f_pos);
@@ -444,7 +444,7 @@ int FhgfsOps_readdirIncremental(struct file* file, void* buf, filldir_t filldir)
          currentIno = currentIno >> 32; // (32-bit apps would fail with EOVERFLOW)
 
 
-      #ifdef KERNEL_HAS_ITERATE_DIR
+      #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
          if(!dir_emit(
             ctx, currentName, strlen(currentName), currentIno, currentOSEntryType) )
             break;
@@ -1039,12 +1039,12 @@ ssize_t __FhgfsOps_readSparse(struct file* file, char __user *buf, size_t size, 
 }
 
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 
 ssize_t FhgfsOps_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
 {
 
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
 
 ssize_t FhgfsOps_aio_read(struct kiocb *iocb, const struct iovec *iov, unsigned long nr_segs,
    loff_t pos)
@@ -1080,9 +1080,9 @@ ssize_t FhgfsOps_read_iter(struct kiocb *iocb, struct iov_iter *to)
       return retVal;
    }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
    retVal = generic_file_aio_read(iocb, buf, count, pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
    retVal = generic_file_aio_read(iocb, iov, nr_segs, pos);
 #else // LINUX_VERSION_CODE
    retVal = generic_file_read_iter(iocb, to);
@@ -1091,7 +1091,7 @@ ssize_t FhgfsOps_read_iter(struct kiocb *iocb, struct iov_iter *to)
    return retVal;
 }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
       loff_t pos)
 {
@@ -1101,9 +1101,9 @@ static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, char __user *buf, 
    FhgfsOpsHelper_logOpDebug(app, iocb->ki_filp->f_dentry, iocb->ki_filp->f_mapping->host,
          __func__, "(offset: %lld; count: %lld)", (long long)pos, (long long)count);
 
-   return FhgfsOps_read(iocb->ki_filp, buf, count, &pos);
+   return FhgfsOps_read(iocb->ki_filp, buf, count, &iocb->ki_pos);
 }
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
 static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec *iov,
       unsigned long nr_segs, loff_t pos)
 {
@@ -1124,7 +1124,7 @@ static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec
       if (totalReadRes + len >= (2<<30) || totalReadRes + len < totalReadRes)
          len = (2<<30) - totalReadRes;
 
-      readRes = FhgfsOps_read(iocb->ki_filp, base, len, &pos);
+      readRes = FhgfsOps_read(iocb->ki_filp, base, len, &iocb->ki_pos);
       if (readRes < 0 && totalReadRes == 0)
          return readRes;
 
@@ -1341,12 +1341,12 @@ unlockappend_and_exit:
    return writeRes;
 }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 
 ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
 {
 
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
 
 ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const struct iovec *iov, unsigned long nr_segs,
    loff_t pos)
@@ -1409,9 +1409,9 @@ ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from)
       iocb->ki_pos = pos;
    }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
    retVal = generic_file_aio_write(iocb, buf, count, pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
    retVal = generic_file_aio_write(iocb, iov, nr_segs, pos);
 #else
    iov_iter_truncate(from, count);
@@ -1445,7 +1445,7 @@ ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from)
    return retVal;
 }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
       loff_t pos)
 {
@@ -1455,9 +1455,9 @@ static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const char __user
    FhgfsOpsHelper_logOpDebug(app, iocb->ki_filp->f_dentry, iocb->ki_filp->f_mapping->host,
          __func__, "(offset: %lld; count: %lld)", (long long)pos, (long long)count);
 
-   return FhgfsOps_write(iocb->ki_filp, buf, count, &pos);
+   return FhgfsOps_write(iocb->ki_filp, buf, count, &iocb->ki_pos);
 }
-#elif !defined(KERNEL_HAS_WRITE_ITER)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
 static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iovec *iov,
       unsigned long nr_segs, loff_t pos)
 {
@@ -1478,7 +1478,7 @@ static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iove
       if (totalWriteRes + len >= (2<<30) || totalWriteRes + len < totalWriteRes)
          len = (2<<30) - totalWriteRes;
 
-      writeRes = FhgfsOps_write(iocb->ki_filp, base, len, &pos);
+      writeRes = FhgfsOps_write(iocb->ki_filp, base, len, &iocb->ki_pos);
       if (writeRes < 0 && totalWriteRes == 0)
          return writeRes;
 
@@ -1582,7 +1582,7 @@ static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter 
 int FhgfsOps_fsync(struct file* file, loff_t start, loff_t end, int datasync)
 {
    struct dentry* dentry = file->f_dentry;
-#elif !defined(KERNEL_HAS_FSYNC_DENTRY)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35)
 int FhgfsOps_fsync(struct file* file, int datasync)
 {
       struct dentry* dentry = file->f_dentry;
@@ -1741,7 +1741,7 @@ exit:
    return retVal;
 }
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 
 /**
  * Note: We never return an error code here, currently.
@@ -1867,7 +1867,7 @@ int FhgfsOps_commit_write(struct file* file, struct page* page, unsigned from, u
    return retVal;
 }
 
-#else
+#else // LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28)
 
 /**
  * @param fsdata can be used to hand any data over to write_end() (but note that the old
@@ -2073,7 +2073,14 @@ ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
 
 ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
 {
-   const struct iovec* iov = iter->iov;
+
+   #ifdef KERNEL_HAS_SPECIAL_UEK_IOV_ITER
+      // oracle uek seems to be the only kernel with a special version of struct iov_iter
+      const struct iovec* iov = iov_iter_iovec(iter);
+   #else // KERNEL_HAS_SPECIAL_UEK_IOV_ITER
+      const struct iovec* iov = iter->iov;
+   #endif // KERNEL_HAS_SPECIAL_UEK_IOV_ITER
+
    unsigned long nr_segs = iter->nr_segs;
 
 #else // KERNEL_HAS_DIRECT_IO_ITER

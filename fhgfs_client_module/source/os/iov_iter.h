@@ -18,6 +18,8 @@
 #include <linux/version.h>
 #include <linux/uaccess.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+
 #ifndef KERNEL_HAS_IOV_ITER_TYPE
 struct iov_iter {
    const struct iovec *iov;
@@ -83,27 +85,44 @@ static inline void iov_iter_init(struct iov_iter *i, const struct iovec *iov, un
 }
 #endif
 
-#if defined(KERNEL_HAS_IOV_ITER_IN_FS)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 #include <linux/fs.h>
 #else
 #include <linux/uio.h>
 #endif
 
-#ifndef iov_for_each
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0)
 #define iov_for_each(iov, iter, start)                          \
         for (iter = (start);                                    \
              (iter).count &&                                    \
-             ((iov = iov_iter_iovec(&(iter))), 1);              \
+             ((iov = BEEGFS_IOV_ITER_IOVEC(&(iter))), 1);              \
              iov_iter_advance(&(iter), (iov).iov_len))
 #endif
 
-#if !defined(KERNEL_HAS_IOV_ITER_IOVEC)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,15,0)) && !defined(KERNEL_HAS_SPECIAL_UEK_IOV_ITER)
 static inline struct iovec iov_iter_iovec(const struct iov_iter *iter)
 {
    return (struct iovec) {
       .iov_base = iter->iov->iov_base + iter->iov_offset,
       .iov_len = min(iter->count, iter->iov->iov_len - iter->iov_offset),
    };
+}
+#endif
+
+#ifdef KERNEL_HAS_SPECIAL_UEK_IOV_ITER
+static inline struct iovec BEEGFS_IOV_ITER_IOVEC(struct iov_iter *iter)
+{
+   struct iovec iov = *iov_iter_iovec(iter);
+
+   return (struct iovec) {
+      .iov_base = iov.iov_base + iter->iov_offset,
+      .iov_len = min(iter->count, iov.iov_len - iter->iov_offset),
+   };
+}
+#else
+static inline struct iovec BEEGFS_IOV_ITER_IOVEC(const struct iov_iter *iter)
+{
+   return iov_iter_iovec(iter);
 }
 #endif
 
@@ -118,26 +137,26 @@ static inline void iov_iter_truncate(struct iov_iter *i, size_t count)
 static inline void BEEGFS_IOV_ITER_INIT(struct iov_iter* iter, int direction,
    const struct iovec* iov, unsigned long nr_segs, size_t count)
 {
-#ifdef KERNEL_HAS_IOV_ITER_INIT_DIR
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,16,0)
    iov_iter_init(iter, direction, iov, nr_segs, count);
 #else
    iov_iter_init(iter, iov, nr_segs, count, 0);
 #endif
 }
 
-#if !defined(KERNEL_HAS_ITER_BVEC)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,16,0)
 static inline bool iter_is_iovec(struct iov_iter* i)
 {
    return true;
 }
-#elif !defined(KERNEL_HAS_ITER_IS_IOVEC)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
 static inline bool iter_is_iovec(struct iov_iter* i)
 {
    return !(i->type & (ITER_BVEC | ITER_KVEC) );
 }
 #endif
 
-#ifndef KERNEL_HAS_COPY_FROM_ITER
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,18,0)
 static inline size_t copy_from_iter(void* to, size_t bytes, struct iov_iter* i)
 {
    /* FIXME: check for != IOV iters */
@@ -153,7 +172,7 @@ static inline size_t copy_from_iter(void* to, size_t bytes, struct iov_iter* i)
       return 0;
 
    wanted = bytes;
-   iov = iov_iter_iovec(i);
+   iov = BEEGFS_IOV_ITER_IOVEC(i);
    buf = iov.iov_base;
    copy = min(bytes, iov.iov_len);
 
@@ -163,7 +182,7 @@ static inline size_t copy_from_iter(void* to, size_t bytes, struct iov_iter* i)
    bytes -= copy;
    while (unlikely(!left && bytes) ) {
       iov_iter_advance(i, copy);
-      iov = iov_iter_iovec(i);
+      iov = BEEGFS_IOV_ITER_IOVEC(i);
       buf = iov.iov_base;
       copy = min(bytes, iov.iov_len);
       left = __copy_from_user(to, buf, copy);
@@ -191,7 +210,7 @@ static inline size_t copy_to_iter(void* from, size_t bytes, struct iov_iter* i)
       return 0;
 
    wanted = bytes;
-   iov = iov_iter_iovec(i);
+   iov = BEEGFS_IOV_ITER_IOVEC(i);
    buf = iov.iov_base;
    copy = min(bytes, iov.iov_len);
 
@@ -201,7 +220,7 @@ static inline size_t copy_to_iter(void* from, size_t bytes, struct iov_iter* i)
    bytes -= copy;
    while (unlikely(!left && bytes) ) {
       iov_iter_advance(i, copy);
-      iov = iov_iter_iovec(i);
+      iov = BEEGFS_IOV_ITER_IOVEC(i);
       copy = min(bytes, iov.iov_len);
       left = __copy_to_user(buf, from, copy);
       copy -= left;
@@ -212,6 +231,20 @@ static inline size_t copy_to_iter(void* from, size_t bytes, struct iov_iter* i)
    iov_iter_advance(i, copy);
    return wanted - bytes;
 }
+#endif
+
+#ifdef KERNEL_HAS_SPECIAL_UEK_IOV_ITER
+#define BEEGFS_IOV_ITER_RAW(iter) \
+   ({ \
+      BUG_ON((iter)->iov_offset); \
+      (struct iovec*) (iter)->data; \
+   })
+#else
+#define BEEGFS_IOV_ITER_RAW(iter) \
+   ({ \
+      BUG_ON((iter)->iov_offset); \
+      (iter)->iov; \
+   })
 #endif
 
 #endif

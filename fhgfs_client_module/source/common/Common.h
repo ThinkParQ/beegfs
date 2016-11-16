@@ -142,7 +142,7 @@
 
 
 // get effective ID of current FS user/group access
-#if !defined(KERNEL_HAS_CURRENT_FSUID)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29)
    #define currentFsUserID       (current->fsuid)
    #define currentFsGroupID      (current->fsgid)
 #else

@@ -13,7 +13,11 @@
 #include <common/Common.h>
 #include <filesystem/FhgfsOpsSuper.h>
 
-#ifndef KERNEL_HAS_MEMDUP_USER
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34)
+   static atomic_long_t fhgfs_bdiSeq = ATOMIC_LONG_INIT(0);
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30)
    /**
     * memdup_user - duplicate memory region from user space
     *
@@ -45,7 +49,8 @@
 #endif // memdup_user, LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30)
 
 
-#if defined(KERNEL_HAS_SB_BDI) && !defined(KERNEL_HAS_BDI_SETUP_AND_REGISTER)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32) && \
+     LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34)
    /*
     * For use from filesystems to quickly init and register a bdi associated
     * with dirty writeback
@@ -53,7 +58,6 @@
    int bdi_setup_and_register(struct backing_dev_info *bdi, char *name,
                unsigned int cap)
    {
-      static atomic_long_t fhgfs_bdiSeq = ATOMIC_LONG_INIT(0);
       char tmp[32];
       int err;
 
@@ -112,7 +116,7 @@
 #endif // find_get_pages_tag() for <2.6.22
 
 
-#ifndef KERNEL_HAS_D_MAKE_ROOT
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0)
 
 /**
  * This is the former d_alloc_root with an additional iput on error.
@@ -125,7 +129,7 @@ struct dentry *d_make_root(struct inode *root_inode)
 
    return allocRes;
 }
-#endif
+#endif // LINUX_VERSION_CODE (d_make_root)
 
 #ifndef KERNEL_HAS_D_MATERIALISE_UNIQUE
 /**
@@ -140,10 +144,10 @@ struct dentry* d_materialise_unique(struct dentry *dentry, struct inode *inode)
 /**
  * Note: Call this once during module init (and remember to call kmem_cache_destroy() )
  */
-#if defined(KERNEL_HAS_KMEMCACHE_CACHE_FLAGS_CTOR)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,23)
 struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSize,
    void initFuncPtr(void* initObj, struct kmem_cache* cache, unsigned long flags) )
-#elif defined(KERNEL_HAS_KMEMCACHE_CACHE_CTOR)
+#elif LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
 struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSize,
    void initFuncPtr(struct kmem_cache* cache, void* initObj) )
 #else
@@ -155,7 +159,7 @@ struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSiz
 
    unsigned long cacheFlags = SLAB_RECLAIM_ACCOUNT | SLAB_MEM_SPREAD;
 
-#if defined(KERNEL_HAS_KMEMCACHE_DTOR)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
    cache = kmem_cache_create(cacheName, cacheSize, 0, cacheFlags, initFuncPtr, NULL);
 #else
    cache = kmem_cache_create(cacheName, cacheSize, 0, cacheFlags, initFuncPtr);
@@ -165,7 +169,7 @@ struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSiz
    return cache;
 }
 
-#ifndef rbtree_postorder_for_each_entry_safe
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0)
 static struct rb_node* rb_left_deepest_node(const struct rb_node* node)
 {
    for (;;)
@@ -211,7 +215,7 @@ struct rb_node* rb_first_postorder(const struct rb_root* root)
 }
 #endif
 
-#ifndef KERNEL_HAS_WRITE_CACHE_PAGES
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 int os_write_cache_pages(struct address_space* mapping, struct writeback_control* wbc,
    int (*writepage)(struct page*, struct writeback_control*, void*), void* data)
 {
@@ -328,7 +332,7 @@ retry:
 }
 #endif
 
-#ifdef KERNEL_HAS_GENERIC_WRITE_CHECKS_ITER
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
 int os_generic_write_checks(struct file* filp, loff_t* offset, size_t* size, int isblk)
 {
    struct iovec iov = { 0, *size };

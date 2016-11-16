@@ -26,7 +26,7 @@ BEEGFS_DECLARE_FAULT_ATTR(commkit_writefile_senddata_timeout);
    if(IS_ERR(fault_create_debugfs_attr(#name, fault_dir, &beegfs_fault_ ## name))) \
       goto err_fault_dir;
 
-#ifndef KERNEL_HAS_FAULTATTR_DNAME
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
 #define DESTROY_FAULT(name) do { } while (0)
 #else
 #define DESTROY_FAULT(name) \

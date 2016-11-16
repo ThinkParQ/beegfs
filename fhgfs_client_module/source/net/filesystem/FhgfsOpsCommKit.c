@@ -31,7 +31,7 @@ bool FhgfsOpsCommKit_initEmergencyPools()
       return false;
    }
 
-#ifdef KERNEL_HAS_KMEMCACHE_DTOR
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
    headerBufferCache = kmem_cache_create("beegfs-msgheaders", BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
       SLAB_MEM_SPREAD, NULL, NULL);
 #else
@@ -1066,7 +1066,7 @@ static int __commkit_readfile_recvdata(CommKitContext* context, struct CommKitTa
       BUG_ON(currentState->data.count == 0);
    }
 
-   iov = iov_iter_iovec(&currentState->data);
+   iov = BEEGFS_IOV_ITER_IOVEC(&currentState->data);
    missingLength = MIN(iov.iov_len, currentState->toBeTransmitted - currentState->transmitted);
 
    // receive available dataPart

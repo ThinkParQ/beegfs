@@ -24,9 +24,9 @@ static int __NIC_sockIoctlV2(struct socket* sock, int cmd, unsigned long arg);
 
 static struct net_device* __first_netdev(void)
 {
-#if !defined(KERNEL_HAS_FIRST_NET_DEVICE) && !defined(KERNEL_HAS_FIRST_NET_DEVICE_NS)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
    return dev_base;
-#elif defined(KERNEL_HAS_FIRST_NET_DEVICE)
+#elif LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,23)
    return first_net_device();
 #else
    return first_net_device(&init_net);
@@ -35,7 +35,7 @@ static struct net_device* __first_netdev(void)
 
 static struct net_device* __next_netdev(struct net_device* currentDev)
 {
-#if !defined(KERNEL_HAS_FIRST_NET_DEVICE) && !defined(KERNEL_HAS_FIRST_NET_DEVICE_NS)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
    return currentDev->next;
 #else
    return next_net_device(currentDev);

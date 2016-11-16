@@ -499,7 +499,7 @@ cleanup:
 }
 #endif // KERNEL_HAS_POSIX_GET_ACL
 
-#ifdef KERNEL_HAS_SET_ACL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
 int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
 {
    App* app = FhgfsOps_getApp(inode->i_sb);
@@ -560,7 +560,7 @@ cleanup:
  */
 int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry)
 {
-#ifdef KERNEL_HAS_SET_ACL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
    if (iattr->ia_valid & ATTR_MODE)
       return posix_acl_chmod(dentry->d_inode, iattr->ia_mode);
    else
@@ -1772,7 +1772,7 @@ const char* FhgfsOps_get_link(struct dentry* dentry, struct inode* inode,
 
    return destination;
 }
-#elif defined(KERNEL_HAS_FOLLOW_LINK_COOKIE)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
 const char* FhgfsOps_follow_link(struct dentry* dentry, void** cookie)
 {
    char* destination;
@@ -1891,6 +1891,47 @@ int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
 
    return retVal;
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)
+
+/**
+ * Note: i_size of the inode is set to the desired size before this is called
+ *
+ * Note: unused, can later be removed; truncation is done via sys_truncate -> setattr (and this was
+ * just called additionally indirectly via sys_truncate -> vmtruncate -> truncate).
+ */
+void FhgfsOps_truncate(struct inode* inode)
+{
+   App* app = FhgfsOps_getApp(inode->i_sb);
+   Logger* log = App_getLogger(app);
+   const char* logContext = "FhgfsOps_truncate";
+
+   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
+
+   loff_t size = i_size_read(inode);
+
+   if(unlikely(Logger_getLogLevel(log) >= 5) )
+   {
+      struct dentry* dentry = d_find_alias(inode); // calls dget_locked (can return NULL)
+
+      FhgfsOpsHelper_logOp(5, app, dentry, inode, logContext);
+
+      if(dentry)
+         dput(dentry);
+   }
+
+   FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo
+
+   // (see below why return val is not checked)
+   FhgfsOpsRemoting_truncfile(app, FhgfsInode_getEntryInfo(fhgfsInode), size);
+
+   FhgfsInode_entryInfoReadUnlock(fhgfsInode); // UNLOCK EntryInfo
+
+
+   return; // note: this is an internal function which gives us no way to return a result.
+}
+
+#endif // LINUX_VERSION_CODE
 
 /**
  * Note: This is almost a copy of general vmtruncate(), just with inode->i_lock around the i_size
@@ -2100,7 +2141,8 @@ struct inode* __FhgfsOps_newInodeWithParentID(struct super_block* sb, struct kst
             inode->i_data.a_ops = &fhgfs_address_ops;
          }
 
-         #ifdef KERNEL_HAS_ADDRESS_SPACE_BDI
+         #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32) ) && \
+            (LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0) )
             inode->i_data.backing_dev_info = FhgfsOps_getBdi(sb);
          #endif
 

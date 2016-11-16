@@ -187,7 +187,7 @@ bool SocketTk_getHostByName(struct ExternalHelperd* helperd, const char* hostnam
  */
 bool SocketTk_getHostByAddrStr(const char* hostAddr, struct in_addr* outIPAddr)
 {
-#ifndef KERNEL_HAS_IN4_PTON
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,19)
    outIPAddr->s_addr = in_aton(hostAddr); // this version has no error handling
 #else
    if(unlikely(!in4_pton(hostAddr, strlen(hostAddr), (u8 *)outIPAddr, -1, NULL) ) )

@@ -14,16 +14,18 @@
 #define f_dentry        f_path.dentry
 #endif // KERNEL_HAS_F_DENTRY
 
-#if defined(KERNEL_HAS_PERMISSION_2)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
    int FhgfsOps_permission(struct inode *inode, int mask);
-#elif defined(KERNEL_HAS_PERMISSION_FLAGS)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)
    int FhgfsOps_permission(struct inode *inode, int mask, unsigned int flags);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+   int FhgfsOps_permission(struct inode *inode, int mask);
 #else
    /* <= 2.6.26 */
    int FhgfsOps_permission(struct inode *inode, int mask, struct nameidata *nd);
 #endif
 
-#ifdef KERNEL_HAS_GET_SB_NODEV
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,38)
 extern int FhgfsOps_getSB(struct file_system_type *fs_type,
    int flags, const char *dev_name, void *data, struct vfsmount *mnt);
 #else
@@ -37,9 +39,9 @@ extern int FhgfsOps_statfs(struct dentry* dentry, struct kstatfs* kstatfs);
 
 extern int FhgfsOps_flush(struct file *file, fl_owner_t id);
 
-#if defined(KERNEL_HAS_KMEMCACHE_CACHE_FLAGS_CTOR)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,23)
 extern void FhgfsOps_initInodeOnce(void* inode, struct kmem_cache* cache, unsigned long flags);
-#elif defined(KERNEL_HAS_KMEMCACHE_CACHE_CTOR)
+#elif LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
 extern void FhgfsOps_initInodeOnce(struct kmem_cache* cache, void* inode);
 #else
 extern void FhgfsOps_initInodeOnce(void* inode);
@@ -49,7 +51,9 @@ extern void FhgfsOps_initInodeOnce(void* inode);
 ////////////// start of kernel method emulators //////////////
 
 
-#ifndef KERNEL_HAS_GENERIC_FILE_LLSEEK_UNLOCKED
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
+extern loff_t generic_file_llseek_unlocked(struct file *file, loff_t offset, int origin);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0)
 extern loff_t generic_file_llseek_unlocked(struct file *file, loff_t offset, int origin);
 #endif // LINUX_VERSION_CODE
 
@@ -65,15 +69,24 @@ extern void clear_nlink(struct inode *inode);
 extern void inc_nlink(struct inode *inode);
 #endif // KERNEL_HAS_INC_NLINK
 
-#ifndef KERNEL_HAS_SET_NLINK
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0)
 static inline void set_nlink(struct inode *inode, unsigned int nlink);
 #endif // LINUX_VERSION_CODE
 
-#ifndef KERNEL_HAS_MAPPING_SET_ERROR
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,27)
+static inline void pagevec_lru_add_file(struct pagevec *pvec);
+static inline void __pagevec_lru_add_file(struct pagevec *pvec);
+#endif // LINUX_VERSION_CODE
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
+static inline int trylock_page(struct page *page);
+#endif // LINUX_VERSION_CODE
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
 static inline void mapping_set_error(struct address_space *mapping, int error);
 #endif // LINUX_VERSION_CODE
 
-#ifndef KERNEL_HAS_DENTRY_PATH_RAW
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
 char *dentry_path_raw(struct dentry *dentry, char *buf, int buflen);
 #endif
 
@@ -83,7 +96,7 @@ static inline struct inode *file_inode(struct file *f);
 
 
 
-#ifndef KERNEL_HAS_SET_NLINK
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0)
 /**
  * Note: This is just an emulator that does the job for old kernels.
  */
@@ -93,7 +106,41 @@ void set_nlink(struct inode *inode, unsigned int nlink)
 }
 #endif // LINUX_VERSION_CODE
 
-#ifndef KERNEL_HAS_MAPPING_SET_ERROR
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,27)
+
+/**
+ * Note: This is just a wrapper that calls the old function name for old kernels.
+ */
+void pagevec_lru_add_file(struct pagevec *pvec)
+{
+   pagevec_lru_add(pvec);
+}
+
+/**
+ * Note: This is just a wrapper that calls the old function name for old kernels.
+ */
+void __pagevec_lru_add_file(struct pagevec *pvec)
+{
+   __pagevec_lru_add(pvec);
+}
+
+#endif // LINUX_VERSION_CODE
+
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
+
+/**
+ * Note: This is just an emulator that does the job for old kernels.
+ */
+int trylock_page(struct page *page)
+{
+   return (likely(!test_and_set_bit(PG_locked, &page->flags) ) );
+}
+
+#endif // LINUX_VERSION_CODE
+
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
 
 /**
  * Note: This is just an emulator that does the job for old kernels.
