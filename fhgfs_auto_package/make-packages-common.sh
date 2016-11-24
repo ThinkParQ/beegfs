@@ -27,9 +27,9 @@ print_usage()
 	echo "  $ `basename $0` [options]"
 	echo
 	echo "OPTIONS:"
-        echo "  -v S   Major version string (e.g. \"2015.03\")."
+        echo "  -v S   Major version string (e.g. \"6\")."
 	echo "         Default is based on current date."
-        echo "  -s S   Minor version string (e.g. \"r1\")."
+        echo "  -m S   Minor version string (e.g. \"2\")."
         echo "         Default is based on current date."
         echo "  -j N   Number of parallel processes for \"make\"."
         echo "  -p S   Package destination directory."
