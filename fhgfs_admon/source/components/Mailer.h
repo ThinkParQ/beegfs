@@ -29,8 +29,7 @@ class Mailer : public PThread
       Mailer() : PThread("Mailer"), log("Mailer") {};
       virtual ~Mailer() {};
 
-      static int sendMail(const std::string& smtpServerName, const std::string& sender,
-         const std::string& recipient, const std::string& subject, const std::string& msg);
+      int sendMail(const std::string& subject, const std::string& msg);
       bool addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeType);
 
 
@@ -84,6 +83,11 @@ class Mailer : public PThread
       void run();
       void notifyDownNodes();
       void notifyBackUpNodes();
+
+      int sendMailSocket(const std::string& smtpServerName, const std::string& sender,
+         const std::string& recipient, const std::string& subject, const std::string& msg);
+      int sendMailSystem(const std::string& sender, const std::string& recipient,
+         const std::string& subject, const std::string& msg);
 
    public:
       // public inliners

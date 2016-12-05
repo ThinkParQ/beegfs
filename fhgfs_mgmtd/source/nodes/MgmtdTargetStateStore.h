@@ -18,6 +18,7 @@ class MgmtdTargetStateStore : public TargetStateStore
       bool autoOfflineTargets(const unsigned pofflineTimeout, const unsigned offlineTimeout,
          MirrorBuddyGroupMapper* buddyGroups);
       bool resolveDoubleResync();
+      bool resolvePrimaryResync();
 
       void saveResyncSetToFile();
       bool loadResyncSetFromFile() throw (InvalidConfigException);
@@ -36,6 +37,7 @@ class MgmtdTargetStateStore : public TargetStateStore
       NodeType nodeType; // Meta node state store or storage target state store.
 
       UInt16Vector findDoubleResync();
+      UInt16Vector findPrimaryResync();
       bool setTargetsGood(const UInt16Vector& ids);
 
    public:

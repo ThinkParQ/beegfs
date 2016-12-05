@@ -91,7 +91,7 @@ char* StringTk_strDup(const char* s)
  */
 char* StringTk_strnDup(const char* s, size_t len)
 {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,23)
+#ifndef KERNEL_HAS_KSTRNDUP
    return kstrdup(s, GFP_NOFS);
 #else
    return kstrndup(s, len, GFP_NOFS);

@@ -24,6 +24,12 @@
 #define MODEGETQUOTAINFO_ARG_WITHSYSTEM         "--withsystem"
 #define MODEGETQUOTAINFO_ARG_DEFAULT            "--defaultlimits"
 
+static const int MODEGETQUOTAINFO_RETVAL_USEDQUOTA_SUCCESS =  0;
+static const int MODEGETQUOTAINFO_RETVAL_USEDQUOTA_INVALID = -1;
+static const int MODEGETQUOTAINFO_RETVAL_USEDQUOTA_EMPTY   = -2;
+
+
+
 int ModeGetQuotaInfo::execute()
 {
    int retVal = APPCODE_RUNTIME_ERROR;
@@ -447,28 +453,16 @@ void ModeGetQuotaInfo::printQuota(QuotaDataMap* usedQuota, QuotaDataMap* quotaLi
 
    // prepare default limits
    std::string defaultLimitSize;
-   std::string defaultLimitSizeUnit;
-   uint64_t defaultSizeLimit = (cfg.cfgType == QuotaDataType_USER) ?
-      defaultLimits.getDefaultUserQuotaSize() : defaultLimits.getDefaultGroupQuotaSize();
-   uint64_t defaultInodeLimit = (cfg.cfgType == QuotaDataType_USER) ?
-      defaultLimits.getDefaultUserQuotaInodes() : defaultLimits.getDefaultGroupQuotaInodes();
+   std::string defaultInodeLimit;
+   getDefaultQuotaStrings(defaultLimits, cfg.cfgType, defaultLimitSize, defaultInodeLimit);
 
    if(this->cfg.cfgCsv)
    {
-      // prepare default limit size strings for csv file
-      defaultLimitSize = StringTk::doubleToStr(defaultSizeLimit, 0);
-      defaultLimitSizeUnit = "Byte";
-
       // print header vor csv file
       printf("name,id,size,hard,files,hard\n");
    }
    else
    {
-      // prepare default limit size strings for console output
-      double defaultSizeLimitValue = UnitTk::byteToXbyte(defaultSizeLimit, &defaultLimitSizeUnit);
-      int precision = ( (defaultLimitSize == "Byte") || (defaultLimitSize == "B") ) ? 0 : 2;
-      defaultLimitSize = StringTk::doubleToStr(defaultSizeLimitValue, precision);
-
       // print header for console output
       printf("      user/group     ||           size          ||    chunk files    \n");
       printf("     name     |  id  ||    used    |    hard    ||  used   |  hard   \n");
@@ -476,15 +470,15 @@ void ModeGetQuotaInfo::printQuota(QuotaDataMap* usedQuota, QuotaDataMap* quotaLi
    }
 
    if(this->cfg.cfgUseAll || this->cfg.cfgUseList)
-      allValid = printQuotaForList(usedQuota, quotaLimits, defaultLimitSize, defaultLimitSizeUnit,
-         defaultInodeLimit, quotaInodeSupport);
+      allValid = printQuotaForList(usedQuota, quotaLimits, defaultLimitSize, defaultInodeLimit,
+         quotaInodeSupport);
    else
    if(this->cfg.cfgUseRange)
-      allValid = printQuotaForRange(usedQuota, quotaLimits, defaultLimitSize, defaultLimitSizeUnit,
-         defaultInodeLimit, quotaInodeSupport);
+      allValid = printQuotaForRange(usedQuota, quotaLimits, defaultLimitSize, defaultInodeLimit,
+         quotaInodeSupport);
    else
       allValid = printQuotaForID(usedQuota, quotaLimits, this->cfg.cfgID, defaultLimitSize,
-         defaultLimitSizeUnit, defaultInodeLimit, quotaInodeSupport);
+         defaultInodeLimit, quotaInodeSupport);
 
    if(!allValid)
       std::cerr << std::endl << "Some IDs were skipped because of invalid values. "
@@ -492,116 +486,29 @@ void ModeGetQuotaInfo::printQuota(QuotaDataMap* usedQuota, QuotaDataMap* quotaLi
 }
 
 bool ModeGetQuotaInfo::printQuotaForID(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits,
-   unsigned id, std::string& defaultSizeLimitValue, std::string& defaultSizeLimitUnit,
-   uint64_t defaultInodeLimit, QuotaInodeSupport quotaInodeSupport)
+   unsigned id, std::string& defaultSizeLimit, std::string& defaultInodeLimit,
+   QuotaInodeSupport quotaInodeSupport)
 {
    // prepare used quota values
    std::string usedSize;
-   std::string usedSizeUnit;
    std::string usedInodes;
+   int retVal = getUsedQuotaStrings(usedQuota, id, quotaInodeSupport, usedSize, usedInodes);
 
-   QuotaDataMapIter usedQuotaIter = usedQuota->find(id);
-   if(usedQuotaIter != usedQuota->end() )
+   // skip invalid or empty quota data
+   if(retVal == MODEGETQUOTAINFO_RETVAL_USEDQUOTA_INVALID)
    {
-      // check if used quota data are valid
-      if(!usedQuotaIter->second.isValid() )
-         return false;
-
-      // skip user/group with no space usage
-      if(!this->cfg.cfgPrintUnused &&
-         !usedQuotaIter->second.getSize() && !usedQuotaIter->second.getInodes() )
-         return true;
-
-      if(this->cfg.cfgCsv)
-      {
-         usedSize = StringTk::doubleToStr(usedQuotaIter->second.getSize(), 0);
-         usedSizeUnit = "Byte";
-      }
-      else
-      {
-         double usedSizeValue = UnitTk::byteToXbyte(usedQuotaIter->second.getSize(), &usedSizeUnit);
-         int precision = ( (usedSizeUnit == "Byte") || (usedSizeUnit == "B") ) ? 0 : 2;
-         usedSize = StringTk::doubleToStr(usedSizeValue, precision);
-      }
-
-      if(quotaInodeSupport == QuotaInodeSupport_NO_BLOCKDEVICES)
-      {
-         usedInodes = "-";
-      }
-      else if(quotaInodeSupport == QuotaInodeSupport_SOME_BLOCKDEVICES)
-      {
-         usedInodes = StringTk::uint64ToStr(usedQuotaIter->second.getInodes() );
-         usedInodes.append("+");
-      }
-      else
-      {
-         usedInodes = StringTk::uint64ToStr(usedQuotaIter->second.getInodes() );
-      }
+      return false;
    }
-   else
-   if(this->cfg.cfgPrintUnused)
+   else if(retVal == MODEGETQUOTAINFO_RETVAL_USEDQUOTA_EMPTY)
    {
-      usedSize = "0";
-      usedSizeUnit = "Byte";
-
-      if(quotaInodeSupport == QuotaInodeSupport_NO_BLOCKDEVICES)
-      {
-         usedInodes = "-";
-      }
-      else if(quotaInodeSupport == QuotaInodeSupport_SOME_BLOCKDEVICES)
-      {
-         usedInodes = "0+";
-      }
-      else
-      {
-         usedInodes = "0";
-      }
-   }
-   else // skip user/group with no space usage
       return true;
-
+   }
 
    // prepare hard limit values
    std::string hardLimitSize;
-   std::string hardLimitSizeUnit;
-   unsigned long long hardLimitInodes;
-
-   QuotaDataMapIter limitsIter = quotaLimits->find(id);
-   if(limitsIter != quotaLimits->end() )
-   {
-      // check if a individual size limit is set
-      if(limitsIter->second.getSize() )
-      { // use the individual size limit
-         if( this->cfg.cfgCsv )
-         {
-            hardLimitSize = StringTk::doubleToStr(limitsIter->second.getSize(), 0);
-            hardLimitSizeUnit = "Byte";
-         }
-         else
-         {
-            double hardLimitSizeValue = UnitTk::byteToXbyte(limitsIter->second.getSize(),
-               &hardLimitSizeUnit);
-            int precision = ( (hardLimitSizeUnit == "Byte") || (hardLimitSizeUnit == "B") ) ? 0 : 2;
-            hardLimitSize = StringTk::doubleToStr(hardLimitSizeValue, precision);
-         }
-      }
-      else
-      { // use the default size limit
-         hardLimitSize = defaultSizeLimitValue;
-         hardLimitSizeUnit = defaultSizeLimitUnit;
-      }
-
-      hardLimitInodes = limitsIter->second.getInodes() ? limitsIter->second.getInodes() :
-         defaultInodeLimit;
-   }
-   else
-   {
-      hardLimitSize = defaultSizeLimitValue;
-      hardLimitSizeUnit = defaultSizeLimitUnit;
-
-      hardLimitInodes = defaultInodeLimit;
-   }
-
+   std::string hardLimitInodes;
+   getQuotaLimitsStrings(quotaLimits, id, defaultSizeLimit, defaultInodeLimit, hardLimitSize,
+      hardLimitInodes);
 
    // prepare the user or group name
    std::string name;
@@ -621,52 +528,56 @@ bool ModeGetQuotaInfo::printQuotaForID(QuotaDataMap* usedQuota, QuotaDataMap* qu
     */
    if(this->cfg.cfgCsv)
    {
-      printf("%s,%u,%s,%s,%s,%qu\n",
+      printf("%s,%u,%s,%s,%s,%s\n",
          name.c_str(),                                         // name
          id,                                                   // id
-         usedSize.c_str(),                                     // used (blocks)
-         hardLimitSize.c_str(),                                // hard limit (blocks)
-         usedInodes.c_str(),                                   // used (inodes)
-         hardLimitInodes);                                     // hard limit (inodes)
+         usedSize.c_str(),                                     // used size
+         hardLimitSize.c_str(),                                // hard limit size
+         usedInodes.c_str(),                                   // used chunks
+         hardLimitInodes.c_str() );                            // hard limit chunks
    }
    else
    {
-      printf("%14s|%6u||%7s %-4s|%7s %-4s||%9s|%9qu\n",
+      printf("%14s|%6u||%12s|%12s||%9s|%9s\n",
          name.c_str(),                                         // name
          id,                                                   // id
-         usedSize.c_str(),                                     // used (blocks)
-         usedSizeUnit.c_str(),                                 // unit (used blocks)
-         hardLimitSize.c_str(),                                // hard limit (blocks)
-         hardLimitSizeUnit.c_str(),                            // unit (hard limit)
-         usedInodes.c_str(),                                   // used (inodes)
-         hardLimitInodes);                                     // hard limit (inodes)
+         usedSize.c_str(),                                     // used size
+         hardLimitSize.c_str(),                                // hard limit size
+         usedInodes.c_str(),                                   // used chunks
+         hardLimitInodes.c_str() );                            // hard limit chunks
    }
 
    return true;
 }
 
 bool ModeGetQuotaInfo::printQuotaForRange(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits,
-   std::string& defaultSizeLimitValue, std::string& defaultSizeLimitUnit,
-   uint64_t defaultInodeLimit, QuotaInodeSupport quotaInodeSupport)
+   std::string& defaultSizeLimitValue, std::string& defaultInodeLimit,
+   QuotaInodeSupport quotaInodeSupport)
 {
    bool allValid = false;
 
    for(unsigned id = this->cfg.cfgIDRangeStart; id <= this->cfg.cfgIDRangeEnd; id++)
-      allValid = printQuotaForID(usedQuota, quotaLimits, id, defaultSizeLimitValue,
-         defaultSizeLimitUnit, defaultInodeLimit, quotaInodeSupport);
+   {
+      bool valid = printQuotaForID(usedQuota, quotaLimits, id, defaultSizeLimitValue,
+         defaultInodeLimit, quotaInodeSupport);
+      allValid = valid ? allValid : false;
+   }
 
    return allValid;
 }
 
 bool ModeGetQuotaInfo::printQuotaForList(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits,
-   std::string& defaultSizeLimitValue, std::string& defaultSizeLimitUnit,
-   uint64_t defaultInodeLimit, QuotaInodeSupport quotaInodeSupport)
+   std::string& defaultSizeLimitValue, std::string& defaultInodeLimit,
+   QuotaInodeSupport quotaInodeSupport)
 {
-   bool allValid = false;
+   bool allValid = true;
 
    for(UIntListIter id = this->cfg.cfgIDList.begin(); id != this->cfg.cfgIDList.end(); id++)
-      allValid = printQuotaForID(usedQuota, quotaLimits, *id, defaultSizeLimitValue,
-         defaultSizeLimitUnit, defaultInodeLimit, quotaInodeSupport);
+   {
+      bool valid = printQuotaForID(usedQuota, quotaLimits, *id, defaultSizeLimitValue,
+         defaultInodeLimit, quotaInodeSupport);
+      allValid = valid ? allValid : false;
+   }
 
    return allValid;
 }
@@ -678,37 +589,197 @@ bool ModeGetQuotaInfo::printQuotaForList(QuotaDataMap* usedQuota, QuotaDataMap* 
  */
 void ModeGetQuotaInfo::printDefaultQuotaLimits(QuotaDefaultLimits& quotaLimits)
 {
-   std::string hardLimitSizeUnitUser;
-   double hardLimitSizeValueUser = UnitTk::byteToXbyte(quotaLimits.getDefaultUserQuotaSize(),
-      &hardLimitSizeUnitUser);
-   int precisionUser = ( (hardLimitSizeUnitUser == "Byte") || (hardLimitSizeUnitUser == "B") ) ?
-      0 : 2;
-   std::string hardLimitSizeUser = StringTk::doubleToStr(hardLimitSizeValueUser, precisionUser);
-   unsigned long long hardLimitInodesUser = quotaLimits.getDefaultUserQuotaInodes();
+   std::string hardLimitSizeUser;
+   std::string hardLimitInodesUser;
+   std::string hardLimitSizeGroup;
+   std::string hardLimitInodesGroup;
 
-   std::string hardLimitSizeUnitGroup;
-   double hardLimitSizeValueGroup = UnitTk::byteToXbyte(quotaLimits.getDefaultGroupQuotaSize(),
-      &hardLimitSizeUnitGroup);
-   int precisionGroup = ( (hardLimitSizeUnitGroup == "Byte") || (hardLimitSizeUnitGroup == "B") ) ?
-      0 : 2;
-   std::string hardLimitSizeGroup = StringTk::doubleToStr(hardLimitSizeValueGroup, precisionGroup);
-   unsigned long long hardLimitInodesGroup = quotaLimits.getDefaultGroupQuotaInodes() ;
+   getDefaultQuotaStrings(quotaLimits, QuotaDataType_USER, hardLimitSizeUser, hardLimitInodesUser);
+   getDefaultQuotaStrings(quotaLimits, QuotaDataType_GROUP, hardLimitSizeGroup,
+      hardLimitInodesGroup);
 
    if(cfg.cfgCsv)
    {
       printf("user size limit,user chunk files limit,group size limit,group chunk files\n");
-      printf("%s%s,%qu,%s%s,%qu\n",
-         hardLimitSizeUser.c_str(), hardLimitSizeUnitUser.c_str(),
-         hardLimitInodesUser,
-         hardLimitSizeGroup.c_str(), hardLimitSizeUnitGroup.c_str(),
-         hardLimitInodesGroup);
+      printf("%s,%s,%s,%s\n",
+         hardLimitSizeUser.c_str(), hardLimitInodesUser.c_str(),
+         hardLimitSizeGroup.c_str(), hardLimitInodesGroup.c_str());
    }
    else
    {
-      printf("user size limit: %s%s\n", hardLimitSizeUser.c_str(), hardLimitSizeUnitUser.c_str() );
-      printf("user chunk files limit: %qu\n", hardLimitInodesUser);
-      printf("group size limit: %s%s\n", hardLimitSizeGroup.c_str(),
-         hardLimitSizeUnitGroup.c_str() );
-      printf("group chunk files: %qu\n\n", hardLimitInodesGroup);
+      printf("user size limit:        %s\n", hardLimitSizeUser.c_str() );
+      printf("user chunk files limit: %s\n", hardLimitInodesUser.c_str() );
+      printf("group size limit:       %s\n", hardLimitSizeGroup.c_str() );
+      printf("group chunk files:      %s\n\n", hardLimitInodesGroup.c_str() );
    }
+}
+
+int ModeGetQuotaInfo::getUsedQuotaStrings(QuotaDataMap* usedQuota, unsigned id,
+   QuotaInodeSupport quotaInodeSupport, std::string& usedSizeOut, std::string& usedInodesOut)
+{
+   std::string usedSizeUnit;
+
+   QuotaDataMapIter usedQuotaIter = usedQuota->find(id);
+   if(usedQuotaIter != usedQuota->end() )
+   {
+      // check if used quota data are valid
+      if(!usedQuotaIter->second.isValid() )
+         return MODEGETQUOTAINFO_RETVAL_USEDQUOTA_INVALID;
+
+      // skip user/group with no space usage
+      if(!this->cfg.cfgPrintUnused &&
+         !usedQuotaIter->second.getSize() && !usedQuotaIter->second.getInodes() )
+         return MODEGETQUOTAINFO_RETVAL_USEDQUOTA_EMPTY;
+
+      if(this->cfg.cfgCsv)
+      {
+         usedSizeOut = StringTk::doubleToStr(usedQuotaIter->second.getSize(), 0);
+         usedSizeOut.append(" Byte");
+      }
+      else
+      {
+         double usedSizeValue = UnitTk::byteToXbyte(usedQuotaIter->second.getSize(), &usedSizeUnit);
+         int precision = ( (usedSizeUnit == "Byte") || (usedSizeUnit == "B") ) ? 0 : 2;
+         usedSizeOut = StringTk::doubleToStr(usedSizeValue, precision);
+         usedSizeOut.append(" ").append(usedSizeUnit);
+      }
+
+      if(quotaInodeSupport == QuotaInodeSupport_NO_BLOCKDEVICES)
+      {
+         usedInodesOut = "-";
+      }
+      else if(quotaInodeSupport == QuotaInodeSupport_SOME_BLOCKDEVICES)
+      {
+         usedInodesOut = StringTk::uint64ToStr(usedQuotaIter->second.getInodes() );
+         usedInodesOut.append("+");
+      }
+      else
+      {
+         usedInodesOut = StringTk::uint64ToStr(usedQuotaIter->second.getInodes() );
+      }
+   }
+   else if(this->cfg.cfgPrintUnused)
+   {
+      usedSizeOut = "0";
+      usedSizeOut.append(" Byte");
+
+      if(quotaInodeSupport == QuotaInodeSupport_NO_BLOCKDEVICES)
+      {
+         usedInodesOut = "-";
+      }
+      else if(quotaInodeSupport == QuotaInodeSupport_SOME_BLOCKDEVICES)
+      {
+         usedInodesOut = "0+";
+      }
+      else
+      {
+         usedInodesOut = "0";
+      }
+   }
+   else
+   { // skip user/group with no space usage
+      return MODEGETQUOTAINFO_RETVAL_USEDQUOTA_EMPTY;
+   }
+
+   return MODEGETQUOTAINFO_RETVAL_USEDQUOTA_SUCCESS;
+}
+
+void ModeGetQuotaInfo::getQuotaLimitsStrings(QuotaDataMap* quotaLimits, unsigned id,
+   std::string& defaultSizeLimit, std::string& defaultInodeLimit, std::string& limitSizeOut,
+   std::string& limitInodesOut)
+{
+   QuotaDataMapIter limitsIter = quotaLimits->find(id);
+   if(limitsIter != quotaLimits->end() )
+   {
+      // check if a individual size limit is set
+      if(limitsIter->second.getSize() )
+      { // use the individual size limit
+         if(isUnlimtedValue(limitsIter->second.getSize() ) )
+         {
+            limitSizeOut = "unlimited";
+         }
+         else if( this->cfg.cfgCsv )
+         {
+            limitSizeOut = StringTk::doubleToStr(limitsIter->second.getSize(), 0);
+            limitSizeOut.append(" Byte");
+         }
+         else
+         {
+            std::string sizeUnit;
+            double limitSizeValue = UnitTk::byteToXbyte(limitsIter->second.getSize(), &sizeUnit);
+            int precision = ( (sizeUnit == "Byte") || (sizeUnit == "B") ) ? 0 : 2;
+            limitSizeOut = StringTk::doubleToStr(limitSizeValue, precision);
+            limitSizeOut.append(" ").append(sizeUnit);
+         }
+      }
+      else
+      { // individual size limit is not set, use the default size limit
+         limitSizeOut = defaultSizeLimit;
+      }
+
+      // check if a individual inode limit is set
+      if(limitsIter->second.getInodes() )
+      {
+         if(isUnlimtedValue(limitsIter->second.getInodes() ) )
+         {
+            limitInodesOut = "unlimited";
+         }
+         else
+         {
+            limitInodesOut = StringTk::uint64ToStr(limitsIter->second.getInodes() );
+         }
+      }
+      else
+      { // individual inode limit is not set, use the default inode limit
+         limitInodesOut = defaultInodeLimit;
+      }
+   }
+   else
+   { // ID not found, use default limits
+      limitSizeOut = defaultSizeLimit;
+      limitInodesOut = defaultInodeLimit;
+   }
+}
+
+void ModeGetQuotaInfo::getDefaultQuotaStrings(QuotaDefaultLimits& quotaLimits, QuotaDataType type,
+   std::string& defaultLimitSizeOut, std::string& defaultLimitInodesOut)
+{
+   uint64_t limitSizeValueByte = (type == QuotaDataType_USER) ?
+      quotaLimits.getDefaultUserQuotaSize() : quotaLimits.getDefaultGroupQuotaSize();
+   if(isUnlimtedValue(limitSizeValueByte) )
+   {
+      defaultLimitSizeOut = "unlimited";
+   }
+   else
+   {
+      if(this->cfg.cfgCsv)
+      {
+         defaultLimitSizeOut = StringTk::uint64ToStr(limitSizeValueByte);
+         defaultLimitSizeOut.append(" Byte");
+      }
+      else
+      {
+         std::string limitSizeUnit;
+         double limitSizeValue = UnitTk::byteToXbyte(limitSizeValueByte, &limitSizeUnit);
+         int precision = ( (limitSizeUnit == "Byte") || (limitSizeUnit == "B") ) ? 0 : 2;
+         defaultLimitSizeOut = StringTk::doubleToStr(limitSizeValue, precision);
+         defaultLimitSizeOut.append(" ").append(limitSizeUnit);
+      }
+   }
+
+   uint64_t inodeLimitValue = (type == QuotaDataType_USER) ?
+      quotaLimits.getDefaultUserQuotaInodes() : quotaLimits.getDefaultGroupQuotaInodes();
+   if(isUnlimtedValue(inodeLimitValue) )
+   {
+      defaultLimitInodesOut = "unlimited";
+   }
+   else
+   {
+      defaultLimitInodesOut = StringTk::uint64ToStr(inodeLimitValue);
+   }
+}
+
+bool ModeGetQuotaInfo::isUnlimtedValue(uint64_t inValue)
+{
+   return ( (!inValue) || (inValue == std::numeric_limits<uint64_t>::max() ) );
 }

@@ -8,22 +8,15 @@
 
 class RuntimeConfig
 {
-   private:
-      Config *cfg;
-      bool mailEnabled;
-      std::string mailSender;
-      std::string mailRecipient;
-      std::string mailSmtpServer;
-      int mailMinDownTimeSec;
-      int mailResendMailTimeMin;
-      std::string scriptPath;
-
-      void setDefaults();
    public:
       RuntimeConfig(Config *cfg)
       {
          this->cfg = cfg;
          setDefaults();
+      }
+
+      virtual ~RuntimeConfig()
+      {
       }
 
       bool getMailEnabled()
@@ -38,6 +31,34 @@ class RuntimeConfig
       void setMailEnabled(bool mailEnabled)
       {
          this->mailEnabled = mailEnabled;
+      }
+
+      SmtpSendType getMailSmtpSendType()
+      {
+         if (cfg->isMailConfigOverrideActive())
+         {
+            return cfg->getMailSmtpSendType();
+         }
+         return mailSmtpSendTypeNum;
+      }
+
+      void setMailSmtpSendType(SmtpSendType mailSmtpSendType)
+      {
+         this->mailSmtpSendTypeNum = mailSmtpSendType;
+      }
+
+      std::string getMailSendmailPath()
+      {
+         if (cfg->isMailConfigOverrideActive())
+         {
+            return cfg->getMailSendmailPath();
+         }
+         return mailSendmailPath;
+      }
+
+      void setMailSendmailPath(std::string mailSendmailPath)
+      {
+         this->mailSendmailPath = mailSendmailPath;
       }
 
       std::string getMailSender()
@@ -130,18 +151,21 @@ class RuntimeConfig
          {
             (*outMap)["mailEnabled"] = "false";
          }
+         (*outMap)["mailSmtpSendTypeNum"] = StringTk::intToStr(mailSmtpSendTypeNum);
+         (*outMap)["mailSendmailPath"] = mailSendmailPath;
          (*outMap)["mailSender"] = mailSender;
          (*outMap)["mailRecipient"] = mailRecipient;
          (*outMap)["mailSmtpServer"] = mailSmtpServer;
          (*outMap)["mailMinDownTimeSec"] = StringTk::intToStr(mailMinDownTimeSec);
          (*outMap)["mailResendMailTimeMin"] = StringTk::intToStr(mailResendMailTimeMin);
          (*outMap)["scriptPath"] = scriptPath;
-
       }
 
       void importAsMap(std::map<std::string, std::string> *inMap)
       {
          mailEnabled = StringTk::strToBool((*inMap)["mailEnabled"]);
+         mailSmtpSendTypeNum = (SmtpSendType) StringTk::strToInt( (*inMap)["mailSmtpSendTypeNum"]);
+         mailSendmailPath = (*inMap)["mailSendmailPath"];
          mailSender = (*inMap)["mailSender"];
          mailRecipient = (*inMap)["mailRecipient"];
          mailSmtpServer = (*inMap)["mailSmtpServer"];
@@ -150,9 +174,20 @@ class RuntimeConfig
          scriptPath = (*inMap)["scriptPath"];
       }
 
-      virtual ~RuntimeConfig()
-      {
-      }
+
+   private:
+      Config *cfg;
+      bool mailEnabled;
+      SmtpSendType mailSmtpSendTypeNum;
+      std::string mailSendmailPath;
+      std::string mailSender;
+      std::string mailRecipient;
+      std::string mailSmtpServer;
+      int mailMinDownTimeSec;
+      int mailResendMailTimeMin;
+      std::string scriptPath;
+
+      void setDefaults();
 };
 
 #endif /* RUNTIMECONFIG_H_ */

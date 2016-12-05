@@ -32,7 +32,7 @@ tar czf $BUILD/buildroot/SOURCES/${NAME}-${BEEGFS_VERSION}.tgz   --exclude=build
 cd $BUILD
 sed 	-e "s#%BEEGFS_OPENTK_PATH%#$BEEGFS_OPENTK_PATH#" \
 	-e "s#%BEEGFS_COMMON_PATH%#$BEEGFS_COMMON_PATH#" \
-	-e "s/%NAME%/$NAME/" \
+	-e "s/%NAME%/$NAME/g" \
 	-e "s/%BEEGFS_VERSION%/$BEEGFS_VERSION/"   \
 	-e "s/%BUILDARCH%/$BUILDARCH/"   \
 	${SPEC_FILE}.in > ${SPEC_FILE}

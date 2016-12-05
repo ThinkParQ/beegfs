@@ -82,7 +82,7 @@ cd build
 echo "mkdir RPM_BUILD_ROOT (${RPM_BUILD_ROOT})"
 mkdir -p ${RPM_BUILD_ROOT}
 install -D --mode=u+rwxs,g+rx,o+rx beegfs-ctl ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-ctl
-install -D beegfs-fsck ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-fsck
+install -D --mode=u+rwxs,g+rx,o+rx beegfs-fsck ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-fsck
 mkdir -p ${RPM_BUILD_ROOT}/sbin
 cp -a ../scripts/fsck.beegfs ${RPM_BUILD_ROOT}/sbin/
 mkdir -p ${RPM_BUILD_ROOT}/usr/bin/
@@ -100,8 +100,8 @@ cp -a ../scripts/etc/bash_completion.d/beegfs-ctl ${RPM_BUILD_ROOT}/etc/bash_com
 
 %files
 %defattr(-,root,root)
-/opt/beegfs/sbin/beegfs-ctl
-/opt/beegfs/sbin/beegfs-fsck
+%attr(4755, root, root) /opt/beegfs/sbin/beegfs-fsck
+%attr(4755, root, root) /opt/beegfs/sbin/beegfs-ctl
 /opt/beegfs/lib/jbeegfs.jar
 /opt/beegfs/lib/libjbeegfs.so
 /usr/bin/*

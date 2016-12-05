@@ -2,7 +2,15 @@
 #include <program/Program.h>
 #include "Config.h"
 
+#include <sys/stat.h>
+
+
+
 #define CONFIG_DEFAULT_CFGFILENAME "/etc/beegfs/beegfs-admon.conf"
+
+#define SMTPSENDTYPE_SOCKET        "socket"
+#define SMTPSENDTYPE_SENDMAIL      "sendmail"
+
 
 
 Config::Config(int argc, char** argv) throw(InvalidConfigException) : AbstractConfig(argc, argv)
@@ -20,7 +28,7 @@ void Config::loadDefaults(bool addDashes)
    AbstractConfig::loadDefaults();
 
    // re-definitions
-   configMapRedefine("cfgFile",                  "" /*createDefaultCfgFilename()*/ );
+   configMapRedefine("cfgFile",                  "");
    configMapRedefine("connUseRDMA",              "false"); // overrides abstract config
 
    // own definitions
@@ -44,6 +52,8 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("clearDatabase",            "false");
 
    configMapRedefine("mailEnabled",              "false");
+   configMapRedefine("mailSmtpSendType",         SMTPSENDTYPE_SOCKET);
+   configMapRedefine("mailSendmailPath",         MAIL_SENDMAIL_DEFAULT_PATH);
    configMapRedefine("mailSmtpServer",           "");
    configMapRedefine("mailSender",               "");
    configMapRedefine("mailRecipient",            "");
@@ -105,6 +115,12 @@ void Config::applyConfigMap(bool enableException, bool addDashes) throw(InvalidC
       if(iter->first == std::string("mailEnabled") )
          mailEnabled = StringTk::strToBool(iter->second);
       else
+      if(iter->first == std::string("mailSmtpSendType") )
+         mailSmtpSendType = iter->second;
+      else
+      if(iter->first == std::string("mailSendmailPath") )
+         mailSendmailPath = iter->second;
+      else
       if(iter->first == std::string("mailSmtpServer") )
          mailSmtpServer = iter->second;
       else
@@ -148,6 +164,8 @@ void Config::initImplicitVals() throw(InvalidConfigException)
 {
    // connAuthHash
    AbstractConfig::initConnAuthHash(connAuthFile, &connAuthHash);
+
+   initMailerConfig();
 }
 
 std::string Config::createDefaultCfgFilename()
@@ -187,3 +205,41 @@ void Config::resetMgmtdDaemon()
    mutexLock.unlock();
 }
 
+/**
+ * Converts the given parameter mailSmtpSendType into a enum value SmtpSendType_... and checks if
+ * the sendmail path is valid.
+ *
+ * @throws InvalidConfigException If the mailSmtpSendType is invalid or the sendmail path is not
+ *         valid.
+ */
+void Config::initMailerConfig()
+{
+   if(this->mailSmtpSendType == SMTPSENDTYPE_SOCKET)
+   {
+      this->mailSmtpSendTypeNum = SmtpSendType_SOCKET;
+   }
+   else
+   if(this->mailSmtpSendType == SMTPSENDTYPE_SENDMAIL)
+   {
+      this->mailSmtpSendTypeNum = SmtpSendType_SENDMAIL;
+
+      // the default must be overridden by an empty string
+      if(mailSendmailPath.empty() )
+         throw InvalidConfigException("Path to sendmail path is empty.");
+
+      // a path to the sendmail binary was given which is not the default path
+      if(mailSendmailPath != MAIL_SENDMAIL_DEFAULT_PATH)
+      {
+         struct stat statBuffer;
+         int statRetVal = stat(mailSendmailPath.c_str(), &statBuffer);
+
+         if(statRetVal)
+            throw InvalidConfigException("Stat of given sendmail path failed: " + mailSendmailPath +
+               " ; Errno: " + System::getErrString() );
+      }
+   }
+   else
+   { // invalid chooser specified
+      throw InvalidConfigException("Invalid SMTP send type specified: " + mailSmtpSendType);
+   }
+}

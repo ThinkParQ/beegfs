@@ -7,6 +7,8 @@ void RuntimeConfig::setDefaults()
    gethostname(localHost, 256);
    // setting defaults
    mailEnabled = false;
+   mailSmtpSendTypeNum = SmtpSendType_SOCKET;
+   mailSendmailPath = MAIL_SENDMAIL_DEFAULT_PATH;
    mailSender = "beegfs_admon@" + std::string(localHost);
    mailRecipient = "";
    mailSmtpServer = "";

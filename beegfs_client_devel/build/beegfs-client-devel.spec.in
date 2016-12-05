@@ -71,6 +71,8 @@ cd build
 echo "mkdir RPM_BUILD_ROOT (${RPM_BUILD_ROOT})"
 mkdir -p ${RPM_BUILD_ROOT}/usr/include
 cp -a ../include/beegfs ${RPM_BUILD_ROOT}/usr/include/
+mkdir -p ${RPM_BUILD_ROOT}/usr/share/doc/%NAME%/examples/
+cp -a dist/usr/share/doc/%NAME%/examples/* ${RPM_BUILD_ROOT}/usr/share/doc/%NAME%/examples/
 
 %post
 
@@ -79,4 +81,4 @@ cp -a ../include/beegfs ${RPM_BUILD_ROOT}/usr/include/
 %files
 %defattr(-,root,root)
 /usr/include/*
-
+/usr/share/doc/%NAME%/examples/*

@@ -56,7 +56,7 @@ install: build
 	
 	# manual installation
 	install -D --mode=u+rwxs,g+rx,o+rx beegfs-ctl $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-ctl
-	install -D beegfs-fsck $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-fsck
+	install -D --mode=u+rwxs,g+rx,o+rx beegfs-fsck $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-fsck
 	mkdir -p ${DEB_BUILD_ROOT}/sbin
 	cp -a ../scripts/fsck.beegfs ${DEB_BUILD_ROOT}/sbin/
 	mkdir -p $(DEB_BUILD_ROOT)/usr/bin/

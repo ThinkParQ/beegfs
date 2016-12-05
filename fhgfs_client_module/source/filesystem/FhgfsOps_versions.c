@@ -18,12 +18,10 @@
   *
   * @return 0 on success, negative linux error code otherwise
   */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
+#if defined(KERNEL_HAS_PERMISSION_2)
    int FhgfsOps_permission(struct inode *inode, int mask)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)
+#elif defined(KERNEL_HAS_PERMISSION_FLAGS)
    int FhgfsOps_permission(struct inode *inode, int mask, unsigned int flags)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
-   int FhgfsOps_permission(struct inode *inode, int mask)
 #else
    /* <= 2.6.26 */
    int FhgfsOps_permission(struct inode *inode, int mask, struct nameidata *nd)
@@ -32,10 +30,10 @@
     /* note: 2.6.38 introduced rcu-walk mode, which is inappropriate for us, because we need the
        parent. the code below tells vfs to call this again in old ref-walk mode.
        (see Documentation/filesystems/vfs.txt:d_revalidate) */
-   #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
+   #ifdef MAY_NOT_BLOCK
       if(mask & MAY_NOT_BLOCK)
          return -ECHILD;
-   #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)
+   #elif defined(IPERM_FLAG_RCU)
       if(flags & IPERM_FLAG_RCU)
          return -ECHILD;
    #endif // LINUX_VERSION_CODE
@@ -101,7 +99,7 @@ int FhgfsOps_statfs(struct dentry* dentry, struct kstatfs* kstatfs)
 
 
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,38)
+#ifdef KERNEL_HAS_GET_SB_NODEV
 
 int FhgfsOps_getSB(struct file_system_type *fs_type,
    int flags, const char *dev_name, void *data, struct vfsmount *mnt)
@@ -147,7 +145,7 @@ int FhgfsOps_flush(struct file *file, fl_owner_t id)
 /**
  * Note: Called for new cache objects (see FhgfsOps_initInodeCache() )
  */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
+#ifdef SLAB_CTOR_CONSTRUCTOR
 
 void FhgfsOps_initInodeOnce(void* inode, struct kmem_cache* cache, unsigned long flags)
 {
@@ -166,9 +164,9 @@ void FhgfsOps_initInodeOnce(void* inode, struct kmem_cache* cache, unsigned long
 
 #else
 
-   #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,23)
+   #if defined(KERNEL_HAS_KMEMCACHE_CACHE_FLAGS_CTOR)
    void FhgfsOps_initInodeOnce(void* inode, struct kmem_cache* cache, unsigned long flags)
-   #elif LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
+   #elif defined(KERNEL_HAS_KMEMCACHE_CACHE_CTOR)
    void FhgfsOps_initInodeOnce(struct kmem_cache* cache, void* inode)
    #else
    void FhgfsOps_initInodeOnce(void* inode)
@@ -185,6 +183,7 @@ void FhgfsOps_initInodeOnce(void* inode, struct kmem_cache* cache, unsigned long
 #endif // LINUX_VERSION_CODE
 
 
+#ifndef KERNEL_HAS_GENERIC_FILE_LLSEEK_UNLOCKED
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
 
 /**
@@ -234,7 +233,7 @@ loff_t generic_file_llseek_unlocked(struct file *file, loff_t offset, int origin
    return offset;
 }
 
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0)
+#else
 
 /**
  * Note: The lock (to which the _unlocked suffix refers) was dropped in linux 3.2, so we can now
@@ -246,6 +245,7 @@ loff_t generic_file_llseek_unlocked(struct file *file, loff_t offset, int origin
 }
 
 #endif // LINUX_VERSION_CODE
+#endif
 
 #ifndef KERNEL_HAS_DROP_NLINK
 
@@ -307,7 +307,7 @@ void inc_nlink(struct inode *inode)
 #endif // KERNEL_HAS_INC_NLINK
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
+#ifndef KERNEL_HAS_DENTRY_PATH_RAW
 /**
  * Get the relative path of a dentry to the mount point
  * 

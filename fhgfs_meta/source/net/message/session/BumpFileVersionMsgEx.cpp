@@ -19,13 +19,19 @@ FileIDLock BumpFileVersionMsgEx::lock(EntryLockStore& store)
 std::unique_ptr<MirroredMessageResponseState> BumpFileVersionMsgEx::executeLocally(
    ResponseContext& ctx, bool isSecondary)
 {
-   auto inode = Program::getApp()->getMetaStore()->referenceFile(&getEntryInfo());
+   auto* metaStore = Program::getApp()->getMetaStore();
+
+   auto inode = metaStore->referenceFile(&getEntryInfo());
    if (!inode)
       return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
 
    if (!inode->incrementFileVersion(&getEntryInfo()))
+   {
+      metaStore->releaseFile(getEntryInfo().getParentEntryID(), inode);
       return boost::make_unique<ResponseState>(FhgfsOpsErr_SAVEERROR);
+   }
 
+   metaStore->releaseFile(getEntryInfo().getParentEntryID(), inode);
    return boost::make_unique<ResponseState>(FhgfsOpsErr_SUCCESS);
 }
 

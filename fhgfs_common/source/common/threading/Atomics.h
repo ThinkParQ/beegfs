@@ -161,7 +161,7 @@ class Atomic
           * need the entire preprocessor construct, but disassembling a test program showed
           * gcc adds a "lock xadd" command, which is slow)
           */
-         return __sync_fetch_and_add((TemplateType*) &this->atomicValue, 0);
+         return __sync_fetch_and_add(&this->atomicValue, 0);
       #endif
       }
 

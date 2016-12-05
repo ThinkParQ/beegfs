@@ -24,7 +24,7 @@ struct FhgfsNfsFileHandleV3;
 extern const struct export_operations fhgfs_export_ops;
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
+#ifndef KERNEL_HAS_ENCODE_FH_INODE
 int FhgfsOpsExport_encodeNfsFileHandle(struct dentry* dentry, __u32* file_handle_buf, int* max_len,
    int connectable);
 #else

@@ -213,7 +213,7 @@ void ModeStartResync::printHelp()
    std::cout << "  --mirrorgroupid=<mirrorGroupID> Resync the secondary target of this" << std::endl;
    std::cout << "                                  mirror buddy group." << std::endl;
    std::cout << std::endl;
-   std::cout << " Note: Either --targetid or --mirrorgroupid can be used, not both." << std::endl;
+   std::cout << " Note: --mirrorgroupid can not be used together with --targetid or --nodeid." << std::endl;
    std::cout << std::endl;
    std::cout << " Optional (only for nodetype=storage):" << std::endl;
    std::cout << "  --timestamp=<unixTimestamp>     Override last buddy communication timestamp." << std::endl;

@@ -26,7 +26,7 @@ extern struct dentry_operations fhgfs_dentry_ops;
    extern int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags);
 #endif // LINUX_VERSION_CODE
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,37)
+#ifndef KERNEL_HAS_D_DELETE_CONST_ARG
    extern int FhgfsOps_deleteDentry(struct dentry* dentry);
 #else
    extern int FhgfsOps_deleteDentry(const struct dentry* dentry);

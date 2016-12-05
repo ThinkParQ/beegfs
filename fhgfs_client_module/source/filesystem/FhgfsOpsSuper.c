@@ -37,7 +37,7 @@ static struct file_system_type fhgfs_fs_type =
    .kill_sb    = FhgfsOps_killSB,
    //.fs_flags   = FS_BINARY_MOUNTDATA, // not required currently
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,38)
+#ifdef KERNEL_HAS_GET_SB_NODEV
    .get_sb     = FhgfsOps_getSB,
 #else
    .mount      = FhgfsOps_mount, // basically the same thing as get_sb before
@@ -141,7 +141,7 @@ int __FhgfsOps_constructFsInfo(struct super_block* sb, void* rawMountOptions)
 
 
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
+#if defined(KERNEL_HAS_SB_BDI)
    struct backing_dev_info* bdi;
 #endif
 
@@ -168,7 +168,7 @@ int __FhgfsOps_constructFsInfo(struct super_block* sb, void* rawMountOptions)
    log = App_getLogger(app);
    IGNORE_UNUSED_VARIABLE(log);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
+#if defined(KERNEL_HAS_SB_BDI)
    bdi = &sbInfo->bdi;
 
    /* NOTE: The kernel expects a fully initialized bdi structure, so at a minimum it has to be
@@ -222,7 +222,7 @@ void __FhgfsOps_destructFsInfo(struct super_block* sb)
    {
       App* app = FhgfsOps_getApp(sb);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
+#if defined(KERNEL_HAS_SB_BDI)
       struct backing_dev_info* bdi = FhgfsOps_getBdi(sb);
 
       bdi_destroy(bdi);
@@ -291,7 +291,7 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
    sb->s_export_op = &fhgfs_export_ops;
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
+#if defined(KERNEL_HAS_SB_BDI)
    sb->s_bdi = FhgfsOps_getBdi(sb);
 #endif
 
@@ -362,7 +362,7 @@ void FhgfsOps_killSB(struct super_block* sb)
 
    RWPagesWork_flushWorkQueue();
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32) && LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)
+#if defined(KERNEL_HAS_SB_BDI) && LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)
    /**
     * s_fs_info might be NULL
     */

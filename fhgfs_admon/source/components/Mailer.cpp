@@ -1,8 +1,18 @@
+#include <app/config/RuntimeConfig.h>
 #include <program/Program.h>
 #include "Mailer.h"
 
 
 
+/**
+ * Adds a node to the list of broken nodes.
+ *
+ * @param nodeNumID The nodeNumID of the broken node.
+ * @param nodeID THe ID/hostname/name of the broken node.
+ * @param nodeType The NodeType of the broken node.
+ * @return True on success, if the node is in the list or the node type is not supported false is
+ *         returned.
+ */
 bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeType)
 {
    std::string nodeTypeStr = "";
@@ -13,8 +23,7 @@ bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeT
       list = &(this->downNodes.downMetaNodes);
       nodeTypeStr = "meta";
    }
-   else
-   if(nodeType == NODETYPE_Storage)
+   else if(nodeType == NODETYPE_Storage)
    {
       list = &(this->downNodes.downStorageNodes);
       nodeTypeStr = "storage";
@@ -26,7 +35,7 @@ bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeT
 
    for(DownNodeListIter iter = list->begin(); iter != list->end(); iter++)
    {
-      if ( (*iter).nodeNumID == nodeNumID )
+      if ( (*iter).nodeNumID == nodeNumID)
          return false;
    }
 
@@ -41,7 +50,7 @@ bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeT
    RuntimeConfig *runtimeCfg = Program::getApp()->getRuntimeConfig();
    std::string scriptPath = runtimeCfg->getScriptPath();
 
-   if(!scriptPath.empty())
+   if(!scriptPath.empty() )
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
@@ -61,6 +70,9 @@ bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeT
    return true;
 }
 
+/**
+ * The run methode of the mailer thread.
+ */
 void Mailer::run()
 {
    unsigned intervalMS = Program::getApp()->getConfig()->getMailCheckIntervalTimeSec() * 1000;
@@ -69,17 +81,17 @@ void Mailer::run()
    {
       log.log(Log_DEBUG, "Component started.");
       registerSignalHandler();
-      while (!getSelfTerminate())
+      while (!getSelfTerminate() )
       {
          RuntimeConfig *runtimeCfg = Program::getApp()->getRuntimeConfig();
-         if(runtimeCfg->getMailEnabled())
+         if(runtimeCfg->getMailEnabled() )
          {
             notifyBackUpNodes();
             notifyDownNodes();
          }
 
          // do nothing but wait for the time of intervalMS
-         if(PThread::waitForSelfTerminateOrder(intervalMS))
+         if(PThread::waitForSelfTerminateOrder(intervalMS) )
          {
             break;
          }
@@ -93,29 +105,31 @@ void Mailer::run()
    }
 }
 
+/**
+ * Notify the administrator/user by email about nodes which are broken.
+ */
 void Mailer::notifyDownNodes()
 {
    RuntimeConfig *runtimeCfg = Program::getApp()->getRuntimeConfig();
    int minDownTimeSec = runtimeCfg->getMailMinDownTimeSec();
    int resendMailTimeMin = runtimeCfg->getMailResendMailTimeMin();
    bool notifiedNewDownNodes = false;
-   bool sendMail = false;
+   bool mailSend = false;
 
    std::string msg = "Some Nodes in the BeeGFS System monitored by " +
       Program::getApp()->getLocalNode().getTypedNodeID() +" seem to be dead!\r\n\r\n";
 
-   msg += "A list of these hosts follows : \r\n\r\n Meta Nodes :"
-      "\r\n----------------\r\n\r\n";
+   msg += "A list of these hosts follows:\r\n\r\nMeta Nodes:\r\n----------------\r\n\r\n";
 
    int64_t nowTime = time (NULL);
    for(DownNodeListIter iter = downNodes.downMetaNodes.begin();
       iter != downNodes.downMetaNodes.end(); iter++)
    {
-      if ( (nowTime - (*iter).downSince) > (minDownTimeSec) )
+      if ( (nowTime - (*iter).downSince) > minDownTimeSec)
       {
-         msg += Mailer::getHumanReadableNodeID((*iter)) +" / Down since " +
+         msg += Mailer::getHumanReadableNodeID(*iter) +" / Down since " +
             StringTk::timespanToStr(nowTime - (*iter).downSince)+".\r\n";
-         sendMail = true;
+         mailSend = true;
 
          if (!(*iter).eMailSent)
          {
@@ -125,16 +139,16 @@ void Mailer::notifyDownNodes()
       }
    }
 
-   msg += "\r\n\r\n\r\n Storage Nodes :\r\n----------------\r\n\r\n";
+   msg += "\r\n\r\n\r\nStorage Nodes:\r\n----------------\r\n\r\n";
 
    for(DownNodeListIter iter=downNodes.downStorageNodes.begin();
       iter!=downNodes.downStorageNodes.end(); iter++)
    {
-      if ( (nowTime - (*iter).downSince) > (minDownTimeSec) )
+      if ( (nowTime - (*iter).downSince) > minDownTimeSec)
       {
-         msg += Mailer::getHumanReadableNodeID((*iter)) +" / Down since " +
+         msg += Mailer::getHumanReadableNodeID(*iter) +" / Down since " +
             StringTk::timespanToStr(nowTime - (*iter).downSince)+".\r\n";
-         sendMail = true;
+         mailSend = true;
 
          if (!(*iter).eMailSent)
          {
@@ -145,28 +159,26 @@ void Mailer::notifyDownNodes()
    }
 
    if (notifiedNewDownNodes ||
-      (sendMail && ((nowTime - downNodes.lastMail) > (resendMailTimeMin * 60))) )
+      (mailSend && ((nowTime - downNodes.lastMail) > (resendMailTimeMin * 60) ) ) )
    {
-      log.log(Log_SPAM, "Sending eMail caused by down nodes");
-      std::string subject = "BeeGFS: Nodes Down";
-      Mailer::sendMail(runtimeCfg->getMailSmtpServer(),
-         runtimeCfg->getMailSender(), runtimeCfg->getMailRecipient(),
-         subject, msg);
+      log.log(Log_SPAM, "Sending eMail caused by down nodes.");
+      std::string subject = "BeeGFS - Nodes Down";
+      sendMail(subject, msg);
 
       downNodes.lastMail = nowTime;
    }
 }
 
+/**
+ * Notify the administrator/user by email about nodes which are working again.
+ */
 void Mailer::notifyBackUpNodes()
 {
-   RuntimeConfig *runtimeCfg = Program::getApp()->getRuntimeConfig();
    bool sendMail = false;
 
    std::string msg = "Some nodes in the BeeGFS System monitored by " +
-      Program::getApp()->getLocalNode().getID() + " seem to be up again after "
-      "a downtime!\r\n\r\n";
-   msg += "A list of these hosts follows : \r\n\r\n Meta Nodes :"
-      "\r\n----------------\r\n\r\n";
+      Program::getApp()->getLocalNode().getID() + " seem to be up again after a downtime!\r\n\r\n";
+   msg += "A list of these hosts follows:\r\n\r\nMeta Nodes:\r\n----------------\r\n\r\n";
 
    int64_t nowTime = time (NULL);
 
@@ -174,21 +186,20 @@ void Mailer::notifyBackUpNodes()
    NodeStoreMetaEx *metaNodeStore = Program::getApp()->getMetaNodes();
    DownNodeListIter iter=downNodes.downMetaNodes.begin();
 
-   while (iter!=downNodes.downMetaNodes.end())
+   while (iter!=downNodes.downMetaNodes.end() )
    {
       auto node = std::static_pointer_cast<MetaNodeEx>(
-            metaNodeStore->referenceNode((*iter).nodeNumID));
-      if (node==NULL) // node seems to be removed from store
+            metaNodeStore->referenceNode( (*iter).nodeNumID) );
+      if (node == NULL) // node seems to be removed from store
       {
             iter = downNodes.downMetaNodes.erase(iter);
       }
       else
       {
-         if ( node->getContent().isResponding )
+         if (node->getContent().isResponding)
          {
-            msg += Mailer::getHumanReadableNodeID((*iter)) +
-               " / Was down for " + StringTk::timespanToStr(
-               nowTime - (*iter).downSince)+".\r\n";
+            msg += Mailer::getHumanReadableNodeID(*iter) + " - Was down for " +
+               StringTk::timespanToStr(nowTime - (*iter).downSince)+".\r\n";
             iter = downNodes.downMetaNodes.erase(iter);
             sendMail = true;
             node->upAgain();
@@ -200,7 +211,7 @@ void Mailer::notifyBackUpNodes()
       }
    }
 
-   msg += "\r\n\r\n\r\n Storage Nodes :\r\n----------------\r\n\r\n";
+   msg += "\r\n\r\n\r\nStorage Nodes:\r\n----------------\r\n\r\n";
 
     NodeStoreStorageEx *storageNodeStore = Program::getApp()->getStorageNodes();
    iter = downNodes.downStorageNodes.begin();
@@ -208,11 +219,11 @@ void Mailer::notifyBackUpNodes()
     while (iter != downNodes.downStorageNodes.end() )
    {
       auto node = std::static_pointer_cast<StorageNodeEx>(
-            storageNodeStore->referenceNode((*iter).nodeNumID));
+            storageNodeStore->referenceNode( (*iter).nodeNumID) );
 
-      if ( node->getContent().isResponding )
+      if (node->getContent().isResponding)
       {
-         msg += Mailer::getHumanReadableNodeID((*iter)) +" / Was down for " +
+         msg += Mailer::getHumanReadableNodeID( (*iter) ) +" - Was down for " +
             StringTk::timespanToStr(nowTime - (*iter).downSince)+".\r\n";
          iter = downNodes.downStorageNodes.erase(iter);
          sendMail = true;
@@ -226,39 +237,82 @@ void Mailer::notifyBackUpNodes()
 
     if (sendMail)
     {
-       log.log(Log_SPAM,"Sending eMail caused by nodes which are up again");
-       std::string subject = "BeeGFS : Nodes Up again";
-       Mailer::sendMail(runtimeCfg->getMailSmtpServer(),
-          runtimeCfg->getMailSender(), runtimeCfg->getMailRecipient(),
-          subject, msg);
+       log.log(Log_SPAM,"Sending eMail caused by nodes which are up again.");
+       std::string subject = "BeeGFS - Nodes Up again";
+       Mailer::sendMail(subject, msg);
     }
 }
 
-int Mailer::sendMail(const std::string& smtpServerName, const std::string& sender,
+/**
+ * Sends an email.
+ *
+ * @param subject The subject of the email.
+ * @param msg The message of the email.
+ * @return 0 on success else -1
+ */
+int Mailer::sendMail(const std::string& subject, const std::string& msg)
+{
+   RuntimeConfig *runtimeCfg = Program::getApp()->getRuntimeConfig();
+
+   const std::string& smtpServerName = runtimeCfg->getMailSmtpServer();
+   const std::string& sender = runtimeCfg->getMailSender();
+   const std::string& recipient = runtimeCfg->getMailRecipient();
+
+   if (sender.empty() )
+   {
+      log.log(Log_ERR, "Unable to deliver mail due to missing sender address.");
+      return -1;
+   }
+   if (recipient.empty() )
+   {
+      log.log(Log_ERR, "Unable to deliver mail due to missing recipient address.");
+      return -1;
+   }
+   if (subject.empty() )
+   {
+      log.log(Log_ERR, "Won't send due to empty subject.");
+      return -1;
+   }
+   if (msg.empty() )
+   {
+      log.log(Log_ERR, "Won't send due to empty message body.");
+      return -1;
+   }
+
+   if(runtimeCfg->getMailSmtpSendType() == SmtpSendType_SOCKET)
+   {
+      if (smtpServerName.empty() )
+      {
+         log.log(Log_ERR, "Unable to deliver mail due to missing SMTP server.");
+         return -1;
+      }
+
+      sendMailSocket(smtpServerName, sender, recipient, subject, msg);
+   }
+   else
+   {
+      sendMailSystem(sender, recipient, subject, msg);
+   }
+
+   return 0;
+}
+
+/**
+ * Uses a socket to send an email.
+ *
+ * @param smtpServerName The smtp server to send the email.
+ * @param sender The sender email address to send the email.
+ * @param recipient The recipient email address to send the email.
+ * @param subject The subject of the email.
+ * @param msg The message of the email.
+ * @return 0 on success else -1
+ */
+int Mailer::sendMailSocket(const std::string& smtpServerName, const std::string& sender,
    const std::string& recipient, const std::string& subject, const std::string& msg)
 {
-   LogContext log("Mail");
-
-   if (smtpServerName.empty())
-   {
-      log.log(Log_DEBUG, "Unable to deliver mail due to missing SMTP server");
-      return -1;
-   }
-   if (sender.empty())
-   {
-      log.log(Log_DEBUG, "Unable to deliver mail due to missing sender "
-         "address");
-      return -1;
-   }
-   if (recipient.empty())
-   {
-      log.log(Log_DEBUG, "Unable to deliver mail due to missing recipient "
-         "address");
-      return -1;
-   }
+   LogContext log("Mail-socket");
 
    size_t startPoint = sender.find_last_of("@");
-
    std::string domain = sender.substr(startPoint+1);
 
    struct addrinfo hint;
@@ -410,5 +464,56 @@ int Mailer::sendMail(const std::string& smtpServerName, const std::string& sende
    send(sock, quit.c_str(), strlen(quit.c_str()), 0);
 
    freeaddrinfo(addressList);
+
+   return 0;
+}
+
+/**
+ * Uses sendmail of the system to send an email.
+ *
+ * @param smtpServerName The smtp server to send the email.
+ * @param sender The sender email address to send the email.
+ * @param recipient The recipient email address to send the email.
+ * @param subject The subject of the email.
+ * @param msg The message of the email.
+ * @return 0 on success else -1
+ */
+int Mailer::sendMailSystem(const std::string& sender, const std::string& recipient,
+   const std::string& subject, const std::string& msg)
+{
+   LogContext log("Mail-sendmail");
+
+   App* app = Program::getApp();
+   ExternalJobRunner *jobRunner = app->getJobRunner();
+   RuntimeConfig* runCfg = app->getRuntimeConfig();
+
+   std::string cmd = "echo \""; // echo to pipe the message to sendmail and " for message start
+   cmd.append("Subject: ").append(subject).append("\n\n"); // add the subject of the mail
+   cmd.append(msg).append("\" |"); // add message body and end of message body and pipe for echo
+   cmd.append(runCfg->getMailSendmailPath() ); // the path to the sendmail binary
+   cmd.append(" -f ").append(runCfg->getMailSender() ); // the sender mail address
+   cmd.append(" \"").append(runCfg->getMailRecipient() ).append("\""); // the list of recipients
+
+   Mutex mutex;
+   SafeMutexLock mutexLock(&mutex);
+
+   Job *job = jobRunner->addJob(cmd, &mutex);
+
+   while (!job->finished)
+      job->jobFinishedCond.wait(&mutex);
+
+   mutexLock.unlock();
+
+   if (job->returnCode != 0)
+   {
+      log.log(Log_ERR, "Unable to deliver mail. Subject: " + subject + " ; Sender: " + sender +
+         " ; Recipient: " + recipient);
+      log.log(Log_DEBUG, "Unable to deliver mail. Command: " + cmd);
+      jobRunner->delJob(job->id);
+      return -1;
+   }
+
+   jobRunner->delJob(job->id);
+
    return 0;
 }

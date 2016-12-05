@@ -52,7 +52,7 @@ extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type);
 int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry);
 #endif // KERNEL_HAS_POSIX_GET_ACL
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
+#ifdef KERNEL_HAS_SET_ACL
 extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type);
 #endif // LINUX_VERSION_CODE
 
@@ -90,7 +90,7 @@ extern int FhgfsOps_hardlinkAsSymlink(struct dentry* oldDentry, struct inode* di
 #if defined KERNEL_HAS_GET_LINK
 extern const char* FhgfsOps_get_link(struct dentry* dentry, struct inode* inode,
    struct delayed_call* done);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4,2,0)
+#elif defined(KERNEL_HAS_FOLLOW_LINK_COOKIE)
 extern const char* FhgfsOps_follow_link(struct dentry* dentry, void** cookie);
 extern void FhgfsOps_put_link(struct inode* inode, void* cookie);
 #else
@@ -100,10 +100,6 @@ extern void FhgfsOps_put_link(struct dentry* dentry, struct nameidata* nd, void*
 
 extern int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    struct inode* inodeDirTo, struct dentry* dentryTo);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)
-extern void FhgfsOps_truncate(struct inode* inode);
-#endif // LINUX_VERSION_CODE
 
 extern int FhgfsOps_vmtruncate(struct inode* inode, loff_t offset);
 

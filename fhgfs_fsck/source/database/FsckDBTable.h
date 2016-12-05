@@ -14,8 +14,6 @@
 #include <database/StripeTargets.h>
 #include <database/UsedTarget.h>
 
-#include <fstream>
-
 class FsckDBDentryTable
 {
    public:
@@ -36,34 +34,64 @@ class FsckDBDentryTable
             NameBuffer(const std::string& path, unsigned id):
                fileID(id)
             {
-               streamBuf.resize(4096 * 1024);
+               fd = ::open(path.c_str(), O_RDWR | O_CREAT, 0660);
+               if(fd < 0)
+                  throw std::runtime_error("could not open name file");
 
-               wstream.rdbuf()->pubsetbuf(&streamBuf[0], streamBuf.size());
-               wstream.exceptions(std::fstream::badbit | std::fstream::failbit);
-               wstream.open(path.c_str(), std::fstream::out | std::fstream::app);
-               wstream.seekp(0, std::fstream::end);
-               writeOffset = wstream.tellp();
+               streamBuf.reserve(4096 * 1024);
 
-               rstream.exceptions(std::fstream::badbit | std::fstream::failbit);
-               rstream.open(path.c_str(), std::fstream::in | std::fstream::app);
+               writePos = ::lseek(fd, 0, SEEK_END);
+               if (writePos < 0)
+               {
+                  close(fd);
+                  fd = -1;
+                  throw std::runtime_error("could not open name file");
+               }
+            }
+
+            NameBuffer(NameBuffer&&) = delete;
+            NameBuffer& operator=(NameBuffer&&) = delete;
+
+            ~NameBuffer()
+            {
+               if (fd >= 0)
+               {
+                  flush();
+                  close(fd);
+               }
             }
 
             uint64_t put(const std::string& name)
             {
-               unsigned len = name.size() + 1;
-               this->wstream.write(name.c_str(), len);
-               this->writeOffset += len;
-               return this->writeOffset - len;
+               if (streamBuf.size() + name.size() + 1 > streamBuf.capacity())
+                  flush();
+
+               if (name.size() > streamBuf.capacity())
+                  streamBuf.reserve(name.size());
+
+               uint64_t result = writePos + streamBuf.size();
+               streamBuf.insert(streamBuf.end(), name.begin(), name.end());
+               streamBuf.push_back(0);
+
+               return result;
             }
 
             std::string get(uint64_t offset)
             {
-               wstream.flush();
-               rstream.clear();
-               rstream.seekg(offset);
+               flush();
 
                char buffer[255 + 1];
-               rstream.getline(buffer, sizeof(buffer), 0);
+               ssize_t readRes = ::pread(fd, buffer, sizeof(buffer), offset);
+               // if the read did not fill the full buffer, we can
+               //   a) have an error, or
+               //   b) have a short read.
+               // errors should be reported directly. short reads are likely caused be trying to
+               // read past the end of the file. since we cannot possible have a sane read that
+               // stretches beyond writePos here (as we have flushed the write buffer), we can
+               // reliably detect both.
+               if (readRes < 0 || ssize_t(offset) + readRes > writePos)
+                  throw std::runtime_error("could not read name file");
+
                return buffer;
             }
 
@@ -73,15 +101,18 @@ class FsckDBDentryTable
             unsigned fileID;
             std::vector<char> streamBuf;
 
-            // the data stream is split into two parts because libstdc++ before version 4.6 has a
-            // bug affects fstreams used for reading and writing, see:
-            //   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=45708
-            // while seeking to the required position before each read/write is supposed to have the
-            // desired effect (ie, reads and writes work), this does not seem to be the case.
-            std::ofstream wstream;
-            uint64_t writeOffset;
+            int fd;
+            ssize_t writePos;
 
-            std::ifstream rstream;
+            void flush()
+            {
+               ssize_t writeRes = ::pwrite(fd, &streamBuf[0], streamBuf.size(), writePos);
+               if (writeRes < 0 || size_t(writeRes) < streamBuf.size())
+                  throw std::runtime_error("error in flush");
+
+               writePos += writeRes;
+               streamBuf.resize(0);
+            }
       };
 
       struct BulkHandle

@@ -101,7 +101,7 @@ bool _StandardSocket_initSock(StandardSocket* this, int domain, int type, int pr
    int createRes;
 
    // prepare/create socket
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,2,0)
+#ifndef KERNEL_HAS_SOCK_CREATE_KERN_NS
    createRes = sock_create_kern(domain, type, protocol, &this->sock);
 #else
    createRes = sock_create_kern(&init_net, domain, type, protocol, &this->sock);
@@ -562,8 +562,8 @@ ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
       .msg_namelen      = sizeof(toSockAddr),
    };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
-   struct iovec iov = BEEGFS_IOV_ITER_IOVEC(iter);
+#ifndef KERNEL_HAS_MSGHDR_ITER
+   struct iovec iov = iov_iter_iovec(iter);
 
    msg.msg_iov       = &iov;
    msg.msg_iovlen    = 1;
@@ -582,7 +582,7 @@ ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
 
    ACQUIRE_PROCESS_CONTEXT(oldfs);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,1,0)
+#ifndef KERNEL_HAS_SOCK_SENDMSG_NOLEN
    sendRes = sock_sendmsg(thisCast->sock, &msg, len);
 #else
    sendRes = sock_sendmsg(thisCast->sock, &msg);
@@ -614,8 +614,8 @@ ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* iter, int
       .msg_namelen      = sizeof(fromSockAddr),
    };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,19,0)
-   struct iovec iov = BEEGFS_IOV_ITER_IOVEC(iter);
+#ifndef KERNEL_HAS_MSGHDR_ITER
+   struct iovec iov = iov_iter_iovec(iter);
 
    msg.msg_iov       = &iov;
    msg.msg_iovlen    = 1;

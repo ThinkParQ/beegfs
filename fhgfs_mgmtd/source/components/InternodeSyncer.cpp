@@ -109,6 +109,10 @@ void InternodeSyncer::syncLoop()
 
          statesModified |= mgmtdMetaStateStore->resolveDoubleResync();
 
+         statesModified |= mgmtdTargetStateStore->resolvePrimaryResync();
+
+         statesModified |= mgmtdMetaStateStore->resolvePrimaryResync();
+
          // if target states have changed, inform other nodes about it
          if (statesModified)
             app->getHeartbeatMgr()->notifyAsyncRefreshTargetStates();

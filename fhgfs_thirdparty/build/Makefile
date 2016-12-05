@@ -3,18 +3,6 @@
 
 SHELL := /bin/bash
 
-ifneq ($(target_arch),)
-   configure_host := --host=$(target_arch)
-   make_host := CC=$(target_arch)-gcc CXX=$(target_arch)-g++ AR=$(target_arch)-ar \
-                RANLIB=$(target_arch)-ranlib
-   cppunit_host := $(configure_host)
-endif
-
-# unfortunately cppunit does not recognize aarch64-linux-gnu as valid
-ifeq ($(cppunit_host),--host=aarch64-linux-gnu)
-   cppunit_host := --host=aarch64-unknown-linux-gnu $(make_host)
-endif
-
 SQLITE_PATH     = ../source/sqlite
 OPENSSL_PATH    = ../source/openssl
 MONGOOSE_PATH   = ../source/mongoose
@@ -71,7 +59,7 @@ sqlite:
 		cd $(SOURCE_PATH)                                  && \
 		tar xf sqlite-autoconf-$(SQLITE_VER).tar.gz        && \
 		cd $(SQLITE_PATH)                                  && \
-	        ./configure --disable-dynamic-extensions $(configure_host) && \
+	        ./configure --disable-dynamic-extensions           && \
 		$(MAKE) CFLAGS+="-DSQLITE_ENABLE_UNLOCK_NOTIFY"     && \
 		cd $(BUILD_PATH)                                   && \
 		ar -r $(SQLITE_LIB_IN) $(SQLITE_OBJ_IN);              \
@@ -88,8 +76,7 @@ openssl:
 		cd $(SOURCE_PATH)                         &&     \
 		tar xf libressl-$(OPENSSL_VER).tar.gz     &&     \
 		cd $(OPENSSL_VER_PATH)                    &&     \
-		export $(make_host)                       &&     \
-		./configure $(configure_host)             &&     \
+		./config -no-apps                         &&     \
 		$(MAKE);                                         \
 	fi
 
@@ -107,7 +94,7 @@ cppunit:
 		tar xf cppunit-$(CPPUNIT_VER).tar.gz      &&     \
 		mkdir $(CPPUNIT_INSTALL_PATH)             &&     \
 		cd $(CPPUNIT_VER_PATH)                    &&     \
-		./configure $(BUILDTYPE) $(cppunit_host)  &&     \
+		./configure $(BUILDTYPE)                  &&     \
 		$(MAKE) DESTDIR=$(CPPUNIT_INSTALL_PATH) install; \
 	fi
 	# copy lib
@@ -115,11 +102,7 @@ cppunit:
 
 mongoose:
 	# we run make clean first here, to be sure to remove old object files
-	if [ ! -f $(MONGOOSE_LIB_IN) ]; then \
-		cd $(MONGOOSE_PATH); \
-		$(MAKE) clean && \
-		$(MAKE) $(make_host); \
-	fi
+	if [ ! -f $(MONGOOSE_LIB_IN) ]; then cd $(MONGOOSE_PATH); $(MAKE) clean && $(MAKE); fi
 	# copy lib
 	cp $(MONGOOSE_LIB_IN) $(MONGOOSE_LIB_OUT)
 
@@ -143,7 +126,7 @@ ticpp: premake
 		${PREMAKE} --unicode gmake                 && \
 		$(MAKE) clean config=release               && \
 		mkdir -p obj/Release                       && \
-		$(MAKE) $(make_host) config=release        && \
+		$(MAKE) config=release                     && \
 		cd $(BUILD_PATH);                             \
 	fi
 	# copy lib

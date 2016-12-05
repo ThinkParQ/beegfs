@@ -1,7 +1,20 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+
 #include <common/app/config/AbstractConfig.h>
+
+
+
+#define MAIL_SENDMAIL_DEFAULT_PATH         "sendmail"
+
+enum SmtpSendType
+{
+   SmtpSendType_SOCKET = 0,
+   SmtpSendType_SENDMAIL = 1,
+};
+
+
 
 class Config : public AbstractConfig
 {
@@ -40,6 +53,9 @@ class Config : public AbstractConfig
 
       // eMail notification which overrides the runtime configuration
       bool mailEnabled;
+      std::string mailSmtpSendType;
+      SmtpSendType mailSmtpSendTypeNum;  // auto-generated based on mailSmtpSendType
+      std::string mailSendmailPath;
       std::string mailSmtpServer;
       std::string mailSender;
       std::string mailRecipient;
@@ -53,6 +69,7 @@ class Config : public AbstractConfig
       virtual void applyConfigMap(bool enableException, bool addDashes)
          throw(InvalidConfigException);
       virtual void initImplicitVals() throw(InvalidConfigException);
+      void initMailerConfig();
       std::string createDefaultCfgFilename();
 
 
@@ -194,6 +211,16 @@ class Config : public AbstractConfig
       bool getMailEnabled()
       {
          return mailEnabled;
+      }
+
+      SmtpSendType getMailSmtpSendType()
+      {
+         return mailSmtpSendTypeNum;
+      }
+
+      std::string getMailSendmailPath()
+      {
+         return mailSendmailPath;
       }
 
       std::string getMailSmtpServer()

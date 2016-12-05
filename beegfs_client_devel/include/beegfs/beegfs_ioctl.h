@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+
 
 #define BEEGFS_IOCTL_CFG_MAX_PATH 4096 // max path length for config file
 #define BEEGFS_IOCTL_TEST_STRING  "_FhGFS_" /* copied to user space by BEEGFS_IOC_TEST_IS_BEEGFS to

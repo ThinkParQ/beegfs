@@ -492,7 +492,7 @@ bool __App_initInodeOperations(App* this)
          this->fileInodeOps->get_acl = FhgfsOps_get_acl;
          this->dirInodeOps->get_acl  = FhgfsOps_get_acl;
          // Note: symlinks don't have ACLs
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
+#ifdef KERNEL_HAS_SET_ACL
          this->fileInodeOps->set_acl = FhgfsOps_set_acl;
          this->dirInodeOps->set_acl  = FhgfsOps_set_acl;
 #endif // LINUX_VERSION_CODE

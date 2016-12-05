@@ -146,7 +146,7 @@ void ProcFs_createEntries(App* app)
 
    struct proc_dir_entry* procDir;
    
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
+#if defined(KERNEL_HAS_PROC_CREATE_DATA)
    const struct fhgfs_proc_file* procFile;
    const struct fhgfs_proc_file_rw* procFileRW;
 #else
@@ -171,7 +171,7 @@ void ProcFs_createEntries(App* app)
    // create entries
 
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
+#if defined(KERNEL_HAS_PROC_CREATE_DATA)
 
    /* note: linux-3.10 kills create_proc_(read_)entry and uses proc_create_data instead.
       proc_create_data existed for ealier linux version already, so we use it there, too. */

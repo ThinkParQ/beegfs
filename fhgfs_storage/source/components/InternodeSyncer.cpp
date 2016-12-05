@@ -1071,7 +1071,7 @@ bool InternodeSyncer::downloadAllExceededQuotaLists()
    {
       if(!cfg->getQuotaEnableEnforcement() )
       {
-         LogContext(logContext).log(Log_WARNING,
+         LogContext(logContext).log(Log_DEBUG,
             "Quota enforcement is enabled on the management daemon, "
             "but not in the configuration of this storage server. "
             "The configuration from the management daemon overrides the local setting.");
@@ -1087,7 +1087,7 @@ bool InternodeSyncer::downloadAllExceededQuotaLists()
    {
       if(cfg->getQuotaEnableEnforcement() )
       {
-         LogContext(logContext).log(Log_WARNING,
+         LogContext(logContext).log(Log_DEBUG,
                "Quota enforcement is enabled in the configuration of this storage server, "
                "but not on the management daemon. "
                "The configuration from the management daemon overrides the local setting.");

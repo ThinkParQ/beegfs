@@ -31,15 +31,24 @@ class ModeGetQuotaInfo : public Mode, GetQuotaInfo
       void printQuota(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits,
          QuotaDefaultLimits& defaultLimits, QuotaInodeSupport quotaInodeSupport);
       bool printQuotaForID(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits, unsigned id,
-         std::string& defaultSizeLimitValue, std::string& defaultSizeLimitUnit,
-         uint64_t defaultInodeLimit, QuotaInodeSupport quotaInodeSupport);
+         std::string& defaultSizeLimit, std::string& defaultInodeLimit,
+         QuotaInodeSupport quotaInodeSupport);
       bool printQuotaForRange(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits,
-         std::string& defaultSizeLimitValue, std::string& defaultSizeLimitUnit,
-         uint64_t defaultInodeLimit, QuotaInodeSupport quotaInodeSupport);
+         std::string& defaultSizeLimitValue, std::string& defaultInodeLimit,
+         QuotaInodeSupport quotaInodeSupport);
       bool printQuotaForList(QuotaDataMap* usedQuota, QuotaDataMap* quotaLimits,
-         std::string& defaultSizeLimitValue, std::string& defaultSizeLimitUnit,
-         uint64_t defaultInodeLimit, QuotaInodeSupport quotaInodeSupport);
+         std::string& defaultSizeLimitValue, std::string& defaultInodeLimit,
+         QuotaInodeSupport quotaInodeSupport);
       void printDefaultQuotaLimits(QuotaDefaultLimits& quotaLimits);
+
+      int getUsedQuotaStrings(QuotaDataMap* usedQuota, unsigned id,
+         QuotaInodeSupport quotaInodeSupport, std::string& usedSizeOut, std::string& usedInodesOut);
+      void getQuotaLimitsStrings(QuotaDataMap* quotaLimits, unsigned id,
+         std::string& defaultSizeLimit, std::string& defaultInodeLimit, std::string& limitSizeOut,
+         std::string& limitInodesOut);
+      void getDefaultQuotaStrings(QuotaDefaultLimits& quotaLimits, QuotaDataType type,
+         std::string& defaultLimitSizeOut, std::string& defaultLimitInodesOut);
+      bool isUnlimtedValue(uint64_t inValue);
 };
 
 #endif /* MODEGETQUOTAINFO_H_ */

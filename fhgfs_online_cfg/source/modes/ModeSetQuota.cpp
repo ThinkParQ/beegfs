@@ -24,6 +24,9 @@
 #define MODESETQUOTA_ARG_INODE_LIMIT         "--inodelimit"
 #define MODESETQUOTA_ARG_DEFAULT             "--default"
 
+#define MODESETQUOTA_ARGVALUE_SIZE_INODE_RESET          "reset"
+#define MODESETQUOTA_ARGVALUE_SIZE_INODE_UNLIMITED      "unlimited"
+
 #define MODESETQUOTA_ERR_OPEN_FILE_FAILED   -1
 #define MODESETQUOTA_ERR_NONE                0
 #define MODESETQUOTA_ERR_FAILD_LINES         1 // positive values are the number of failed lines
@@ -253,14 +256,25 @@ int ModeSetQuota::checkConfig(StringMap* cfg)
          return APPCODE_INVALID_CONFIG;
       }
 
-      if(!UnitTk::isValidHumanString(iter->second))
+      if(UnitTk::isValidHumanString(iter->second))
+      {
+         this->cfg.cfgSizeLimit = UnitTk::strHumanToInt64(iter->second.c_str());
+      }
+      else if(iter->second == MODESETQUOTA_ARGVALUE_SIZE_INODE_RESET)
+      {
+         this->cfg.cfgSizeLimit = 0;
+      }
+      else if(iter->second == MODESETQUOTA_ARGVALUE_SIZE_INODE_UNLIMITED)
+      {
+         this->cfg.cfgSizeLimit = std::numeric_limits<uint64_t>::max();
+      }
+      else
       {
          std::cerr << "Invalid configuration. "
             "The quota size limit is not valid." << std::endl;
          return APPCODE_INVALID_CONFIG;
       }
 
-      this->cfg.cfgSizeLimit = UnitTk::strHumanToInt64(iter->second.c_str());
       quotaSizeLimitGiven = true;
       cfg->erase(iter);
    }
@@ -276,14 +290,25 @@ int ModeSetQuota::checkConfig(StringMap* cfg)
          return APPCODE_INVALID_CONFIG;
       }
 
-      if (!StringTk::isNumeric(iter->second) )
+      if (StringTk::isNumeric(iter->second) )
+      {
+         this->cfg.cfgInodeLimit = StringTk::strToUInt64(iter->second.c_str() );
+      }
+      else if(iter->second == MODESETQUOTA_ARGVALUE_SIZE_INODE_RESET)
+      {
+         this->cfg.cfgInodeLimit = 0;
+      }
+      else if(iter->second == MODESETQUOTA_ARGVALUE_SIZE_INODE_UNLIMITED)
+      {
+         this->cfg.cfgInodeLimit = std::numeric_limits<uint64_t>::max();
+      }
+      else
       {
          std::cerr << "Invalid configuration. "
             "The quota inode limit is not a numeric value." << std::endl;
          return APPCODE_INVALID_CONFIG;
       }
 
-      this->cfg.cfgInodeLimit = StringTk::strToUInt64(iter->second.c_str());
       quotaInodeLimitGiven = true;
       cfg->erase(iter);
    }
@@ -416,9 +441,15 @@ void ModeSetQuota::printHelp()
    std::cout << "    --default             Set the default quota limits for users or groups." << std::endl;
    std::cout << std::endl;
    std::cout << "  Mandatory if not imported via --file:" << std::endl;
-   std::cout << "    --sizelimit           The diskspace limit for the users/groups." << std::endl;
-   std::cout << "    --inodelimit          The inodes (chunk files) limit for the users/groups." << std::endl;
+   std::cout << "    --sizelimit=<size>    The diskspace limit for the users/groups." << std::endl;
+   std::cout << "    --inodelimit=<count>  The inodes (chunk files) limit for the users/groups." << std::endl;
    std::cout << std::endl;
+   std::cout << "NOTE:" << std::endl;
+   std::cout << "Without any configuration the limits are set to unlimited. If a default quota" << std::endl;
+   std::cout << "limit is set by the beegfs-ctl this quota limits are used. User and group" << std::endl;
+   std::cout << "quota limits has a higher priority then the default quota limits. When both" << std::endl;
+   std::cout << "user and group quota limits are defined, the lower limit takes precedence for"  << std::endl;
+   std::cout << "quota enforcement. " << std::endl;
    std::cout << "USAGE:" << std::endl;
    std::cout << " This mode sets the size and inodes (chunk files) quota limits for users and" << std::endl;
    std::cout << " groups." << std::endl;
@@ -435,10 +466,15 @@ void ModeSetQuota::printHelp()
    std::cout << std::endl;
    std::cout << " Example: Set quota to unlimited diskspace and 5000 chunk files for group IDs" << std::endl;
    std::cout << "          in range 1000 to 1500." << std::endl;
-   std::cout << "  $ beegfs-ctl --setquota --sizelimit=0 --inodelimit=5000 --gid --range 1000 1500" << std::endl;
+   std::cout << "  $ beegfs-ctl --setquota --sizelimit=unlimted --inodelimit=5000 --gid \\" << std::endl;
+   std::cout << "       --range 1000 1500" << std::endl;
    std::cout << std::endl;
    std::cout << " Example: Set default quota for users to 20 MiB and 500 chunk files." << std::endl;
    std::cout << "  $ beegfs-ctl --setquota --uid --sizelimit=20M --inodelimit=500 --default" << std::endl;
+   std::cout << std::endl;
+   std::cout << " Example: Reset diskspace and chunk files quota for users ID 100. The default " << std::endl;
+   std::cout << "          limits are used afterwards." << std::endl;
+   std::cout << "  $ beegfs-ctl --setquota --uid --sizelimit=reset --inodelimit=reset 100" << std::endl;
 }
 
 /*
@@ -496,29 +532,57 @@ int ModeSetQuota::readFromFile(std::string pathToFile, QuotaDataType quotaType)
                }
             }
 
-            if(!UnitTk::isValidHumanString(lineList[1]))
+            uint64_t sizeLimit = 0;
+            uint64_t inodeLimit = 0;
+
+            if(UnitTk::isValidHumanString(lineList[1]) )
+            {
+               sizeLimit = UnitTk::strHumanToInt64(lineList[1].c_str() );
+            }
+            else if(lineList[1] == MODESETQUOTA_ARGVALUE_SIZE_INODE_RESET)
+            {
+               sizeLimit = 0;
+            }
+            else if(lineList[1] == MODESETQUOTA_ARGVALUE_SIZE_INODE_UNLIMITED)
+            {
+               sizeLimit = std::numeric_limits<uint64_t>::max();
+            }
+            else
             { // size limit is a invalid value
                std::cerr << "The value for the size limit is not valid: " << lineList[1] <<
                   " ; Check line " << lineNumber << " of file: " << pathToFile << " Format: GID or "
-                  "UID, size limit,inode limit ; Example: 2034,500M,10000" << std::endl;
+                  "UID, size limit,inode limit ; Example: 2034,500M,10000 ; "
+                  "Example: 2034,unlimited,reset" << std::endl;
 
                retVal++;
                continue;
             }
 
-            if(!StringTk::isNumeric(lineList[2]))
+            if(StringTk::isNumeric(lineList[2]) )
+            {
+               inodeLimit = StringTk::strToUInt64(lineList[2].c_str() );
+            }
+            else if(lineList[2] == MODESETQUOTA_ARGVALUE_SIZE_INODE_RESET)
+            {
+               inodeLimit = 0;
+            }
+            else if(lineList[2] == MODESETQUOTA_ARGVALUE_SIZE_INODE_UNLIMITED)
+            {
+               inodeLimit = std::numeric_limits<uint64_t>::max();
+            }
+            else
             { // inode limit is a invalid value
                std::cerr << "The value for the inode limit is not valid: " << lineList[2] <<
                   " ; Check line " << lineNumber << " of file: " << pathToFile << " Format: GID or "
-                  "UID,size limit,inode limit ; Example: 2034,500M,10000" << std::endl;
+                  "UID,size limit,inode limit ; Example: 2034,500M,10000 ; "
+                  "Example: 2034,unlimited,reset" << std::endl;
 
                retVal++;
                continue;
             }
 
             QuotaData quota(id, quotaType);
-            quota.setQuotaData(UnitTk::strHumanToInt64(lineList[1].c_str()),
-               StringTk::strToUInt64(lineList[2].c_str()));
+            quota.setQuotaData(sizeLimit, inodeLimit);
             if(!QuotaData::uniqueIDAddQuotaDataToList(quota, &this->quotaLimitsList) )
                std::cerr << "The ID " << id << " in line " << lineNumber << " of file "
                   << pathToFile << " occours more then once." << std::endl;
@@ -527,7 +591,7 @@ int ModeSetQuota::readFromFile(std::string pathToFile, QuotaDataType quotaType)
          {
             std::cerr << "Check line " << lineNumber << " of file: " << pathToFile << " ; Not "
                "enough or to much values are given. Format: GID or UID,size limit,inode limit ; "
-               "Example: 2034,500M,10000"<< std::endl;
+               "Example: 2034,500M,10000 ; Example: 2034,unlimited,reset" << std::endl;
 
             retVal++;
             continue;

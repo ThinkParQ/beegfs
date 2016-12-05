@@ -15,7 +15,7 @@ char* System_getHostnameCopy(void)
    down_read(&uts_sem);
 #endif
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,18)
+#ifdef KERNEL_HAS_SYSTEM_UTSNAME
    hostnameOrig = system_utsname.nodename;
 #else
    hostnameOrig = utsname()->nodename;

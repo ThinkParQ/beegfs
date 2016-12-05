@@ -31,7 +31,7 @@ bool FhgfsOpsCommKit_initEmergencyPools()
       return false;
    }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
+#ifdef KERNEL_HAS_KMEMCACHE_DTOR
    headerBufferCache = kmem_cache_create("beegfs-msgheaders", BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
       SLAB_MEM_SPREAD, NULL, NULL);
 #else
@@ -557,7 +557,10 @@ static void __commkit_cleanup_generic(CommKitContext* context, struct CommKitTar
    info->headerBuffer = NULL;
 
    if(likely(info->node) )
+   {
       Node_put(info->node);
+      info->node = NULL;
+   }
 
    // prepare next stage
 
@@ -1066,7 +1069,7 @@ static int __commkit_readfile_recvdata(CommKitContext* context, struct CommKitTa
       BUG_ON(currentState->data.count == 0);
    }
 
-   iov = BEEGFS_IOV_ITER_IOVEC(&currentState->data);
+   iov = iov_iter_iovec(&currentState->data);
    missingLength = MIN(iov.iov_len, currentState->toBeTransmitted - currentState->transmitted);
 
    // receive available dataPart
@@ -1309,7 +1312,7 @@ static enum CKTargetBadAction __commkit_fsync_selectedTargetBad(CommKitContext* 
 
    if(StripePattern_getPatternType(context->ioInfo->pattern) == STRIPEPATTERN_BuddyMirror &&
          info->useBuddyMirrorSecond)
-      info->nodeResult = FhgfsOpsErr_SUCCESS;
+      info->nodeResult = -FhgfsOpsErr_SUCCESS;
 
    return CK_SKIP_TARGET;
 }
@@ -1327,7 +1330,7 @@ static unsigned __commkit_fsync_prepareHeader(CommKitContext* context,
 
    if(!fctx->forceRemoteFlush && !fctx->checkSession && !fctx->doSyncOnClose)
    {
-      info->nodeResult = FhgfsOpsErr_SUCCESS;
+      info->nodeResult = -FhgfsOpsErr_SUCCESS;
       return 0;
    }
 
@@ -1377,7 +1380,7 @@ static int __commkit_fsync_recvHeader(CommKitContext* context, struct CommKitTar
    if(!parseRes)
       return __commkit_message_genericResponse(context, info, NETMSGTYPE_FSyncLocalFile);
 
-   info->nodeResult = FSyncLocalFileRespMsg_getValue(&respMsg);
+   info->nodeResult = -FSyncLocalFileRespMsg_getValue(&respMsg);
    return 0;
 }
 
@@ -1428,7 +1431,7 @@ static int __commkit_statstorage_recvHeader(CommKitContext* context, struct Comm
 
    state->totalFree = respMsg.sizeFree;
    state->totalSize = respMsg.sizeTotal;
-   info->nodeResult = respMsg.result;
+   info->nodeResult = -respMsg.result;
    return 0;
 }
 

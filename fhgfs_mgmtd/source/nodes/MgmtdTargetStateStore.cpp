@@ -326,6 +326,31 @@ bool MgmtdTargetStateStore::resolveDoubleResync()
 }
 
 /**
+ * If any target/node is a primary of a buddy group, and needs a resync, a switchover in that
+ * buddy group will be triggered.
+ * @returns true if any group was switched over.
+ */
+bool MgmtdTargetStateStore::resolvePrimaryResync()
+{
+   App* app = Program::getApp();
+   MirrorBuddyGroupMapper* mbgm;
+   if (nodeType == NODETYPE_Meta)
+      mbgm = app->getMetaBuddyGroupMapper();
+   else
+      mbgm = app->getStorageBuddyGroupMapper();
+
+   UInt16Vector groupsToSwitch = findPrimaryResync();
+   for (auto groupIDIt = groupsToSwitch.begin(); groupIDIt != groupsToSwitch.end(); ++groupIDIt)
+   {
+      RWLockGuard lock(mbgm->rwlock, SafeRWLock_WRITE);
+      mbgm->switchover(*groupIDIt);
+   }
+
+   return false;
+}
+
+
+/**
  * Finds mirror groups where both targets / nodes are in needs-resync state.
  * @returns a list of the primary targets.
  */
@@ -403,6 +428,76 @@ UInt16Vector MgmtdTargetStateStore::findDoubleResync()
    }
 
    return goodTargetsList;
+}
+
+UInt16Vector MgmtdTargetStateStore::findPrimaryResync()
+{
+   const char* logContext = "Resolve primary resync";
+   LogContext(logContext).log(LogTopic_STATESYNC, Log_DEBUG,
+         "Checking for primary that needs resync.");
+
+   App* app = Program::getApp();
+   MirrorBuddyGroupMapper* mbgm;
+   if (nodeType == NODETYPE_Meta)
+      mbgm = app->getMetaBuddyGroupMapper();
+   else
+      mbgm = app->getStorageBuddyGroupMapper();
+
+   UInt16Vector groupsToSwitch;
+
+   MirrorBuddyGroupMap groups;
+   mbgm->getMirrorBuddyGroups(groups);
+
+   RWLockGuard lock(rwlock, SafeRWLock_READ);
+
+   for (auto buddyGroupIter = groups.cbegin(); buddyGroupIter != groups.end(); ++buddyGroupIter)
+   {
+      const uint16_t primaryTargetID = buddyGroupIter->second.firstTargetID;
+      const uint16_t secondaryTargetID = buddyGroupIter->second.secondTargetID;
+      const uint16_t mirrorGroupID = buddyGroupIter->first;
+
+      CombinedTargetState primaryState;
+      const bool primaryStateRes = getStateUnlocked(primaryTargetID, primaryState);
+      if (!primaryStateRes)
+      {
+         LogContext(logContext).log(LogTopic_STATESYNC, Log_ERR,
+               "Failed to get state for " + nodeTypeStr(false) + " "
+               + StringTk::uintToStr(primaryTargetID));
+
+         continue;
+      }
+
+      if (primaryState.consistencyState == TargetConsistencyState_NEEDS_RESYNC)
+      {
+         // The primary is in needs resync state. This is not a valid state for a buddy group to be
+         // in, so we need to switch over if the secondary is NOT bad or in needs resync state, too
+         // (i.e. it is GOOD) - and we don't care whether it's online or offline.
+
+         CombinedTargetState secondaryState;
+         const bool secondaryStateRes = getStateUnlocked(secondaryTargetID, secondaryState);
+         if (!secondaryStateRes)
+         {
+            LogContext(logContext).log(LogTopic_STATESYNC, Log_ERR,
+                  "Failed to get state for " + nodeTypeStr(false) + " "
+                  + StringTk::uintToStr(secondaryTargetID));
+
+            continue;
+         }
+
+         if (secondaryState.consistencyState == TargetConsistencyState_GOOD
+             && secondaryState.reachabilityState == TargetReachabilityState_ONLINE)
+         {
+            LogContext(logContext).log(LogTopic_STATESYNC, Log_WARNING,
+                  "The primary " + nodeTypeStr(false) + " of mirror group " +
+                  StringTk::uintToStr(mirrorGroupID) + " needs a resync. "
+                  "Switching primary/secondary.");
+
+            groupsToSwitch.push_back(mirrorGroupID);
+         }
+      }
+   }
+
+   return groupsToSwitch;
 }
 
 /**

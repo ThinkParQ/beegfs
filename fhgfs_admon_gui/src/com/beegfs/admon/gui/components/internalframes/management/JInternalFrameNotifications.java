@@ -1,6 +1,8 @@
 package com.beegfs.admon.gui.components.internalframes.management;
 
 import com.beegfs.admon.gui.common.XMLParser;
+import static com.beegfs.admon.gui.common.enums.SmtpSendTypeEnum.SMTP_SEND_TYPE_SENDMAIL;
+import static com.beegfs.admon.gui.common.enums.SmtpSendTypeEnum.SMTP_SEND_TYPE_SOCKET;
 import com.beegfs.admon.gui.common.exceptions.CommunicationException;
 import com.beegfs.admon.gui.common.tools.CryptTk;
 import static com.beegfs.admon.gui.common.tools.DefinesTk.DEFAULT_STRING_LENGTH;
@@ -26,6 +28,9 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
    private static final long serialVersionUID = 1L;
    private static final String THREAD_NAME = "Notification";
 
+   private String lastSmtpServer = "";
+   private String lastSendmailPath = "";
+
    /**
     * Creates new form JInternalFrameMetaNode
     */
@@ -44,10 +49,15 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       return obj instanceof JInternalFrameNotifications;
    }
 
-   private void setMailSettings(boolean enable)
+   private void setMailSettings(boolean enable, boolean ignoreEnableCheckbox)
    {
+      if(!ignoreEnableCheckbox)
+      {
+         jCheckBoxEnable.setEnabled(enable);
+      }
+
       jButtonSubmitMail.setEnabled(enable);
-      jCheckBoxEnable.setEnabled(enable);
+      jComboBoxSendType.setEnabled(enable);
       jTextFieldSmtp.setEnabled(enable);
       jTextFieldSender.setEnabled(enable);
       jTextFieldRecipient.setEnabled(enable);
@@ -72,15 +82,29 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          {
             jCheckBoxEnable.setSelected(false);
          }
-         jTextFieldSmtp.setText(data.get("smtpServer"));
+         jComboBoxSendType.setSelectedIndex(Integer.parseInt(data.get("sendType")));
+
+         lastSendmailPath = data.get("sendmailPath");
+         lastSmtpServer = data.get("smtpServer");
+         if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SOCKET.ordinal())
+         {
+            jTextFieldSmtp.setText(lastSmtpServer);
+         }
+         else if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SENDMAIL.ordinal())
+         {
+            jTextFieldSmtp.setText(lastSendmailPath);
+         }
+
          jTextFieldSender.setText(data.get("sender"));
          jTextFieldRecipient.setText(data.get("recipient"));
          jTextFieldDelay.setText(data.get("delay"));
          jTextFieldResend.setText(data.get("resendTime"));
-         checkMailSettingsStateInputFields();
+
+         setMailSettings(jCheckBoxEnable.isSelected(), true);
+         setLabelAfterComboboxChanged();
 
          boolean overrideActive = Boolean.parseBoolean(data.get("overrideActive"));
-         setMailSettings(!overrideActive);
+         setMailSettings(!overrideActive, false);
          jLabelDisableInfo.setVisible(overrideActive);
       }
       catch (CommunicationException e)
@@ -90,26 +114,6 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
             e,
             true
          });
-      }
-   }
-
-   private void checkMailSettingsStateInputFields()
-   {
-      if (jCheckBoxEnable.isSelected())
-      {
-         jTextFieldSmtp.setEnabled(true);
-         jTextFieldSender.setEnabled(true);
-         jTextFieldRecipient.setEnabled(true);
-         jTextFieldDelay.setEnabled(true);
-         jTextFieldResend.setEnabled(true);
-      }
-      else
-      {
-         jTextFieldSmtp.setEnabled(false);
-         jTextFieldSender.setEnabled(false);
-         jTextFieldRecipient.setEnabled(false);
-         jTextFieldDelay.setEnabled(false);
-         jTextFieldResend.setEnabled(false);
       }
    }
 
@@ -133,11 +137,22 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          long nonce = Long.parseLong(data.get("nonce"));
          String secret = CryptTk.cryptWithNonce(Main.getSession().getPw(), nonce);
 
+         if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SOCKET.ordinal())
+         {
+            lastSmtpServer = jTextFieldSmtp.getText();
+         }
+         else if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SENDMAIL.ordinal())
+         {
+            lastSendmailPath = jTextFieldSmtp.getText();
+         }
+
          Object[] obj = new Object[]
          {
             "change", "true",
             "mailEnabled", String.valueOf(mailEnabled),
-            "smtpServer", jTextFieldSmtp.getText(),
+            "sendType", String.valueOf(jComboBoxSendType.getSelectedIndex()),
+            "sendmailPath", lastSendmailPath,
+            "smtpServer", lastSmtpServer,
             "sender", jTextFieldSender.getText(),
             "recipient", jTextFieldRecipient.getText(),
             "mailMinDownTimeSec", jTextFieldDelay.getText(),
@@ -314,6 +329,20 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       }
    }
 
+   private void setLabelAfterComboboxChanged()
+   {
+      if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SOCKET.ordinal())
+      {
+         jLabelSmtp.setText("Smtp server to use for sending mails:");
+         jTextFieldSmtp.setText(lastSmtpServer);
+      }
+      else if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SENDMAIL.ordinal())
+      {
+         jLabelSmtp.setText("Path to sendmail binary:");
+         jTextFieldSmtp.setText(lastSendmailPath);
+      }
+   }
+
    /**
     * This method is called from within the constructor to initialize the form. WARNING: Do NOT
     * modify this code. The content of this method is always regenerated by the Form Editor.
@@ -329,6 +358,8 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       jTabbedPaneSettings = new javax.swing.JTabbedPane();
       jPanelMail = new javax.swing.JPanel();
       jCheckBoxEnable = new javax.swing.JCheckBox();
+      jLabelSendType = new javax.swing.JLabel();
+      jComboBoxSendType = new javax.swing.JComboBox<>();
       jLabelSmtp = new javax.swing.JLabel();
       jTextFieldSmtp = new javax.swing.JTextField();
       jTextFieldSender = new javax.swing.JTextField();
@@ -353,7 +384,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       setIconifiable(true);
       setMaximizable(true);
       setResizable(true);
-      setPreferredSize(new java.awt.Dimension(859, 341));
+      setPreferredSize(new java.awt.Dimension(859, 400));
       addInternalFrameListener(new javax.swing.event.InternalFrameListener()
       {
          public void internalFrameOpened(javax.swing.event.InternalFrameEvent evt)
@@ -381,12 +412,14 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       });
 
       jPanelFrame.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
-      jPanelFrame.setPreferredSize(new java.awt.Dimension(830, 288));
+      jPanelFrame.setPreferredSize(new java.awt.Dimension(830, 300));
       jPanelFrame.setLayout(new java.awt.BorderLayout());
 
       jTabbedPaneSettings.setPreferredSize(new java.awt.Dimension(839, 292));
 
       jPanelMail.setBorder(javax.swing.BorderFactory.createTitledBorder("Mail Notifications"));
+      jPanelMail.setMinimumSize(new java.awt.Dimension(732, 310));
+      jPanelMail.setPreferredSize(new java.awt.Dimension(732, 310));
       jPanelMail.setLayout(new java.awt.GridBagLayout());
 
       jCheckBoxEnable.setHorizontalTextPosition(javax.swing.SwingConstants.LEADING);
@@ -406,16 +439,42 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jCheckBoxEnable, gridBagConstraints);
 
-      jLabelSmtp.setText("Smtp server to use for sending mails :");
+      jLabelSendType.setText("Methode to send the mails:");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 2;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
-      jPanelMail.add(jLabelSmtp, gridBagConstraints);
+      jPanelMail.add(jLabelSendType, gridBagConstraints);
+
+      jComboBoxSendType.setMaximumRowCount(2);
+      jComboBoxSendType.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "socket", "sendmail"}));
+      jComboBoxSendType.addActionListener(new java.awt.event.ActionListener()
+      {
+         public void actionPerformed(java.awt.event.ActionEvent evt)
+         {
+            jComboBoxSendTypeActionPerformed(evt);
+         }
+      });
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
       gridBagConstraints.gridy = 2;
+      gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+      gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+      gridBagConstraints.weightx = 1.0;
+      gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
+      jPanelMail.add(jComboBoxSendType, gridBagConstraints);
+
+      jLabelSmtp.setText("Smtp server to use for sending mails:");
+      gridBagConstraints = new java.awt.GridBagConstraints();
+      gridBagConstraints.gridx = 0;
+      gridBagConstraints.gridy = 3;
+      gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+      gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
+      jPanelMail.add(jLabelSmtp, gridBagConstraints);
+      gridBagConstraints = new java.awt.GridBagConstraints();
+      gridBagConstraints.gridx = 1;
+      gridBagConstraints.gridy = 3;
       gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.weightx = 1.0;
@@ -423,65 +482,65 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       jPanelMail.add(jTextFieldSmtp, gridBagConstraints);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
-      gridBagConstraints.gridy = 3;
+      gridBagConstraints.gridy = 4;
       gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.weightx = 1.0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldSender, gridBagConstraints);
 
-      jLabelSender.setText("Sender eMail address to use :");
+      jLabelSender.setText("Sender eMail address to use:");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
-      gridBagConstraints.gridy = 3;
+      gridBagConstraints.gridy = 4;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jLabelSender, gridBagConstraints);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
-      gridBagConstraints.gridy = 4;
+      gridBagConstraints.gridy = 5;
       gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.weightx = 1.0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldRecipient, gridBagConstraints);
 
-      jLabelRecipient.setText("Recipient address, to which notifications are sent :");
+      jLabelRecipient.setText("Recipient address, to which notifications are sent:");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
-      gridBagConstraints.gridy = 4;
+      gridBagConstraints.gridy = 5;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jLabelRecipient, gridBagConstraints);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
-      gridBagConstraints.gridy = 5;
+      gridBagConstraints.gridy = 6;
       gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.weightx = 1.0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldDelay, gridBagConstraints);
 
-      jLabelDelay.setText("Minimum amount of time between a event and the mail notification in seconds :");
+      jLabelDelay.setText("Minimum amount of time between a event and the mail notification in seconds:");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
-      gridBagConstraints.gridy = 5;
+      gridBagConstraints.gridy = 6;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jLabelDelay, gridBagConstraints);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
-      gridBagConstraints.gridy = 6;
+      gridBagConstraints.gridy = 7;
       gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.weightx = 1.0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldResend, gridBagConstraints);
 
-      jLabelResend.setText("Amount of time after which an already sent eMail is resent as reminder in minutes :");
+      jLabelResend.setText("Amount of time after which an already sent eMail is resent as reminder in minutes:");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
-      gridBagConstraints.gridy = 6;
+      gridBagConstraints.gridy = 7;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jLabelResend, gridBagConstraints);
@@ -499,7 +558,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       });
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
-      gridBagConstraints.gridy = 7;
+      gridBagConstraints.gridy = 8;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelMail.add(jButtonSubmitMail, gridBagConstraints);
@@ -517,7 +576,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       });
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
-      gridBagConstraints.gridy = 7;
+      gridBagConstraints.gridy = 8;
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelMail.add(jButtonSendEMail, gridBagConstraints);
@@ -534,7 +593,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTH;
       jPanelMail.add(jLabelDisableInfo, gridBagConstraints);
 
-      jLabelEnable.setText("Enable eMail notifications :");
+      jLabelEnable.setText("Enable eMail notifications:");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -610,42 +669,50 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       );
       layout.setVerticalGroup(
          layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-         .addComponent(jScrollPaneFrame, javax.swing.GroupLayout.DEFAULT_SIZE, 370, Short.MAX_VALUE)
+         .addComponent(jScrollPaneFrame, javax.swing.GroupLayout.DEFAULT_SIZE, 344, Short.MAX_VALUE)
       );
 
       pack();
    }// </editor-fold>//GEN-END:initComponents
 
     private void formInternalFrameClosed(javax.swing.event.InternalFrameEvent evt) {//GEN-FIRST:event_formInternalFrameClosed
-       FrameManager.delFrame(this);
+      FrameManager.delFrame(this);
     }//GEN-LAST:event_formInternalFrameClosed
 
     private void jCheckBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jCheckBoxEnableActionPerformed
-       checkMailSettingsStateInputFields();
+      setMailSettings(jCheckBoxEnable.isSelected(), true);
     }//GEN-LAST:event_jCheckBoxEnableActionPerformed
 
     private void jButtonSubmitMailActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonSubmitMailActionPerformed
-       uploadMailConfig();
+      uploadMailConfig();
 }//GEN-LAST:event_jButtonSubmitMailActionPerformed
 
     private void jButtonSubmitScriptActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonSubmitScriptActionPerformed
-       uploadScriptSettings();
+      uploadScriptSettings();
 }//GEN-LAST:event_jButtonSubmitScriptActionPerformed
 
     private void jButtonSendEMailActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonSendEMailActionPerformed
-       sendTestEmail();
+      sendTestEmail();
     }//GEN-LAST:event_jButtonSendEMailActionPerformed
+
+   private void jComboBoxSendTypeActionPerformed(java.awt.event.ActionEvent evt)//GEN-FIRST:event_jComboBoxSendTypeActionPerformed
+   {//GEN-HEADEREND:event_jComboBoxSendTypeActionPerformed
+      setLabelAfterComboboxChanged();
+   }//GEN-LAST:event_jComboBoxSendTypeActionPerformed
+
    // Variables declaration - do not modify//GEN-BEGIN:variables
    private javax.swing.JButton jButtonSendEMail;
    private javax.swing.JButton jButtonSubmitMail;
    private javax.swing.JButton jButtonSubmitScript;
    private javax.swing.JCheckBox jCheckBoxEnable;
+   private javax.swing.JComboBox<String> jComboBoxSendType;
    private javax.swing.JLabel jLabel6;
    private javax.swing.JLabel jLabelDelay;
    private javax.swing.JLabel jLabelDisableInfo;
    private javax.swing.JLabel jLabelEnable;
    private javax.swing.JLabel jLabelRecipient;
    private javax.swing.JLabel jLabelResend;
+   private javax.swing.JLabel jLabelSendType;
    private javax.swing.JLabel jLabelSender;
    private javax.swing.JLabel jLabelSmtp;
    private javax.swing.JPanel jPanelFrame;
