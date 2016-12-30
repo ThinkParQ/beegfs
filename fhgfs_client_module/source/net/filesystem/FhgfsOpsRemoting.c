@@ -1557,6 +1557,12 @@ ssize_t FhgfsOpsRemoting_rwChunkPageVec(FhgfsChunkPageVec *pageVec, RemotingIOIn
       if (rwType == BEEGFS_RWTYPE_WRITE)
          BitStore_setBit(ioInfo->firstWriteDone, targetIndex, true);
    }
+   else if (retVal == -FhgfsOpsErr_COMMUNICATION)
+   {
+      // commkit has done no communication at all, and thus hasn't touched any pages. it is our
+      // responsibility to end pending io with an error now.
+      needReadWriteHandlePages = true;
+   }
 
    LOG_DEBUG_FORMATTED(log, Log_SPAM, logContext, "fileHandleID: %s rwType %s: sum-result %lld",
       ioInfo->fileHandleID, rwTypeStr, retVal);

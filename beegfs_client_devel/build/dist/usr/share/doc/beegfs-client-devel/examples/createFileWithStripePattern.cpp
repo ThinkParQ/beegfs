@@ -44,20 +44,22 @@ int main(int argc, char** argv)
    DIR* parentDir = opendir(parentDirectory.c_str() );
    if(parentDir == NULL)
    {
-      std::cout << "Can not get directory stream of directory: " << parentDirectory << " errno: " << errno << std::endl;
+      std::cout << "Can not get directory stream of directory: " << parentDirectory
+         << " errno: " << errno << std::endl;
       exit(-1);
    }
-   
+
    // get a fd of the parent directory
    int fd = dirfd(parentDir);
    if(fd == -1)
    {
-      std::cout << "Can not get fd from directory: " << parentDirectory << " errno: " << errno << std::endl;
+      std::cout << "Can not get fd from directory: " << parentDirectory
+         << " errno: " << errno << std::endl;
       exit(-1);
    }
 
-   // check if the parent directory is located on a BeeGFS, because the striping API works only on a BeeGFS
-   // if the ioctl is used on a other filesystem everything can happens
+   // check if the parent directory is located on a BeeGFS, because the striping API works only on
+   // BeeGFS (Results of BeeGFS ioctls on other file systems are undefined.)
    bool isBeegfs = beegfs_testIsBeeGFS(fd);
    if(!isBeegfs)
    {

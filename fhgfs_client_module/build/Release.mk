@@ -12,6 +12,21 @@ ifneq ($(KERNELRELEASE),)
 # --- kbuild part [START] ---
 #
 
+BEEGFS_FEATURE_DETECTION := $(shell $(dir $(lastword $(MAKEFILE_LIST)))/feature-detect.sh)
+ifneq ($(lastword $(BEEGFS_FEATURE_DETECTION)),--~~success~~--)
+   $(error feature detection reported an error)
+else
+   BEEGFS_FEATURE_DETECTION := $(filter-out --~~success~~--,$(BEEGFS_FEATURE_DETECTION))
+endif
+
+# ccflags-y was introduced in 2.6.24, earlier kernels use EXTRA_CFLAGS for the same purpose
+ifeq ($(origin ccflags-y),file)
+ccflags-y += $(BEEGFS_FEATURE_DETECTION)
+else
+# the client makefile sets this already
+override EXTRA_CFLAGS += $(BEEGFS_FEATURE_DETECTION)
+endif
+
 # Auto-selection of source files and corresponding target objects 
 BEEGFS_SOURCES := $(shell find $(obj)/../source -name '*.c')
 BEEGFS_SOURCES_STRIPPED := $(subst $(obj)/, , $(BEEGFS_SOURCES) ) 

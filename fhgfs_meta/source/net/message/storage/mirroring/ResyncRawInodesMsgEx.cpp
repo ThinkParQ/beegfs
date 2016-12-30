@@ -301,10 +301,16 @@ FhgfsOpsErr ResyncRawInodesMsgEx::removeUntouchedInodes()
 
    while (true)
    {
-      struct dirent entry;
       struct dirent* found;
 
+#if USE_READDIR_P
+      struct dirent entry;
       int err = readdir_r(dir.get(), &entry, &found);
+#else
+      errno = 0;
+      found = readdir(dir.get());
+      int err = found ? 0 : errno;
+#endif
       if (err > 0)
       {
          LOG(ERR, "readdir() failed.", sysErr(err));

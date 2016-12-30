@@ -9,11 +9,21 @@ static FhgfsOpsErr checkChunkDirRemovable(const int dirFD)
    DIR* dir = fdopendir(dirFD);
    std::unique_ptr<DIR, StorageTk::CloseDirDeleter> _dir(dir);
 
-   struct dirent buffer;
-   struct dirent* result;
-
-   while (readdir_r(dir, &buffer, &result) == 0)
+   while (true)
    {
+      struct dirent* result;
+
+#if USE_READDIR_R
+      struct dirent buffer;
+      if (readdir_r(dir, &buffer, &result) != 0)
+         break;
+#else
+      errno = 0;
+      result = readdir(dir);
+      if (!result && errno)
+         break;
+#endif
+
       if (!result)
          return FhgfsOpsErr_SUCCESS;
 

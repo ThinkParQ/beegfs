@@ -202,7 +202,7 @@ void FsckDBFileInodesTable::insert(FsckFileInodeList& fileInodes, const BulkHand
             if(offsetInPattern == extraTargets.NTARGETS - 1)
             {
                if(handle)
-                  handle->second->append(extraTargets);
+                  std::get<1>(*handle)->append(extraTargets);
                else
                   this->targets.insert(extraTargets);
 
@@ -213,9 +213,9 @@ void FsckDBFileInodesTable::insert(FsckFileInodeList& fileInodes, const BulkHand
 
       if(handle)
       {
-         handle->first->append(inode);
+         std::get<0>(*handle)->append(inode);
          if(extraTargets.firstTargetIndex != 0)
-            handle->second->append(extraTargets);
+            std::get<1>(*handle)->append(extraTargets);
       }
       else
       {

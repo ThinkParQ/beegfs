@@ -72,7 +72,8 @@
 #define BEEGFS_IOC_GET_STRIPETARGET_V2     _IOR( \
    BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_GET_STRIPETARGET, struct BeegfsIoctl_GetStripeTargetV2_Arg)
 #define BEEGFS_IOC_MKFILE_STRIPEHINTS      _IOW( \
-   BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_MKFILE_STRIPEHINTS, struct BeegfsIoctl_MkFileWithStripeHints_Arg)
+   BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_MKFILE_STRIPEHINTS, \
+      struct BeegfsIoctl_MkFileWithStripeHints_Arg)
 
 
 /* used to return the client config file name using an ioctl */
@@ -102,7 +103,8 @@ struct BeegfsIoctl_MkFile_Arg
    int entryNameLen;
    int fileType; // see linux/fs.h or man 3 readdir, DT_UNKNOWN, DT_FIFO, ...
 
-   const char* symlinkTo;  // Only must be set for symlinks. The name a symlink is supposed to point to
+   const char* symlinkTo;  // Only must be set for symlinks.
+                           // The name a symlink is supposed to point to
    int symlinkToLen; // Length of the symlink name
 
    int mode; // mode (permission) of the new file
@@ -135,7 +137,8 @@ struct BeegfsIoctl_MkFileV2_Arg
    int entryNameLen;
    int fileType; // see linux/fs.h or man 3 readdir, DT_UNKNOWN, DT_FIFO, ...
 
-   const char* symlinkTo;  // Only must be set for symlinks. The name a symlink is supposed to point to
+   const char* symlinkTo;  // Only must be set for symlinks.
+                           // The name a symlink is supposed to point to
    int symlinkToLen; // Length of the symlink name
 
    int mode; // mode (permission) of the new file
@@ -161,7 +164,7 @@ struct BeegfsIoctl_GetStripeInfo_Arg
 struct BeegfsIoctl_GetStripeTarget_Arg
 {
    uint16_t targetIndex; // index of the target that should be queried (0-based)
-   
+
    uint16_t outTargetNumID; // (out-value) numeric ID of target with given index
    uint16_t outNodeNumID; // (out-value) numeric ID of node to which this target is mapped
    char outNodeStrID[BEEGFS_IOCTL_NODESTRID_BUFLEN]; /* (out-value) string ID of node to which this

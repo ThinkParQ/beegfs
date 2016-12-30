@@ -17,7 +17,7 @@ class Barrier
       {
          int res = pthread_barrier_destroy(&barrier);
          if (res != 0)
-            throw PThreadException(System::getErrString(res));
+            std::terminate();
       }
 
       Barrier(const Barrier&) = delete;

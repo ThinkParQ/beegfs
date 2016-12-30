@@ -55,10 +55,16 @@ void BuddyResyncerGatherSlave::crawlDir(const std::string& path, const MetaSyncD
 
    while (!getSelfTerminate())
    {
-      struct dirent buffer;
       struct dirent* entry;
 
+#if USE_READDIR_R
+      struct dirent buffer;
       const int readRes = ::readdir_r(dirHandle.get(), &buffer, &entry);
+#else
+      errno = 0;
+      entry = ::readdir(dirHandle.get());
+      const int readRes = entry ? 0 : errno;
+#endif
       if (readRes != 0)
       {
          LOG(ERR, "Could not read dir entry.", path, sysErr(readRes));

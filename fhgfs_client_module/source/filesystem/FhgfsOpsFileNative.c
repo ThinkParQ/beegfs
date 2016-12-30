@@ -310,12 +310,13 @@ static int beegfs_release_range(struct file* filp, loff_t first, loff_t last)
    int writeRes;
 
    // expand range to fit full pages
-   first &= PAGE_MASK;
-   last |= ~PAGE_MASK;
+   first &= ~PAGE_MASK;
+   last |= PAGE_MASK;
 
    clear_bit(AS_EIO, &filp->f_mapping->flags);
 
-#if !defined(KERNEL_HAS_FILEMAP_WRITE_AND_WAIT_RANGE)
+#if !defined(KERNEL_HAS_FILEMAP_WRITE_AND_WAIT_RANGE) || LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+   /* rhel5 kernels declare the *_range symbol, but don't actually have it ... */
    writeRes = filemap_write_and_wait(filp->f_mapping);
 #else
    writeRes = filemap_write_and_wait_range(filp->f_mapping, first, last);
@@ -339,8 +340,8 @@ static int beegfs_acquire_range(struct file* filp, loff_t first, loff_t last)
    int err;
 
    // expand range to fit full pages
-   first &= PAGE_MASK;
-   last |= ~PAGE_MASK;
+   first &= ~PAGE_MASK;
+   last |= PAGE_MASK;
 
    err = beegfs_release_range(filp, first, last);
    if(err)

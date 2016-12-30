@@ -641,7 +641,7 @@ void TestSerialization::testStatData()
             (
                fmt & (StatDataFormat_Flag_HasFlags | StatDataFormat_Flag_IsNet)
                ? a.flags == b.flags
-                  && a.settableFileAttribs.mode == a.settableFileAttribs.mode
+                  && a.settableFileAttribs.mode == b.settableFileAttribs.mode
                   && (fmt & StatDataFormat_Flag_IsNet
                         ? true // numBlocks comparison is spurious
                         : a.getIsSparseFile()

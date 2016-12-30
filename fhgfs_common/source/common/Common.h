@@ -306,4 +306,10 @@ extern void assertMsg(const char* file, unsigned line, const char* condition);
 # define ASSERT(cond) do {} while (0)
 #endif
 
+#if defined (__GLIBC__) && (__GLIBC__ >= 2) && (__GLIBC_MINOR__ >= 24)
+#define USE_READDIR_R 0
+#else
+#define USE_READDIR_R 1
+#endif
+
 #endif /*COMMON_H_*/

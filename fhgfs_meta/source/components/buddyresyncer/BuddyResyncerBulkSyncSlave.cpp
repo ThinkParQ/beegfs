@@ -119,13 +119,19 @@ FhgfsOpsErr BuddyResyncerBulkSyncSlave::streamCandidateDir(Socket& socket,
       return FhgfsOpsErr_INTERNAL;
    }
 
-   struct dirent entryBuf;
-
    while (true)
    {
       struct dirent* entry;
 
-      if (::readdir_r(dir.get(), &entryBuf, &entry) < 0)
+#if USE_READDIR_P
+      struct dirent entryBuf;
+      int err = ::readdir_r(dir.get(), &entryBuf, &entry);
+#else
+      errno = 0;
+      entry = readdir(dir.get());
+      int err = entry ? 0 : errno;
+#endif
+      if (err > 0)
       {
          LOG(ERR, "Could not read candidate directory.", candidatePath, sysErr());
          numDirErrors.increase();

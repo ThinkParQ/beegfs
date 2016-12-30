@@ -51,6 +51,7 @@ class ModeCheckFS : public Mode
 
       int initDatabase();
       void printHeaderInformation();
+      void disposeUnusedFiles();
       FhgfsOpsErr gatherData(bool forceRestart);
 
       template<typename Obj, typename State>

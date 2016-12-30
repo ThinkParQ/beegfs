@@ -81,20 +81,27 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
       return false;
    }
 
-   ::dirent entry;
-   ::dirent* item;
    int readRes;
    bool result = true;
-
-   // we really want struct struct dirent to contain a reasonably sized array for the filename
-   BOOST_STATIC_ASSERT(sizeof(entry.d_name) >= NAME_MAX + 1);
 
    std::string pathBuf = path;
    pathBuf.push_back('/');
 
    while(true && !getSelfTerminate())
    {
+      ::dirent* item;
+
+      // we really want struct struct dirent to contain a reasonably sized array for the filename
+      BOOST_STATIC_ASSERT(sizeof(item->d_name) >= NAME_MAX + 1);
+
+#if USE_READDIR_R
+      ::dirent entry;
       readRes = ::readdir_r(dir, &entry, &item);
+#else
+      errno = 0;
+      item = readdir(dir);
+      readRes = item ? 0 : errno;
+#endif
       if(readRes != 0)
       {
          log.log(Log_WARNING, "readdir failed: " + System::getErrString() );

@@ -3,9 +3,12 @@
 #include "QuotaTk.h"
 
 #include <dlfcn.h>
+// xfs/xfs.h includes linux/fs.h, which (sometimes) defines MS_RDONLY.
+// sys/mount.h is the canonical source of MS_RDONLY, but declares it as an enum - which is then
+// broken by linux/fs.h when included after it
+#include <sys/mount.h>
 #include <xfs/xfs.h>
 #include <xfs/xqm.h>
-#include <sys/mount.h>
 
 
 

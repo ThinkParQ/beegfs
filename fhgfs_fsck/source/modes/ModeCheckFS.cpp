@@ -1,5 +1,6 @@
 #include "ModeCheckFS.h"
 
+#include <common/toolkit/DisposalCleaner.h>
 #include <common/toolkit/ListTk.h>
 #include <common/toolkit/UnitTk.h>
 #include <common/toolkit/ZipIterator.h>
@@ -79,6 +80,21 @@ FsckRepairAction UserPrompter::chooseAction(const std::string& prompt)
       OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
 
    return repairAction;
+}
+
+static FhgfsOpsErr handleDisposalItem(Node& owner, const std::string& entryID,
+   const bool isMirrored)
+{
+   FhgfsOpsErr err = DisposalCleaner::unlinkFile(owner, entryID, isMirrored);
+   if (err == FhgfsOpsErr_INUSE)
+      return FhgfsOpsErr_SUCCESS;
+   else
+      return err;
+}
+
+static void handleDisposalError(Node& node, FhgfsOpsErr err, uint64_t& errors)
+{
+   errors += 1;
 }
 
 
@@ -182,6 +198,8 @@ int ModeCheckFS::execute()
       int initDBRes = initDatabase();
       if (initDBRes)
          return initDBRes;
+
+      disposeUnusedFiles();
 
       boost::scoped_ptr<ModificationEventHandler> modificationEventHandler;
 
@@ -397,9 +415,33 @@ void ModeCheckFS::printHeaderInformation()
          + cfg->getDatabasePath(), OutputOptions_LINEBREAK | OutputOptions_HEADLINE);
 }
 
+void ModeCheckFS::disposeUnusedFiles()
+{
+   Config* cfg = Program::getApp()->getConfig();
+
+   if (cfg->getReadOnly() || cfg->getNoFetch())
+      return;
+
+   FsckTkEx::fsckOutput("Step 2: Delete unused files from disposal: ", OutputOptions_NONE);
+
+   using namespace std::placeholders;
+
+   uint64_t errors = 0;
+
+   DisposalCleaner dc(*Program::getApp()->getMetaMirrorBuddyGroupMapper());
+   dc.run(*Program::getApp()->getMetaNodes(),
+         handleDisposalItem,
+         std::bind(handleDisposalError, _1, _2, std::ref(errors)));
+
+   if (errors > 0)
+      FsckTkEx::fsckOutput("Some files could not be deleted.");
+   else
+      FsckTkEx::fsckOutput("Finished.");
+}
+
 FhgfsOpsErr ModeCheckFS::gatherData(bool forceRestart)
 {
-   FsckTkEx::fsckOutput("Step 2: Gather data from nodes: ", OutputOptions_DOUBLELINEBREAK);
+   FsckTkEx::fsckOutput("Step 3: Gather data from nodes: ", OutputOptions_DOUBLELINEBREAK);
 
    DataFetcher dataFetcher(*this->database, forceRestart);
    const FhgfsOpsErr retVal = dataFetcher.execute();
@@ -862,7 +904,7 @@ void ModeCheckFS::repairMalformedChunk(FsckChunk& chunk, UserPrompter& prompt)
 
 void ModeCheckFS::checkAndRepair()
 {
-   FsckTkEx::fsckOutput("Step 3: Check for errors... ", OutputOptions_DOUBLELINEBREAK);
+   FsckTkEx::fsckOutput("Step 4: Check for errors... ", OutputOptions_DOUBLELINEBREAK);
 
    Config* cfg = Program::getApp()->getConfig();
 

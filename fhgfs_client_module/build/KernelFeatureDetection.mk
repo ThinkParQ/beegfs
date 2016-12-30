@@ -314,10 +314,6 @@ $(call define_if_matches, KERNEL_HAS_GENERIC_PERMISSION_4, \
 $(call define_if_matches, KERNEL_HAS_WRITE_ITER, -F "ssize_t (*write_iter)", fs.h)
 $(call define_if_matches, KERNEL_HAS_AIO_WRITE_BUF, \
    -P "ssize_t \(\*aio_write\).*const char", fs.h)
-KERNEL_FEATURE_DETECTION += $(shell \
-   grep -sFB20 "launder_page" ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
-      | grep -LF "address_space_operations_ext" | grep -qsvF "input" \
-      && echo "-DKERNEL_HAS_LAUNDER_PAGE")
 $(call define_if_matches, KERNEL_HAS_INVALIDATEPAGE_RANGE, \
    -P "void \(\*invalidatepage\) \(struct page \*. unsigned int. unsigned int\);", fs.h)
 $(call define_if_matches, KERNEL_HAS_PERMISSION_2, \

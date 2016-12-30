@@ -24,7 +24,7 @@ class Condition
       {
          int condRes = pthread_cond_destroy(&condition);
          if(unlikely(condRes) )
-            throw MutexException(System::getErrString(condRes) );
+            std::terminate();
       }
 
       static bool initStaticCondAttr();

@@ -624,7 +624,7 @@ FhgfsOpsErr DirInode::unlinkDirEntryUnlocked(const std::string& entryName, DirEn
       if (!getRes)
          return FhgfsOpsErr_PATHNOTEXISTS;
 
-         entry = &loadedEntry;
+      entry = &loadedEntry;
    }
    else
       entry = inEntry;

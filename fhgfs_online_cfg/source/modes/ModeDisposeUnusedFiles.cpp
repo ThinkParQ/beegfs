@@ -5,6 +5,7 @@
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
 #include <common/storage/Metadata.h>
 #include <common/storage/StorageDefinitions.h>
+#include <common/toolkit/DisposalCleaner.h>
 #include <common/toolkit/MetadataTk.h>
 #include <common/toolkit/NodesTk.h>
 #include <common/toolkit/UnitTk.h>
@@ -111,214 +112,80 @@ bool ModeDisposeUnusedFiles::readConfig()
    return true;
 }
 
+FhgfsOpsErr ModeDisposeUnusedFiles::handleItem(Node& owner, const std::string& entryID,
+   const bool isMirrored)
+{
+   if (currentNode != &owner)
+   {
+      printStats();
+
+      if (cfgPrintNodes)
+      {
+         if (currentNode)
+            std::cout << "---" << std::endl << std::endl;
+
+         std::cout << "Node: " << owner.getNumID() << std::endl;
+      }
+
+      numEntriesReceived = 0;
+   }
+
+   currentNode = &owner;
+   numEntriesTotal += 1;
+   numEntriesReceived += 1;
+
+   if (cfgPrintFiles)
+   {
+      if (cfgPrintNodes)
+         std::cout << NODEINFO_INDENTATION_STR;
+
+      std::cout << entryID << std::endl;
+   }
+
+   if (cfgUnlinkFiles)
+   {
+      auto err = DisposalCleaner::unlinkFile(owner, entryID, isMirrored);
+
+      if (err == FhgfsOpsErr_COMMUNICATION)
+         std::cerr << "[" << entryID <<  "] Communication error" << std::endl;
+      else if (err == FhgfsOpsErr_INUSE)
+         std::cerr << "[" << entryID <<  "] File still in use" << std::endl;
+      else if (err != FhgfsOpsErr_SUCCESS)
+         std::cerr << "[" << entryID << "] Node encountered an error: " <<
+            FhgfsOpsErrTk::toErrString(err) << std::endl;
+      else
+         numUnlinkedTotal += 1;
+   }
+
+   return FhgfsOpsErr_SUCCESS;
+}
+
+void ModeDisposeUnusedFiles::printStats()
+{
+   if (currentNode && cfgPrintStats)
+   {
+      if (cfgPrintNodes)
+         std::cout << NODEINFO_INDENTATION_STR;
+
+      std::cout << "#Entries: " << numEntriesReceived << std::endl;
+   }
+}
+
+void ModeDisposeUnusedFiles::handleError(Node& node, FhgfsOpsErr err)
+{
+   std::cerr << "Metadata server " << node.getNumID() << " encoutered an error: "
+      << FhgfsOpsErrTk::toErrString(err) << "\n";
+}
+
 void ModeDisposeUnusedFiles::handleNodes(NodeStoreServers* metaNodes)
 {
-   auto node = metaNodes->referenceFirstNode();
-   while (node)
-   {
-      NumNodeID currentNodeID = node->getNumID();
+   using namespace std::placeholders;
 
-      if(cfgPrintNodes)
-         std::cout << "Node: " << currentNodeID << std::endl;
+   DisposalCleaner dc(*Program::getApp()->getMetaMirrorBuddyGroupMapper());
 
-      bool filesRes = getAndHandleFiles(*node);
-      if(!filesRes)
-         std::cerr << "Metadata server encoutered an error: " << currentNodeID << std::endl;
+   dc.run(*metaNodes,
+         std::bind(&ModeDisposeUnusedFiles::handleItem, this, _1, _2, _3),
+         std::bind(&ModeDisposeUnusedFiles::handleError, this, _1, _2));
 
-      // prepare next round
-      node = metaNodes->referenceNextNode(node);
-
-      if(cfgPrintNodes && node)
-         std::cout << "---" << std::endl << std::endl;
-   }
-
-}
-
-bool ModeDisposeUnusedFiles::getAndHandleFiles(Node& node)
-{
-   MirrorBuddyGroupMapper* mbm = Program::getApp()->getMetaMirrorBuddyGroupMapper();
-
-   bool retVal = true;
-
-   size_t numEntriesReceived = 0; // received during all RPC rounds (for this particular server)
-   size_t numEntriesThisRound = 0; // received during last RPC round
-   bool commRes = true;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-   ListDirFromOffsetRespMsg* respMsgCast;
-
-   FhgfsOpsErr listRes = FhgfsOpsErr_SUCCESS;
-   unsigned maxOutNames = 50;
-   StringList* entryNames;
-   uint64_t currentServerOffset = 0;
-
-   do
-   {
-      for (int i = 0; i <= 1; i++)
-      {
-         // i == 0 -> non-mirrored metadata
-         // i == 1 -> mirrored metadata
-         //
-         // we have to skip mirrored metadata if the node we are looking at is the secondary if its
-         // group, otherwise we would list mirrored disposal file twice - and attempt to delete them
-         // twice.
-         // also, we don't have to list anything if the node is not part of a mirror group at all.
-         if (i == 1)
-         {
-            const uint16_t thisGroup = mbm->getBuddyGroupID(node.getNumID().val());
-
-            if (thisGroup == 0)
-               continue;
-
-            if (mbm->getPrimaryTargetID(thisGroup) != node.getNumID().val())
-               continue;
-         }
-
-         NumNodeID ownerNodeID      = node.getNumID();
-         std::string parentEntryID = "";
-         std::string entryID       = i == 0
-            ? META_DISPOSALDIR_ID_STR
-            : META_MIRRORDISPOSALDIR_ID_STR;
-         std::string fileName      = entryID;
-         EntryInfo entryInfo(ownerNodeID, parentEntryID, entryID, fileName, DirEntryType_DIRECTORY,
-               i == 0 ? 0 : ENTRYINFO_FEATURE_BUDDYMIRRORED);
-
-         ListDirFromOffsetMsg listMsg(&entryInfo, currentServerOffset, maxOutNames, true);
-
-         // request/response
-         commRes = MessagingTk::requestResponse(
-            node, &listMsg, NETMSGTYPE_ListDirFromOffsetResp, &respBuf, &respMsg);
-         if(!commRes)
-         {
-            std::cerr << "Communication error" << std::endl;
-
-            retVal = false;
-            goto err_cleanup;
-         }
-
-         respMsgCast = (ListDirFromOffsetRespMsg*)respMsg;
-
-         listRes = (FhgfsOpsErr)respMsgCast->getResult();
-         if(listRes != FhgfsOpsErr_SUCCESS)
-         {
-            std::cerr << "Node encountered an error: " << FhgfsOpsErrTk::toErrString(listRes) <<
-               std::endl;
-
-            retVal = false;
-            goto err_cleanup;
-         }
-
-         entryNames = &respMsgCast->getNames();
-
-         numEntriesThisRound = entryNames->size();
-         currentServerOffset = respMsgCast->getNewServerOffset();
-
-         handleEntries(node, *entryNames, i != 0);
-
-         numEntriesReceived += numEntriesThisRound;
-
-
-      err_cleanup:
-         SAFE_DELETE(respMsg);
-         SAFE_FREE(respBuf);
-      }
-   } while(retVal && (numEntriesThisRound == maxOutNames) );
-
-
-   numEntriesTotal += numEntriesReceived;
-
-   if(cfgPrintStats)
-   {
-      if(cfgPrintNodes) // indent
-         std::cout << NODEINFO_INDENTATION_STR << "#Entries: " << numEntriesReceived << std::endl;
-      else
-         std::cout << "#Entries: " << numEntriesReceived << std::endl;
-   }
-
-   return retVal;
-}
-
-/**
- * Handle received entries (e.g. print, unlink)
- */
-void ModeDisposeUnusedFiles::handleEntries(Node& node, StringList& entryNames, bool buddyMirrored)
-{
-   for(StringListIter iter = entryNames.begin(); iter != entryNames.end(); iter++)
-   {
-      std::string entry = *iter;
-
-      if(cfgPrintFiles)
-      {
-         if(cfgPrintNodes) // indent
-            std::cout << NODEINFO_INDENTATION_STR << entry << std::endl;
-         else
-            std::cout << entry << std::endl;
-      }
-
-      if(cfgUnlinkFiles)
-         unlinkEntry(node, entry, buddyMirrored);
-   }
-}
-
-bool ModeDisposeUnusedFiles::unlinkEntry(Node& node, std::string entryName, bool buddyMirrored)
-{
-   bool retVal = false;
-
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-   UnlinkFileRespMsg* respMsgCast;
-
-   FhgfsOpsErr unlinkRes;
-
-   NumNodeID ownerNodeID    = node.getNumID();
-   std::string parentEntry;
-   std::string entryID     = buddyMirrored
-      ? META_MIRRORDISPOSALDIR_ID_STR
-      : META_DISPOSALDIR_ID_STR;
-   std::string fileName    = entryID;
-   DirEntryType entryType  = DirEntryType_DIRECTORY;
-   int flags               = buddyMirrored ? ENTRYINFO_FEATURE_BUDDYMIRRORED : 0;
-
-   EntryInfo parentInfo(ownerNodeID, parentEntry, entryID, fileName, entryType, flags);
-
-   UnlinkFileMsg getInfoMsg(&parentInfo, entryName);
-
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      node, &getInfoMsg, NETMSGTYPE_UnlinkFileResp, &respBuf, &respMsg);
-   if(!commRes)
-   {
-      std::cerr << "[" << entryName <<  "] Communication error" << std::endl;
-
-      goto err_cleanup;
-   }
-
-   respMsgCast = (UnlinkFileRespMsg*)respMsg;
-
-   unlinkRes = (FhgfsOpsErr)respMsgCast->getValue();
-   if(unlinkRes == FhgfsOpsErr_INUSE)
-   {
-      std::cerr << "[" << entryName <<  "] File still in use" << std::endl;
-   }
-   else
-   if(unlinkRes != FhgfsOpsErr_SUCCESS)
-   {
-      std::cerr << "[" << entryName << "] Node encountered an error: " <<
-         FhgfsOpsErrTk::toErrString(unlinkRes) << std::endl;
-      goto err_cleanup;
-   }
-   else
-   { // unlinked
-      numUnlinkedTotal++;
-   }
-
-
-   retVal = true;
-
-err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
-   return retVal;
+   printStats();
 }

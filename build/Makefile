@@ -128,12 +128,18 @@ TICPP_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/ticpp
 MONGOOSE_INC_PATH ?= $(BEEGFS_THIRDPARTY_PATH)/source/mongoose
 BOOST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/boost/
 
+ifneq ($(target_arch),)
+   STRIP := $(target_arch)-strip
+   AR := $(target_arch)-ar
+   CC := $(target_arch)-gcc
+   CXX := $(target_arch)-g++
+endif
 
 SHELL := /bin/bash
 STRIP ?= strip
 CXX   ?= g++
+AR    ?= ar
 
-AR := ar
 # if -T is supported by ar, use it. thin archives are quicker to create and maintain.
 ifeq ($(shell ar -TM 2>&1 <<<""),)
 AR += -T

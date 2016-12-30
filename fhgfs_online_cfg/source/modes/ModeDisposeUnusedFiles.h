@@ -10,7 +10,8 @@
 class ModeDisposeUnusedFiles : public Mode
 {
    public:
-      ModeDisposeUnusedFiles()
+      ModeDisposeUnusedFiles():
+         currentNode(nullptr)
       {
          cfgPrintNodes = false;
          cfgPrintFiles = false;
@@ -35,12 +36,17 @@ class ModeDisposeUnusedFiles : public Mode
       size_t numEntriesTotal; // total for all servers
       size_t numUnlinkedTotal; // total for all servers
 
+      size_t numEntriesReceived; // per node
+
+      Node* currentNode;
+
 
       bool readConfig();
       void handleNodes(NodeStoreServers* metaNodes);
-      bool getAndHandleFiles(Node& ownerNode);
-      void handleEntries(Node& node, StringList& entryNames, bool buddyMirrored);
-      bool unlinkEntry(Node& node, std::string entryName, bool buddyMirrored);
+      FhgfsOpsErr handleItem(Node& owner, const std::string& entryID, const bool isMirrored);
+      void handleError(Node& node, FhgfsOpsErr err);
+
+      void printStats();
 };
 
 

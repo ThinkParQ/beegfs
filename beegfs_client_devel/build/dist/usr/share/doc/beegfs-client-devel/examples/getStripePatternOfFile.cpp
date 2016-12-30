@@ -30,7 +30,7 @@ int main(int argc, char** argv)
    }
 
    // check if the file is located on a BeeGFS, because the striping API works only on a BeeGFS
-   // if the ioctl is used on a other filesystem everything can happens
+   // (Results of BeeGFS ioctls on other file systems are undefined.)
    bool isBeegfs = beegfs_testIsBeeGFS(fd);
    if(!isBeegfs)
    {
@@ -61,7 +61,7 @@ int main(int argc, char** argv)
          default:
             patternType = "INVALID";
       }
-      std::cout << "Strip pattern of file: " << file << std::endl;
+      std::cout << "Stripe pattern of file: " << file << std::endl;
       std::cout << "+ Type: " << patternType << std::endl;
       std::cout << "+ Chunksize: " << outChunkSize << " Byte" << std::endl;
       std::cout << "+ Number of storage targets: " << outNumTargets << std::endl;
@@ -77,12 +77,20 @@ int main(int argc, char** argv)
          {
             if(outPatternType == BEEGFS_STRIPEPATTERN_BUDDYMIRROR)
             {
-               std::cout << "  + " << outTargetInfo.targetOrGroup << " @ " << outTargetInfo.primaryTarget << " @ " << outTargetInfo.primaryNodeStrID << " [ID: "<< outTargetInfo.primaryNodeID << "]" << std::endl;
-               std::cout << "  + " << outTargetInfo.targetOrGroup << " @ " << outTargetInfo.secondaryTarget << " @ " << outTargetInfo.secondaryNodeStrID << " [ID: "<< outTargetInfo.secondaryNodeID << "]" << std::endl;
+               std::cout << "  + " << outTargetInfo.targetOrGroup
+                  << " @ " << outTargetInfo.primaryTarget
+                  << " @ " << outTargetInfo.primaryNodeStrID
+                  << " [ID: "<< outTargetInfo.primaryNodeID << "]" << std::endl;
+               std::cout << "  + " << outTargetInfo.targetOrGroup
+                  << " @ " << outTargetInfo.secondaryTarget
+                  << " @ " << outTargetInfo.secondaryNodeStrID
+                  << " [ID: "<< outTargetInfo.secondaryNodeID << "]" << std::endl;
             }
             else
             {
-               std::cout << "  + " << outTargetInfo.targetOrGroup << " @ " << outTargetInfo.primaryNodeStrID << " [ID: "<< outTargetInfo.primaryNodeID << "]" << std::endl;
+               std::cout << "  + " << outTargetInfo.targetOrGroup
+                  << " @ " << outTargetInfo.primaryNodeStrID
+                  << " [ID: "<< outTargetInfo.primaryNodeID << "]" << std::endl;
             }
          }
          else

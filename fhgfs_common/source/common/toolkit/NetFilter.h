@@ -111,6 +111,9 @@ class NetFilter
 
          for(size_t i = 0; i < this->filterArrayLen; i++)
          {
+            if (filterArray[i].shiftBitsNum == 32)
+               return true;
+
             // note: stored addresses are in host byte order to enable correct shift operator usage
             const in_addr_t ipHostOrderShifted =
                ipHostOrder >> ( (this->filterArray)[i].shiftBitsNum);

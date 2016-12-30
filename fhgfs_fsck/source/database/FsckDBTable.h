@@ -270,7 +270,7 @@ class FsckDBDentryTable
 class FsckDBFileInodesTable
 {
    public:
-      typedef std::pair<
+      typedef std::tuple<
          boost::shared_ptr<Buffer<db::FileInode> >,
          boost::shared_ptr<Buffer<db::StripeTargets> > > BulkHandle;
 

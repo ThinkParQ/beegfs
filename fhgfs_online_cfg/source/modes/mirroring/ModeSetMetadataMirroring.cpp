@@ -52,6 +52,9 @@ int ModeSetMetadataMirroring::execute()
 
 void ModeSetMetadataMirroring::printHelp()
 {
+   std::cout << "MODE ARGUMENTS:" << std::endl;
+   std::cout << " --mirrormd does not receive any arguments." << std::endl;
+   std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
    std::cout << " Enables metadata mirroring for the root directory." << std::endl;
    std::cout << " If the root directory contains any files, those files will be" << std::endl;
@@ -63,6 +66,9 @@ void ModeSetMetadataMirroring::printHelp()
    std::cout << std::endl;
    std::cout << " Metadata mirroring can be enabled for files by moving them" << std::endl;
    std::cout << " from an unmirrored directory to a mirrored directory." << std::endl;
+   std::cout << std::endl;
+   std::cout << " Example: enable metadata mirroring for the root directory" << std::endl;
+   std::cout << "  $ beegfs-ctl --mirrormd" << std::endl;
 }
 
 bool ModeSetMetadataMirroring::setMirroring(Node& rootNode)
