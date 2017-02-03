@@ -32,7 +32,12 @@ QuotaBlockDevice QuotaBlockDevice::getBlockDeviceOfTarget(std::string& targetPat
 
       // test all mounts, use the mount with the longest match and use the last match if multiple
       // mounts with the longest match exists
-      if ( (targetPath.find(tmpMountPath) == 0) && (resMountPath.size() <= tmpMountPath.size() ) )
+      if (targetPath != tmpMountPath &&
+            tmpMountPath != "/" &&
+            targetPath.substr(0, tmpMountPath.size() + 1) != tmpMountPath + '/')
+         continue;
+
+      if (resMountPath.size() <= tmpMountPath.size())
       {
          resMountPath = mntData->mnt_dir;
          resBlockDevicePath = mntData->mnt_fsname;

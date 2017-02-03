@@ -562,6 +562,7 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
 
    long retVal;
 
+   const char __user* userFilename;
    char* filename;
    int mode; // mode (permission) of the new file
    unsigned numtargets; // number of desired targets, 0 for directory default
@@ -615,6 +616,9 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
    if(cpRes)
       return -EFAULT;
 
+   if (get_user(userFilename, &mkfileArg->filename))
+      return -EFAULT;
+
    { // check if chunksize is valid
       if(unlikely( (chunksize < STRIPEPATTERN_MIN_CHUNKSIZE) ||
                    !MathTk_isPowerOfTwo(chunksize) ) )
@@ -630,7 +634,7 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
 
    // copy filename
 
-   filename = strndup_user(mkfileArg->filename, BEEGFS_IOCTL_FILENAME_MAXLEN);
+   filename = strndup_user(userFilename, BEEGFS_IOCTL_FILENAME_MAXLEN);
    if(IS_ERR(filename) )
    {
       retVal = PTR_ERR(filename);
@@ -773,6 +777,12 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, bool 
       {
          EntryInfo newEntryInfo; // only needed as mandatory argument
 
+         if (!fileInfo.symlinkTo)
+         {
+            retVal = -EINVAL;
+            goto cleanup;
+         }
+
          down_read(&inode->i_sb->s_umount);
 
          mkRes = FhgfsOpsHelper_symlink(app, &parentInfo, fileInfo.symlinkTo,
@@ -808,12 +818,14 @@ cleanup:
    SAFE_KFREE(fileInfo.entryName);
    SAFE_KFREE(fileInfo.symlinkTo);
    SAFE_KFREE(fileInfo.prefTargets);
-   if(createInfo.preferredStorageTargets != App_getPreferredStorageTargets(app) )
+   if (createInfo.preferredStorageTargets &&
+         createInfo.preferredStorageTargets != App_getPreferredStorageTargets(app) )
    {
       UInt16List_uninit(createInfo.preferredStorageTargets);
       SAFE_KFREE(createInfo.preferredStorageTargets);
    }
-   if(createInfo.preferredMetaTargets != App_getPreferredMetaNodes(app) )
+   if (createInfo.preferredMetaTargets &&
+         createInfo.preferredMetaTargets != App_getPreferredMetaNodes(app) )
    {
       UInt16List_uninit(createInfo.preferredMetaTargets);
       SAFE_KFREE(createInfo.preferredMetaTargets);

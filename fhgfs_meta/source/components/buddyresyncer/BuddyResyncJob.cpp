@@ -6,6 +6,7 @@
 #include <common/net/message/storage/mirroring/StorageResyncStartedMsg.h>
 #include <common/net/message/storage/mirroring/StorageResyncStartedRespMsg.h>
 #include <common/threading/Barrier.h>
+#include <common/toolkit/DebugVariable.h>
 #include <common/toolkit/SynchronizedCounter.h>
 
 #include <app/App.h>
@@ -67,6 +68,16 @@ void BuddyResyncJob::run()
       goto cleanup;
    }
 
+   DEBUG_ENV_VAR(unsigned, DIE_AT_RESYNC_N, 0, "BEEGFS_RESYNC_DIE_AT_N");
+   if (DIE_AT_RESYNC_N) {
+      static unsigned resyncs = 0;
+      // for #479: terminating a server at this point caused the workers to terminate before the
+      // resyncer had communicated with them, causing a deadlock on shutdown
+      if (++resyncs == DIE_AT_RESYNC_N) {
+         ::kill(0, SIGTERM);
+         sleep(4);
+      }
+   }
    stopAllWorkersOn(workerBarrier);
    {
       // Notify buddy that resync started and wait for confirmation
@@ -86,13 +97,27 @@ void BuddyResyncJob::run()
       SAFE_DELETE(respMsg);
       SAFE_DELETE(respBuf);
 
-      setState(BuddyResyncJobState_RUNNING);
+      // resync could have been aborted before we got here. if so, exit as soon as possible without
+      // setting the resync job state to something else.
+      {
+         std::unique_lock<Mutex> lock(stateMutex);
+
+         if (state == BuddyResyncJobState_INTERRUPTED)
+         {
+            lock.unlock();
+            workerBarrier.wait();
+            goto cleanup;
+         }
+
+         state = BuddyResyncJobState_RUNNING;
+      }
       internodeSyncer->setResyncInProgress(true);
 
       const bool startGatherSlaveRes = startGatherSlaves();
       if (!startGatherSlaveRes)
       {
          setState(BuddyResyncJobState_FAILURE);
+         workerBarrier.wait();
          goto cleanup;
       }
 
@@ -100,6 +125,7 @@ void BuddyResyncJob::run()
       if (!startResyncSlaveRes)
       {
          setState(BuddyResyncJobState_FAILURE);
+         workerBarrier.wait();
          goto cleanup;
       }
    }

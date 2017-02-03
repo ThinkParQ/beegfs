@@ -7,6 +7,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#ifndef __cplusplus
+#include <stdbool.h>
+#endif
 
 #define BEEGFS_API_MAJOR_VERSION 1 // major version number of the API, different major version
                                    // are  incompatible

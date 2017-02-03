@@ -2,6 +2,7 @@
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
 #include <common/threading/RWLockGuard.h>
 #include <common/toolkit/MessagingTk.h>
+#include <common/toolkit/TempFileTk.h>
 #include <common/toolkit/ZipIterator.h>
 #include <components/HeartbeatManager.h>
 #include <program/Program.h>
@@ -11,7 +12,6 @@
 #define MGMTDTARGETSTATESTORE_TMPFILE_EXT ".tmp"
 
 MgmtdTargetStateStore::MgmtdTargetStateStore(NodeType nodeType) : TargetStateStore(),
-   resyncSetDirty(false),
    nodeType(nodeType)
 {
 }
@@ -47,8 +47,6 @@ void MgmtdTargetStateStore::setConsistencyStatesFromLists(const UInt16List& targ
       {
          targetState.reachabilityState = newReachabilityState;
          targetState.consistencyState = newConsistencyState;
-
-         resyncSetUpdate(newConsistencyState, targetID);
 
          statesChanged = true;
       }
@@ -130,8 +128,6 @@ FhgfsOpsErr MgmtdTargetStateStore::changeConsistencyStatesFromLists(const UInt16
 
             // Set target to online if we successfully received a state report.
             targetState.reachabilityState = TargetReachabilityState_ONLINE;
-
-            resyncSetUpdate(newConsistencyState, targetID);
 
             statesChanged = true;
          }
@@ -585,71 +581,45 @@ bool MgmtdTargetStateStore::setTargetsGood(const UInt16Vector& ids)
 }
 
 /**
- * Saves the list of targets which need a resync to the targets_need_resync file.
+ * Saves the list of targets which need a resync to the targets_need_resync file, if the list has
+ * changed since the last time it was saved.
  */
 void MgmtdTargetStateStore::saveResyncSetToFile()
 {
-   const char* logContext = "Save to resync file";
+   TargetIDSet targetsToResync;
+   {
+      RWLockGuard(rwlock, SafeRWLock_READ);
+      for (TargetStateInfoMapIter it = statesMap.begin();
+           it != statesMap.end();
+           ++it)
+      {
+         if (it->second.consistencyState == TargetConsistencyState_NEEDS_RESYNC)
+            targetsToResync.insert(it->first);
+      }
+   }
 
-   App* app = Program::getApp();
-
-   Path mgmtdPath = *app->getMgmtdPath();
-   Path targetsToResyncPath = mgmtdPath / resyncSetStorePath;
-
-   std::string targetsToResyncTmpPath =
-      targetsToResyncPath.str() + MGMTDTARGETSTATESTORE_TMPFILE_EXT;
+   if (targetsToResync == tempResyncSet)
+      return; // Nothing changed - don't write file
 
    std::string targetsToResyncStr;
-
+   for (TargetIDSetCIter it = targetsToResync.begin();
+        it != targetsToResync.end();
+        ++it)
    {
-      SafeRWLock safeLock(&resyncSetLock, SafeRWLock_READ); // L O C K
-
-      for (TargetIDSetCIter targetIter = resyncSet.begin();
-           targetIter != resyncSet.end(); ++targetIter)
-         targetsToResyncStr += StringTk::uintToStr(*targetIter) + "\n";
-
-      safeLock.unlock(); // U N L O C K
+      targetsToResyncStr += StringTk::uintToStr(*it) + "\n";
    }
 
-   // Create tmp file.
-   const int openFlags = O_CREAT | O_TRUNC | O_RDWR;
-   int fd = open(targetsToResyncTmpPath.c_str(), openFlags, 0644);
-   if (fd == -1)
-   { // error
-      LogContext(logContext).log(Log_ERR, "Could not open temporary file: "
-         + targetsToResyncTmpPath + "; SysErr: " + System::getErrString() );
+   // Write out the set...
+   Path mgmtdPath = *Program::getApp()->getMgmtdPath();
+   Path targetsToResyncPath = mgmtdPath / resyncSetStorePath;
 
-      return;
-   }
+   FhgfsOpsErr storeRes =
+      TempFileTk::storeTmpAndMove(targetsToResyncPath.str(), targetsToResyncStr);
 
-   ssize_t writeRes = write(fd, targetsToResyncStr.c_str(), targetsToResyncStr.length() );
-   if (writeRes != (ssize_t)targetsToResyncStr.length() )
-   {
-      LogContext(logContext).log(Log_ERR, "Writing to file " + targetsToResyncTmpPath +
-         " failed; SysErr: " + System::getErrString() );
+   if (storeRes != FhgfsOpsErr_SUCCESS)
+      LOG(ERR, "Could not save resync set.", as("NodeType", Node::nodeTypeToStr(nodeType)));
 
-      close(fd);
-      return;
-   }
-
-   fsync(fd);
-   close(fd);
-
-   // Rename tmp file to actual file name.
-   int renameRes =
-      rename(targetsToResyncTmpPath.c_str(), targetsToResyncPath.str().c_str() );
-   if (renameRes == -1)
-   {
-      LogContext(logContext).log(Log_ERR, "Renaming file " + targetsToResyncPath.str()
-         + " to " + targetsToResyncPath.str() + " failed; SysErr: "
-         + System::getErrString() );
-   }
-
-   { // Clear dirty flag.
-      SafeRWLock safeLock(&resyncSetLock, SafeRWLock_READ); // L O C K
-      resyncSetDirty = false;
-      safeLock.unlock(); // U N L O C K
-   }
+   tempResyncSet.swap(targetsToResync);
 }
 
 /**
@@ -675,7 +645,7 @@ bool MgmtdTargetStateStore::loadResyncSetFromFile() throw (InvalidConfigExceptio
       ICommonConfig::loadStringListFile(targetsToResyncPath.str().c_str(),
          targetsToResyncList);
 
-   SafeRWLock safeLock(&resyncSetLock, SafeRWLock_WRITE); // L O C K
+   TargetIDSet resyncSet;
 
    for (StringListIter targetsIter = targetsToResyncList.begin();
         targetsIter != targetsToResyncList.end(); ++targetsIter)
@@ -689,19 +659,13 @@ bool MgmtdTargetStateStore::loadResyncSetFromFile() throw (InvalidConfigExceptio
             "Failed to deserialize " + nodeTypeStr(false) + " ID " + *targetsIter);
    }
 
-   resyncSetDirty = true;
-
-   safeLock.unlock(); // U N L O C K
-
-   SafeRWLock safeReadLock(&resyncSetLock, SafeRWLock_READ); // L O C K
-
    // Set targets in the list to NEEDS_RESYNC.
    for (TargetIDSetCIter targetIDIter = resyncSet.begin();
         targetIDIter != resyncSet.end(); ++targetIDIter)
       addOrUpdate(*targetIDIter, CombinedTargetState(TargetReachabilityState_POFFLINE,
          TargetConsistencyState_NEEDS_RESYNC) );
 
-   safeReadLock.unlock(); // U N L O C K
+   tempResyncSet.swap(resyncSet);
 
    return true;
 }

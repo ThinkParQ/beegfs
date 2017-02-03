@@ -144,7 +144,10 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
          setAttrRes = setChunkFileAttribs(*inode, false);
 
       if (cfg->getQuotaEarlyChownResponse())
+      {
+         metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
          return {};
+      }
    }
    else
    {

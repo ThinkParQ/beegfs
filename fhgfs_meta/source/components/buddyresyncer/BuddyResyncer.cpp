@@ -19,6 +19,9 @@ FhgfsOpsErr BuddyResyncer::startResync()
 {
    std::lock_guard<Mutex> lock(jobMutex);
 
+   if (noNewResyncs)
+      return FhgfsOpsErr_INTERRUPTED;
+
    if (!job)
    {
       job = new BuddyResyncJob();
@@ -46,6 +49,25 @@ FhgfsOpsErr BuddyResyncer::startResync()
          job = new BuddyResyncJob();
          job->start();
          return FhgfsOpsErr_SUCCESS;
+   }
+}
+
+void BuddyResyncer::shutdown()
+{
+   std::unique_ptr<BuddyResyncJob> job;
+
+   {
+      std::lock_guard<Mutex> lock(jobMutex);
+
+      job.reset(this->job);
+      this->job = nullptr;
+      noNewResyncs = true;
+   }
+
+   if (job)
+   {
+      job->abort();
+      job->join();
    }
 }
 

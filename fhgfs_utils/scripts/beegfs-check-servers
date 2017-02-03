@@ -17,6 +17,8 @@ print_usage()
 	echo
 	echo "   -p <path> - Check servers for the given BeeGFS mount point."
 	echo
+	echo "   -c <path> - Check servers for the given BeeGFS client config file."
+	echo
 }
 
 # @param $line is the server name.
@@ -60,7 +62,7 @@ parse_output()
 
 # parse command line arguments
 
-while getopts "hp:" opt; do
+while getopts "hp:c:" opt; do
         case $opt in
 	h)
 		print_usage
@@ -68,6 +70,9 @@ while getopts "hp:" opt; do
 		;;
 	p)
 		BEEGFS_PATH_ARG="--mount=$OPTARG"
+		;;
+	c)
+		BEEGFS_PATH_ARG="--cfgFile=$OPTARG"
 		;;
         *)
 		echo "Invalid option: -$OPTARG" >&2

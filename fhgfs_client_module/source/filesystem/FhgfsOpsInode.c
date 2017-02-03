@@ -1366,8 +1366,10 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
 
          FhgfsInode_invalidateCache(fhgfsInode);
          fileInode->i_ctime = dir->i_ctime;
-         drop_nlink(fileInode);
 
+         spin_lock(&fileInode->i_lock);
+         drop_nlink(fileInode);
+         spin_unlock(&fileInode->i_lock);
       }
    }
 
@@ -1542,7 +1544,6 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
 
       // TODO: Remove it here once we support inter directory hard-links
       ihold(fileInode);
-      inc_nlink(fileInode);
 
       linkRes = FhgfsOpsRemoting_hardlink(app, fromFileName, fromFileLen, fromFileInfo,
          fromDirInfo, toFileName, toFileLen, toDirInfo);
@@ -1553,10 +1554,13 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
       {
          d_drop(toFileDentry);
          iput(fileInode);
-         drop_nlink(fileInode);
       }
       else
       {
+         spin_lock(&fileInode->i_lock);
+         inc_nlink(fileInode);
+         spin_unlock(&fileInode->i_lock);
+
          d_instantiate(toFileDentry, fileInode);
       }
    }
@@ -1838,7 +1842,8 @@ int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
          "From: %s; To: %s", oldName, newName);
 
    FhgfsInode_entryInfoReadLock(fhgfsFromDirInode); // LOCK EntryInfo
-   FhgfsInode_entryInfoReadLock(fhgfsToDirInode);   // LOCK EntryInfo
+   if (fhgfsFromDirInode != fhgfsToDirInode)
+      FhgfsInode_entryInfoReadLock(fhgfsToDirInode);   // LOCK EntryInfo
 
    // note the fileInode also needs to be locked to prevent reference/release during a rename
    FhgfsInode_entryInfoWriteLock(fhgfsFromEntryInode);   // LOCK EntryInfo (renamed file dir)
@@ -1881,7 +1886,8 @@ int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    }
 
    FhgfsInode_entryInfoWriteUnlock(fhgfsFromEntryInode);   // UNLOCK EntryInfo (renamed file dir)
-   FhgfsInode_entryInfoReadUnlock(fhgfsToDirInode);   // UNLOCK ToDirEntryInfo
+   if (fhgfsFromDirInode != fhgfsToDirInode)
+      FhgfsInode_entryInfoReadUnlock(fhgfsToDirInode);   // UNLOCK ToDirEntryInfo
    FhgfsInode_entryInfoReadUnlock(fhgfsFromDirInode); // UNLOCK FromDirEntryInfo
 
    LOG_DEBUG_FORMATTED(log, Log_DEBUG, logContext, "remoting complete. result: %d", (int)renameRes);

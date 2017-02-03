@@ -1034,6 +1034,10 @@ void App::stopComponents()
                                 // changed modification state.
       modificationEventFlusher->selfTerminate();
 
+   // resyncer wants to control the workers, so any running resync must be finished or aborted
+   // before the workers are stopped.
+   buddyResyncer->shutdown();
+
    workersStop();
 
    if(internodeSyncer)

@@ -2,7 +2,7 @@
 
 export dirname=$(dirname "$0")
 
-export version="6.0-beta"
+export version="6"
 
 export logFile=/var/log/beegfs-setup.log
 

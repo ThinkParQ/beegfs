@@ -8,6 +8,8 @@
 
 #define STRDUP_OR_RETURN(target, source, len, name) \
    do { \
+      if ((len) == 0) \
+         return -EINVAL; \
       (target) = strndup_user((const char __user *) (source), (len)); \
       if (IS_ERR((target))) \
       { \

@@ -33,10 +33,6 @@ int ModeMigrate::doExecute()
    NodeHandle mgmtNode;
    int findRes = MODE_FIND_ERR_SUCCESS;
 
-   // check privileges
-   if (!cfgFindOnly && !ModeHelper::checkRootPrivileges())
-      return APPCODE_RUNTIME_ERROR;
-
    int retVal = getParams();
    if (retVal != APPCODE_NO_ERROR)
       return retVal;

@@ -29,9 +29,7 @@ class MgmtdTargetStateStore : public TargetStateStore
       typedef TargetIDSet::const_iterator TargetIDSetCIter;
 
       // For persistent storage of storage target / metadata node ids that need resync.
-      RWLock resyncSetLock;
-      TargetIDSet resyncSet;
-      bool resyncSetDirty;
+      TargetIDSet tempResyncSet;
       std::string resyncSetStorePath;
 
       NodeType nodeType; // Meta node state store or storage target state store.
@@ -43,17 +41,6 @@ class MgmtdTargetStateStore : public TargetStateStore
    public:
       // getters & setters
 
-      bool isResyncSetDirty()
-      {
-         SafeRWLock safeLock(&resyncSetLock, SafeRWLock_READ); // L O C K
-
-         bool res = resyncSetDirty;
-
-         safeLock.unlock(); // U N L O C K
-
-         return res;
-      }
-
       void setResyncSetStorePath(const std::string& storePath)
       {
          this->resyncSetStorePath = storePath;
@@ -61,22 +48,6 @@ class MgmtdTargetStateStore : public TargetStateStore
 
 
    private:
-
-      void resyncSetUpdate(TargetConsistencyState consistencyState, uint16_t targetID)
-      {
-         SafeRWLock safeLock(&resyncSetLock, SafeRWLock_WRITE); // L O C K
-
-         bool changed = false;
-
-         if (consistencyState == TargetConsistencyState_NEEDS_RESYNC)
-            changed = resyncSet.insert(targetID).second;
-         else
-            changed = (resyncSet.erase(targetID) > 0);
-
-         resyncSetDirty |= changed;
-
-         safeLock.unlock(); // L O C K
-      }
 
       /**
        * Sets the consistency state of a single target, not changing the reachability state.

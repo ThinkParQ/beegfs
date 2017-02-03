@@ -117,6 +117,7 @@ FhgfsOpsErr BuddyResyncerModSyncSlave::streamCandidates(Socket& socket)
             // reuse the current stream, but terminating a stream that has seen an error is simpler
             // to handle than keeping it open. also, bulk resync would like "fail on error"
             // semantics very much.
+            sendResyncPacket(socket, std::tuple<>());
             return FhgfsOpsErr_SUCCESS;
          }
          else

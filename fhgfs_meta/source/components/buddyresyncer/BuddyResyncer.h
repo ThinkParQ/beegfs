@@ -18,12 +18,13 @@ class BuddyResyncer
 {
    public:
       BuddyResyncer()
-         : job(NULL)
+         : job(NULL), noNewResyncs(false)
       { }
 
       ~BuddyResyncer();
 
       FhgfsOpsErr startResync();
+      void shutdown();
 
       static void commitThreadChangeSet();
 
@@ -59,6 +60,8 @@ class BuddyResyncer
 
    private:
       static __thread MetaSyncCandidateFile* currentThreadChangeSet;
+
+      bool noNewResyncs;
 
       // No copy allowed
       BuddyResyncer(const BuddyResyncer&);

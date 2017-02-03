@@ -25,6 +25,8 @@ static mempool_t* headerBufferPool;
 
 bool FhgfsOpsCommKit_initEmergencyPools()
 {
+   const char* cacheName = BEEGFS_MODULE_NAME_STR "-msgheaders";
+
    if(BEEGFS_COMMKIT_MSGBUF_SIZE > PAGE_SIZE)
    {
       WARN_ON(1);
@@ -32,10 +34,10 @@ bool FhgfsOpsCommKit_initEmergencyPools()
    }
 
 #ifdef KERNEL_HAS_KMEMCACHE_DTOR
-   headerBufferCache = kmem_cache_create("beegfs-msgheaders", BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
+   headerBufferCache = kmem_cache_create(cacheName, BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
       SLAB_MEM_SPREAD, NULL, NULL);
 #else
-   headerBufferCache = kmem_cache_create("beegfs-msgheaders", BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
+   headerBufferCache = kmem_cache_create(cacheName, BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
       SLAB_MEM_SPREAD, NULL);
 #endif
 

@@ -336,6 +336,8 @@ void SessionStore::deserializeLockStates(Deserializer& des, MetaStore& metaStore
 
       des % inode->lockState();
 
+      metaStore.releaseFile(info.getParentEntryID(), inode);
+
       if (!des.good())
          break;
    }

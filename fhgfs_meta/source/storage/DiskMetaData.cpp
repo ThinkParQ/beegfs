@@ -434,7 +434,7 @@ void DiskMetaData::serializeDentryV5(Serializer& ser)
 }
 
 /**
- * Deserialize dentries, which have the V4 format, which includes inlined inodes and have the new
+ * Deserialize dentries, which have the V5 format, which includes inlined inodes and have the new
  * chunk path (V2, which has UID and parentID)
  */
 void DiskMetaData::deserializeDentryV5(Deserializer& des)

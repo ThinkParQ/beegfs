@@ -529,9 +529,12 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
       if(removedSessionFiles.size() || referencedSessionFiles.size() )
       {
          std::ostringstream logMsgStream;
-         logMsgStream << sessionID << ": Removing " << removedSessionFiles.size() <<
-            " file sessions. " << "(" << referencedSessionFiles.size() << " are unremovable)";
-         LogContext(logContext).log(Log_NOTICE, logMsgStream.str() );
+         logMsgStream << "Removing " << removedSessionFiles.size() << " file sessions. ("
+            << referencedSessionFiles.size() << " are unremovable). clientNumID: " << sessionID;
+         if (referencedSessionFiles.empty())
+            LogContext(logContext).log(Log_SPAM, logMsgStream.str() );
+         else
+            LogContext(logContext).log(Log_NOTICE, logMsgStream.str() );
       }
 
 
@@ -579,7 +582,7 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
             MsgHelperClose::closeChunkFile(sessionID, fileHandleID.c_str(),
                maxUsedNodesIndex, *inode, entryInfo, NETMSG_DEFAULT_USERID);
 
-         LogContext(logContext).log(Log_NOTICE, std::string("closing file ") + "ParentID: " +
+         LogContext(logContext).log(Log_NOTICE, "closing file. ParentID: " +
             entryInfo->getParentEntryID() + " FileName: " + entryInfo->getFileName() );
 
          metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks,

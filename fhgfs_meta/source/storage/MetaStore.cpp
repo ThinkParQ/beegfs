@@ -647,6 +647,11 @@ FhgfsOpsErr MetaStore::mkNewMetaFile(DirInode& dir, MkFileDetails* mkDetails,
    NumNodeID ownerNodeID = dir.getIsBuddyMirrored() ?
       NumNodeID(metaBuddyGroupMapper->getLocalGroupID() ) : localNode.getNumID();
 
+   // refuse to create a directory before we even touch the parent. a client could send a request
+   // to create an S_IFDIR inode via mkfile.
+   if (S_ISDIR(mkDetails->mode))
+      return FhgfsOpsErr_INVAL;
+
    // load DirInode on demand if required, we need it now
    if (dir.loadIfNotLoadedUnlocked() == false)
       return FhgfsOpsErr_PATHNOTEXISTS;

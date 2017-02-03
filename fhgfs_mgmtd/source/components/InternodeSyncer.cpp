@@ -694,11 +694,9 @@ void InternodeSyncer::saveTargetMappings()
    if (metaMirrorGroupMapper->isMapperDirty() )
       metaMirrorGroupMapper->saveToFile();
 
-   if (targetStateStore->isResyncSetDirty() )
-      targetStateStore->saveResyncSetToFile();
+   targetStateStore->saveResyncSetToFile();
 
-   if (metaStateStore->isResyncSetDirty() )
-      metaStateStore->saveResyncSetToFile();
+   metaStateStore->saveResyncSetToFile();
 }
 
 /**

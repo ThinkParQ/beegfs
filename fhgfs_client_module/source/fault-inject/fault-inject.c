@@ -38,7 +38,7 @@ BEEGFS_DECLARE_FAULT_ATTR(commkit_writefile_senddata_timeout);
 
 bool beegfs_fault_inject_init()
 {
-   debug_dir = debugfs_create_dir("beegfs", NULL);
+   debug_dir = debugfs_create_dir(BEEGFS_MODULE_NAME_STR, NULL);
    if(!debug_dir)
       goto err_debug_dir;
 
