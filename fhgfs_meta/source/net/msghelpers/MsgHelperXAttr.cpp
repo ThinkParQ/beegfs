@@ -175,40 +175,28 @@ FhgfsOpsErr MsgHelperXAttr::setxattr(EntryInfo* entryInfo, const std::string& na
    return result;
 }
 
-FhgfsOpsErr MsgHelperXAttr::StreamXAttrState::loadNextXAttr(std::string& name, CharVector& value)
-{
-   if (names.empty())
-      return FhgfsOpsErr_SUCCESS;
-
-   name.swap(names.back());
-   names.pop_back();
-
-   FhgfsOpsErr retVal;
-
-   if (entryInfo)
-      std::tie(retVal, value, std::ignore) = getxattr(entryInfo, name, XATTR_SIZE_MAX);
-   else
-      std::tie(retVal, value, std::ignore) = XAttrTk::getUserXAttr(path, name, XATTR_SIZE_MAX);
-
-   if (retVal == FhgfsOpsErr_SUCCESS)
-      retVal = FhgfsOpsErr_AGAIN;
-
-   return retVal;
-}
-
 FhgfsOpsErr MsgHelperXAttr::StreamXAttrState::streamXattrFn(Socket* socket, void* context)
 {
    StreamXAttrState* state = static_cast<StreamXAttrState*>(context);
 
-   std::string name;
-   CharVector value;
+   return state->streamXattr(socket);
+}
 
-   while (true)
+FhgfsOpsErr MsgHelperXAttr::StreamXAttrState::streamXattr(Socket* socket) const
+{
+   for (auto xattr = names.cbegin(); xattr != names.cend(); ++xattr)
    {
-      FhgfsOpsErr getRes = state->loadNextXAttr(name, value);
-      if (getRes == FhgfsOpsErr_SUCCESS)
-         break;
-      else if (getRes != FhgfsOpsErr_AGAIN)
+      const auto& name = *xattr;
+
+      CharVector value;
+      FhgfsOpsErr getRes;
+
+      if (entryInfo)
+         std::tie(getRes, value, std::ignore) = getxattr(entryInfo, name, XATTR_SIZE_MAX);
+      else
+         std::tie(getRes, value, std::ignore) = XAttrTk::getUserXAttr(path, name, XATTR_SIZE_MAX);
+
+      if (getRes != FhgfsOpsErr_SUCCESS)
       {
          uint32_t endMark = HOST_TO_LE_32(-1);
          socket->send(&endMark, sizeof(endMark), 0);

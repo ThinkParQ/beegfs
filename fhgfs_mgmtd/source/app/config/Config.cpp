@@ -37,6 +37,7 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("storeAllowFirstRunInit",          "true");
 
    configMapRedefine("tuneNumWorkers",                        "4");
+   configMapRedefine("tuneNumQuotaWorkers",                   "8");
    configMapRedefine("tuneMetaNodeAutoRemoveMins",            "0"); // ignored, only for compat
    configMapRedefine("tuneStorageNodeAutoRemoveMins",         "0"); // ignored, only for compat
    configMapRedefine("tuneClientAutoRemoveMins",              "60");
@@ -133,6 +134,9 @@ void Config::applyConfigMap(bool enableException, bool addDashes) throw(InvalidC
       else
       if(iter->first == std::string("tuneNumWorkers") )
          tuneNumWorkers = StringTk::strToUInt(iter->second);
+      else
+      if(iter->first == std::string("tuneNumQuotaWorkers") )
+         tuneNumQuotaWorkers = StringTk::strToUInt(iter->second);
       else
       if(iter->first == std::string("tuneMetaNodeAutoRemoveMins") )
          tuneMetaNodeAutoRemoveMins = StringTk::strToUInt(iter->second);

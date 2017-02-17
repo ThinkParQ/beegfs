@@ -1,4 +1,5 @@
 #include <app/App.h>
+#include <common/components/worker/DummyWork.h>
 #include <common/threading/PThread.h>
 #include <common/threading/SafeRWLock.h>
 #include <common/toolkit/SynchronizedCounter.h>
@@ -35,6 +36,16 @@ QuotaManager::QuotaManager()
 
    // load the quota data and the quota limits if possible
    loadQuotaData();
+
+   const unsigned numWorkers = Program::getApp()->getConfig()->getTuneNumQuotaWorkers();
+
+   for (unsigned i = 0; i < numWorkers; i++)
+   {
+      std::unique_ptr<Worker> worker = std::unique_ptr<Worker>(new Worker(
+         std::string("QuotaWorker") + StringTk::uintToStr(i+1), &workQueue, QueueWorkType_DIRECT));
+
+      workerList.push_back(std::move(worker));
+   }
 }
 
 /**
@@ -42,6 +53,8 @@ QuotaManager::QuotaManager()
  */
 QuotaManager::~QuotaManager()
 {
+   workerList.clear();
+
    SAFE_DELETE(this->usedQuotaUser);
    SAFE_DELETE(this->usedQuotaGroup);
 
@@ -60,7 +73,22 @@ void QuotaManager::run()
    {
       registerSignalHandler();
 
+      for (auto iter = workerList.begin(); iter != workerList.end(); iter++)
+         (*iter)->start();
+
       requestLoop();
+
+      for (auto iter = workerList.begin(); iter != workerList.end(); iter++)
+      {
+         (*iter)->selfTerminate();
+
+         // add dummy work to wake up the worker immediately for faster self termination
+         PersonalWorkQueue* personalQueue = (*iter)->getPersonalWorkQueue();
+         workQueue.addPersonalWork(new DummyWork(), personalQueue);
+      }
+
+      for (auto iter = workerList.begin(); iter != workerList.end(); iter++)
+         (*iter)->join();
 
       log.log(Log_DEBUG, "Component stopped.");
    }
@@ -214,22 +242,22 @@ bool QuotaManager::updateUsedQuota(UIntList& uidList, UIntList& gidList)
 
    if(cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM)
    {
-      requestorUser = new QuotaDataRequestor(QuotaDataType_USER,
+      requestorUser = new QuotaDataRequestor(workQueue, QuotaDataType_USER,
          cfg->getQuotaQueryWithSystemUsersGroups() );
-      requestorGroup = new QuotaDataRequestor(QuotaDataType_GROUP,
+      requestorGroup = new QuotaDataRequestor(workQueue, QuotaDataType_GROUP,
          cfg->getQuotaQueryWithSystemUsersGroups() );
    }
    else if(cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_FILE)
    {
-      requestorUser = new QuotaDataRequestor(QuotaDataType_USER, uidList);
-      requestorGroup = new QuotaDataRequestor(QuotaDataType_GROUP, gidList);
+      requestorUser = new QuotaDataRequestor(workQueue, QuotaDataType_USER, uidList);
+      requestorGroup = new QuotaDataRequestor(workQueue, QuotaDataType_GROUP, gidList);
    }
    else
    {
-      requestorUser = new QuotaDataRequestor(QuotaDataType_USER,
+      requestorUser = new QuotaDataRequestor(workQueue, QuotaDataType_USER,
          cfg->getQuotaQueryUIDRangeStart(), cfg->getQuotaQueryUIDRangeEnd(),
          cfg->getQuotaQueryWithSystemUsersGroups() );
-      requestorGroup = new QuotaDataRequestor(QuotaDataType_GROUP,
+      requestorGroup = new QuotaDataRequestor(workQueue, QuotaDataType_GROUP,
          cfg->getQuotaQueryGIDRangeStart(), cfg->getQuotaQueryGIDRangeEnd(),
          cfg->getQuotaQueryWithSystemUsersGroups() );
    }
@@ -451,7 +479,6 @@ bool QuotaManager::pushExceededQuotaIDs()
 {
    App* app = Program::getApp();
    ExceededQuotaStore* exQuotaStore = app->getQuotaManager()->getExceededQuotaStore();
-   MultiWorkQueue* workQ = app->getWorkQueue();
 
    auto storageNodeList = app->getStorageNodes()->referenceAllNodes();
    auto metadataNodeList = app->getMetaNodes()->referenceAllNodes();
@@ -493,7 +520,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_USER, QuotaLimitType_SIZE,
             **nodeIter, messageNumber, &exceededQuotaUIDSize, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -506,7 +533,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_USER, QuotaLimitType_SIZE,
             **nodeIter, messageNumber, &exceededQuotaUIDSize, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -519,7 +546,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_USER, QuotaLimitType_INODE,
             **nodeIter, messageNumber, &exceededQuotaUIDInodes, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -532,7 +559,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_USER, QuotaLimitType_INODE,
             **nodeIter, messageNumber, &exceededQuotaUIDInodes, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -545,7 +572,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_GROUP, QuotaLimitType_SIZE,
             **nodeIter, messageNumber, &exceededQuotaGIDSize, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -558,7 +585,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_GROUP, QuotaLimitType_SIZE,
             **nodeIter, messageNumber, &exceededQuotaGIDSize, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -571,7 +598,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_GROUP, QuotaLimitType_INODE,
             **nodeIter, messageNumber, &exceededQuotaGIDInodes, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }
@@ -584,7 +611,7 @@ bool QuotaManager::pushExceededQuotaIDs()
       {
          Work* work = new SetExceededQuotaWork(QuotaDataType_GROUP, QuotaLimitType_INODE,
             **nodeIter, messageNumber, &exceededQuotaGIDInodes, &counter, &nodeResults[numWorks]);
-         workQ->addDirectWork(work);
+         workQueue.addDirectWork(work);
 
          numWorks++;
       }

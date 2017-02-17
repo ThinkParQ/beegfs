@@ -2,6 +2,7 @@
 #define QUOTAMANAGER_H_
 
 #include <common/app/log/LogContext.h>
+#include <common/components/worker/Worker.h>
 #include <common/storage/quota/GetQuotaInfo.h>
 #include <common/storage/quota/ExceededQuotaStore.h>
 #include <common/storage/quota/QuotaDefaultLimits.h>
@@ -52,6 +53,10 @@ class QuotaManager : public PThread
       QuotaDefaultLimits defaultLimits;
 
       AtomicInt16 limitChanged;
+
+      // QuotaManager will have its own workqueue
+      MultiWorkQueue workQueue;
+      std::list<std::unique_ptr<Worker>> workerList;
 
       void requestLoop();
 

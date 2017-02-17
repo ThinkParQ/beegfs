@@ -9,11 +9,13 @@ Before building BeeGFS, install the following dependency packages:
 * Depedencies for RPM packages (Red Hat):
   libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config
   rpm-build xfsprogs-devel cppunit cppunit-devel zlib-devel openssl-devel sqlite
+  sqlite-devel ant gcc-c++ gcc redhat-lsb-core java-devel
 
 * Dependencies for DEB packages (Debian):
   gcc g++ autoconf automake devscripts debhelper libtool libattr1-dev 
   xfslibs-dev lsb-release module-init-tools librdmacm-dev libibverbs-dev 
-  openjdk-7-jdk ant dh-systemd libcppunit-dev zlib1g-dev libssl-dev sqlite
+  default-jdk ant dh-systemd libcppunit-dev zlib1g-dev libssl-dev sqlite3
+  libsqlite3-dev
 
 
 Building all packages together

@@ -101,7 +101,7 @@ void InternodeSyncer::run()
 void InternodeSyncer::syncLoop()
 {
    const int sleepIntervalMS = 3*1000; // 3sec
-   const unsigned downloadNodesAndStatesIntervalMS = 30000; // 30 sec // 5min
+   const unsigned downloadNodesAndStatesIntervalMS = 30000; // 30 sec
 
    Time lastDownloadNodesAndStatesT;
 

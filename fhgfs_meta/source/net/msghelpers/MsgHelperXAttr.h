@@ -34,7 +34,6 @@ class MsgHelperXAttr
                entryInfo(nullptr), path(std::move(path)), names(std::move(names))
             {}
 
-            FhgfsOpsErr loadNextXAttr(std::string& name, CharVector& value);
             static FhgfsOpsErr streamXattrFn(Socket* socket, void* context);
 
             static FhgfsOpsErr readNextXAttr(Socket* socket, std::string& name, CharVector& value);
@@ -43,6 +42,8 @@ class MsgHelperXAttr
             EntryInfo* entryInfo;
             std::string path;
             StringVector names;
+
+            FhgfsOpsErr streamXattr(Socket* socket) const;
       };
 };
 

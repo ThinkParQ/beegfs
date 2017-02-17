@@ -12,7 +12,7 @@ typedef std::map<uint16_t, std::shared_ptr<Mutex>> MutexMap;
  *
  * @param mgmtNode the management node, need to be referenced
  * @param storageNodes a NodeStore with all storage servers
- * @param workQ the MultiWorkQueue of the app
+ * @param workQ the MultiWorkQueue to use
  * @param outQuotaResults returns the quota informations
  * @param mapper the target mapper (only required for GETQUOTACONFIG_SINGLE_TARGET and
  *        GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET)

@@ -56,11 +56,24 @@ void InternodeSyncer::syncLoop()
    const int sleepIntervalMS = 5*1000; // 5sec
 
    // If (undocumented) sysUpdateTargetStatesSecs is set in config, use that value, otherwise
-   // default to 1/3 sysTargetOfflineTimeoutSecs.
+   // default to 1/6 sysTargetOfflineTimeoutSecs.
    const unsigned updateStatesMS =
       (cfg->getSysUpdateTargetStatesSecs() != 0)
       ? cfg->getSysUpdateTargetStatesSecs() * 1000
-      : cfg->getSysTargetOfflineTimeoutSecs() * 333;
+      : cfg->getSysTargetOfflineTimeoutSecs() * 166;
+
+   // Set POffline timout to half the Offline timeout.
+   const unsigned targetPOfflineTimeoutMS = cfg->getSysTargetOfflineTimeoutSecs() * 333;
+
+   // The updateStates interval is used by the other nodes to ask the Mgmtd for the states,
+   // which should happen at least twice between POffline and Offline timeouts - 1/3 of the
+   // Offline - POffline interval ensures that, even if the remote InternodeSyncer is delayed for
+   // some reason.
+   // The POffline timeout in the v6 is chosen to that the POffline state will be reported to
+   // clients for at least 1.5 UpdateTargetStates (in clients which have a 6.3 or older default
+   // config, this value defaults to 60s), so that they have the chance to see the POffline state at
+   // least once even if their InternodeSyncer experiences a delay. The updateStates interval is
+   // also used by the other nodes to ask the Mgmtd for the states,
 
    // Is very short on the first loop, so that the targets can be assigned to pools quickly. When
    // the first capacity pools update has happened, this delay will be increased.
@@ -75,8 +88,7 @@ void InternodeSyncer::syncLoop()
    Time lastTargetMappingsSaveT;
    Time lastIdleDisconnectT;
 
-
-   while(!waitForSelfTerminateOrder(sleepIntervalMS) )
+   while(!waitForSelfTerminateOrder(sleepIntervalMS))
    {
       // On the first loop, send out a request for the metadata and storage servers to publish
       // their free capacity information. This way we can assign them to capacity pools with a much
@@ -96,8 +108,6 @@ void InternodeSyncer::syncLoop()
          (lastStatesUpdateT.elapsedMS() > updateStatesMS) )
       {
          bool statesModified = false;
-
-         const unsigned targetPOfflineTimeoutMS = (3 * sleepIntervalMS) + (2 * updateStatesMS);
 
          statesModified |= mgmtdTargetStateStore->autoOfflineTargets(targetPOfflineTimeoutMS,
             targetOfflineTimeoutMS, app->getStorageBuddyGroupMapper() );
@@ -129,7 +139,7 @@ void InternodeSyncer::syncLoop()
          lastCapacityPoolsUpdateT.setToNow();
 
          // Increase timeout after first capacity update.
-         updateCapacityPoolsMS = 3 * updateStatesMS;
+         updateCapacityPoolsMS = 6 * updateStatesMS;
       }
 
       if(lastTargetMappingsSaveT.elapsedMS() > saveTargetMappingsMS)

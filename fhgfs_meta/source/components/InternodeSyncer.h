@@ -50,6 +50,7 @@ class InternodeSyncer : public PThread
       // waiting to be offlined by the mgmtd.
       NodeOfflineWait offlineWait;
 
+      Mutex nodeConsistencyStateMutex;
       TargetConsistencyState nodeConsistencyState; // Node's own consistency state.
       // Note: This is initialized when updateMetaStates... is called from App::downloadMgmtInfo.
       AtomicUInt32 buddyResyncInProgress;
@@ -99,12 +100,14 @@ class InternodeSyncer : public PThread
 
       TargetConsistencyState getNodeConsistencyState()
       {
-         return this->nodeConsistencyState;
+         std::lock_guard<Mutex> lock(nodeConsistencyStateMutex);
+         return nodeConsistencyState;
       }
 
       void setNodeConsistencyState(TargetConsistencyState newState)
       {
-         this->nodeConsistencyState = newState;
+         std::lock_guard<Mutex> lock(nodeConsistencyStateMutex);
+         nodeConsistencyState = newState;
       }
 
       void setResyncInProgress(bool resyncInProgress)

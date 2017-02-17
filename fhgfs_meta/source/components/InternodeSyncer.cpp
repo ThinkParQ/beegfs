@@ -36,8 +36,8 @@ InternodeSyncer::InternodeSyncer(TargetConsistencyState initialConsistencyState)
    MirrorBuddyGroupMapper* mbg = Program::getApp()->getMetaBuddyGroupMapper();
    MirrorBuddyState buddyState = mbg->getBuddyState(Program::getApp()->getLocalNodeNumID().val() );
 
-   if ( (buddyState == BuddyState_PRIMARY)
-     && (this->nodeConsistencyState == TargetConsistencyState_NEEDS_RESYNC) )
+   if ((buddyState == BuddyState_PRIMARY)
+         && (nodeConsistencyState == TargetConsistencyState_NEEDS_RESYNC))
       offlineWait.startTimer();
 }
 
@@ -65,13 +65,13 @@ void InternodeSyncer::syncLoop()
    const int sleepIntervalMS = 3*1000; // 3sec
 
    // If (undocumented) sysUpdateTargetStatesSecs is set in config, use that value, otherwise
-   // default to 1/3 sysTargetOfflineTimeoutSecs.
+   // default to 1/6 sysTargetOfflineTimeoutSecs.
    const unsigned updateTargetStatesMS =
       (cfg->getSysUpdateTargetStatesSecs() != 0)
       ? cfg->getSysUpdateTargetStatesSecs() * 1000
-      : cfg->getSysTargetOfflineTimeoutSecs() * 333;
+      : cfg->getSysTargetOfflineTimeoutSecs() * 166;
 
-   const unsigned updateCapacityPoolsMS = 2 * updateTargetStatesMS;
+   const unsigned updateCapacityPoolsMS = 4 * updateTargetStatesMS;
 
    const unsigned metaCacheSweepNormalMS = 5*1000; // 5sec
    const unsigned metaCacheSweepStressedMS = 2*1000; // 2sec
@@ -145,11 +145,13 @@ void InternodeSyncer::syncLoop()
          {
             // if we're waiting to be offlined, set our local state to needs-resync and don't report
             // anything to the mgmtd
-            this->nodeConsistencyState = TargetConsistencyState_NEEDS_RESYNC;
+            setNodeConsistencyState(TargetConsistencyState_NEEDS_RESYNC);
          }
          else
          {
-            updateMetaStatesAndBuddyGroups(this->nodeConsistencyState, true);
+            TargetConsistencyState newConsistencyState;
+            updateMetaStatesAndBuddyGroups(newConsistencyState, true);
+            setNodeConsistencyState(newConsistencyState);
             downloadAndSyncTargetStatesAndBuddyGroups();
          }
 
@@ -800,14 +802,14 @@ TargetConsistencyState InternodeSyncer::decideResync(const CombinedTargetState n
 
    // If the consistency state is BAD, it stays BAD until admin intervenes.
    if (internodeSyncer && // during early startup, INS is not constructed yet.
-       internodeSyncer->nodeConsistencyState == TargetConsistencyState_BAD)
+       internodeSyncer->getNodeConsistencyState() == TargetConsistencyState_BAD)
       return TargetConsistencyState_BAD;
 
    const bool isResyncing = newState.consistencyState == TargetConsistencyState_NEEDS_RESYNC;
    const bool isBad = newState.consistencyState == TargetConsistencyState_BAD;
 
    if (internodeSyncer &&
-       internodeSyncer->nodeConsistencyState == TargetConsistencyState_NEEDS_RESYNC)
+       internodeSyncer->getNodeConsistencyState() == TargetConsistencyState_NEEDS_RESYNC)
    {
       // If we're already (locally) maked as needs resync, this state can only be left when our
       // (primary) buddy tells us the resync is finished.
@@ -915,7 +917,7 @@ void InternodeSyncer::publishNodeCapacity()
    getStatInfo(&sizeTotal, &sizeFree, &inodesTotal, &inodesFree);
 
    StorageTargetInfo targetInfo(app->getLocalNodeNumID().val(), metaPath, sizeTotal, sizeFree,
-      inodesTotal, inodesFree, nodeConsistencyState);
+      inodesTotal, inodesFree, getNodeConsistencyState());
    // Note: As long as we don't have meta-HA, consistency state will always be GOOD.
 
    StorageTargetInfoList targetInfoList(1, targetInfo);

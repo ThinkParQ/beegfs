@@ -67,13 +67,13 @@ void InternodeSyncer::syncLoop()
    const unsigned downloadNodesIntervalMS = 600000; // 10min
 
    // If (undocumented) sysUpdateTargetStatesSecs is set in config, use that value, otherwise
-   // default to 1/3 sysTargetOfflineTimeoutSecs.
+   // default to 1/6 sysTargetOfflineTimeoutSecs.
    const unsigned updateTargetStatesMS =
       (cfg->getSysUpdateTargetStatesSecs() != 0)
       ? cfg->getSysUpdateTargetStatesSecs() * 1000
-      : cfg->getSysTargetOfflineTimeoutSecs() * 333;
+      : cfg->getSysTargetOfflineTimeoutSecs() * 166;
 
-   const unsigned updateCapacitiesMS = updateTargetStatesMS * 2;
+   const unsigned updateCapacitiesMS = updateTargetStatesMS * 4;
 
    Time lastCacheSweepT;
    Time lastIdleDisconnectT;

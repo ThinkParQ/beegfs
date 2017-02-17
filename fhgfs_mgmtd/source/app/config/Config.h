@@ -57,6 +57,7 @@ class Config : public AbstractConfig
       bool        storeAllowFirstRunInit;
 
       unsigned    tuneNumWorkers;
+      unsigned    tuneNumQuotaWorkers;
       unsigned    tuneMetaNodeAutoRemoveMins; // ignored! (only for compatibility with old cfg file)
       unsigned    tuneStorageNodeAutoRemoveMins;  // ignored! (only for compat with old cfg file)
       unsigned    tuneClientAutoRemoveMins;
@@ -175,6 +176,11 @@ class Config : public AbstractConfig
       unsigned getTuneNumWorkers() const
       {
          return tuneNumWorkers;
+      }
+
+      unsigned getTuneNumQuotaWorkers() const
+      {
+         return tuneNumQuotaWorkers;
       }
 
       unsigned getTuneClientAutoRemoveMins() const

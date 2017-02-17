@@ -705,7 +705,7 @@ bool FileInode::loadFromFileContents(const std::string& id, bool isBuddyMirrored
    const char* logContext = "File inode (load from file)";
    App* app = Program::getApp();
 
-   const Path* inodePath = isBuddyMirrored ? app->getInodesPath() : app->getBuddyMirrorInodesPath();
+   const Path* inodePath = isBuddyMirrored ? app->getBuddyMirrorInodesPath() : app->getInodesPath();
    std::string metaFilename = MetaStorageTk::getMetaInodePath(inodePath->str(), id);
    bool retVal = false;
 

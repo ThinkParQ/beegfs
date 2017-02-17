@@ -220,7 +220,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "sysSyncOnClose",                   "false");
    _Config_configMapRedefine(this, "sysSessionCheckOnClose",           "false");
 
-   _Config_configMapRedefine(this, "sysUpdateTargetStatesSecs",        "60");
+   _Config_configMapRedefine(this, "sysUpdateTargetStatesSecs",        "30");
    _Config_configMapRedefine(this, "sysTargetOfflineTimeoutSecs",      "900");
    // Note: The default here is intentionally set to double the value from the server config.
    // This ensures that the servers push their state twice during one Mgmtd InternodeSyncer run,

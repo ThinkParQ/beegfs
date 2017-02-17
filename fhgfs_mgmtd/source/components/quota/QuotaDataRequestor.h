@@ -26,7 +26,9 @@ class QuotaDataRequestor : public GetQuotaInfo
        * @param type The type of the quota data, a value of the enum QuotaDataType.
        * @param withSystemusersGroups True if also system users should be queried.
        */
-      QuotaDataRequestor(QuotaDataType type, bool withSystemusersGroups) : GetQuotaInfo()
+      QuotaDataRequestor(MultiWorkQueue& workQueue, QuotaDataType type,
+         bool withSystemusersGroups):
+         GetQuotaInfo(), workQueue(workQueue)
       {
          this->cfg.cfgTargetSelection = GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET;
          this->cfg.cfgType = type;
@@ -40,7 +42,8 @@ class QuotaDataRequestor : public GetQuotaInfo
        * @param type The type of the quota data, a value of the enum QuotaDataType.
        * @param id The ID to query.
        */
-      QuotaDataRequestor(QuotaDataType type, unsigned id) : GetQuotaInfo()
+      QuotaDataRequestor(MultiWorkQueue& workQueue, QuotaDataType type, unsigned id):
+         GetQuotaInfo(), workQueue(workQueue)
       {
          this->cfg.cfgTargetSelection = GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET;
          this->cfg.cfgType = type;
@@ -52,7 +55,8 @@ class QuotaDataRequestor : public GetQuotaInfo
        * @param type The type of the quota data, a value of the enum QuotaDataType.
        * @param idList The ID list to query.
        */
-      QuotaDataRequestor(QuotaDataType type, UIntList& idList) : GetQuotaInfo()
+      QuotaDataRequestor(MultiWorkQueue& workQueue, QuotaDataType type, UIntList& idList):
+         GetQuotaInfo(), workQueue(workQueue)
       {
          this->cfg.cfgTargetSelection = GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET;
          this->cfg.cfgType = type;
@@ -63,8 +67,9 @@ class QuotaDataRequestor : public GetQuotaInfo
       /**
        * Constructor for QuotaDataRequestor to collect IDs from a range of the given type.
        */
-      QuotaDataRequestor(QuotaDataType type, unsigned rangeStart, unsigned rangeEnd,
-         bool withSystemusersGroups) : GetQuotaInfo()
+      QuotaDataRequestor(MultiWorkQueue& workQueue, QuotaDataType type, unsigned rangeStart,
+         unsigned rangeEnd, bool withSystemusersGroups):
+         GetQuotaInfo(), workQueue(workQueue)
       {
          this->cfg.cfgTargetSelection = GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET;
          this->cfg.cfgType = type;
@@ -90,6 +95,8 @@ class QuotaDataRequestor : public GetQuotaInfo
       }
 
    private:
+      MultiWorkQueue& workQueue;
+
       void updateQuotaDataWithResponse(QuotaDataMapForTarget* inQuotaData,
          QuotaDataMapForTarget* outQuotaData, TargetMapper* mapper);
 };
