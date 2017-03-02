@@ -239,11 +239,22 @@ int FhgfsXAttr_setUser(struct inode* inode, const char* name, const void* value,
    strcpy(prefixedName, FHGFS_XATTR_USER_PREFIX);
    strcpy(prefixedName + sizeof(FHGFS_XATTR_USER_PREFIX) - 1, name); // sizeof-1 to remove the '\0'
 
+   if (value)
+   {
 #ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
-   res = FhgfsOps_setxattr(dentry, prefixedName, value, size, flags);
+      res = FhgfsOps_setxattr(dentry, prefixedName, value, size, flags);
 #else
-   res = FhgfsOps_setxattr(inode, prefixedName, value, size, flags);
+      res = FhgfsOps_setxattr(inode, prefixedName, value, size, flags);
 #endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
+   }
+   else
+   {
+#ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
+      res = FhgfsOps_removexattr(dentry, prefixedName);
+#else
+      res = FhgfsOps_removexattrInode(inode, prefixedName);
+#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
+   }
 
    kfree(prefixedName);
    return res;
@@ -331,11 +342,22 @@ int FhgfsXAttr_setSecurity(struct inode* inode, const char* name, const void* va
    strcpy(prefixedName, FHGFS_XATTR_SECURITY_PREFIX);
    strcpy(prefixedName + sizeof(FHGFS_XATTR_SECURITY_PREFIX) - 1, name); // sizeof-1 to remove '\0'
 
+   if (value)
+   {
 #ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
-   res = FhgfsOps_setxattr(dentry, prefixedName, value, size, flags);
+      res = FhgfsOps_setxattr(dentry, prefixedName, value, size, flags);
 #else
-   res = FhgfsOps_setxattr(inode, prefixedName, value, size, flags);
+      res = FhgfsOps_setxattr(inode, prefixedName, value, size, flags);
 #endif
+   }
+   else
+   {
+#ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
+      res = FhgfsOps_removexattr(dentry, prefixedName);
+#else
+      res = FhgfsOps_removexattrInode(inode, prefixedName);
+#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
+   }
 
    kfree(prefixedName);
    return res;

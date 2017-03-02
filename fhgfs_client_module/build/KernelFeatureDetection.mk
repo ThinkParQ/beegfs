@@ -55,6 +55,11 @@ KERNEL_FEATURE_DETECTION += $(shell \
       ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
       && echo "-DOFED_SPLIT_WR")
 
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -qs -F "IB_PD_UNSAFE_GLOBAL_RKEY" \
+      ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
+      && echo "-DOFED_UNSAFE_GLOBAL_RKEY")
+
 endif # BEEGFS_OPENTK_IBVERBS
 
 # Find out whether the kernel has a scsi/fc_compat.h file, which defines
@@ -247,6 +252,10 @@ $(call define_if_matches, KERNEL_HAS_IOV_DIO, \
    -F "ssize_t (*direct_IO)(struct kiocb *, struct iov_iter *iter);", fs.h)
 $(call define_if_matches, KERNEL_HAS_XATTR_HANDLERS_INODE_ARG, \
    -P "generic_getxattr.*struct inode", xattr.h)
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -sPA1 "\(\*set\).const struct xattr_handler" $(KSRCDIR_PRUNED_HEAD)/include/linux/xattr.h \
+      | grep -qsP "^\s+struct inode" \
+      && echo "-DKERNEL_HAS_XATTR_HANDLERS_INODE_ARG")
 $(call define_if_matches, KERNEL_HAS_INODE_LOCK, "static inline void inode_lock", fs.h)
 
 #<linuy-4.8
@@ -358,3 +367,13 @@ $(call define_if_matches, KERNEL_HAS_COPY_FROM_ITER, "copy_from_iter", uio.h)
 $(call define_if_matches, KERNEL_HAS_INIT_WORK_2, -F "INIT_WORK(_work, _func)", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_ALLOC_WORKQUEUE, "alloc_workqueue", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)
+
+# inodeChangeRes was changed to setattr_prepare in vanilla 4.9
+$(call define_if_matches, KERNEL_HAS_SETATTR_PREPARE, "int setattr_prepare", fs.h)
+
+$(call define_if_matches, KERNEL_HAS_GENERIC_GETXATTR, "generic_getxattr", xattr.h)
+
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -sA1 "(*rename) " $(KSRCDIR_PRUNED_HEAD)/include/linux/fs.h \
+      | grep -qsF "unsigned int" \
+      && echo "-DKERNEL_HAS_RENAME_FLAGS")

@@ -500,7 +500,11 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
 
    // protection domain...
 
+#ifndef OFED_UNSAFE_GLOBAL_RKEY
    commContext->pd = ib_alloc_pd(cm_id->device);
+#else
+   commContext->pd = ib_alloc_pd(cm_id->device, IB_PD_UNSAFE_GLOBAL_RKEY);
+#endif
    if(IS_ERR(commContext->pd) )
    {
       ibv_print_info("Couldn't allocate PD. ErrCode: %ld\n", PTR_ERR(commContext->pd) );
@@ -515,6 +519,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    //    "The consumer is not allowed to assign remote-write (or remote-atomic) to
    //    a memory region that has not been assigned local-write.")
 
+#ifndef OFED_UNSAFE_GLOBAL_RKEY
    commContext->dmaMR = ib_get_dma_mr(commContext->pd,
       IB_ACCESS_LOCAL_WRITE| IB_ACCESS_REMOTE_READ| IB_ACCESS_REMOTE_WRITE);
    if(IS_ERR(commContext->dmaMR) )
@@ -524,6 +529,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       commContext->dmaMR = NULL;
       goto err_cleanup;
    }
+#endif
 
    // alloc and register buffers...
 
@@ -713,8 +719,10 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
    SAFE_KFREE(commContext->recvBufs);
    SAFE_KFREE(commContext->sendBufs);
 
+#ifndef OFED_UNSAFE_GLOBAL_RKEY
    if(commContext->dmaMR)
       ib_dereg_mr(commContext->dmaMR);
+#endif
 
    if(commContext->pd)
       ib_dealloc_pd(commContext->pd);
@@ -732,7 +740,11 @@ void __IBVSocket_initCommDest(IBVCommContext* commContext, IBVCommDest* outDest)
 {
    memcpy(outDest->verificationStr, IBVSOCKET_PRIVATEDATA_STR, IBVSOCKET_PRIVATEDATA_STR_LEN);
    outDest->protocolVersion = cpu_to_le64(IBVSOCKET_PRIVATEDATA_PROTOCOL_VER);
+#ifndef OFED_UNSAFE_GLOBAL_RKEY
    outDest->rkey = cpu_to_le32(commContext->dmaMR->rkey);
+#else
+   outDest->rkey = cpu_to_le32(commContext->pd->unsafe_global_rkey);
+#endif
    outDest->vaddr = cpu_to_le64(commContext->checkConBuffer.lists[0].addr);
    outDest->recvBufNum = cpu_to_le32(commContext->commCfg.bufNum);
    outDest->recvBufSize = cpu_to_le32(commContext->commCfg.bufSize);

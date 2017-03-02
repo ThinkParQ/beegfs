@@ -30,7 +30,6 @@ struct StorageTargetData
    bool cleanShutdown; // Was the previous session cleanly shut down?
 };
 
-
 typedef std::map<uint16_t, StorageTargetData> StorageTargetDataMap;
 typedef StorageTargetDataMap::iterator StorageTargetDataMapIter;
 typedef StorageTargetDataMap::const_iterator StorageTargetDataMapCIter;
@@ -41,7 +40,6 @@ typedef ConsistencyStateMap::const_iterator ConsistencyStateMapCIter;
 typedef ConsistencyStateMap::value_type ConsistencyStateMapVal;
 
 typedef std::map<uint16_t, unsigned> TargetNeedsResyncCountMap;
-
 
 class StorageTargets
 {
@@ -76,6 +74,8 @@ class StorageTargets
       static void updateTargetStateLists(const TargetStateMap& stateMap,
          const UInt16List& targetIDs, UInt8List& outReachabilityStates,
          UInt8List& outConsistencyStates);
+
+      TargetConsistencyStateVec getTargetConsistencyStates(UInt16Vector targetIDs);
 
    private:
       RWLock rwlock;

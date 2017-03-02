@@ -1657,9 +1657,17 @@ int __IBVSocket_waitForRecvCompletionEvent(IBVSocket* _this, int timeoutMS, stru
       if(unlikely(_this->cm_channel &&
          (epollEvent.data.fd == _this->cm_channel->fd) ) )
       { // cm event incoming
-         struct rdma_cm_event* event;
-      
-         rdma_get_cm_event(_this->cm_channel, &event);
+         struct rdma_cm_event* event = 0;
+
+         if (rdma_get_cm_event(_this->cm_channel, &event) < 0)
+         {
+            syslog_fhgfs_connerr(stderr, "%s: Disconnected by rdma_get_cm_event error.\n",
+                  __func__);
+
+            _this->errState = -1;
+            return -1;
+         }
+
          if(event->event == RDMA_CM_EVENT_DISCONNECTED)
          {
             syslog_fhgfs_connerr(stderr, "%s: Disconnect event received (%d: %s)\n",

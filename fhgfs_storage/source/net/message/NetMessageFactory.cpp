@@ -17,6 +17,7 @@
 #include <common/net/message/nodes/RegisterTargetRespMsg.h>
 #include <common/net/message/nodes/RemoveNodeRespMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
+#include <common/net/message/nodes/GetTargetConsistencyStatesRespMsg.h>
 #include <net/message/nodes/GenericDebugMsgEx.h>
 #include <net/message/nodes/GetClientStatsMsgEx.h>
 #include <net/message/nodes/HeartbeatMsgEx.h>
@@ -28,6 +29,7 @@
 #include <net/message/nodes/RemoveNodeMsgEx.h>
 #include <net/message/nodes/SetMirrorBuddyGroupMsgEx.h>
 #include <net/message/nodes/SetTargetConsistencyStatesMsgEx.h>
+#include <net/message/nodes/GetTargetConsistencyStatesMsgEx.h>
 
 // storage messages
 #include <common/net/message/storage/attribs/SetLocalAttrRespMsg.h>
@@ -129,6 +131,8 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_SetMirrorBuddyGroup: { msg = new SetMirrorBuddyGroupMsgEx(); } break;
       case NETMSGTYPE_SetTargetConsistencyStates: { msg = new SetTargetConsistencyStatesMsgEx(); } break;
       case NETMSGTYPE_SetTargetConsistencyStatesResp: { msg = new SetTargetConsistencyStatesRespMsg(); } break;
+      case NETMSGTYPE_GetTargetConsistencyStates: { msg = new GetTargetConsistencyStatesMsgEx(); } break;
+      case NETMSGTYPE_GetTargetConsistencyStatesResp: { msg = new GetTargetConsistencyStatesRespMsg(); } break;
 
       // storage messages
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;

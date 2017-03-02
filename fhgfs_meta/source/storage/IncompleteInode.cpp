@@ -68,6 +68,12 @@ FhgfsOpsErr IncompleteInode::clearUnsetXAttrs()
    {
       if (xattrsSet.count(*it))
          continue;
+      // do not sync the system namespaces.
+      //  * security. cannot be synced at all, since userspace can't write to it
+      //  * trusted. is unused by us and thus not interesting
+      //  * system. contains only acls, which we don't use to represent metadata
+      if (it->compare(0, 5, "user.") != 0)
+         continue;
 
       int removeRes = ::fremovexattr(fd, it->c_str());
       if (removeRes != 0)

@@ -17,7 +17,11 @@ bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen)
 
    for(i = 0; i < count; i++)
    {
+#ifndef OFED_UNSAFE_GLOBAL_RKEY
       buffer->lists[i].lkey = ctx->dmaMR->lkey;
+#else
+      buffer->lists[i].lkey = ctx->pd->local_dma_lkey;
+#endif
       buffer->lists[i].length = bufLen;
       buffer->buffers[i] = ib_dma_alloc_coherent(ctx->pd->device, bufLen, &buffer->lists[i].addr,
          GFP_KERNEL);

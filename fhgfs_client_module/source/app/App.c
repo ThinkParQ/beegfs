@@ -477,14 +477,17 @@ bool __App_initInodeOperations(App* this)
    if (Config_getSysXAttrsEnabled(cfg) )
    {
       this->fileInodeOps->listxattr   = FhgfsOps_listxattr;
+      this->dirInodeOps->listxattr   = FhgfsOps_listxattr;
+
+#ifdef KERNEL_HAS_GENERIC_GETXATTR
       this->fileInodeOps->getxattr    = generic_getxattr;
       this->fileInodeOps->removexattr = FhgfsOps_removexattr;
       this->fileInodeOps->setxattr    = generic_setxattr;
 
-      this->dirInodeOps->listxattr   = FhgfsOps_listxattr;
       this->dirInodeOps->getxattr    = generic_getxattr;
       this->dirInodeOps->removexattr = FhgfsOps_removexattr;
       this->dirInodeOps->setxattr    = generic_setxattr;
+#endif
 
       if (Config_getSysACLsEnabled(cfg) )
       {

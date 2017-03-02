@@ -72,8 +72,25 @@ class SessionStore
       {
          bool result = true;
 
-         for (auto it = sessions.begin(); it != sessions.end(); ++it)
-            result &= it->second->getReferencedObject()->relinkInodes(store);
+         for (auto it = sessions.begin(); it != sessions.end(); )
+         {
+            const bool relinkRes = it->second->getReferencedObject()->relinkInodes(store);
+
+            if (!relinkRes)
+            {
+               // Relinking failed on at least one SessionFile in this Session -> remove if empty
+               if (it->second->getReferencedObject()->getFiles()->getSize() == 0)
+                  sessions.erase(it++);
+               else
+                  ++it;
+            }
+            else
+            {
+               ++it;
+            }
+
+            result &= relinkRes;
+         }
 
          return result;
       }

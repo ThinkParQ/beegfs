@@ -6,6 +6,8 @@
 #include <common/net/message/nodes/GetNodeCapacityPoolsRespMsg.h>
 #include <common/net/message/nodes/HeartbeatMsg.h>
 #include <common/net/message/nodes/MapTargetsMsg.h>
+#include <common/net/message/nodes/GetTargetConsistencyStatesMsg.h>
+#include <common/net/message/nodes/GetTargetConsistencyStatesRespMsg.h>
 #include <common/net/message/nodes/MapTargetsRespMsg.h>
 #include <common/net/message/nodes/RefreshCapacityPoolsMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
@@ -611,7 +613,6 @@ void InternodeSyncer::requestBuddyTargetStates()
    NodeStore* storageNodes = Program::getApp()->getStorageNodes();
    TargetStateStore* targetStateStore = Program::getApp()->getTargetStateStore();
    UInt16List localStorageTargetIDs;
-   const StorageTargetInfoList* storageTargetInfoList;
 
    LogContext(logContext).log(LogTopic_STATESYNC, Log_DEBUG, "Requesting buddy target states.");
 
@@ -623,8 +624,6 @@ void InternodeSyncer::requestBuddyTargetStates()
        iter++)
    {
       uint16_t targetID = *iter;
-      TargetConsistencyState buddyTargetConsistencyState;
-      bool buddyNeedsResync;
 
       // check if target is part of a buddy group
       uint16_t buddyTargetID = buddyGroupMapper->getBuddyTargetID(targetID);
@@ -654,51 +653,94 @@ void InternodeSyncer::requestBuddyTargetStates()
       CombinedTargetState currentState;
       targetStateStore->getState(buddyTargetID, currentState);
 
-      bool commRes;
-      char* respBuf = NULL;
-      NetMessage* respMsg = NULL;
-      GetStorageTargetInfoRespMsg* respMsgCast;
-
       if(currentState.reachabilityState == TargetReachabilityState_ONLINE)
       {
-         // communicate
-         UInt16List queryTargetIDs;
-         queryTargetIDs.push_back(buddyTargetID);
-         GetStorageTargetInfoMsg msg(&queryTargetIDs);
+         char* respBuf = NULL;
+         NetMessage* respMsg = NULL;
 
-         // connect & communicate
-         commRes = MessagingTk::requestResponse(*node, &msg,
-         NETMSGTYPE_GetStorageTargetInfoResp, &respBuf, &respMsg);
-         if(!commRes)
-         { // communication failed
-            LogContext(logContext).log(LogTopic_STATESYNC, Log_WARNING,
-               "Communication with buddy target failed. "
-                  "nodeID: " + nodeID.str() + "; buddy targetID: "
-                  + StringTk::uintToStr(buddyTargetID));
+         if (node->hasFeature(STORAGE_FEATURE_GETTARGETCONSISTENCYSTATES))
+         {
+            UInt16Vector queryTargetIDs(1, buddyTargetID);
 
-            goto cleanup;
+            // communicate
+            GetTargetConsistencyStatesMsg msg(queryTargetIDs);
+
+            // connect & communicate
+            bool commRes = MessagingTk::requestResponse(*node, &msg,
+                  NETMSGTYPE_GetTargetConsistencyStatesResp, &respBuf, &respMsg);
+            if(!commRes)
+            { // communication failed
+               LogContext(logContext).log(LogTopic_STATESYNC, Log_WARNING,
+                     "Communication with buddy target failed. "
+                     "nodeID: " + nodeID.str() + "; buddy targetID: "
+                     + StringTk::uintToStr(buddyTargetID));
+
+               SAFE_DELETE(respMsg);
+               SAFE_FREE(respBuf);
+               continue;
+            }
+
+            // handle response
+            auto respMsgCast = (GetTargetConsistencyStatesRespMsg*)respMsg;
+            const auto& targetConsistencyStates = &respMsgCast->getStates();
+
+            // get received target information
+            // (note: we only requested a single target info, so the first one must be the
+            // requested one)
+            const TargetConsistencyState buddyTargetConsistencyState =
+               targetConsistencyStates->empty() ? TargetConsistencyState_BAD :
+               targetConsistencyStates->front();
+
+            // set last comm timestamp, but ignore it if we think buddy needs a resync
+            const bool buddyNeedsResync = storageTargets->getBuddyNeedsResync(targetID);
+            if((buddyTargetConsistencyState == TargetConsistencyState_GOOD) && !buddyNeedsResync)
+               storageTargets->writeLastBuddyCommTimestamp(targetID);
+
+            SAFE_DELETE(respMsg);
+            SAFE_FREE(respBuf);
          }
+         else // Compatibility code for nodes without the GetTargetConsistencyStatesMsg
+         {
+            UInt16List queryTargetIDs(1, buddyTargetID);
 
-         // handle response
-         respMsgCast = (GetStorageTargetInfoRespMsg*) respMsg;
-         storageTargetInfoList = &respMsgCast->getStorageTargetInfos();
+            // communicate
+            GetStorageTargetInfoMsg msg(&queryTargetIDs);
 
-         // get received target information
-         // (note: we only requested a single target info, so the first one must be the
-         // requested one)
-         buddyTargetConsistencyState =
-            storageTargetInfoList->empty() ? TargetConsistencyState_BAD :
+            // connect & communicate
+            bool commRes = MessagingTk::requestResponse(*node, &msg,
+                  NETMSGTYPE_GetStorageTargetInfoResp, &respBuf, &respMsg);
+            if(!commRes)
+            { // communication failed
+               LogContext(logContext).log(LogTopic_STATESYNC, Log_WARNING,
+                     "Communication with buddy target failed. "
+                     "nodeID: " + nodeID.str() + "; buddy targetID: "
+                     + StringTk::uintToStr(buddyTargetID));
+
+               SAFE_DELETE(respMsg);
+               SAFE_FREE(respBuf);
+               continue;
+            }
+
+            // handle response
+            auto respMsgCast = (GetStorageTargetInfoRespMsg*) respMsg;
+            const auto& storageTargetInfoList = &respMsgCast->getStorageTargetInfos();
+
+            // get received target information
+            // (note: we only requested a single target info, so the first one must be the
+            // requested one)
+            const TargetConsistencyState buddyTargetConsistencyState =
+               storageTargetInfoList->empty() ? TargetConsistencyState_BAD :
                storageTargetInfoList->front().getState();
 
-         // set last comm timestamp, but ignore it if we think buddy needs a resync
-         buddyNeedsResync = storageTargets->getBuddyNeedsResync(targetID);
-         if((buddyTargetConsistencyState == TargetConsistencyState_GOOD) && !buddyNeedsResync)
-            storageTargets->writeLastBuddyCommTimestamp(targetID);
-      }
+            // set last comm timestamp, but ignore it if we think buddy needs a resync
+            const bool buddyNeedsResync = storageTargets->getBuddyNeedsResync(targetID);
+            if((buddyTargetConsistencyState == TargetConsistencyState_GOOD) && !buddyNeedsResync)
+               storageTargets->writeLastBuddyCommTimestamp(targetID);
 
-      cleanup:
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
+            SAFE_DELETE(respMsg);
+            SAFE_FREE(respBuf);
+         }
+      }
    }
 
    // requeue

@@ -30,6 +30,7 @@
 // storage feature flags
 
 #define STORAGE_FEATURE_DUMMY       0
+#define STORAGE_FEATURE_GETTARGETCONSISTENCYSTATES 1 // Supports GetTargetConsistencyStatesMsg
 
 
 // client feature flags

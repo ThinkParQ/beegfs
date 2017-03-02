@@ -2,6 +2,7 @@
 #include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
 #include <common/storage/Storagedata.h>
+#include <common/threading/RWLockGuard.h>
 #include <common/toolkit/StorageTk.h>
 #include <common/toolkit/StringTk.h>
 #include <common/toolkit/ZipIterator.h>
@@ -865,4 +866,24 @@ void StorageTargets::updateTargetStateLists(const TargetStateMap& stateMap, cons
       *reachabilityStateIter = newStateIter->second.reachabilityState;
       *consistencyStateIter = newStateIter->second.consistencyState;
    }
+}
+
+TargetConsistencyStateVec StorageTargets::getTargetConsistencyStates(UInt16Vector targetIDs)
+{
+   RWLockGuard lock(rwlock, SafeRWLock_READ);
+
+   TargetConsistencyStateVec states;
+   states.reserve(targetIDs.size());
+
+   for (auto it = targetIDs.cbegin(); it != targetIDs.cend(); ++it)
+   {
+      auto dataIt = storageTargetDataMap.find(*it);
+
+      if (dataIt == storageTargetDataMap.end())
+         states.push_back(TargetConsistencyState_BAD);
+      else
+         states.push_back((dataIt->second).consistencyState);
+   }
+
+   return states;
 }

@@ -372,15 +372,23 @@ ssize_t FhgfsOps_getxattr(struct inode* inode, const char* name, void* value, si
 int FhgfsOps_removexattr(struct dentry* dentry, const char* name)
 {
    App* app = FhgfsOps_getApp(dentry->d_sb);
-   FhgfsOpsErr remotingRes;
-
-   FhgfsInode* fhgfsInode = BEEGFS_INODE(dentry->d_inode);
-
-   int refreshRes = maybeRefreshInode(dentry->d_inode, true, false);
-   if (refreshRes)
-      return refreshRes;
 
    FhgfsOpsHelper_logOpDebug(app, dentry, NULL, __func__, "(name: %s)", name);
+   (void) app;
+
+   return FhgfsOps_removexattrInode(dentry->d_inode, name);
+}
+
+int FhgfsOps_removexattrInode(struct inode* inode, const char* name)
+{
+   App* app = FhgfsOps_getApp(inode->i_sb);
+   FhgfsOpsErr remotingRes;
+
+   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
+
+   int refreshRes = maybeRefreshInode(inode, true, false);
+   if (refreshRes)
+      return refreshRes;
 
    FhgfsInode_entryInfoReadLock(fhgfsInode);
 
@@ -637,7 +645,7 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
    const char* logContext = "FhgfsOps_setattr";
 
    int retVal = 0;
-   int inodeChangeRes;
+   int setAttrPrepRes;
    SettableFileAttribs fhgfsAttr;
    int validFhgfsAttribs;
    FhgfsOpsErr setAttrRes = FhgfsOpsErr_SUCCESS;
@@ -650,23 +658,29 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
          (iattr->ia_valid & ATTR_SIZE) ? "(with trunc)" : "");
    }
 
-   inodeChangeRes = inode_change_ok(inode, iattr);
-   if(inodeChangeRes < 0)
-      return inodeChangeRes;
+#ifdef KERNEL_HAS_SETATTR_PREPARE
+   setAttrPrepRes = setattr_prepare(dentry, iattr);
+   if(setAttrPrepRes < 0)
+      return setAttrPrepRes;
+#else
+   setAttrPrepRes = inode_change_ok(inode, iattr);
+   if(setAttrPrepRes < 0)
+      return setAttrPrepRes;
+#endif
 
-   #ifdef KERNEL_HAS_ATTR_OPEN
-      /* we do trunc during open message on meta server, so we don't want this redundant trunc
-         (and ctime/mtime update) from the kernel */
-      if(iattr->ia_valid & ATTR_OPEN)
-      {
-         if (iattr->ia_valid & ATTR_SIZE)
-         {  // the file was already remotely truncate by open, now also truncate it locally
-            FhgfsOps_vmtruncate(inode, iattr->ia_size);
-         }
-
-         return 0;
+#ifdef KERNEL_HAS_ATTR_OPEN
+   /* we do trunc during open message on meta server, so we don't want this redundant trunc
+      (and ctime/mtime update) from the kernel */
+   if(iattr->ia_valid & ATTR_OPEN)
+   {
+      if (iattr->ia_valid & ATTR_SIZE)
+      {  // the file was already remotely truncate by open, now also truncate it locally
+         FhgfsOps_vmtruncate(inode, iattr->ia_size);
       }
-   #endif
+
+      return 0;
+   }
+#endif
 
    if(iattr->ia_valid & ATTR_SIZE)
    { // make sure we only update size of regular files
@@ -1811,7 +1825,11 @@ void FhgfsOps_put_link(struct dentry* dentry, struct nameidata* nd, void* p)
 
 
 int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
-   struct inode* inodeDirTo, struct dentry* dentryTo)
+   struct inode* inodeDirTo, struct dentry* dentryTo
+#ifdef KERNEL_HAS_RENAME_FLAGS
+   , unsigned flags
+#endif
+   )
 {
    struct super_block* sb = dentryFrom->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1836,6 +1854,11 @@ int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
 
    const char* newName = dentryTo->d_name.name;
    unsigned newLen = dentryTo->d_name.len;
+
+#ifdef KERNEL_HAS_RENAME_FLAGS
+   if (flags != 0)
+      return -EINVAL;
+#endif
 
    if(unlikely(Logger_getLogLevel(log) >= Log_DEBUG) )
       FhgfsOpsHelper_logOpMsg(Log_SPAM, app, dentryFrom, dentryFrom->d_inode, logContext,

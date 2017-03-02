@@ -45,6 +45,7 @@ extern int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* 
       size_t size, int flags);
 #endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
 extern int FhgfsOps_removexattr(struct dentry* dentry, const char* name);
+extern int FhgfsOps_removexattrInode(struct inode* inode, const char* name);
 
 
 #ifdef KERNEL_HAS_POSIX_GET_ACL
@@ -98,8 +99,13 @@ extern void* FhgfsOps_follow_link(struct dentry* dentry, struct nameidata* nd);
 extern void FhgfsOps_put_link(struct dentry* dentry, struct nameidata* nd, void* p);
 #endif
 
+#ifdef KERNEL_HAS_RENAME_FLAGS
+extern int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
+   struct inode* inodeDirTo, struct dentry* dentryTo, unsigned flags);
+#else
 extern int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    struct inode* inodeDirTo, struct dentry* dentryTo);
+#endif
 
 extern int FhgfsOps_vmtruncate(struct inode* inode, loff_t offset);
 

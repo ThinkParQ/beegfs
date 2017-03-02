@@ -42,6 +42,7 @@
  */
 unsigned const APP_FEATURES[] =
 {
+   STORAGE_FEATURE_GETTARGETCONSISTENCYSTATES,
    STORAGE_FEATURE_DUMMY,
 };
 
@@ -573,7 +574,6 @@ void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
    localNode->setNodeType(NODETYPE_Storage);
    localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
 
-   // nodeFeatureFlags
    BitStore nodeFeatureFlags;
 
    featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);

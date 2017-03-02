@@ -53,6 +53,11 @@
 #define NETMSGTYPE_ChangeTargetConsistencyStates     1057
 #define NETMSGTYPE_ChangeTargetConsistencyStatesResp 1058
 #define NETMSGTYPE_PublishCapacities                 1059
+#define NETMSGTYPE_RemoveBuddyGroup                  1060
+#define NETMSGTYPE_RemoveBuddyGroupResp              1061
+#define NETMSGTYPE_GetTargetConsistencyStates        1062
+#define NETMSGTYPE_GetTargetConsistencyStatesResp    1063
+
 
 // storage messages
 #define NETMSGTYPE_MkDir                           2001

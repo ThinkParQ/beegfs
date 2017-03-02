@@ -359,17 +359,14 @@ bool SessionStore::deserializeFromBuf(const char* buf, size_t bufLen, MetaStore&
    deserialize(des);
 
    if (!des.good())
-   {
       LOG(ERR, "Unable to deserialize session store from buffer.");
-      return false;
-   }
 
    const bool relinkRes = relinkInodes(metaStore);
    if (!relinkRes)
-   {
       LOG(ERR, "Unable to relink inodes.");
+
+   if (!des.good() || !relinkRes)
       return false;
-   }
 
    deserializeLockStates(des, metaStore);
    if (!des.good())

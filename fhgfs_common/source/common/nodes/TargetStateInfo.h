@@ -19,6 +19,14 @@ enum TargetConsistencyState
    TargetConsistencyState_BAD
 };
 
+template<>
+struct SerializeAs<TargetConsistencyState>
+{
+   typedef int32_t type;
+};
+
+typedef std::vector<TargetConsistencyState> TargetConsistencyStateVec;
+
 /**
  * A combined target state is a pair of TargetReachabilityState and TargetConsistencyState.
  */

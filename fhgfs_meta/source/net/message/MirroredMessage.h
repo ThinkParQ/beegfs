@@ -286,6 +286,7 @@ class MirroredMessage : public BaseT
          // set flag here instead of at the beginning because &message == this is often used
          message.addFlag(NetMessageHeader::Flag_BuddyMirrorSecond);
          message.addFlag(this->getFlags() & NetMessageHeader::Flag_IsSelectiveAck);
+         message.addFlag(this->getFlags() & NetMessageHeader::Flag_HasSequenceNumber);
 
          FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 

@@ -8,7 +8,7 @@ import java.io.FileNotFoundException;
 /**
  * Wrapper class for the calls to the beegfs ioctl library.
  */
-class JBeeGFS {
+public class JBeeGFS {
    static {
       System.loadLibrary("jbeegfs");
    }

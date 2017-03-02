@@ -48,8 +48,17 @@ class SessionFileStore
       {
          bool result = true;
 
-         for (auto it = sessions.begin(); it != sessions.end(); ++it)
-            result &= it->second->getReferencedObject()->relinkInode(store);
+         for (auto it = sessions.begin(); it != sessions.end(); )
+         {
+            const bool relinkRes = it->second->getReferencedObject()->relinkInode(store);
+
+            if (!relinkRes)
+               sessions.erase(it++);
+            else
+               ++it;
+
+            result &= relinkRes;
+         }
 
          return result;
       }
