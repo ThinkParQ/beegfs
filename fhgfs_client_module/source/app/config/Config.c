@@ -483,7 +483,15 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          this->sysUpdateTargetStatesSecs = StringTk_strToUInt(valueStr);
       else
       if(!strcmp(keyStr, "sysTargetOfflineTimeoutSecs") )
+      {
          this->sysTargetOfflineTimeoutSecs = StringTk_strToUInt(valueStr);
+         if (this->sysTargetOfflineTimeoutSecs < 30)
+         {
+            printk_fhgfs(KERN_WARNING, "Invalid argument for sysTargetOfflineTimeoutSecs: %s "
+                  "(must be at least 30)\n", valueStr);
+            return false;
+         }
+      }
       else
       if(!strcmp(keyStr, "sysXAttrsEnabled") )
          this->sysXAttrsEnabled = StringTk_strToBool(valueStr);

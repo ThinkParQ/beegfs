@@ -86,6 +86,9 @@ class ChunkStore
       bool mkdirChunkDirPath(int targetFD, Path* chunkDirPath, bool hasOrigFeature,
          ChunkDir** outChunkDir);
 
+      std::pair<FhgfsOpsErr, int> openAndChown(const int targetFD, const std::string& path,
+         const int openFlags, const SessionQuotaInfo& quota);
+
       // inlined
 
       /**

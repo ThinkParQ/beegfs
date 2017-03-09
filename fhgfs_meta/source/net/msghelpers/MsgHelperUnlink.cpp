@@ -16,14 +16,14 @@
 FhgfsOpsErr MsgHelperUnlink::unlinkFile(DirInode& parentDir, const std::string& removeName,
    unsigned msgUserID)
 {
-   FileInode* unlinkedInode = NULL;
+   std::unique_ptr<FileInode> unlinkedInode;
 
    FhgfsOpsErr unlinkMetaRes = unlinkMetaFile(parentDir, removeName, &unlinkedInode);
 
    /* note: if the file is still opened or if there are/were hardlinks then unlinkedInode will be
       NULL even on FhgfsOpsErr_SUCCESS */
    if (unlinkMetaRes == FhgfsOpsErr_SUCCESS && unlinkedInode)
-      unlinkMetaRes = unlinkChunkFiles(unlinkedInode, msgUserID);
+      unlinkMetaRes = unlinkChunkFiles(unlinkedInode.release(), msgUserID);
 
    return unlinkMetaRes;
 }
@@ -35,7 +35,7 @@ FhgfsOpsErr MsgHelperUnlink::unlinkFile(DirInode& parentDir, const std::string& 
  * the chunk files via unlinkChunkFiles().
  */
 FhgfsOpsErr MsgHelperUnlink::unlinkMetaFile(DirInode& parentDir,
-   const std::string& removeName, FileInode** outUnlinkedFile)
+   const std::string& removeName, std::unique_ptr<FileInode>* outUnlinkedFile)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    ModificationEventFlusher* modEventFlusher = Program::getApp()->getModificationEventFlusher();

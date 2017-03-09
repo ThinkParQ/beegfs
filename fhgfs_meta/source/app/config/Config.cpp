@@ -220,7 +220,12 @@ void Config::applyConfigMap(bool enableException, bool addDashes) throw(InvalidC
          quotaEnableEnforcement = StringTk::strToBool(iter->second);
       else
       if(iter->first == std::string("sysTargetOfflineTimeoutSecs") )
+      {
          sysTargetOfflineTimeoutSecs = StringTk::strToUInt(iter->second);
+         if (sysTargetOfflineTimeoutSecs < 30)
+            throw InvalidConfigException("Invalid sysTargetOfflineTimeoutSecs value "
+                  + iter->second + " (must be at least 30)");
+      }
       else
       if(iter->first == std::string("sysResyncSafetyThresholMins") )
          sysResyncSafetyThresholdMins = StringTk::strToInt64(iter->second.c_str() );

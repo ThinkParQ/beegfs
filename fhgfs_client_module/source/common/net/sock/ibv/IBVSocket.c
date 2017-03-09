@@ -340,7 +340,7 @@ err_invalidateSock:
 
 err_fault:
    _this->errState = -1;
-   return -1;
+   return -EFAULT;
 }
 
 

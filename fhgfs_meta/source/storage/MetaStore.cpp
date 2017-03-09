@@ -823,7 +823,7 @@ FhgfsOpsErr MetaStore::fsckUnlinkFileInode(const std::string& entryID)
  * @param subDir may be NULL and then needs to be referenced
  */
 FhgfsOpsErr MetaStore::unlinkInodeUnlocked(EntryInfo* entryInfo, DirInode* subDir,
-   FileInode** outInode)
+   std::unique_ptr<FileInode>* outInode)
 {
    if (this->fileStore.isInStore(entryInfo->getEntryID()))
       return fileStore.unlinkFileInode(entryInfo, outInode);
@@ -856,10 +856,10 @@ FhgfsOpsErr MetaStore::unlinkInodeUnlocked(EntryInfo* entryInfo, DirInode* subDi
  * @param outFile will be set to the unlinked file and the object must then be deleted by the caller
  * (can be NULL if the caller is not interested in the file)
  */
-FhgfsOpsErr MetaStore::unlinkInode(EntryInfo* entryInfo, FileInode** outInode)
+FhgfsOpsErr MetaStore::unlinkInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode)
 {
    UniqueRWLock lock(rwlock, SafeRWLock_READ);
-   return this->unlinkInodeUnlocked(entryInfo, NULL, outInode);
+   return unlinkInodeUnlocked(entryInfo, NULL, outInode);
 }
 
 /**
@@ -871,7 +871,7 @@ FhgfsOpsErr MetaStore::unlinkInode(EntryInfo* entryInfo, FileInode** outInode)
  *   note: caller needs to delete storage chunk files. E.g. via MsgHelperUnlink::unlinkLocalFile()
  */
 FhgfsOpsErr MetaStore::unlinkFileUnlocked(DirInode& subdir, const std::string& fileName,
-   FileInode** outInode, EntryInfo* outEntryInfo, bool& outWasInlined)
+   std::unique_ptr<FileInode>* outInode, EntryInfo* outEntryInfo, bool& outWasInlined)
 {
    FhgfsOpsErr retVal;
 
@@ -925,7 +925,7 @@ FhgfsOpsErr MetaStore::unlinkFileUnlocked(DirInode& subdir, const std::string& f
  * note: caller needs to delete storage chunk files. E.g. via MsgHelperUnlink::unlinkLocalFile()
  */
 FhgfsOpsErr MetaStore::unlinkFile(DirInode& dir, const std::string& fileName,
-   EntryInfo* outEntryInfo, FileInode** outInode)
+   EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outInode)
 {
    const char* logContext = "Unlink File";
    FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
@@ -975,12 +975,13 @@ FhgfsOpsErr MetaStore::unlinkFile(DirInode& dir, const std::string& fileName,
  * Unlink a dirEntry with an inlined inode
  */
 FhgfsOpsErr MetaStore::unlinkDirEntryWithInlinedInodeUnlocked(const std::string& entryName,
-   DirInode& subDir, DirEntry* dirEntry, unsigned unlinkTypeFlags, FileInode** outInode)
+      DirInode& subDir, DirEntry* dirEntry, unsigned unlinkTypeFlags,
+      std::unique_ptr<FileInode>* outInode)
 {
    const char* logContext = "Unlink DirEntry with inlined inode";
 
    if (outInode)
-      *outInode = nullptr;
+      outInode->reset();
 
    std::string parentEntryID = subDir.getID();
 
@@ -1095,7 +1096,7 @@ FhgfsOpsErr MetaStore::unlinkDirEntryWithInlinedInodeUnlocked(const std::string&
    if (outInode && numHardlinks < 2)
    {
       inode->setIsInlined(false); // last dirEntry gone, so not inlined anymore
-      *outInode = inode->clone();
+      outInode->reset(inode->clone());
    }
 
    releaseFileUnlocked(subDir, inode);
@@ -1107,7 +1108,8 @@ FhgfsOpsErr MetaStore::unlinkDirEntryWithInlinedInodeUnlocked(const std::string&
  * Unlink seperated dirEntry and Inode
  */
 FhgfsOpsErr MetaStore::unlinkDentryAndInodeUnlocked(const std::string& fileName,
-   DirInode& subdir, DirEntry* dirEntry, unsigned unlinkTypeFlags, FileInode** outInode)
+      DirInode& subdir, DirEntry* dirEntry, unsigned unlinkTypeFlags,
+      std::unique_ptr<FileInode>* outInode)
 {
    // unlink dirEntry first
    FhgfsOpsErr retVal = subdir.unlinkDirEntryUnlocked(fileName, dirEntry, unlinkTypeFlags);
@@ -1125,7 +1127,7 @@ FhgfsOpsErr MetaStore::unlinkDentryAndInodeUnlocked(const std::string& fileName,
 
    dirEntry->getEntryInfo(parentEntryID, addionalEntryInfoFlags, &entryInfo);
 
-   FhgfsOpsErr unlinkFileRes = this->unlinkInodeUnlocked(&entryInfo, &subdir, outInode);
+   FhgfsOpsErr unlinkFileRes = unlinkInodeUnlocked(&entryInfo, &subdir, outInode);
    if(unlinkFileRes != FhgfsOpsErr_SUCCESS && unlinkFileRes == FhgfsOpsErr_INUSE)
       retVal = FhgfsOpsErr_INUSE;
 

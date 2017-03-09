@@ -37,7 +37,7 @@ class InodeFileStore
       FileInode* referenceFileInode(EntryInfo* entryInfo, bool loadFromDisk);
       FileInode* referenceLoadedFile(const std::string& entryID);
       bool releaseFileInode(FileInode* inode);
-      FhgfsOpsErr unlinkFileInode(EntryInfo* entryInfo, FileInode** outFile);
+      FhgfsOpsErr unlinkFileInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outFile);
       void unlinkAllFiles();
 
       FhgfsOpsErr moveRemoteBegin(EntryInfo* entryInfo, char* buf, size_t bufLen,
@@ -71,7 +71,8 @@ class InodeFileStore
 
       FhgfsOpsErr makeFileInode(FileInode* file);
       FhgfsOpsErr makeFileInodeUnlocked(FileInode* file);
-      FhgfsOpsErr unlinkFileInodeUnlocked(EntryInfo* entryInfo, FileInode** outFile);
+      FhgfsOpsErr unlinkFileInodeUnlocked(EntryInfo* entryInfo,
+            std::unique_ptr<FileInode>* outFile);
       bool existsUnlocked(std::string fileID);
 
       bool loadAndInsertFileInodeUnlocked(EntryInfo* entryInfo, InodeMapIter& newElemIter);

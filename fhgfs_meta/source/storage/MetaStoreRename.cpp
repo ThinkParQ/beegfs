@@ -22,7 +22,7 @@
  *    existed).
  */
 FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& fromName,
-   const std::string& toName, FileInode** outUnlinkInode)
+   const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode)
 {
    const char* logContext = "Rename in dir";
 
@@ -59,7 +59,7 @@ FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& f
    }
    else
    {
-      *outUnlinkInode = nullptr;
+      outUnlinkInode->reset();
 
       // irrelevant values, just to please the compiler
       unlinkRes = FhgfsOpsErr_SUCCESS;
@@ -129,7 +129,7 @@ FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& f
  *   We lock everything ourself
  */
 FhgfsOpsErr MetaStore::unlinkOverwrittenEntry(DirInode& parentDir,
-   DirEntry* overWrittenEntry, FileInode** outInode)
+   DirEntry* overWrittenEntry, std::unique_ptr<FileInode>* outInode)
 {
    SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
    SafeRWLock parentLock(&parentDir.rwlock, SafeRWLock_WRITE);
@@ -150,7 +150,7 @@ FhgfsOpsErr MetaStore::unlinkOverwrittenEntry(DirInode& parentDir,
  *    parentDir       : Write-lock
  */
 FhgfsOpsErr MetaStore::unlinkOverwrittenEntryUnlocked(DirInode& parentDir,
-   DirEntry* overWrittenEntry, FileInode** outInode)
+   DirEntry* overWrittenEntry, std::unique_ptr<FileInode>* outInode)
 {
    FhgfsOpsErr unlinkRes;
 
@@ -159,7 +159,7 @@ FhgfsOpsErr MetaStore::unlinkOverwrittenEntryUnlocked(DirInode& parentDir,
       /* We advise the calling code not to try to delete the entryName dentry,
        * as renameEntryUnlocked() already did that */
       unlinkRes = unlinkDirEntryWithInlinedInodeUnlocked("", parentDir, overWrittenEntry,
-         DirEntry_UNLINK_ID, outInode);
+            DirEntry_UNLINK_ID, outInode);
    }
    else
    {
@@ -330,15 +330,15 @@ FhgfsOpsErr MetaStore::checkRenameOverwrite(EntryInfo* fromEntry, EntryInfo* ove
  * corresponding object; may not be NULL
  */
 FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
-   const std::string& newEntryName, const char* buf, uint32_t bufLen,
-   FileInode** outUnlinkedInode, EntryInfo& newFileInfo, FileIDLock& newFileLock)
+      const std::string& newEntryName, const char* buf, uint32_t bufLen,
+      std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo, FileIDLock& newFileLock)
 {
    // note: we do not allow newEntry to be a file if the old entry was a directory (and vice versa)
    const char* logContext = "rename(): Insert remote entry";
 
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
-   *outUnlinkedInode = nullptr;
+   outUnlinkedInode->reset();
 
    SafeRWLock safeMetaStoreLock(&rwlock, SafeRWLock_READ); // L O C K
 

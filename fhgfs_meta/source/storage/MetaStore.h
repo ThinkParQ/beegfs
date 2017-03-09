@@ -56,20 +56,20 @@ class MetaStore
       FhgfsOpsErr makeDirInode(DirInode& dir, const CharVector& defaultACLXAttr,
          const CharVector& accessACLXAttr);
       FhgfsOpsErr removeDirInode(const std::string& dirID, bool isBuddyMirrored);
-      FhgfsOpsErr unlinkInode(EntryInfo* entryInfo, FileInode** outInode);
+      FhgfsOpsErr unlinkInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID);
       FhgfsOpsErr unlinkFile(DirInode& dir, const std::string& fileName,
-         EntryInfo* outEntryInfo, FileInode** outFile);
+         EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outFile);
 
       FhgfsOpsErr unlinkInodeLater(EntryInfo* entryInfo, bool wasInlined);
 
       FhgfsOpsErr renameInSameDir(DirInode& parentDir, const std::string& fromName,
-         const std::string& toName, FileInode** outUnlinkInode);
+         const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode);
 
       FhgfsOpsErr moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
-         const std::string& newEntryName, const char* buf,
-         uint32_t bufLen, FileInode** outUnlinkedFile, EntryInfo& newFileInfo,
-         FileIDLock& newFileLock);
+            const std::string& newEntryName, const char* buf,
+            uint32_t bufLen, std::unique_ptr<FileInode>* outUnlinkedFile, EntryInfo& newFileInfo,
+            FileIDLock& newFileLock);
 
       FhgfsOpsErr moveRemoteFileBegin(DirInode& dir, EntryInfo* entryInfo, char* buf, size_t bufLen,
          size_t* outUsedBufLen);
@@ -119,21 +119,22 @@ class MetaStore
          DirEntryType entryType, FileInode* inode);
 
       FhgfsOpsErr unlinkInodeUnlocked(EntryInfo* entryInfo, DirInode* subDir,
-         FileInode** outInode);
+         std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr unlinkInodeLaterUnlocked(EntryInfo* entryInfo, bool wasInlined);
 
       FhgfsOpsErr unlinkFileUnlocked(DirInode& subdir, const std::string& fileName,
-         FileInode** outInode, EntryInfo* outEntryInfo, bool& outWasInlined);
+         std::unique_ptr<FileInode>* outInode, EntryInfo* outEntryInfo, bool& outWasInlined);
 
       FhgfsOpsErr unlinkDirEntryWithInlinedInodeUnlocked(const std::string& fileName,
-         DirInode& subdir, DirEntry* dirEntry, unsigned unlinkTypeFlags, FileInode** outInode);
+            DirInode& subdir, DirEntry* dirEntry, unsigned unlinkTypeFlags,
+            std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr unlinkDentryAndInodeUnlocked(const std::string& fileName, DirInode& subdir,
-         DirEntry* dirEntry, unsigned unlinkTypeFlags, FileInode** outInode);
+         DirEntry* dirEntry, unsigned unlinkTypeFlags, std::unique_ptr<FileInode>* outInode);
 
       FhgfsOpsErr unlinkOverwrittenEntry(DirInode& parentDir, DirEntry* overWrittenEntry,
-         FileInode** outInode);
+         std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr unlinkOverwrittenEntryUnlocked(DirInode& parentDir, DirEntry* overWrittenEntry,
-         FileInode** outInode);
+         std::unique_ptr<FileInode>* outInode);
 
 
       DirInode* referenceDirUnlocked(const std::string& dirID, bool isBuddyMirrored,

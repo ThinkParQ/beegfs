@@ -334,10 +334,11 @@ FhgfsOpsErr InodeFileStore::isUnlinkable(EntryInfo* entryInfo)
  *              other. So no need to return an error here. Update all code path to handle
  *              *outInode = NULL, even is the return code is FhgfsOpsErr_SUCCESS
  */
-FhgfsOpsErr InodeFileStore::unlinkFileInodeUnlocked(EntryInfo* entryInfo, FileInode** outInode)
+FhgfsOpsErr InodeFileStore::unlinkFileInodeUnlocked(EntryInfo* entryInfo,
+      std::unique_ptr<FileInode>* outInode)
 {
    if(outInode)
-      *outInode = NULL;
+      outInode->reset();
 
    std::string entryID = entryInfo->getEntryID();
 
@@ -347,7 +348,7 @@ FhgfsOpsErr InodeFileStore::unlinkFileInodeUnlocked(EntryInfo* entryInfo, FileIn
 
    if (outInode)
    {
-      *outInode = createUnreferencedInodeUnlocked(entryInfo);
+      outInode->reset(createUnreferencedInodeUnlocked(entryInfo));
       if (!*outInode)
          return FhgfsOpsErr_PATHNOTEXISTS;
    }
@@ -356,10 +357,7 @@ FhgfsOpsErr InodeFileStore::unlinkFileInodeUnlocked(EntryInfo* entryInfo, FileIn
    if(!unlinkRes)
    {
       if(outInode)
-      {
-         delete(*outInode);
-         *outInode = NULL;
-      }
+         outInode->reset();
 
       return FhgfsOpsErr_INTERNAL;
    }
@@ -371,7 +369,8 @@ FhgfsOpsErr InodeFileStore::unlinkFileInodeUnlocked(EntryInfo* entryInfo, FileIn
  * @param outFile will be set to the unlinked file and the object must then be deleted by the caller
  * (can be NULL if the caller is not interested in the file)
  */
-FhgfsOpsErr InodeFileStore::unlinkFileInode(EntryInfo* entryInfo, FileInode** outInode)
+FhgfsOpsErr InodeFileStore::unlinkFileInode(EntryInfo* entryInfo,
+      std::unique_ptr<FileInode>* outInode)
 {
    SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
 

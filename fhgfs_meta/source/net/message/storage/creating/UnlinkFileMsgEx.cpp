@@ -93,7 +93,7 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
 
     if(cfg->getTuneEarlyUnlinkResponse() && !isMirrored())
     { // alternative 1: response before chunk files unlink
-       FileInode* unlinkedInode = NULL;
+       std::unique_ptr<FileInode> unlinkedInode;
 
        FhgfsOpsErr unlinkMetaRes = MsgHelperUnlink::unlinkMetaFile(*dir,
           getDelFileName(), &unlinkedInode);
@@ -105,13 +105,13 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
        /* note: if the file is still opened or if there were hardlinks then unlinkedInode will be
           NULL even on FhgfsOpsErr_SUCCESS */
        if( (unlinkMetaRes == FhgfsOpsErr_SUCCESS) && unlinkedInode)
-          MsgHelperUnlink::unlinkChunkFiles(unlinkedInode, getMsgHeaderUserID() );
+          MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(), getMsgHeaderUserID() );
 
        return {};
     }
 
     // alternative 2: response after chunk files unlink
-    FileInode* unlinkedInode = NULL;
+    std::unique_ptr<FileInode> unlinkedInode;
 
     FhgfsOpsErr unlinkRes = MsgHelperUnlink::unlinkMetaFile(*dir,
        getDelFileName(), &unlinkedInode);
@@ -135,7 +135,8 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
        NULL even on FhgfsOpsErr_SUCCESS */
     if( (unlinkRes == FhgfsOpsErr_SUCCESS) && unlinkedInode)
     {
-       unlinkRes = MsgHelperUnlink::unlinkChunkFiles(unlinkedInode, getMsgHeaderUserID());
+       unlinkRes = MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(),
+             getMsgHeaderUserID());
     }
 
     app->getMetaStore()->releaseDir(dir->getID());
@@ -147,7 +148,7 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executeSecondar
    ResponseContext& ctx)
 {
    MetaStore* const metaStore = Program::getApp()->getMetaStore();
-   FileInode* unlinkedInode = NULL;
+   std::unique_ptr<FileInode> unlinkedInode;
 
    // we do not need to load the directory here - if the dentry does not exist, it will not be
    // modified. if the dentry does exist, it will be loaded.

@@ -382,10 +382,10 @@ FhgfsOpsErr RenameV2MsgEx::renameInSameDir(DirInode& fromParent, const std::stri
    /* we are passing here the very same fromParent pointer also a toParent pointer, which is
     * essential in order not to dead-lock */
 
-   FileInode* unlinkInode; // inode belong to a possibly existing toName file
+   std::unique_ptr<FileInode> unlinkInode; // inode belong to a possibly existing toName file
 
    FhgfsOpsErr renameRes = metaStore->renameInSameDir(fromParent, oldName, toName,
-      &unlinkInode);
+         &unlinkInode);
 
    if (renameRes == FhgfsOpsErr_SUCCESS)
    {
@@ -425,7 +425,7 @@ FhgfsOpsErr RenameV2MsgEx::renameInSameDir(DirInode& fromParent, const std::stri
          unlinkedEntryID = unlinkInode->getEntryID();
 
          FhgfsOpsErr chunkUnlinkRes = MsgHelperUnlink::unlinkChunkFiles(
-            unlinkInode, getMsgHeaderUserID() );
+            unlinkInode.release(), getMsgHeaderUserID() );
 
          if (chunkUnlinkRes != FhgfsOpsErr_SUCCESS)
          {

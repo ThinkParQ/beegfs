@@ -29,7 +29,7 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
    EntryInfo* toDirInfo    = this->getToDirInfo();
    std::string newName     = this->getNewName();
 
-   FileInode* unlinkInode = NULL;
+   std::unique_ptr<FileInode> unlinkInode;
    unsigned inodeBufLen;
    std::unique_ptr<char[]> inodeBuf;
 
@@ -91,8 +91,6 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
          unlinkInode->serializeMetaData(ser);
          inodeBufLen = ser.size();
       }
-
-      delete unlinkInode;
    }
    else
    {  // no file overwritten

@@ -530,6 +530,10 @@ static void __commkit_socketinvalidate_generic(CommKitContext* context,
       Logger_logErrFormatted(context->log, context->ops->logContext,
          "Communication with inactive node. Node: %s", Node_getNodeIDWithTypeStr(info->node) );
    }
+   else if (info->nodeResult == -FhgfsOpsErr_ADDRESSFAULT)
+   {
+      // not a commkit error. release all resources and treat this CTI as done during cleanup.
+   }
    else
    { // "normal" connection error
       info->nodeResult = -FhgfsOpsErr_COMMUNICATION;
@@ -1003,8 +1007,8 @@ static ssize_t __commkit_readfile_receive(CommKitContext* context, ReadfileState
    if(unlikely(recvRes < 0) )
    {
       Logger_logFormatted(context->log, Log_SPAM, context->ops->logContext,
-         "Request details: receive from %s: %lld bytes",
-         Node_getNodeIDWithTypeStr(currentState->base.node), (long long)length);
+         "Request details: receive from %s: %lld bytes (error %zi)",
+         Node_getNodeIDWithTypeStr(currentState->base.node), (long long)length, recvRes);
    }
 
    return recvRes;

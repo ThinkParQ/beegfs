@@ -550,6 +550,54 @@ out:
    return retVal;
 }
 
+std::pair<FhgfsOpsErr, int> ChunkStore::openAndChown(const int targetFD, const std::string& path,
+   const int openFlags, const SessionQuotaInfo& quota)
+{
+   // if we aren't using quota, we don't care about the file owner at all and may simply create the
+   // file if it does exist (and if openFlags requests it).
+   //
+   // if we are using quota, we must ensure that the owner information in of the file is correct.
+   // this is slightly complicated by the fact that chunk files are created *at first write*, not
+   // during file create itself. lazily creating chunk files enables races:
+   //  * process A creates the chunk file by writing to it, with quota information (U1, G1)
+   //  * process B runs chown on the file with quota information (U2, G2)
+   // if the chown is processed before the write the chunk file to be chowned does not exist yet,
+   // and subsequently will be created with incorrect quota information. fsck will detect these as
+   // incorrect chunk attributes when run.
+   //
+   // to reduce the impact of this, we chown() the file every time we open it - even when we open
+   // it only for reading. this enables the same race as before, but since reads and writes are
+   // expected to happen much more often than chown it is more likely that we fix a previously
+   // "broken" attribute set than break it.
+   //
+   // the previous implementation used setfsuid/setfsgid to create files with the same correct(racy)
+   // owner information, but never changed the owner afterwards. performance testing has shown that
+   // always calling chown() is as expensive or even cheaper than changing fsuid/fsgid twice per
+   // open. always calling chown() is also cheaper than checking whether the file was created (by
+   // calling create with O_EXCL first, then without O_CREAT if that failed).
+
+   const int fd = openat(targetFD, path.c_str(), openFlags, STORAGETK_DEFAULTCHUNKFILEMODE);
+   if (fd < 0)
+   {
+      if (errno == EACCES)
+         return {FhgfsOpsErr_NOTOWNER, -1};
+      else
+         return {FhgfsOpsErrTk::fromSysErr(errno), -1};
+   }
+
+   if (!quota.useQuota)
+      return {FhgfsOpsErr_SUCCESS, fd};
+
+   if (fchown(fd, quota.uid, quota.gid))
+   {
+      LOG(ERR, "Failed to chown().", path);
+      unlink(path.c_str());
+      close(fd);
+      return {FhgfsOpsErr_INTERNAL, -1};
+   }
+
+   return {FhgfsOpsErr_SUCCESS, fd};
+}
 
 /**
  * Create the chunkFile given by chunkFilePathStr and if that fails try to create the
@@ -563,17 +611,6 @@ FhgfsOpsErr ChunkStore::openChunkFile(int targetFD, Path* chunkDirPath,
 {
    const char* logContext = "ChunkStore create chunkFile";
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
-
-   mode_t openMode = STORAGETK_DEFAULTCHUNKFILEMODE;
-
-   int fd;
-
-   unsigned quotaUID = quotaInfo->uid;
-   unsigned quotaGID = quotaInfo->gid;
-   unsigned processUID;
-   unsigned processGID;
-   unsigned previousUID;
-   unsigned previousGID;
 
    ExceededQuotaStore* exQuotaStore = Program::getApp()->getExceededQuotaStore();
 
@@ -596,97 +633,54 @@ FhgfsOpsErr ChunkStore::openChunkFile(int targetFD, Path* chunkDirPath,
                   exceededError) + " UID: " + StringTk::uintToStr(quotaInfo->uid) + " ; GID: " +
                   StringTk::uintToStr(quotaInfo->gid) );
 
-               retVal = FhgfsOpsErr_DQUOT;
-               goto out;
+               return FhgfsOpsErr_DQUOT;
             }
          }
       }
    }
 
-   if (quotaInfo->useQuota)
-      System::setFsIDs(quotaUID, quotaGID, &processUID, &processGID); // S E T _ U I D
+   std::tie(retVal, *outFD) = openAndChown(targetFD, chunkFilePathStr, openFlags, *quotaInfo);
+   if (retVal == FhgfsOpsErr_SUCCESS)
+      return FhgfsOpsErr_SUCCESS;
 
-   fd = openat(targetFD, chunkFilePathStr.c_str(), openFlags, openMode);
-   if (fd == -1)
-   { // hash dir didn't exist yet or real error?
-
-      // reset IDs to process ID
-      if (quotaInfo->useQuota)
-         System::setFsIDs(processUID, processGID, &previousUID, &previousGID); //R E S E T _ U I D
-
-      if(errno == ENOENT)
-      {  // hash dir just didn't exist yet => create it and open again
-         Path chunkDirPathTmp;
-         if (!chunkDirPath)
-         {
-            chunkDirPathTmp = chunkFilePathStr;
-            chunkDirPathTmp = chunkDirPathTmp.dirname();
-            chunkDirPath = &chunkDirPathTmp;
-         }
-
-         ChunkDir* lastChunkDirElement;
-
-         bool createPathRes = mkdirChunkDirPath(targetFD, chunkDirPath, hasOrigFeature,
-            &lastChunkDirElement);
-         if(!createPathRes)
-         {
-            int errCode = errno;
-
-            LogContext(logContext).logErr("Unable to create path for file: "  +
-               chunkFilePathStr + ". " + "SysErr: " + System::getErrString(errCode) );
-
-            retVal = FhgfsOpsErrTk::fromSysErr(errCode);
-            goto out;
-         }
-
-         if (quotaInfo->useQuota)
-            System::setFsIDs(quotaUID, quotaGID, &processUID, &processGID); // S E T _ U I D
-
-         // dir created => try file open/create again...
-         fd = openat(targetFD, chunkFilePathStr.c_str(), openFlags, openMode);
-
-         // reset IDs to process ID
-         if (quotaInfo->useQuota)
-            System::setFsIDs(processUID, processGID, &previousUID, &previousGID);//R E S E T _ U I D
-
-         if (lastChunkDirElement) // old V2 files do not get this
-         {
-            /* Unlock and release the last element once we have created
-             * (or at least tried to create) the file. */
-            lastChunkDirElement->unlock();
-            releaseDir(lastChunkDirElement->getID() );
-         }
-      }
-      else
-      if (errno == EACCES)
+   // hash dir didn't exist yet or real error?
+   if (retVal == FhgfsOpsErr_PATHNOTEXISTS)
+   {  // hash dir just didn't exist yet => create it and open again
+      Path chunkDirPathTmp;
+      if (!chunkDirPath)
       {
-         retVal = FhgfsOpsErr_NOTOWNER;
-         goto out;
+         chunkDirPathTmp = chunkFilePathStr;
+         chunkDirPathTmp = chunkDirPathTmp.dirname();
+         chunkDirPath = &chunkDirPathTmp;
       }
 
-      if(unlikely(fd == -1) )
-      {  // error
-         LogContext(logContext).logErr(
-            "Failed to create file: " + chunkFilePathStr + ". " +
-            "SysErr: " + System::getErrString() );
+      ChunkDir* lastChunkDirElement;
 
-         retVal = FhgfsOpsErrTk::fromSysErr(errno);
-         goto out;
+      bool createPathRes = mkdirChunkDirPath(targetFD, chunkDirPath, hasOrigFeature,
+         &lastChunkDirElement);
+      if(!createPathRes)
+      {
+         int errCode = errno;
+
+         LOG(ERR, "Unable to create path for file.", chunkFilePathStr, sysErr());
+         return FhgfsOpsErrTk::fromSysErr(errCode);
+      }
+
+      // dir created => try file open/create again...
+      std::tie(retVal, *outFD) = openAndChown(targetFD, chunkFilePathStr, openFlags, *quotaInfo);
+
+      if (lastChunkDirElement) // old V2 files do not get this
+      {
+         /* Unlock and release the last element once we have created
+          * (or at least tried to create) the file. */
+         lastChunkDirElement->unlock();
+         releaseDir(lastChunkDirElement->getID() );
       }
    }
-   else
-   { // success
-      // reset IDs to process ID
-      if (quotaInfo->useQuota)
-         System::setFsIDs(processUID, processGID, &previousUID, &previousGID); // R E S E T _ U I D
-   }
 
-   // success
+   if (retVal != FhgfsOpsErr_SUCCESS)
+      LOG(ERR, "Failed to create file.", chunkFilePathStr, retVal);
 
-   retVal = FhgfsOpsErr_SUCCESS;
-   *outFD = fd;
-
-out:
    return retVal;
 }
 
