@@ -331,7 +331,8 @@ FhgfsOpsErr MetaStore::checkRenameOverwrite(EntryInfo* fromEntry, EntryInfo* ove
  */
 FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
       const std::string& newEntryName, const char* buf, uint32_t bufLen,
-      std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo, FileIDLock& newFileLock)
+      std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo, FileIDLock& newFileLock,
+      FileIDLock& oldFileLock)
 {
    // note: we do not allow newEntry to be a file if the old entry was a directory (and vice versa)
    const char* logContext = "rename(): Insert remote entry";
@@ -361,6 +362,12 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
          retVal = checkRes;
          goto outUnlock;
       }
+
+      // if we overwrite an existing dentry, the inode behind the dentry will be either updated or
+      // unlinked, thus requiring a lock.
+      if (toParent.getIsBuddyMirrored() && overWriteInfo.getIsInlined())
+         oldFileLock = {Program::getApp()->getMirroredSessions()->getEntryLockStore(),
+               overWriteInfo.getEntryID()};
 
       // only unlink the dir-entry-name here, so we can still restore it from dir-entry-id
       FhgfsOpsErr unlinkRes = toParent.unlinkDirEntryUnlocked(newEntryName, overWrittenEntry,

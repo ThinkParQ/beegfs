@@ -15,7 +15,7 @@ namespace TempFileTk {
  * @param filename the name of the final file. If the file exists, it will be overwritten.
  * @param contents data to write to the file
  */
-FhgfsOpsErr storeTmpAndMove(const std::string& filename, const std::string& contents)
+FhgfsOpsErr storeTmpAndMove(const std::string& filename, const std::vector<char>& contents)
 {
    // Need a copy of the string, because the Xs will be replaced by mkstemp.
    std::string tmpname = filename + ".tmp-XXXXXX\0"; // terminating 0 needed for c library calls
@@ -32,9 +32,9 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const std::string& cont
 
    // Write to temp file
    ssize_t written = 0;
-   while (written < (ssize_t)contents.length())
+   while (written < (ssize_t)contents.size())
    {
-      ssize_t writeRes = write(fd, contents.c_str() + written, contents.length() - written);
+      ssize_t writeRes = write(fd, &contents[0] + written, contents.size() - written);
       if (writeRes == -1)
       {
          FhgfsOpsErr err = FhgfsOpsErrTk::fromSysErr(errno);

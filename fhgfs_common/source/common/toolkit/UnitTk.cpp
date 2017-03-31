@@ -295,13 +295,15 @@ std::string UnitTk::int64ToHumanStr(int64_t a)
  */
 bool UnitTk::isValidHumanString(std::string humanString)
 {
+   size_t humanStringLen = humanString.length();
+   if(!humanStringLen)
+      return false;
+
    if(StringTk::isNumeric(humanString))
       return true;
 
-   size_t humanStringLen = humanString.length();
    char unit = humanString.at(humanStringLen-1);
    std::string value = humanString.substr(0, humanStringLen-1);
-
    if( StringTk::isNumeric(value) && ( (unit == 'E') || (unit == 'e') ||
       (unit == 'P') || (unit == 'p') || (unit == 'T') || (unit == 't') ||
       (unit == 'G') || (unit == 'g') || (unit == 'M') || (unit == 'm') ||
@@ -358,13 +360,15 @@ int64_t UnitTk::timeStrHumanToInt64(const char* s)
  */
 bool UnitTk::isValidHumanTimeString(std::string humanString)
 {
+   size_t humanStringLen = humanString.length();
+   if(!humanStringLen)
+      return false;
+
    if(StringTk::isNumeric(humanString))
       return true;
 
-   size_t humanStringLen = humanString.length();
    char unit = humanString.at(humanStringLen-1);
    std::string value = humanString.substr(0, humanStringLen-1);
-
    if( StringTk::isNumeric(value) && ( (unit == 'd') || (unit == 'D') || (unit == 'H') ||
       (unit == 'h') || (unit == 'M') || (unit == 'm') || (unit == 'S') || (unit == 's') ) )
          return true;

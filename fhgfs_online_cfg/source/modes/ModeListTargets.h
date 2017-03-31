@@ -21,6 +21,7 @@ class ModeListTargets : public Mode
          cfgPrintSpaceInfo = false;
          cfgGetFromMeta = false;
          cfgUseBuddyGroups = false;
+         cfgReportStateErrors = false;
          cfgNodeType = NODETYPE_Storage;
          cfgPoolQueryType = CapacityPoolQuery_STORAGE;
 
@@ -41,6 +42,7 @@ class ModeListTargets : public Mode
       bool cfgPrintSpaceInfo;
       bool cfgGetFromMeta;
       bool cfgUseBuddyGroups;
+      bool cfgReportStateErrors;
       NodeType cfgNodeType;
       CapacityPoolQueryType cfgPoolQueryType;
 

@@ -213,6 +213,12 @@ NetMessage* NetMessageFactory_createFromMsgType(unsigned short msgType)
       HANDLE(BumpFileVersionResp, BumpFileVersionRespMsg);
       HANDLE(GetFileVersionResp, GetFileVersionRespMsg);
 
+      case NETMSGTYPE_AckNotifyResp: {
+         SimpleMsg* msg = os_kmalloc(sizeof(*msg));
+         SimpleMsg_init(msg, msgType);
+         return &msg->netMessage;
+      }
+
       default:
       {
          SimpleMsg* msg = os_kmalloc(sizeof(*msg));

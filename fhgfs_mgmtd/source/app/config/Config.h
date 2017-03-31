@@ -14,6 +14,8 @@
 #define CONFIG_METABUDDYGROUPMAPPINGS_FILENAME    "metabuddygroups"
 #define CONFIG_STORAGETARGETSTORESYNC_FILENAME    "targetsToResync"
 #define CONFIG_METANODESTORESYNC_FILENAME         "nodesToResync"
+#define CONFIG_STORAGETARGETSTATES_FILENAME       "targetStates"
+#define CONFIG_METANODESTATES_FILENAME            "nodeStates"
 
 #define CONFIG_QUOTA_DATA_DIR                 "quota/"
 #define CONFIG_QUOTA_DEFAULT_LIMITS           (CONFIG_QUOTA_DATA_DIR "quotaDefaultLimits.store")

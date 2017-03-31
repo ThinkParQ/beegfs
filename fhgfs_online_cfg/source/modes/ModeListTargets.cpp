@@ -25,6 +25,7 @@
 #define MODELISTTARGETS_ARG_FROMMETA            "--frommeta" /* implies provided nodeID */
 #define MODELISTTARGETS_ARG_PRINTSPACEINFO      "--spaceinfo"
 #define MODELISTTARGETS_ARG_MIRRORGROUPS        "--mirrorgroups"
+#define MODELISTTARGETS_ARG_ERRORCODES          "--errorcodes"
 
 #define MODELISTTARGETS_MAX_LINE_LENGTH         256
 
@@ -109,6 +110,13 @@ int ModeListTargets::checkConfig()
    if(iter != cfg->end() )
    {
       cfgPrintCapacityPools = true;
+      cfg->erase(iter);
+   }
+
+   iter = cfg->find(MODELISTTARGETS_ARG_ERRORCODES);
+   if(iter != cfg->end() )
+   {
+      cfgReportStateErrors = true;
       cfg->erase(iter);
    }
 
@@ -210,6 +218,9 @@ void ModeListTargets::printHelp()
    std::cout << "  --nodesfirst            Print nodes in first column." << std::endl;
    std::cout << "  --longnodes             Print node IDs in long format." << std::endl;
    std::cout << "  --state                 Print state of each target." << std::endl;
+   std::cout << "  --errorcodes            Exit code reports an error if a target is not" << std::endl;
+   std::cout << "                          in the reachability state online or not in the" << std::endl;
+   std::cout << "                          consistency state good, requires the option --state." << std::endl;
    std::cout << "  --pools                 Print the capacity pool which the target belongs to." << std::endl;
    std::cout << "  --nodetype=<nodetype>   The node type to list (meta, storage)." << std::endl;
    std::cout << "                          (Default: storage)" << std::endl;
@@ -320,11 +331,12 @@ int ModeListTargets::print()
          {
             fprintf(stderr, " [ERROR: Could not find storage servers for targetID: %u]\n",
                primaryTargetID);
-            retVal = APPCODE_RUNTIME_ERROR;
+            retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
          }
          else
          {
-            retVal = printTarget(primaryTargetID, true, *node, buddyGroupID, secondaryTargetID);
+            int err = printTarget(primaryTargetID, true, *node, buddyGroupID, secondaryTargetID);
+            retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
          }
 
          // print secondary target of buddy group
@@ -333,11 +345,12 @@ int ModeListTargets::print()
          {
             fprintf(stderr, " [ERROR: Could not find storage servers for targetID: %u]\n",
                secondaryTargetID);
-            retVal = APPCODE_RUNTIME_ERROR;
+            retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
          }
          else
          {
-            retVal = printTarget(secondaryTargetID, false, *node, buddyGroupID, primaryTargetID);
+            int err = printTarget(secondaryTargetID, false, *node, buddyGroupID, primaryTargetID);
+            retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
          }
       }
    }
@@ -367,11 +380,12 @@ int ModeListTargets::print()
          if (!node)
          {
             fprintf(stderr, " [ERROR: Unknown metadata server ID: %u]\n", primaryNodeID);
-            retVal = APPCODE_RUNTIME_ERROR;
+            retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
          }
          else
          {
-            retVal = printTarget(primaryNodeID, true, *node, buddyGroupID, secondaryNodeID);
+            int err = printTarget(primaryNodeID, true, *node, buddyGroupID, secondaryNodeID);
+            retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
          }
 
          //print secondary node of buddy group
@@ -379,11 +393,12 @@ int ModeListTargets::print()
          if (!node)
          {
             fprintf(stderr, " [ERROR: Unknown metadata servcer ID: %u]\n", secondaryNodeID);
-            retVal = APPCODE_RUNTIME_ERROR;
+            retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
          }
          else
          {
-            retVal = printTarget(secondaryNodeID, false, *node, buddyGroupID, primaryNodeID);
+            int err = printTarget(secondaryNodeID, false, *node, buddyGroupID, primaryNodeID);
+            retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
          }
       }
    }
@@ -405,11 +420,12 @@ int ModeListTargets::print()
          {
             fprintf(stderr, " [ERROR: Unknown storage server ID: %s]\n",
                targetNodeIDIter()->second->str().c_str());
-            retVal = APPCODE_RUNTIME_ERROR;
+            retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
          }
          else
          {
-            retVal = printTarget(*(targetNodeIDIter()->first), false, *node, 0, 0);
+            int err = printTarget(*(targetNodeIDIter()->first), false, *node, 0, 0);
+            retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
          }
       }
    }
@@ -421,12 +437,13 @@ int ModeListTargets::print()
       if (!node)
       {
          fprintf(stderr, " [ERROR: No metadata servers found]\n");
-         retVal = APPCODE_RUNTIME_ERROR;
+         retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
       }
 
       while(node)
       {
-         retVal = printTarget(node->getNumID().val(), false, *node, 0, 0);
+         int err = printTarget(node->getNumID().val(), false, *node, 0, 0);
+         retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
          node = metaServers->referenceNextNode(node);
       }
    }
@@ -541,7 +558,10 @@ int ModeListTargets::printTarget(uint16_t targetID, bool isPrimaryTarget, Node& 
    addTargetIDToLine(lineString, &sizeLine, targetID);
 
    if(cfgPrintState)
-      addStateToLine(lineString, &sizeLine, targetID, buddyTargetID);
+   {
+      int stateRetVal = addStateToLine(lineString, &sizeLine, targetID, buddyTargetID);
+      retVal = (retVal == APPCODE_NO_ERROR) ? stateRetVal : retVal;
+   }
 
    if(cfgPrintCapacityPools)
       retVal = (retVal == APPCODE_NO_ERROR) ?
@@ -610,6 +630,8 @@ int ModeListTargets::addNodeIDToLine(char* inOutString, int* inOutOffset, Node& 
 int ModeListTargets::addStateToLine(char* inOutString, int* inOutOffset, uint16_t currentTargetID,
    uint16_t buddyTargetID)
 {
+   int retVal = APPCODE_NO_ERROR;
+
    App* app = Program::getApp();
    TargetStateStore* targetStateStore;
    MirrorBuddyGroupMapper* buddyGroupMapper;
@@ -630,9 +652,20 @@ int ModeListTargets::addStateToLine(char* inOutString, int* inOutOffset, uint16_
    if (!targetStateStore->getState(currentTargetID, state) )
    {
       *inOutOffset += sprintf(&inOutString[*inOutOffset], "%29s ", "<invalid_value>");
+
+      if(cfgReportStateErrors)
+         retVal = APPCODE_RUNTIME_ERROR;
    }
    else
    {
+      if(cfgReportStateErrors)
+      {
+         if (state.consistencyState != TargetConsistencyState_GOOD)
+            retVal = APPCODE_TARGET_NOT_GOOD;
+         else if (state.reachabilityState != TargetReachabilityState_ONLINE)
+            retVal = APPCODE_TARGET_NOT_ONLINE;
+      }
+
       std::string consistencyStateString = TargetStateStore::stateToStr(state.consistencyState);
 
       if(state.consistencyState == TargetConsistencyState_NEEDS_RESYNC)
@@ -686,7 +719,7 @@ int ModeListTargets::addStateToLine(char* inOutString, int* inOutOffset, uint16_
          TargetStateStore::stateToStr(state.reachabilityState), consistencyStateString.c_str() );
    }
 
-   return APPCODE_NO_ERROR;
+   return retVal;
 }
 
 /**

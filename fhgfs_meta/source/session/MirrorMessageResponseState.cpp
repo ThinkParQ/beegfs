@@ -1,26 +1,30 @@
 #include "MirrorMessageResponseState.h"
 
-#include <net/message/session/opening/OpenFileMsgEx.h>
+#include <net/message/session/AckNotifyMsgEx.h>
+#include <net/message/session/BumpFileVersionMsgEx.h>
+#include <net/message/session/locking/FLockEntryMsgEx.h>
+#include <net/message/session/locking/FLockRangeMsgEx.h>
 #include <net/message/session/opening/CloseFileMsgEx.h>
-#include <net/message/storage/TruncFileMsgEx.h>
-#include <net/message/storage/creating/MkFileWithPatternMsgEx.h>
-#include <net/message/storage/creating/HardlinkMsgEx.h>
-#include <net/message/storage/creating/MkLocalDirMsgEx.h>
-#include <net/message/storage/creating/UnlinkFileMsgEx.h>
-#include <net/message/storage/creating/RmLocalDirMsgEx.h>
-#include <net/message/storage/creating/MkDirMsgEx.h>
-#include <net/message/storage/creating/MkFileMsgEx.h>
-#include <net/message/storage/creating/RmDirMsgEx.h>
-#include <net/message/storage/attribs/UpdateDirParentMsgEx.h>
+#include <net/message/session/opening/OpenFileMsgEx.h>
+#include <net/message/storage/attribs/RefreshEntryInfoMsgEx.h>
 #include <net/message/storage/attribs/RemoveXAttrMsgEx.h>
-#include <net/message/storage/attribs/SetXAttrMsgEx.h>
 #include <net/message/storage/attribs/SetAttrMsgEx.h>
 #include <net/message/storage/attribs/SetDirPatternMsgEx.h>
-#include <net/message/storage/attribs/RefreshEntryInfoMsgEx.h>
-#include <net/message/storage/moving/MovingFileInsertMsgEx.h>
-#include <net/message/storage/moving/MovingDirInsertMsgEx.h>
-#include <net/message/storage/moving/RenameV2MsgEx.h>
+#include <net/message/storage/attribs/SetXAttrMsgEx.h>
+#include <net/message/storage/attribs/UpdateDirParentMsgEx.h>
+#include <net/message/storage/creating/HardlinkMsgEx.h>
+#include <net/message/storage/creating/MkDirMsgEx.h>
+#include <net/message/storage/creating/MkFileMsgEx.h>
+#include <net/message/storage/creating/MkFileWithPatternMsgEx.h>
+#include <net/message/storage/creating/MkLocalDirMsgEx.h>
+#include <net/message/storage/creating/RmDirMsgEx.h>
+#include <net/message/storage/creating/RmLocalDirMsgEx.h>
+#include <net/message/storage/creating/UnlinkFileMsgEx.h>
 #include <net/message/storage/lookup/LookupIntentMsgEx.h>
+#include <net/message/storage/moving/MovingDirInsertMsgEx.h>
+#include <net/message/storage/moving/MovingFileInsertMsgEx.h>
+#include <net/message/storage/moving/RenameV2MsgEx.h>
+#include <net/message/storage/TruncFileMsgEx.h>
 
 void MirroredMessageResponseState::serialize(Serializer& ser) const
 {
@@ -63,6 +67,15 @@ std::unique_ptr<MirroredMessageResponseState> MirroredMessageResponseState::dese
       HANDLE_TAG(NETMSGTYPE_MovingDirInsert,   MovingDirInsertMsgEx)
       HANDLE_TAG(NETMSGTYPE_Rename,            RenameV2MsgEx)
       HANDLE_TAG(NETMSGTYPE_LookupIntent,      LookupIntentMsgEx)
+      HANDLE_TAG(NETMSGTYPE_AckNotify,         AckNotifiyMsgEx)
+      HANDLE_TAG(NETMSGTYPE_FLockEntry,        FLockEntryMsgEx)
+      HANDLE_TAG(NETMSGTYPE_FLockRange,        FLockRangeMsgEx)
+      HANDLE_TAG(NETMSGTYPE_BumpFileVersion,   BumpFileVersionMsgEx)
+
+      default:
+         LOG(ERR, "bad mirror response state tag.", tag);
+         des.setBad();
+         break;
    }
 
    return {};

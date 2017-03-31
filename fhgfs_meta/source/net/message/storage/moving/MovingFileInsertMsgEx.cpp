@@ -40,7 +40,8 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
 
    FhgfsOpsErr moveRes = metaStore->moveRemoteFileInsert(
       fromFileInfo, *toDir, newName,
-      getSerialBuf(), getSerialBufLen(), &unlinkInode, newFileInfo, std::get<0>(lockState));
+      getSerialBuf(), getSerialBufLen(), &unlinkInode, newFileInfo, std::get<0>(lockState),
+      std::get<1>(lockState));
    if (moveRes != FhgfsOpsErr_SUCCESS)
    {
       metaStore->releaseDir(toDir->getID());

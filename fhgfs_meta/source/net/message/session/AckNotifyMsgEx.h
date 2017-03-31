@@ -11,7 +11,7 @@ class AckNotifiyMsgEx : public MirroredMessage<AckNotifiyMsg, std::tuple<>>
    public:
       typedef ErrorCodeResponseState<
          AckNotifiyRespMsg,
-         NETMSGTYPE_AckNotifyResp> ResponseState;
+         NETMSGTYPE_AckNotify> ResponseState;
 
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext&, bool) override
       {

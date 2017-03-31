@@ -6,6 +6,7 @@
 #include <common/threading/SafeRWLock.h>
 #include <common/threading/SafeMutexLock.h>
 #include <common/Common.h>
+#include <common/nodes/NodeStore.h>
 
 #include <limits.h>
 #include <algorithm>
@@ -84,10 +85,14 @@ class MirrorBuddyGroupMapper
       MirrorBuddyState getBuddyState(uint16_t targetID, uint16_t buddyGroupID);
 
       void attachCapacityPools(NodeCapacityPools* capacityPools);
+      void attachNodeStore(NodeStore* usableNodes);
 
    private:
       TargetMapper* targetMapper;
       NodeCapacityPools* capacityPools;
+      // this node store is only used for metadata nodes to check for their existence when adding
+      // them to a BMG
+      NodeStore* usableNodes;
 
       RWLock rwlock;
       MirrorBuddyGroupMap mirrorBuddyGroups;

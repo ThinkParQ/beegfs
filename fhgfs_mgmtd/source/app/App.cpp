@@ -328,7 +328,7 @@ bool App::runIntegrationTests()
 
 void App::initDataObjects(int argc, char** argv) throw(InvalidConfigException)
 {
-   preinitStorage();
+   bool firstRun = !preinitStorage();
 
    this->netFilter = new NetFilter(cfg->getConnNetFilterFile() );
    this->tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
@@ -393,6 +393,8 @@ void App::initDataObjects(int argc, char** argv) throw(InvalidConfigException)
 
    this->metaNodes->attachCapacityPools(metaCapacityPools);
 
+   this->metaBuddyGroupMapper->attachNodeStore(metaNodes);
+
    this->storageNodes->attachTargetMapper(targetMapper);
    this->targetMapper->attachCapacityPools(storageCapacityPools);
 
@@ -410,7 +412,7 @@ void App::initDataObjects(int argc, char** argv) throw(InvalidConfigException)
 
    registerSignalHandler();
 
-   initStorage(); // (required here for persistent objects)
+   initStorage(firstRun); // (required here for persistent objects)
 
    this->netMessageFactory = new NetMessageFactory();
 }
@@ -476,7 +478,10 @@ void App::initLocalNodeInfo() throw(InvalidConfigException)
    localNode->setFeatureFlags(&nodeFeatureFlags);
 }
 
-void App::preinitStorage() throw(InvalidConfigException)
+/**
+ * @returns true if this is mgmtd directory has been initialized before (false on first run).
+ */
+bool App::preinitStorage() throw(InvalidConfigException)
 {
    /* note: this contains things that would actually live inside initStorage() but need to be
       done at an earlier stage (like working dir locking before log file creation) */
@@ -490,8 +495,9 @@ void App::preinitStorage() throw(InvalidConfigException)
    if(!mgmtdPath->absolute() ) /* (check to avoid problems after chdir) */
       throw InvalidConfigException("Path to storage directory must be absolute: " + mgmtdPathStr);
 
-   if(!cfg->getStoreAllowFirstRunInit() &&
-      !StorageTk::checkStorageFormatFileExists(mgmtdPathStr) )
+   const bool initialized = StorageTk::checkStorageFormatFileExists(mgmtdPathStr);
+
+   if(!cfg->getStoreAllowFirstRunInit() && !initialized)
       throw InvalidConfigException("Storage directory not initialized and "
          "initialization has been disabled: " + mgmtdPathStr);
 
@@ -508,44 +514,30 @@ void App::preinitStorage() throw(InvalidConfigException)
    this->workingDirLockFD = StorageTk::lockWorkingDirectory(cfg->getStoreMgmtdDirectory() );
    if(workingDirLockFD == -1)
       throw InvalidConfigException("Invalid working directory: locking failed");
+
+   return initialized;
 }
 
-namespace {
-struct StateFileLoader
+template<typename StoreT>
+void App::loadStoreFromFile(int format, LogContext& log,
+      StoreT& store, char storeFlag, const std::string& path, const std::string& description)
 {
-   int format;
-   const std::string& mgmtdPathStr;
-   LogContext& log;
-   StringMap& formatProperties;
+   Path storePath(path);
+   store.setStorePath(storePath.str() );
 
-   template<typename StoreT>
-   void loadStoreFromFile(StoreT& store, char storeFlag, const std::string& path,
-         const std::string& description)
+   const bool nodeIDsAreShort = format < STORAGETK_FORMAT_LONG_NODE_IDS;
+
+   if(store.loadFromFile(!nodeIDsAreShort))
+      log.log(Log_NOTICE, "Loaded " + description + ": " + StringTk::intToStr(store.getSize()));
+
+   if (nodeIDsAreShort)
    {
-      Path storePath(path);
-      store.setStorePath(storePath.str() );
-
-      std::string& formatFlags = formatProperties["longNodeIDs"];
-      const bool nodeIDsAreShort = format < STORAGETK_FORMAT_LONG_NODE_IDS
-         && formatFlags.find(storeFlag) == std::string::npos;
-
-      if(store.loadFromFile(!nodeIDsAreShort))
-         log.log(Log_NOTICE, "Loaded " + description + ": " + StringTk::intToStr(store.getSize()));
-
-      if (nodeIDsAreShort)
-      {
-         if (!store.saveToFile())
-            throw InvalidConfigException("Could not update " + description + " file.");
-
-         formatFlags += storeFlag;
-         StorageTk::checkAndUpdateStorageFormatFile(mgmtdPathStr,
-            STORAGETK_FORMAT_MIN_VERSION, format, &formatProperties, true);
-      }
+      if (!store.saveToFile())
+         throw InvalidConfigException("Could not update " + description + " file.");
    }
-};
 }
 
-void App::initStorage() throw(InvalidConfigException)
+void App::initStorage(const bool firstRun) throw(InvalidConfigException, ComponentInitException)
 {
    std::string mgmtdPathStr = mgmtdPath->str();
    StringMap formatProperties;
@@ -562,14 +554,12 @@ void App::initStorage() throw(InvalidConfigException)
 
    // storage format file
 
-   if(!StorageTk::createStorageFormatFile(mgmtdPathStr, STORAGETK_FORMAT_LONG_NODE_IDS) )
+   if(!StorageTkEx::createStorageFormatFile(mgmtdPathStr, STORAGETK_FORMAT_LONG_NODE_IDS) )
       throw InvalidConfigException("Unable to create storage format file in: " +
          cfg->getStoreMgmtdDirectory() );
 
    StorageTk::loadStorageFormatFile(mgmtdPathStr, STORAGETK_FORMAT_MIN_VERSION,
          STORAGETK_FORMAT_LONG_NODE_IDS, formatVersion, formatProperties);
-
-   StateFileLoader loader = {formatVersion, mgmtdPathStr, *log, formatProperties};
 
    if (formatVersion < STORAGETK_FORMAT_LONG_NODE_IDS
          && formatProperties["longNodeIDs"].find_first_not_of("msc") != std::string::npos)
@@ -581,14 +571,17 @@ void App::initStorage() throw(InvalidConfigException)
 
    // load stored nodes
 
-   loader.loadStoreFromFile(*metaNodes, 'm', CONFIG_METANODES_FILENAME, "metadata nodes");
+   loadStoreFromFile(formatVersion, *log, *metaNodes,
+         'm', CONFIG_METANODES_FILENAME, "metadata nodes");
 
    // Fill the meta nodes' target state store (Note: The storage target state store is filled by
    // the TargetMapper, since it contains target IDs, not node IDs).
    metaNodes->fillStateStore();
 
-   loader.loadStoreFromFile(*storageNodes, 's', CONFIG_STORAGENODES_FILENAME, "storage nodes");
-   loader.loadStoreFromFile(*clientNodes, 'c', CONFIG_CLIENTNODES_FILENAME, "client nodes");
+   loadStoreFromFile(formatVersion, *log, *storageNodes,
+         's', CONFIG_STORAGENODES_FILENAME, "storage nodes");
+   loadStoreFromFile(formatVersion, *log, *clientNodes,
+         'c', CONFIG_CLIENTNODES_FILENAME, "client nodes");
 
    // load mapped targetNumIDs
 
@@ -635,22 +628,23 @@ void App::initStorage() throw(InvalidConfigException)
       this->log->log(Log_NOTICE, "Loaded metadata node mirror buddy group mappings: " +
          StringTk::intToStr(metaBuddyGroupMapper->getSize() ) );
 
-   // load storage targets need resync list
+   // Set path for legacy resync set file
    Path targetsToResyncPath(CONFIG_STORAGETARGETSTORESYNC_FILENAME);
    targetStateStore->setResyncSetStorePath(targetsToResyncPath.str() );
-   if (targetStateStore->loadResyncSetFromFile() )
-      this->log->log(Log_NOTICE, "Loaded list of storage targets to resync.");
+   Path nodesToResyncPath(CONFIG_METANODESTORESYNC_FILENAME);
+   metaStateStore->setResyncSetStorePath(nodesToResyncPath.str() );
 
-   // load meta nodes to resync list
-   Path nodesToResync(CONFIG_METANODESTORESYNC_FILENAME);
-   metaStateStore->setResyncSetStorePath(nodesToResync.str() );
-   if (metaStateStore->loadResyncSetFromFile() )
-      this->log->log(Log_NOTICE, "Loaded list of metadata nodes to resync.");
+   // Set path for state set file
+   targetStateStore->setTargetStateStorePath(CONFIG_STORAGETARGETSTATES_FILENAME);
+   metaStateStore->setTargetStateStorePath(CONFIG_METANODESTATES_FILENAME);
+
+   readTargetStates(firstRun, formatProperties, targetStateStore);
+   readTargetStates(firstRun, formatProperties, metaStateStore);
 
    // save config, just to be sure that the format is correct and up to date
    formatProperties.erase("longNodeIDs");
-   StorageTk::checkAndUpdateStorageFormatFile(mgmtdPathStr, STORAGETK_FORMAT_MIN_VERSION,
-         STORAGETK_FORMAT_LONG_NODE_IDS, &formatProperties, true);
+   StorageTkEx::updateStorageFormatFile(mgmtdPathStr, STORAGETK_FORMAT_MIN_VERSION,
+         STORAGETK_FORMAT_LONG_NODE_IDS, &formatProperties);
 
    // raise file descriptor limit
 
@@ -666,6 +660,58 @@ void App::initStorage() throw(InvalidConfigException)
             "(SysErr: " + System::getErrString() + ")");
    }
 
+}
+
+/**
+ * Restore target and node states from file.
+ * If the file does not exist, also try the legacy file.
+ * The file paths need to be set in the state store before calling this function.
+ */
+void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
+      MgmtdTargetStateStore* stateStore) throw(ComponentInitException)
+{
+   if (stateStore->loadStatesFromFile())
+   {
+      LOG(NOTICE, "Loaded storage target states.", as("NodeType", stateStore->nodeTypeStr(true)));
+      return;
+   }
+
+   std::string propertiesKey;
+
+   switch (stateStore->getNodeType())
+   {
+      case NODETYPE_Meta:
+         propertiesKey = STORAGETK_FORMAT_STATES_META;
+         break;
+      case NODETYPE_Storage:
+         propertiesKey = STORAGETK_FORMAT_STATES_STORAGE;
+         break;
+      default:
+         throw ComponentInitException("Invalid node type: "
+               + Node::nodeTypeToStr(stateStore->getNodeType()));
+   }
+
+   if (firstRun)
+   {
+      // The first run in this mgmtd directory - just set the flag.
+      formatProperties[propertiesKey] = "1";
+      return;
+   }
+
+   if (formatProperties[propertiesKey] == "1")
+      throw ComponentInitException("Could not load target or node states. NodeType: "
+            + stateStore->nodeTypeStr(true) + ".");
+
+   // The first run after an update - read the old file, and set the flag.
+   if (targetStateStore->loadResyncSetFromFile())
+   {
+      LOG(NOTICE, "Restored resync set.", as("NodeType", stateStore->nodeTypeStr(true)));
+
+      // Make an effort to unlink the resync set file
+      ::unlink(stateStore->getResyncSetStorePath().c_str());
+   }
+
+   formatProperties[propertiesKey] = "1";
 }
 
 

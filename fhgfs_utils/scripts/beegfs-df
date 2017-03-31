@@ -18,15 +18,20 @@ print_usage()
 	echo
 	echo "   -p <path> - Show servers and targets for the given BeeGFS mount point."
 	echo
+	echo "   -e        - Exit code reports an error if a target is not"
+	echo "               in the reachability state online or not in the"
+	echo "               consistency state good, requires the option --state."
 }
 
 
 ################# end of function definitions ####################
 
+ERROR=0
+
 
 # parse command line arguments
 
-while getopts "hp:" opt; do
+while getopts "hp:e" opt; do
         case $opt in
 	h)
 		print_usage
@@ -34,6 +39,9 @@ while getopts "hp:" opt; do
 		;;
 	p)
 		BEEGFS_PATH_ARG="--mount=$OPTARG"
+		;;
+	e)
+		OPTIONAL_ARGS="--errorcodes"
 		;;
 	*)
 		echo "Invalid option: -$OPTARG" >&2
@@ -46,11 +54,28 @@ done
 # show metadata server space info
 
 echo "METADATA SERVERS:"
-beegfs-ctl --listtargets --hidenodeid --pools --spaceinfo --nodetype=meta $BEEGFS_PATH_ARG
+beegfs-ctl --listtargets --hidenodeid --pools --spaceinfo $OPTIONAL_ARGS --nodetype=meta \
+$BEEGFS_PATH_ARG
+if [ $? -ne 0 ]
+then
+	ERROR=1
+fi
 
 echo
 
 # show storage server space info
 
 echo "STORAGE TARGETS:"
-beegfs-ctl --listtargets --hidenodeid --pools --spaceinfo --nodetype=storage $BEEGFS_PATH_ARG
+beegfs-ctl --listtargets --hidenodeid --pools --spaceinfo $OPTIONAL_ARGS --nodetype=storage \
+$BEEGFS_PATH_ARG
+if [ $? -ne 0 ]
+then
+	ERROR=1
+fi
+
+if [ -n "$OPTIONAL_ARGS" ] && [ $ERROR -eq 1 ]
+then
+        exit 1
+fi
+
+

@@ -121,7 +121,13 @@ std::unique_ptr<MkDirMsgEx::ResponseState> MkDirMsgEx::mkDirPrimary(ResponseCont
       LogContext(logContext).logErr("No metadata servers available for new directory: " + newName);
 
       metaStore->releaseDir(parentInfo->getEntryID() );
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_UNKNOWNNODE, EntryInfo());
+      // we know that *some* metadata server must exist, since we are obviously active when we get
+      // here. most likely a client has received a pool update before we have, or we have been
+      // switched from secondary to primary and haven't been set to Good yet.
+      // if preferred nodes have been set (currently only done by ctl), those may also be registered
+      // as unavailable at the current time.
+      // have the client retry until things work out.
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_COMMUNICATION, EntryInfo());
    }
 
    const uint16_t ownerNodeID = newOwnerNodes[0];

@@ -151,7 +151,7 @@ void ModeResyncStats::printHelp()
    std::cout << "                                 being resynced." << std::endl;
    std::cout << "  --nodeid=<nodeID>              The ID of the secondary metadata node that is" << std::endl;
    std::cout << "                                 being resynced." << std::endl;
-   std::cout << "  --buddygroupid=<buddyGroupID>  The ID of the mirror buddy group that is being " << std::endl;
+   std::cout << "  --mirrorgroupid=<buddyGroupID> The ID of the mirror buddy group that is being " << std::endl;
    std::cout << "                                 resynced." << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
@@ -217,7 +217,8 @@ int ModeResyncStats::getStatsStorage(uint16_t syncToTargetID, bool isBuddyGroupI
 
    if (syncFromTargetID == 0)
    {
-      std::cerr << "Couldn't find buddy of target ID: " << syncToTargetID << "."
+      std::cerr << "Couldn't find " << (isBuddyGroupID ? "secondary of group" : "buddy of target")
+         << " ID: " << syncToTargetID << "."
          " Is it the target ID of the secondary?" << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }

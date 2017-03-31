@@ -80,8 +80,8 @@ void ModeHelp::printGeneralHelp()
    std::cout << std::endl;
    std::cout << " --listmirrorgroups      => List mirror buddy groups." << std::endl;
    std::cout << " --addmirrorgroup (*)    => Add a mirror buddy group." << std::endl;
-   std::cout << " --startresync (*)       => Start resync of a storage target." << std::endl;
-   std::cout << " --resyncstats           => Get statistics on a storage target resync." << std::endl;
+   std::cout << " --startresync (*)       => Start resync of a storage target or metadata node." << std::endl;
+   std::cout << " --resyncstats           => Get statistics on a resync." << std::endl;
    std::cout << std::endl;
    std::cout << "*) Marked modes require root privileges." << std::endl;
    std::cout << std::endl;

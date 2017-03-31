@@ -5,59 +5,14 @@
 
 TARGET ?= beegfs
 
-
-ifneq ($(KERNELRELEASE),)
-
-#
-# --- kbuild part [START] ---
-#
-
-BEEGFS_FEATURE_DETECTION := $(shell $(dir $(lastword $(MAKEFILE_LIST)))/feature-detect.sh)
-ifneq ($(lastword $(BEEGFS_FEATURE_DETECTION)),--~~success~~--)
-   $(error feature detection reported an error)
-else
-   BEEGFS_FEATURE_DETECTION := $(filter-out --~~success~~--,$(BEEGFS_FEATURE_DETECTION))
-endif
-
-# ccflags-y was introduced in 2.6.24, earlier kernels use EXTRA_CFLAGS for the same purpose
-ifeq ($(origin ccflags-y),file)
-ccflags-y += $(BEEGFS_FEATURE_DETECTION)
-else
-# the client makefile sets this already
-override EXTRA_CFLAGS += $(BEEGFS_FEATURE_DETECTION)
-endif
-
-# Auto-selection of source files and corresponding target objects 
-BEEGFS_SOURCES := $(shell find $(obj)/../source -name '*.c')
-BEEGFS_SOURCES_STRIPPED := $(subst $(obj)/, , $(BEEGFS_SOURCES) ) 
-
-BEEGFS_OBJECTS := $(BEEGFS_SOURCES_STRIPPED:.c=.o)
-
-
-
-obj-m	+= ${TARGET}.o
-
-${TARGET}-y	:= $(BEEGFS_OBJECTS)
-
-#
-# --- kbuild part [END] ---
-#
-
-else
-
-#
-# --- Normal make part [START] ---
-#
+export TARGET
+export OFED_INCLUDE_PATH
 
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
 else
 BEEGFS_BUILDDIR := $(obj)
 endif
-
-BEEGFS_AUTOCONF_REL_PATH=source/common/net/sock/rdma_autoconf.h
-BEEGFS_AUTOCONF_BUILD_REL_PATH=../$(BEEGFS_AUTOCONF_REL_PATH)
-BEEGFS_AUTOCONF_BUILD_PATH=$(BEEGFS_BUILDDIR)/$(BEEGFS_AUTOCONF_BUILD_REL_PATH)
 
 
 # The following section deals with the auto-detection of the kernel
@@ -67,7 +22,8 @@ BEEGFS_AUTOCONF_BUILD_PATH=$(BEEGFS_BUILDDIR)/$(BEEGFS_AUTOCONF_BUILD_REL_PATH)
 # (This is usually /lib/modules/<kernelversion>/build, but you can specify
 # multiple directories here as a space-separated list)
 ifeq ($(KDIR),)
-KDIR = /lib/modules/$(shell uname -r)/build /usr/src/linux-headers-$(shell uname -r)
+KDIR = /lib/modules/$(shell uname -r)/build /usr/src/linux-headers-$(shell uname -r) \
+       /usr/src/kernels/$(shell uname -r)
 endif
 
 # Prune the KDIR list down to paths that exist and have an
@@ -145,17 +101,6 @@ ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
 endif
 
-# Note: Make sure we include OFED_INCLUDE_PATH files before the standard kernel
-# include files.
-ifneq ($(OFED_INCLUDE_PATH),)
-BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
-endif
-
-
-ifneq ($(OFED_LIB_PATH),)
-BEEGFS_LDFLAGS += -L$(OFED_LIB_PATH)
-endif
-
 
 # if path to strip command was not given, use default
 # (alternative strip is important when cross-compiling)
@@ -184,28 +129,15 @@ endif
 
 ifneq ($(OFED_INCLUDE_PATH),)
 	if [ -f $(OFED_INCLUDE_PATH)/../Module.symvers ]; then \
-		cp $(OFED_INCLUDE_PATH)/../Module.symvers . ; \
-		cp $(OFED_INCLUDE_PATH)/../Module.symvers Modules.symvers ; \
+		cp $(OFED_INCLUDE_PATH)/../Module.symvers ../source ; \
 	fi
 endif
 
-	@ cp $(BEEGFS_AUTOCONF_BUILD_PATH).in \
-		$(BEEGFS_AUTOCONF_BUILD_PATH)
-
-	@ # note the "/" in ${OFED_INCLUDE_PATH}/! Therefore the if-condition.
-	@ if [ -n "${OFED_INCLUDE_PATH}" ]; then 			       	\
-		  sed -i -e 's#__OFED_INCLUDE_PATH__#${OFED_INCLUDE_PATH}/#g' 	\
-			$(BEEGFS_AUTOCONF_BUILD_PATH);			\
-	  else 									\
-		  sed -i -e 's#__OFED_INCLUDE_PATH__##g' 			\
-			$(BEEGFS_AUTOCONF_BUILD_PATH);			\
-	  fi
-
-
 	@echo "Building beegfs client module"
-	$(MAKE) -C $(KDIR_PRUNED_HEAD) SUBDIRS=$(BEEGFS_BUILDDIR) \
+	$(MAKE) -C $(KDIR_PRUNED_HEAD) SUBDIRS=$(BEEGFS_BUILDDIR)/../source \
 	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS)" modules
-	
+
+	@cp ../source/$(TARGET).ko .
 	@ cp ${TARGET}.ko ${TARGET}-unstripped.ko
 	@ ${STRIP} --strip-debug ${TARGET}.ko
 
@@ -253,9 +185,3 @@ help:
 	@echo '  BEEGFS_OFED_1_2_API={1,2}:'
 	@echo '    Defining this enables OFED 1.2.0 ibverbs API compatibility.'
 	@echo '    (If not defined, OFED 1.2.5 or higher API will be used.)'
-
-#	
-# --- Normal make part [END] ---
-#
-
-endif

@@ -3,6 +3,7 @@
 
 #include <common/Common.h>
 #include <common/toolkit/Time.h>
+#include <common/toolkit/serialization/Serialization.h>
 
 // Make sure to keep this in sync with corresponding enums in client.
 enum TargetReachabilityState
@@ -21,6 +22,12 @@ enum TargetConsistencyState
 
 template<>
 struct SerializeAs<TargetConsistencyState>
+{
+   typedef int32_t type;
+};
+
+template<>
+struct SerializeAs<TargetReachabilityState>
 {
    typedef int32_t type;
 };
@@ -56,6 +63,14 @@ struct CombinedTargetState
    {
       return ( (reachabilityState == other.reachabilityState)
             && (consistencyState == other.consistencyState) );
+   }
+
+   template<typename This, typename Ctx>
+   static void serialize(This obj, Ctx& ctx)
+   {
+      ctx
+         % obj->reachabilityState
+         % obj->consistencyState;
    }
 };
 
@@ -111,6 +126,14 @@ struct TargetStateInfo : public CombinedTargetState
    {
       return ( (reachabilityState != other.reachabilityState)
             || (consistencyState != other.consistencyState) );
+   }
+
+   template<typename This, typename Ctx>
+   static void serialize(This obj, Ctx& ctx)
+   {
+      ctx
+         % serdes::base<CombinedTargetState>(obj)
+         % obj->lastChangedTime;
    }
 };
 

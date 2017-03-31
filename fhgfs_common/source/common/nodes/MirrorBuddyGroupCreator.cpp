@@ -34,7 +34,7 @@ FhgfsOpsErr MirrorBuddyGroupCreator::addGroup(uint16_t primaryTargetID, uint16_t
       if (addRes == FhgfsOpsErr_INUSE)
          errStr = "One of the targets is already mapped to a buddy group.";
       else
-      if (addRes == FhgfsOpsErr_UNKNOWNTARGET)
+      if (addRes == FhgfsOpsErr_UNKNOWNTARGET || addRes == FhgfsOpsErr_UNKNOWNNODE)
          errStr = FhgfsOpsErrTk::toErrString(addRes);
       else
       if (addRes == FhgfsOpsErr_EXISTS)

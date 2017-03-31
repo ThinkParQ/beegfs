@@ -1,7 +1,7 @@
 #include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
-#include <common/threading/RWLockGuard.h>
 #include <common/toolkit/MessagingTk.h>
+#include <common/toolkit/StorageTk.h>
 #include <common/toolkit/TempFileTk.h>
 #include <common/toolkit/ZipIterator.h>
 #include <components/HeartbeatManager.h>
@@ -581,45 +581,58 @@ bool MgmtdTargetStateStore::setTargetsGood(const UInt16Vector& ids)
 }
 
 /**
- * Saves the list of targets which need a resync to the targets_need_resync file, if the list has
- * changed since the last time it was saved.
+ * Saves all the target states to a file.
  */
-void MgmtdTargetStateStore::saveResyncSetToFile()
+void MgmtdTargetStateStore::saveStatesToFile()
 {
-   TargetIDSet targetsToResync;
+   RWLockGuard lock(rwlock, SafeRWLock_READ);
+
+   boost::scoped_array<char> buf;
+   ssize_t serLen = serializeIntoNewBuffer(statesMap, buf);
+
+   FhgfsOpsErr storeRes = FhgfsOpsErr_INVAL;
+   if (serLen != -1)
    {
-      RWLockGuard(rwlock, SafeRWLock_READ);
-      for (TargetStateInfoMapIter it = statesMap.begin();
-           it != statesMap.end();
-           ++it)
-      {
-         if (it->second.consistencyState == TargetConsistencyState_NEEDS_RESYNC)
-            targetsToResync.insert(it->first);
-      }
+      Path targetStatesPath = *Program::getApp()->getMgmtdPath() / targetStateStorePath;
+      storeRes = TempFileTk::storeTmpAndMove(targetStatesPath.str(),
+            std::vector<char>(buf.get(), buf.get() + serLen));
    }
-
-   if (targetsToResync == tempResyncSet)
-      return; // Nothing changed - don't write file
-
-   std::string targetsToResyncStr;
-   for (TargetIDSetCIter it = targetsToResync.begin();
-        it != targetsToResync.end();
-        ++it)
-   {
-      targetsToResyncStr += StringTk::uintToStr(*it) + "\n";
-   }
-
-   // Write out the set...
-   Path mgmtdPath = *Program::getApp()->getMgmtdPath();
-   Path targetsToResyncPath = mgmtdPath / resyncSetStorePath;
-
-   FhgfsOpsErr storeRes =
-      TempFileTk::storeTmpAndMove(targetsToResyncPath.str(), targetsToResyncStr);
 
    if (storeRes != FhgfsOpsErr_SUCCESS)
-      LOG(ERR, "Could not save resync set.", as("NodeType", Node::nodeTypeToStr(nodeType)));
+      LOG(ERR, "Could not save target states.", as("NodeType", Node::nodeTypeToStr(nodeType)));
+}
 
-   tempResyncSet.swap(targetsToResync);
+bool MgmtdTargetStateStore::loadStatesFromFile()
+{
+   if (!targetStateStorePath.length())
+      throw InvalidConfigException("State store path not set.");
+
+   Path targetStatesPath = *Program::getApp()->getMgmtdPath() / targetStateStorePath;
+
+   auto readRes = StorageTk::readFile(targetStatesPath.str(), 4 * 1024 * 1024);
+
+   if (readRes.first != FhgfsOpsErr_SUCCESS)
+   {
+      LOG(ERR, "Could not read states.", as("NodeType", Node::nodeTypeToStr(nodeType)),
+            as("Error", FhgfsOpsErrTk::toErrString(readRes.first)));
+      return false;
+   }
+
+   Deserializer des(&readRes.second[0], readRes.second.size());
+
+   RWLockGuard lock(rwlock, SafeRWLock_WRITE);
+   des % statesMap;
+
+   if (!des.good())
+   {
+      LOG(ERR, "Could not deserialze states.", as("NodeStates", Node::nodeTypeToStr(nodeType)));
+      return false;
+   }
+
+   // Set all targets / nodes to POFFLINE to prevent switchover before we have report from anyone.
+   setAllStatesUnlocked(TargetReachabilityState_POFFLINE);
+
+   return true;
 }
 
 /**
@@ -641,8 +654,10 @@ bool MgmtdTargetStateStore::loadResyncSetFromFile() throw (InvalidConfigExceptio
    StringList targetsToResyncList;
 
    bool fileExists = StorageTk::pathExists(targetsToResyncPath.str() );
-   if (fileExists)
-      ICommonConfig::loadStringListFile(targetsToResyncPath.str().c_str(),
+   if (!fileExists)
+      return false;
+
+   ICommonConfig::loadStringListFile(targetsToResyncPath.str().c_str(),
          targetsToResyncList);
 
    TargetIDSet resyncSet;

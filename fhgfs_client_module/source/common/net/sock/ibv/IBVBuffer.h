@@ -1,9 +1,11 @@
 #ifndef IBVBuffer_h_aMQFNfzrjbEHDOcv216fi
 #define IBVBuffer_h_aMQFNfzrjbEHDOcv216fi
 
-#include <common/net/sock/rdma_autoconf.h>
-
 #ifdef BEEGFS_OPENTK_IBVERBS
+
+#include <rdma/ib_verbs.h>
+#include <rdma/rdma_cm.h>
+#include <rdma/ib_cm.h>
 
 #include <common/Common.h>
 #include <os/iov_iter.h>

@@ -104,8 +104,11 @@ install -D  dist/etc/default/%NAME% ${RPM_BUILD_ROOT}/etc/default/%NAME%
 %post
 if [ "$1" = 1 ]
 then
-	initType=$(pidof systemd >/dev/null && echo "systemd" || echo "sysvinit")
-	if [ "$initType" = "systemd" ]
+	output=$(systemctl is-system-running 2> /dev/null)
+	if [ "$?" == 127 ]
+	then
+		chkconfig %NAME% on
+	elif [ "$?" == 0 ] || ( [ "$output" != "offline" ] && [ "$output" != "unknown" ] )
 	then
 		systemctl enable %NAME%.service
 	else
@@ -116,8 +119,11 @@ fi
 %preun
 if [ "$1" = 0 ]
 then
-	initType=$(pidof systemd >/dev/null && echo "systemd" || echo "sysvinit")
-	if [ "$initType" = "systemd" ]
+	output=$(systemctl is-system-running 2> /dev/null)
+	if [ "$?" == 127 ]
+	then
+		chkconfig %NAME% off
+	elif [ "$?" == 0 ] || ( [ "$output" != "offline" ] && [ "$output" != "unknown" ] )
 	then
 		systemctl disable %NAME%.service
 	else

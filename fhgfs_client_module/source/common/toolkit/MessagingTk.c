@@ -695,6 +695,15 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
    // got response => deserialize it
    rrArgs->outRespMsg = NetMessageFactory_createFromBuf(app, rrArgs->outRespBuf, respRes);
 
+   if (unlikely(rrArgs->outRespMsg->msgHeader.msgType == NETMSGTYPE_AckNotifyResp))
+   {
+      /* a failover happened before the primary could send a negative response to us, and the
+       * secondary has already received word about the failed operation. treat this case like a
+       * communication error and retry the message with a new sequence number. */
+      *wasIndirectCommErr = true;
+      goto socket_invalidate;
+   }
+
    if(unlikely(NetMessage_getMsgType(rrArgs->outRespMsg) == NETMSGTYPE_GenericResponse) )
    { // special control msg received
       retVal = __MessagingTk_handleGenericResponse(app, rrArgs, group, wasIndirectCommErr);

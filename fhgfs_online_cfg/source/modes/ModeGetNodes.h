@@ -8,19 +8,22 @@
 class ModeGetNodes : public Mode
 {
    public:
-      ModeGetNodes()
-      {
-         cfgPrintDetails = false;
-         cfgPrintNicDetails = false;
-         cfgPrintFhgfsVersion = false;
-         cfgCheckReachability = false;
-         cfgReachabilityNumRetries = 6; // (>= 1)
-         cfgReachabilityRetryTimeoutMS = 500;
-         cfgPing = false;
-         cfgPingRetries = 0;
-         cfgConnTestNum = 0;
-         cfgPrintConnRoute = false;
-      }
+      ModeGetNodes() :
+         Mode(true), // Skip init - this way, we can only put the nodes that actually replied to
+                     // the heartbeat request into the node store, so we can filter out
+                     // unreachable nodes later.
+         cfgPrintDetails(false),
+         cfgPrintNicDetails(false),
+         cfgPrintFhgfsVersion(false),
+         cfgCheckReachability(false),
+         cfgNotReachableAsError(false),
+         cfgReachabilityNumRetries(6), // (>= 1)
+         cfgReachabilityRetryTimeoutMS(500),
+         cfgPing(false),
+         cfgPingRetries(0),
+         cfgConnTestNum(0),
+         cfgPrintConnRoute(false)
+      { }
 
       virtual int execute();
 
@@ -34,6 +37,7 @@ class ModeGetNodes : public Mode
       bool cfgPrintNicDetails;
       bool cfgPrintFhgfsVersion;
       bool cfgCheckReachability;
+      bool cfgNotReachableAsError;
       unsigned cfgReachabilityNumRetries; // (>= 1)
       unsigned cfgReachabilityRetryTimeoutMS;
       bool cfgPing;

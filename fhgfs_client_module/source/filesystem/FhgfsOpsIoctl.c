@@ -216,6 +216,7 @@ static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp
    if(!access_ok(VERIFY_WRITE, confFile, sizeof(*confFile) ) )
    {
       Logger_logFormatted(log, Log_DEBUG, logContext, "access_ok() denied to write to conf_file");
+      vfree(fileName);
       return -EINVAL;
    }
 
@@ -234,6 +235,7 @@ static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp
    if(cpRes)
    {
       LOG_DEBUG_FORMATTED(log, Log_DEBUG, logContext, "copy_to_user failed()");
+      vfree(fileName);
       return -EINVAL;
    }
 

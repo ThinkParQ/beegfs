@@ -121,7 +121,8 @@ static inline void ihold(struct inode *inode)
 }
 #endif // KERNEL_HAS_IHOLD
 
-#ifndef KERNEL_HAS_FILE_INODE
+/* some ofeds backport this too - and put a define around it ... */
+#if !defined(KERNEL_HAS_FILE_INODE) && !defined(file_inode)
 
 struct inode *file_inode(struct file *f)
 {
