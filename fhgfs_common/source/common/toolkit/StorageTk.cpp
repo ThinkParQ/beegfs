@@ -1,4 +1,5 @@
 #include <common/app/config/ICommonConfig.h>
+#include <common/toolkit/FDHandle.h>
 #include <common/toolkit/MapTk.h>
 #include <common/toolkit/Time.h>
 #include <common/toolkit/TimeAbs.h>
@@ -14,11 +15,9 @@
 
 #define STORAGETK_DIR_LOCK_FILENAME          "lock.pid"
 
-#define STORAGETK_FORMAT_FILENAME            "format.conf"
 #define STORAGETK_FORMAT_KEY_VERSION         "version"
 
 #define STORAGETK_TMPFILE_EXT                ".tmp" /* tmp extension for saved files until rename */
-#define STORAGETK_BACKUP_EXT                 ".bak" /* extension for old file backups */
 
 #define STORAGETK_DEFAULT_FILEMODE           (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH)
 
@@ -1074,4 +1073,42 @@ bool StorageTk::removeDirRecursive(const std::string& dir)
    };
 
    return ::nftw(dir.c_str(), ops::visit, 10, FTW_DEPTH) == 0;
+}
+
+/**
+ * Reads a file into a buffer, up to the size specified.
+ * @param path The path to be read
+ * @param maxSize The maximum number of bytes to be read
+ * @returns Pair of FhfgfsOpsError and a char vector.
+ *          In case of error, empty vector is returned and Error code is set as follows:
+ *          FhgfsOpsErr_RANGE - File is larger than maxSize
+ *          Appropriate error (via fromSysErr) if open() fails
+ *          Otherwise, the error code is set to FhgfsOpsErr_SUCCESS and vector is filled
+ *          with file contents.
+ */
+std::pair<FhgfsOpsErr, std::vector<char>> StorageTk::readFile(const std::string& filename,
+      int maxSize)
+{
+   FDHandle fd(::open(filename.c_str(), O_RDONLY));
+   if (!fd.valid())
+      return { FhgfsOpsErrTk::fromSysErr(errno), {} };
+
+   auto size = ::lseek(fd.get(), 0, SEEK_END);
+   if (size > maxSize)
+      return { FhgfsOpsErr_RANGE, {} };
+
+   if (size == -1)
+      return { FhgfsOpsErrTk::fromSysErr(errno), {} };
+
+   auto seekRes = ::lseek(fd.get(), 0, SEEK_SET);
+   if (seekRes == -1)
+      return { FhgfsOpsErrTk::fromSysErr(errno), {} };
+
+   std::vector<char> buf(size);
+   auto readRes = ::read(fd.get(), &buf[0], size);
+
+   if (readRes == -1)
+      return { FhgfsOpsErrTk::fromSysErr(errno), {} };
+
+   return { FhgfsOpsErr_SUCCESS, buf };
 }

@@ -5,7 +5,7 @@
 
 namespace TempFileTk {
 
-FhgfsOpsErr storeTmpAndMove(const std::string& filename, const std::string& contents);
+FhgfsOpsErr storeTmpAndMove(const std::string& filename, const std::vector<char>& contents);
 
 };
 

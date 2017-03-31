@@ -13,6 +13,8 @@
 #include <linux/poll.h>
 #include <linux/socket.h>
 #include <rdma/ib_verbs.h>
+#include <rdma/rdma_cm.h>
+#include <rdma/ib_cm.h>
 
 
 #define IBVSOCKET_CONN_TIMEOUT_MS         5000

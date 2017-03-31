@@ -1,7 +1,6 @@
 #ifndef OPENTK_IBVSOCKET_H_
 #define OPENTK_IBVSOCKET_H_
 
-#include <common/net/sock/rdma_autoconf.h>
 #include <common/net/sock/ibv/IBVBuffer.h>
 #include <common/Common.h>
 

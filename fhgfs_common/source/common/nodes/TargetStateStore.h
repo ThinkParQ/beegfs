@@ -104,18 +104,6 @@ class TargetStateStore
          return true;
       }
 
-
-   private:
-      bool getStateInfoUnlocked(uint16_t targetID, TargetStateInfo& outStateInfo)
-      {
-         TargetStateInfoMapConstIter iter = this->statesMap.find(targetID);
-         if (unlikely(iter == statesMap.end() ) )
-            return false;
-
-         outStateInfo = iter->second;
-         return true;
-      }
-
       void setAllStatesUnlocked(TargetReachabilityState state)
       {
          for (TargetStateInfoMapIter iter = this->statesMap.begin();
@@ -128,6 +116,18 @@ class TargetStateStore
                currentState.lastChangedTime.setToNow();
             }
          }
+      }
+
+
+   private:
+      bool getStateInfoUnlocked(uint16_t targetID, TargetStateInfo& outStateInfo)
+      {
+         TargetStateInfoMapConstIter iter = this->statesMap.find(targetID);
+         if (unlikely(iter == statesMap.end() ) )
+            return false;
+
+         outStateInfo = iter->second;
+         return true;
       }
 };
 

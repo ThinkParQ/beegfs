@@ -1011,8 +1011,8 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    createQPRes = rdma_create_qp(cm_id, commContext->pd, &qpInitAttr);
    if(createQPRes)
    {
-      SyslogLogger::log(LOG_WARNING, "%d:%s: Couldn't create QP (Error: %d)\n",
-         __LINE__, __func__, createQPRes);
+      SyslogLogger::log(LOG_WARNING, "%d:%s: Couldn't create QP (Error: %d) (Errno: %d)\n",
+         __LINE__, __func__, createQPRes, errno);
       goto err_cleanup;
    }
 

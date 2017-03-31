@@ -138,7 +138,7 @@ void ModeRefreshEntryInfo::printHelp()
    std::cout << "                         stdin (separated by newline)." << std::endl;
    std::cout << " Optional:" << std::endl;
    std::cout << "  --unmounted            If specified, the given path is relative to the root" << std::endl;
-   std::cout << "                         directory of a possibly unmounted FhGFS. (Symlinks" << std::endl;
+   std::cout << "                         directory of a possibly unmounted BeeGFS. (Symlinks" << std::endl;
    std::cout << "                         will not be resolved in this case.)" << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;

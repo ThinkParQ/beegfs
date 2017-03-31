@@ -2,6 +2,7 @@
 #define TIME_H_
 
 #include <common/Common.h>
+#include <common/toolkit/serialization/Serialization.h>
 #include <time.h>
 
 #define TIME_SAFE_CLOCK_ID CLOCK_MONOTONIC // a clock-id we expect to always work
@@ -173,6 +174,13 @@ class Time
          *outTime = now;
       }
 
+      template<typename This, typename Ctx>
+      static void serialize(This obj, Ctx& ctx)
+      {
+         ctx
+            % serdes::as<int64_t>(obj->now.tv_sec)
+            % serdes::as<int64_t>(obj->now.tv_nsec);
+      }
 };
 
 #endif /*TIME_H_*/

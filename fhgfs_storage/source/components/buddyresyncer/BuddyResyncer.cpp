@@ -9,7 +9,10 @@ BuddyResyncer::~BuddyResyncer()
    {
       BuddyResyncJob* job = iter->second;
       if( job->isRunning() )
+      {
          job->abort();
+         job->join();
+      }
 
       SAFE_DELETE(job);
    }

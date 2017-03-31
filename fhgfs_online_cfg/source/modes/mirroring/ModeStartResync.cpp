@@ -226,7 +226,7 @@ void ModeStartResync::printHelp()
    std::cout << "       (m)inutes, (h)ours and (d)ays." << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
-   std::cout << " This mode starts a resync of a storage target from its buddy target." << std::endl;
+   std::cout << " This mode starts a resync of a storage target or metadata node from its buddy." << std::endl;
    std::cout << std::endl;
    std::cout << " Example: Resync target with ID \"10\" from its buddy using the resync timestamp " << std::endl;
    std::cout << "          saved on the server" << std::endl;

@@ -1,9 +1,10 @@
 #ifndef MGMTDTARGETSTATESTORE_H_
 #define MGMTDTARGETSTATESTORE_H_
 
+#include <common/nodes/Node.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/TargetStateStore.h>
-#include <common/nodes/Node.h>
+#include <common/threading/RWLockGuard.h>
 
 class MgmtdTargetStateStore : public TargetStateStore
 {
@@ -20,8 +21,9 @@ class MgmtdTargetStateStore : public TargetStateStore
       bool resolveDoubleResync();
       bool resolvePrimaryResync();
 
-      void saveResyncSetToFile();
       bool loadResyncSetFromFile() throw (InvalidConfigException);
+      void saveStatesToFile();
+      bool loadStatesFromFile();
 
    private:
       typedef std::set<uint16_t> TargetIDSet;
@@ -31,6 +33,7 @@ class MgmtdTargetStateStore : public TargetStateStore
       // For persistent storage of storage target / metadata node ids that need resync.
       TargetIDSet tempResyncSet;
       std::string resyncSetStorePath;
+      std::string targetStateStorePath;
 
       NodeType nodeType; // Meta node state store or storage target state store.
 
@@ -46,33 +49,17 @@ class MgmtdTargetStateStore : public TargetStateStore
          this->resyncSetStorePath = storePath;
       }
 
-
-   private:
-
-      /**
-       * Sets the consistency state of a single target, not changing the reachability state.
-       * @returns false if target ID was not found, true otherwise.
-       */
-      bool setConsistencyState(const uint16_t targetID, const TargetConsistencyState state)
+      const std::string& getResyncSetStorePath() const
       {
-         bool res;
-
-         SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
-
-         TargetStateInfoMapIter iter = this->statesMap.find(targetID);
-
-         if (iter == this->statesMap.end() )
-            res = false;
-         else
-         {
-            iter->second.consistencyState = state;
-            res = true;
-         }
-
-         safeLock.unlock(); // U N L O C K
-
-         return res;
+         return resyncSetStorePath;
       }
+
+      void setTargetStateStorePath(const std::string& storePath)
+      {
+         targetStateStorePath = storePath;
+      }
+
+      NodeType getNodeType() const { return nodeType; }
 
       /**
        * @returns an std::string that contains either "Storage target" or "Metadata node" depending
@@ -98,6 +85,25 @@ class MgmtdTargetStateStore : public TargetStateStore
             res[0] = ::toupper(res[0]);
 
          return res;
+      }
+
+   private:
+
+      /**
+       * Sets the consistency state of a single target, not changing the reachability state.
+       * @returns false if target ID was not found, true otherwise.
+       */
+      bool setConsistencyState(const uint16_t targetID, const TargetConsistencyState state)
+      {
+         RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
+
+         TargetStateInfoMapIter iter = this->statesMap.find(targetID);
+
+         if (iter == this->statesMap.end() )
+            return false;
+
+         iter->second.consistencyState = state;
+         return true;
       }
 };
 

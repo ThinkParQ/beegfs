@@ -68,14 +68,14 @@ class MovingFileInsertResponseState : public MirroredMessageResponseState
 };
 
 class MovingFileInsertMsgEx : public MirroredMessage<MovingFileInsertMsg,
-   std::tuple<FileIDLock, DirIDLock>>
+   std::tuple<FileIDLock, FileIDLock, DirIDLock>>
 {
    public:
       typedef MovingFileInsertResponseState ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, DirIDLock> lock(EntryLockStore& store) override
+      std::tuple<FileIDLock, FileIDLock, DirIDLock> lock(EntryLockStore& store) override
       {
          // the created file need not be locked, because only the requestor of the move operations
          // knows the new parent of the file, and only knows it for certain once the origin server
@@ -88,7 +88,8 @@ class MovingFileInsertMsgEx : public MirroredMessage<MovingFileInsertMsg,
             return {};
 
          return std::make_tuple(
-               FileIDLock(),
+               FileIDLock(), // new file inode
+               FileIDLock(), // (maybe) overwritten file inode
                DirIDLock(&store, getToDirInfo()->getEntryID(), true));
       }
 

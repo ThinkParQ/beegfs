@@ -8,7 +8,7 @@
 class BumpFileVersionMsgEx : public MirroredMessage<BumpFileVersionMsg, FileIDLock>
 {
    public:
-      typedef ErrorCodeResponseState<BumpFileVersionRespMsg, NETMSGTYPE_BumpFileVersionResp>
+      typedef ErrorCodeResponseState<BumpFileVersionRespMsg, NETMSGTYPE_BumpFileVersion>
          ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;

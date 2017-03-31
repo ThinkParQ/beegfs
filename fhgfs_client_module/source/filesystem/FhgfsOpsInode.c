@@ -1539,7 +1539,8 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
          "From: %s; To: %s", fromFileName, toFileName);
 
    FhgfsInode_entryInfoReadLock(fhgfsFromDirInode); // LOCK EntryInfo
-   FhgfsInode_entryInfoReadLock(fhgfsToDirInode);   // LOCK EntryInfo
+   if (fhgfsFromDirInode != fhgfsToDirInode)
+      FhgfsInode_entryInfoReadLock(fhgfsToDirInode);   // LOCK EntryInfo
    FhgfsInode_entryInfoReadLock(fhgfsFileInode);    // LOCK EntryInfo
 
    fromDirInfo   = FhgfsInode_getEntryInfo(fhgfsFromDirInode);
@@ -1596,7 +1597,8 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
    }
 
    FhgfsInode_entryInfoReadUnlock(fhgfsFileInode);    // UNLOCK fromFileInfo
-   FhgfsInode_entryInfoReadUnlock(fhgfsToDirInode);   // UNLOCK toDirInfo
+   if (fhgfsFromDirInode != fhgfsToDirInode)
+      FhgfsInode_entryInfoReadUnlock(fhgfsToDirInode);   // UNLOCK toDirInfo
    FhgfsInode_entryInfoReadUnlock(fhgfsFromDirInode); // UNLOCK fromDirInfo
 
 #if 0 // TODO: Re-add here once we support inter directory hard-links
@@ -1612,7 +1614,8 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
 #endif
 
    FhgfsInode_invalidateCache(fhgfsFileInode);
-   FhgfsInode_invalidateCache(fhgfsToDirInode);
+   if (fhgfsFromDirInode != fhgfsToDirInode)
+      FhgfsInode_invalidateCache(fhgfsToDirInode);
    FhgfsInode_invalidateCache(fhgfsFromDirInode);
 
    return retVal;

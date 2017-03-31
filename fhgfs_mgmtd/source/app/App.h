@@ -129,8 +129,12 @@ class App : public AbstractApp
 
       void initDataObjects(int argc, char** argv) throw(InvalidConfigException);
       void initLocalNodeInfo() throw(InvalidConfigException);
-      void preinitStorage() throw(InvalidConfigException);
-      void initStorage() throw(InvalidConfigException);
+      bool preinitStorage() throw(InvalidConfigException);
+      template<typename StoreT> void loadStoreFromFile(int format, LogContext& log, StoreT& store,
+            char storeFlag, const std::string& path, const std::string& description);
+      void initStorage(const bool firstRun) throw(InvalidConfigException, ComponentInitException);
+      void readTargetStates(const bool firstRun, StringMap& formatProperties,
+            MgmtdTargetStateStore* stateStore) throw(ComponentInitException);
       void initRootDir() throw(InvalidConfigException);
       void initDisposalDir() throw(InvalidConfigException);
       void initComponents() throw(ComponentInitException);

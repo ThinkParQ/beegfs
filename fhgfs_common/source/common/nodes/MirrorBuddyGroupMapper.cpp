@@ -6,13 +6,13 @@
 
 #include "MirrorBuddyGroupMapper.h"
 
-MirrorBuddyGroupMapper::MirrorBuddyGroupMapper(TargetMapper* targetMapper)
-   : targetMapper(targetMapper), capacityPools(NULL), mappingsDirty(false), localGroupID(0)
-{ }
+MirrorBuddyGroupMapper::MirrorBuddyGroupMapper(TargetMapper* targetMapper):
+      targetMapper(targetMapper), capacityPools(NULL), usableNodes(NULL),
+      mappingsDirty(false), localGroupID(0) { }
 
-MirrorBuddyGroupMapper::MirrorBuddyGroupMapper()
-   : targetMapper(NULL), capacityPools(NULL), mappingsDirty(false), localGroupID(0)
-{ }
+MirrorBuddyGroupMapper::MirrorBuddyGroupMapper():
+     targetMapper(NULL), capacityPools(NULL), usableNodes(NULL),
+     mappingsDirty(false), localGroupID(0) { }
 
 /**
  * Map two target IDs to a buddyGroupID.
@@ -52,6 +52,19 @@ FhgfsOpsErr MirrorBuddyGroupMapper::mapMirrorBuddyGroup(uint16_t buddyGroupID,
 
       if (! this->targetMapper->targetExists(secondaryTargetID) )
          return FhgfsOpsErr_UNKNOWNTARGET;
+   }
+   else if (usableNodes)
+   {
+      // for the metadata buddy group mapper we have no targetMapper to check whether node exists
+      // or not, so we use the nodeStore that was attached from the App
+
+      NodeHandle primaryNode = usableNodes->referenceNode(NumNodeID(primaryTargetID));
+      if (!primaryNode)
+         return FhgfsOpsErr_UNKNOWNNODE;
+
+      NodeHandle secondaryNode = usableNodes->referenceNode(NumNodeID(secondaryTargetID));
+      if (!secondaryNode)
+         return FhgfsOpsErr_UNKNOWNNODE;
    }
 
    uint16_t primaryInGroup = getBuddyGroupID(primaryTargetID);
@@ -566,6 +579,19 @@ void MirrorBuddyGroupMapper::attachCapacityPools(NodeCapacityPools* capacityPool
    SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
 
    this->capacityPools = capacityPools;
+
+   safeLock.unlock(); // U N L O C K
+}
+
+/**
+ * node store is only used for metadata nodes to check for their existence when adding them to a
+ * BMG
+ */
+void MirrorBuddyGroupMapper::attachNodeStore(NodeStore* usableNodes)
+{
+   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+
+   this->usableNodes = usableNodes;
 
    safeLock.unlock(); // U N L O C K
 }

@@ -199,7 +199,7 @@ void ModeGetEntryInfo::printHelp()
    std::cout << "                         stdin (separated by newline)." << std::endl;
    std::cout << " Optional:" << std::endl;
    std::cout << "  --unmounted            If this is specified then the given path is relative" << std::endl;
-   std::cout << "                         to the root directory of a possibly unmounted FhGFS." << std::endl;
+   std::cout << "                         to the root directory of a possibly unmounted BeeGFS." << std::endl;
    std::cout << "                         (Symlinks will not be resolved in this case.)" << std::endl;
    std::cout << "  --verbose              Print more entry information, e.g. location on server." << std::endl;
    std::cout << "  --nomappings           Do not print to which storage servers the stripe" << std::endl;

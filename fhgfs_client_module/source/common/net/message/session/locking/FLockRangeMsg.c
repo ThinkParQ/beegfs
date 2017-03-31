@@ -6,6 +6,7 @@ const struct NetMessageOps FLockRangeMsg_Ops = {
    .deserializePayload = _NetMessage_deserializeDummy,
    .processIncoming = NetMessage_processIncoming,
    .getSupportedHeaderFeatureFlagsMask = NetMessage_getSupportedHeaderFeatureFlagsMask,
+   .supportsSequenceNumbers = true,
 };
 
 void FLockRangeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)

@@ -4,6 +4,7 @@
 #include <common/Common.h>
 #include <common/threading/Condition.h>
 #include <common/threading/Mutex.h>
+#include <common/threading/UniqueRWLock.h>
 #include <common/threading/RWLock.h>
 #include <common/threading/SafeMutexLock.h>
 
@@ -32,26 +33,47 @@ class ChunkLockStore
       std::map<uint16_t, std::shared_ptr<ChunkLockStoreContents>> targetsMap;
       RWLock targetsLock; // synchronizes insertion into targetsMap
 
-   public:
-      void lockChunk(uint16_t targetID, std::string chunkID)
+      ChunkLockStoreContents* getOrInsertTargetLockStore(uint16_t targetID)
       {
-         targetsLock.readLock(); // lock targets map
-
-         ChunkLockStoreContents* targetLockStore = nullptr;
+         UniqueRWLock lock(targetsLock, SafeRWLock_READ);
 
          auto targetsIter = targetsMap.find(targetID);
          if (targetsIter != targetsMap.end())
          {
-            targetLockStore = targetsIter->second.get();
+            return targetsIter->second.get();
          }
          else
-         { // slow path: get write lock and insert
-            targetsLock.unlock();
-            targetsLock.writeLock();
+         {
+            lock.unlock();
+            lock.lock(SafeRWLock_WRITE);
 
-            targetsMap.insert({targetID, std::make_shared<ChunkLockStoreContents>()});
-            targetLockStore = targetsMap[targetID].get();
+            return targetsMap.insert({targetID, std::make_shared<ChunkLockStoreContents>()})
+               .first->second.get();
          }
+      }
+
+      ChunkLockStoreContents* findTargetLockStore(uint16_t targetID)
+      {
+         UniqueRWLock lock(targetsLock, SafeRWLock_READ);
+         auto targetsIter = targetsMap.find(targetID);
+
+         if (unlikely(targetsIter == targetsMap.end()))
+         {
+            LogContext(__func__).log(Log_WARNING,
+               "Tried to access chunk lock, but target not found in lock map. Printing backtrace. "
+               "targetID: " + StringTk::uintToStr(targetID) );
+            LogContext(__func__).logBacktrace();
+
+            return nullptr;
+         }
+
+         return targetsIter->second.get();
+      }
+
+   public:
+      void lockChunk(uint16_t targetID, std::string chunkID)
+      {
+         auto targetLockStore = getOrInsertTargetLockStore(targetID);
 
          SafeMutexLock chunksLock(&targetLockStore->lockedChunksMutex);
 
@@ -68,29 +90,15 @@ class ChunkLockStore
          }
 
          chunksLock.unlock();
-
-         targetsLock.unlock(); // unlock targets map
       }
 
       void unlockChunk(uint16_t targetID, std::string chunkID)
       {
-         ChunkLockStoreContents* targetLockStore;
          StringSetIter lockChunksIter;
 
-         targetsLock.readLock(); // lock targets map
-
-         auto targetsIter = targetsMap.find(targetID);
-         if(unlikely(targetsIter == targetsMap.end() ) )
-         { // target not found should never happen here
-            LogContext(__func__).log(Log_WARNING,
-               "Tried to unlock chunk, but target not found in lock map. Printing backtrace. "
-               "targetID: " + StringTk::uintToStr(targetID) );
-            LogContext(__func__).logBacktrace();
-
-            goto unlock_targets;
-         }
-
-         targetLockStore = targetsIter->second.get();
+         auto targetLockStore = findTargetLockStore(targetID);
+         if(unlikely(targetLockStore == nullptr))
+            return;
 
          targetLockStore->lockedChunksMutex.lock();
 
@@ -110,11 +118,8 @@ class ChunkLockStore
 
          targetLockStore->chunkUnlockedCondition.broadcast(); // notify lock waiters
 
-         unlock_chunks:
-            targetLockStore->lockedChunksMutex.unlock();
-
-         unlock_targets:
-            targetsLock.unlock(); // unlock targets map
+      unlock_chunks:
+         targetLockStore->lockedChunksMutex.unlock();
       }
 
    protected:
@@ -123,21 +128,15 @@ class ChunkLockStore
       {
          size_t retVal = 0;
 
-         targetsLock.readLock(); // lock targets map
-
-         auto targetsIter = targetsMap.find(targetID);
-         if(targetsIter != targetsMap.end() ) // map does exist
+         auto targetLockStore = findTargetLockStore(targetID);
+         if(targetLockStore) // map does exist
          {
-            ChunkLockStoreContents* targetLockStore = targetsIter->second.get();
-
             SafeMutexLock chunksLock(&targetLockStore->lockedChunksMutex);
 
             retVal = targetLockStore->lockedChunks.size();
 
             chunksLock.unlock();
          }
-
-         targetsLock.unlock(); // unlock targets map
 
          return retVal;
       }
@@ -146,21 +145,15 @@ class ChunkLockStore
       {
          StringSet outLockStore;
 
-         targetsLock.readLock(); // lock targets map
-
-         auto targetsIter = targetsMap.find(targetID);
-         if(targetsIter != targetsMap.end() ) // map does exist
+         auto targetLockStore = findTargetLockStore(targetID);
+         if(targetLockStore) // map does exist
          {
-            ChunkLockStoreContents* targetLockStore = targetsIter->second.get();
-
             SafeMutexLock chunksLock(&targetLockStore->lockedChunksMutex);
 
             outLockStore = targetLockStore->lockedChunks;
 
             chunksLock.unlock();
          }
-
-         targetsLock.unlock(); // unlock targets map
 
          return outLockStore;
       }

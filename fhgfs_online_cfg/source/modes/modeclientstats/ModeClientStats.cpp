@@ -234,9 +234,6 @@ void ModeClientStats::printHelp()
    std::cout << "  For per-user stats, requests from unknown user IDs, e.g. due to request" << std::endl;
    std::cout << "  forwarding, will be shown as user ID \"-1\"." << std::endl;
    std::cout << std::endl;
-   std::cout << " Note:" << std::endl;
-   std::cout << "  User statistics are only available with version 2014.01-r6 or higher servers." << std::endl;
-   std::cout << std::endl;
    std::cout << " Example: Show per-client metadata access statistics, refresh every 5 seconds" << std::endl;
    std::cout << "  $ beegfs-ctl --clientstats --interval=5 --nodetype=meta" << std::endl;
    std::cout << std::endl;

@@ -34,6 +34,9 @@
 #define APPCODE_INITIALIZATION_ERROR   2
 #define APPCODE_RUNTIME_ERROR          3
 #define APPCODE_INVALID_RESULT         4
+#define APPCODE_NODE_NOT_REACHABLE     5
+#define APPCODE_TARGET_NOT_ONLINE      6
+#define APPCODE_TARGET_NOT_GOOD        7
 
 
 typedef std::list<Worker*> WorkerList;

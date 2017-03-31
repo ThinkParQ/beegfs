@@ -17,6 +17,9 @@
 #include <dirent.h>
 
 
+#define STORAGETK_FORMAT_FILENAME            "format.conf"
+#define STORAGETK_BACKUP_EXT                 ".bak" /* extension for old file backups */
+
 #define STORAGETK_FILE_COMMENT_CHAR          '#'
 #define STORAGETK_ORIGINALNODEID_FILENAME    "originalNodeID" /* contains first-run nodeID */
 #define STORAGETK_NODEID_FILENAME            "nodeID" /* to force a certain nodeID */
@@ -116,6 +119,9 @@ class StorageTk
          bool hasOrigFeature, Path& outChunkDirPath, std::string& outCompleteChunkFilePathStr);
 
       static bool removeDirRecursive(const std::string& dir);
+
+      static std::pair<FhgfsOpsErr, std::vector<char>> readFile(const std::string& filename,
+            int maxSize);
 
    private:
       StorageTk() {}

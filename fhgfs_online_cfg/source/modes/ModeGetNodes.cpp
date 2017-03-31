@@ -16,6 +16,7 @@
 #define MODEGETNODES_ARG_PRINTNICDETAILS           "--nicdetails"
 #define MODEGETNODES_ARG_PRINTFHGFSVERSION         "--showversion"
 #define MODEGETNODES_ARG_CHECKREACHABILITY         "--reachable"
+#define MODEGETNODES_ARG_ERRORCODES                "--errorcodes"
 #define MODEGETNODES_ARG_REACHABILITYRETRIES       "--reachretries"
 #define MODEGETNODES_ARG_REACHABILITYTIMEOUT_MS    "--reachtimeout"
 #define MODEGETNODES_ARG_PING                      "--ping"
@@ -27,14 +28,19 @@
 int ModeGetNodes::execute()
 {
    App* app = Program::getApp();
-   AbstractNodeStore* nodeStore;
+   DatagramListener* dgramLis = app->getDatagramListener();
+   NodeStoreServers* mgmtNodes = app->getMgmtNodes();
+   std::string mgmtHost = app->getConfig()->getSysMgmtdHost();
+   unsigned short mgmtPortUDP = app->getConfig()->getConnMgmtdPortUDP();
 
+   const int mgmtTimeoutMS = 2500;
+
+   std::vector<std::shared_ptr<Node>> nodes;
    std::set<NumNodeID> unreachableNodes;
 
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
 
    // check arguments
-
    StringMapIter iter = cfg->find(MODEGETNODES_ARG_PRINTDETAILS);
    if(iter != cfg->end() )
    {
@@ -64,6 +70,13 @@ int ModeGetNodes::execute()
       cfg->erase(iter);
    }
 
+   iter = cfg->find(MODEGETNODES_ARG_ERRORCODES);
+   if(iter != cfg->end() )
+   {
+      cfgNotReachableAsError = true;
+      cfg->erase(iter);
+   }
+
    iter = cfg->find(MODEGETNODES_ARG_REACHABILITYRETRIES);
    if(iter != cfg->end() )
    {
@@ -77,7 +90,7 @@ int ModeGetNodes::execute()
       cfgReachabilityRetryTimeoutMS = StringTk::strToUInt(iter->second);
       cfg->erase(iter);
    }
-   
+
    iter = cfg->find(MODEGETNODES_ARG_PING);
    if(iter != cfg->end() )
    {
@@ -113,28 +126,32 @@ int ModeGetNodes::execute()
    if(ModeHelper::checkInvalidArgs(cfg) )
       return APPCODE_INVALID_CONFIG;
 
-   switch (nodeType)
+   if (nodeType != NODETYPE_Client && nodeType != NODETYPE_Meta && nodeType != NODETYPE_Storage
+         && nodeType != NODETYPE_Mgmt)
    {
-      case NODETYPE_Client:
-         nodeStore = app->getClientNodes();
-         break;
-      case NODETYPE_Meta:
-         nodeStore = app->getMetaNodes();
-         rootNodeID = app->getMetaNodes()->getRootNodeNumID();
-         break;
-      case NODETYPE_Storage:
-         nodeStore = app->getStorageNodes();
-         break;
-      case NODETYPE_Mgmt:
-         nodeStore = app->getMgmtNodes();
-         break;
-      default:
-         std::cerr << "Invalid or missing node type." << std::endl;
-         return APPCODE_INVALID_CONFIG;
+      std::cerr << "Invalid or missing node type." << std::endl;
+      return APPCODE_INVALID_CONFIG;
    }
 
-   // rootNode can always come from meta store
-   auto nodes = nodeStore->referenceAllNodes();
+   // Download the nodes into a list, not into the nodeStore yet*
+   // The ones that actually reply to our heartbeat request will be sorted into the node store by
+   // checkReachability.
+   if (!NodesTk::waitForMgmtHeartbeat(
+            NULL, dgramLis, mgmtNodes, mgmtHost, mgmtPortUDP, mgmtTimeoutMS))
+   {
+      std::cerr << "Management node communication failed: " << mgmtHost << std::endl;
+      return APPCODE_RUNTIME_ERROR;
+   }
+
+   auto mgmtNode = mgmtNodes->referenceFirstNode();
+
+   if (!NodesTk::downloadNodes(*mgmtNode, nodeType, nodes, false, &rootNodeID))
+   {
+      std::cerr << "Node download failed." << std::endl;
+      return APPCODE_RUNTIME_ERROR;
+   }
+
+   NodesTk::applyLocalNicCapsToList(app->getLocalNode(), nodes);
 
    // check reachability
    if(cfgCheckReachability)
@@ -152,6 +169,9 @@ int ModeGetNodes::execute()
    // print nodes
    printNodes(nodes, unreachableNodes, rootNodeID);
 
+   if(cfgNotReachableAsError && !unreachableNodes.empty() )
+      return APPCODE_NODE_NOT_REACHABLE;
+
    return APPCODE_NO_ERROR;
 }
 
@@ -168,6 +188,8 @@ void ModeGetNodes::printHelp()
    std::cout << "                         IP address of each node interface." << std::endl;
    std::cout << "  --showversion          Print node version code." << std::endl;
    std::cout << "  --reachable            Check node reachability (from localhost)." << std::endl;
+   std::cout << "  --errorcodes           Exit code reports an error if a node is not reachable," << std::endl;
+   std::cout << "                         requires the option --reachable." << std::endl;
    std::cout << "  --reachretries=<num>   Number of retries for reachability check." << std::endl;
    std::cout << "                         (Default: 6)" << std::endl;
    std::cout << "  --reachtimeout=<ms>    Timeout in ms for reachability check retry." << std::endl;

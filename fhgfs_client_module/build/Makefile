@@ -8,58 +8,14 @@
 
 TARGET ?= beegfs
 
-
-ifneq ($(KERNELRELEASE),)
-
-#
-# --- kbuild part [START] ---
-#
-
-BEEGFS_FEATURE_DETECTION := $(shell $(dir $(lastword $(MAKEFILE_LIST)))/feature-detect.sh)
-ifneq ($(lastword $(BEEGFS_FEATURE_DETECTION)),--~~success~~--)
-   $(error feature detection reported an error)
-else
-   BEEGFS_FEATURE_DETECTION := $(filter-out --~~success~~--,$(BEEGFS_FEATURE_DETECTION))
-endif
-
-# ccflags-y was introduced in 2.6.24, earlier kernels use EXTRA_CFLAGS for the same purpose
-ifeq ($(origin ccflags-y),file)
-ccflags-y += $(BEEGFS_FEATURE_DETECTION)
-else
-# the client makefile sets this already
-override EXTRA_CFLAGS += $(BEEGFS_FEATURE_DETECTION)
-endif
-
-# Auto-selection of source files and corresponding target objects 
-BEEGFS_SOURCES := $(shell find $(obj)/../source -name '*.c')
-BEEGFS_SOURCES_STRIPPED := $(subst $(obj)/, , $(BEEGFS_SOURCES) )
-
-BEEGFS_OBJECTS := $(BEEGFS_SOURCES_STRIPPED:.c=.o)
-
-
-obj-m	+= ${TARGET}.o
-
-${TARGET}-y	:= $(BEEGFS_OBJECTS)
-
-#
-# --- kbuild part [END] ---
-#
-
-else
-
-#
-# --- Normal make part [START] ---
-#
+export TARGET
+export OFED_INCLUDE_PATH
 
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
 else
 BEEGFS_BUILDDIR := $(obj)
 endif
-
-BEEGFS_AUTOCONF_REL_PATH=source/common/net/sock/rdma_autoconf.h
-BEEGFS_AUTOCONF_BUILD_REL_PATH=../$(BEEGFS_AUTOCONF_REL_PATH)
-BEEGFS_AUTOCONF_BUILD_PATH=$(BEEGFS_BUILDDIR)/$(BEEGFS_AUTOCONF_BUILD_REL_PATH)
 
 
 # The following section deals with the auto-detection of the kernel
@@ -69,7 +25,8 @@ BEEGFS_AUTOCONF_BUILD_PATH=$(BEEGFS_BUILDDIR)/$(BEEGFS_AUTOCONF_BUILD_REL_PATH)
 # (This is usually /lib/modules/<kernelversion>/build, but you can specify
 # multiple directories here as a space-separated list)
 ifeq ($(KDIR),)
-KDIR = /lib/modules/$(shell uname -r)/build /usr/src/linux-headers-$(shell uname -r)
+KDIR = /lib/modules/$(shell uname -r)/build /usr/src/linux-headers-$(shell uname -r) \
+       /usr/src/kernels/$(shell uname -r)
 endif
 
 # Prune the KDIR list down to paths that exist and have an
@@ -122,7 +79,7 @@ KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(shell uname -r)/updates/fs/beegfs
 # includes.)
 BEEGFS_CFLAGS  :=  $(BUILD_ARCH) $(KERNEL_FEATURE_DETECTION) \
 	-I$(BEEGFS_BUILDDIR)/../source \
-	-Wextra -Wno-unused-parameter \
+	-Wextra -Wno-unused-parameter -Wno-missing-field-initializers \
 	-DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
 
 ifeq ($(shell echo | gcc -Wtype-limits -E - >/dev/null 2>&1 && echo 1),1)
@@ -148,17 +105,6 @@ endif
 # OFED API version
 ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
-endif
-
-# Note: Make sure we include OFED_INCLUDE_PATH files before the standard kernel
-# include files.
-ifneq ($(OFED_INCLUDE_PATH),)
-BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
-endif
-
-
-ifneq ($(OFED_LIB_PATH),)
-BEEGFS_LDFLAGS += -L$(OFED_LIB_PATH)
 endif
 
 
@@ -208,26 +154,14 @@ module: $(TARGET_ALL_DEPS)
 
 ifneq ($(OFED_INCLUDE_PATH),)
 	if [ -f $(OFED_INCLUDE_PATH)/../Module.symvers ]; then \
-		cp $(OFED_INCLUDE_PATH)/../Module.symvers . ; \
-		cp $(OFED_INCLUDE_PATH)/../Module.symvers Modules.symvers ; \
+		cp $(OFED_INCLUDE_PATH)/../Module.symvers ../source ; \
 	fi
 endif
 
-	@ cp $(BEEGFS_AUTOCONF_BUILD_PATH).in \
-		$(BEEGFS_AUTOCONF_BUILD_PATH)
+	$(MAKE) -C $(KDIR_PRUNED_HEAD) "SUBDIRS=$(BEEGFS_BUILDDIR)/../source" \
+	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)"  modules
 
-	@ # note the "/" in ${OFED_INCLUDE_PATH}/! Therefore the if-condition.
-	@ if [ -n "${OFED_INCLUDE_PATH}" ]; then 			       	\
-		  sed -i -e 's#__OFED_INCLUDE_PATH__#${OFED_INCLUDE_PATH}/#g' 	\
-			$(BEEGFS_AUTOCONF_BUILD_PATH);			\
-	  else 									\
-		  sed -i -e 's#__OFED_INCLUDE_PATH__##g' 			\
-			$(BEEGFS_AUTOCONF_BUILD_PATH);			\
-	  fi
-
-	$(MAKE) -C $(KDIR_PRUNED_HEAD) "SUBDIRS=$(BEEGFS_BUILDDIR)" \
-	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)" modules
-
+	@cp ../source/$(TARGET).ko .
 	@ cp ${TARGET}.ko ${TARGET}-unstripped.ko
 	@ ${STRIP} --strip-debug ${TARGET}.ko;
 
@@ -253,7 +187,7 @@ ifeq ($(BEEGFS_VERSION_CODE),)
 endif
 
 	@ echo "Creating release directory:" $(RELEASE_PATH_CLIENT)
-	mkdir --parents $(RELEASE_PATH_CLIENT)/build
+	mkdir --parents $(RELEASE_PATH_CLIENT)/build $(RELEASE_PATH_CLIENT)/source
 
 	@ echo "Storing beegfs version:" $(BEEGFS_VERSION)
 	echo "BEEGFS_VERSION =" $(BEEGFS_VERSION) > $(RELEASE_PATH_CLIENT)/build/Version.mk
@@ -264,13 +198,7 @@ endif
 	cp KernelFeatureDetection.mk $(RELEASE_PATH_CLIENT)/build/
 	cp AutoRebuild.mk $(RELEASE_PATH_CLIENT)/build/
 	cp feature-detect.sh $(RELEASE_PATH_CLIENT)/build/
-
-	mkdir --parents $(RELEASE_PATH_CLIENT)/source/common/net/sock
-	cp $(BEEGFS_AUTOCONF_BUILD_PATH).in \
-		$(RELEASE_PATH_CLIENT)/$(BEEGFS_AUTOCONF_REL_PATH).in
-
-	# make sure we don't add autoconf.h to packages
-	rm -f $(BEEGFS_AUTOCONF_BUILD_PATH)
+	cp ../source/Makefile $(RELEASE_PATH_CLIENT)/source/
 
 	find ../source -mount -name '*.h' -type f | \
 		xargs -I ’{}’ cp --parents ’{}’ $(RELEASE_PATH_CLIENT)/build
@@ -284,14 +212,13 @@ install:
 clean:
 	rm -f *~ .${TARGET}??*
 	rm -f .*.cmd *.mod.c *.mod.o *.o *.ko *.ko.unsigned
-	rm -f Module*.symvers modules.order Module.markers
+	rm -f ../source/Module*.symvers ../source/modules.order ../source/Module.markers
 	rm -f $(AUTO_REBUILD_KVER_FILE)
 	rm -rf .tmp_versions/
 	find ../source/ -mount -name '*.o' -type f -delete
 	find ../source/ -mount -name '.*.o.cmd' -type f -delete
 	find ../source/ -mount -name '.*.o.d' -type f -delete
 	find ../source/ -mount -name '*.gcno' -type f -delete
-	rm -f $(BEEGFS_AUTOCONF_BUILD_REL_PATH)
 
 rpm:
 	./make-rpm
@@ -334,9 +261,3 @@ help:
 	@echo '   prepare_release   - build and copy files into the RELEASE_PATH directory'
 	@echo '   rpm               - create a rpm package file'
 	@echo '   deb               - build debian package file'
-
-#	
-# --- Normal make part [END] ---
-#
-
-endif

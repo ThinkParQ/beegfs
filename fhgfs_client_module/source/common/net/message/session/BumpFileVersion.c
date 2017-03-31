@@ -12,4 +12,5 @@ const struct NetMessageOps BumpFileVersionMsg_Ops = {
    .deserializePayload = _NetMessage_deserializeDummy,
    .processIncoming = NetMessage_processIncoming,
    .getSupportedHeaderFeatureFlagsMask = NetMessage_getSupportedHeaderFeatureFlagsMask,
+   .supportsSequenceNumbers = true,
 };
