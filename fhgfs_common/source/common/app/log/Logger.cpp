@@ -13,6 +13,7 @@ const Logger::LogTopicElem Logger::LogTopics[] =
 {
    {"general",           LogTopic_GENERAL},
    {"state-sync",        LogTopic_STATESYNC},
+   {"workqueues",        LogTopic_WORKQUEUES},
    {"unknown",           LogTopic_INVALID}
 };
 

@@ -136,7 +136,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    } // end of server heartbeat specific handling
 
-   
+
    if(isNodeNew)
    { // this node is new
       RegisterNodeMsgEx::processNewNode(nodeID, getNodeNumID(), nodeType, getFhgfsVersion(),
@@ -145,6 +145,11 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    // send response
    acknowledge(ctx);
+
+   if (nodeType == NODETYPE_Meta)
+      app->getMetaStateStore()->saveStatesToFile();
+   else if (nodeType == NODETYPE_Storage)
+      app->getTargetStateStore()->saveStatesToFile();
 
    return true;
 }

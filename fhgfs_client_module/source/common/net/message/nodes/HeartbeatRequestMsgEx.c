@@ -22,6 +22,7 @@ bool __HeartbeatRequestMsgEx_processIncoming(NetMessage* this, struct App* app,
    Config* cfg = App_getConfig(app);
    Node* localNode = App_getLocalNode(app);
    const char* localNodeID = Node_getID(localNode);
+   NumNodeID localNodeNumID = Node_getNumID(localNode);
    NicAddressList* nicList = Node_getNicList(localNode);
    const BitStore* nodeFeatureFlags = Node_getNodeFeatures(localNode);
 
@@ -31,7 +32,7 @@ bool __HeartbeatRequestMsgEx_processIncoming(NetMessage* this, struct App* app,
    ssize_t sendRes;
 
 
-   HeartbeatMsgEx_initFromNodeData(&hbMsg, localNodeID, (NumNodeID){0}, NODETYPE_Client, nicList,
+   HeartbeatMsgEx_initFromNodeData(&hbMsg, localNodeID, localNodeNumID, NODETYPE_Client, nicList,
       nodeFeatureFlags);
    HeartbeatMsgEx_setPorts(&hbMsg, Config_getConnClientPortUDP(cfg), 0);
    HeartbeatMsgEx_setFhgfsVersion(&hbMsg, BEEGFS_VERSION_CODE);

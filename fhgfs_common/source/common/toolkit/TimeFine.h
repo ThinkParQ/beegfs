@@ -36,6 +36,11 @@ class TimeFine : public Time
          return TimeFine().elapsedSinceMS(this);
       }
 
+      virtual unsigned elapsedMicro() const
+      {
+         return TimeFine().elapsedSinceMicro(this);
+      }
+
 };
 
 #endif /* TIMEFINE_H_ */

@@ -1,6 +1,8 @@
 #include <common/toolkit/TimeAbs.h>
 #include "StatsCollector.h"
 
+#include <mutex>
+
 StatsCollector::StatsCollector(MultiWorkQueue* workQ, unsigned collectIntervalMS,
    unsigned historyLength) throw(ComponentInitException)
     : PThread("Stats"),
@@ -45,7 +47,7 @@ void StatsCollector::collectStats()
 {
    HighResolutionStats currentStats;
 
-   SafeMutexLock mutexLock(&mutex);
+   std::lock_guard<Mutex> mutexLock(mutex);
 
    // Note: Newer stats in the internal list are pushed at the front side
 
@@ -61,8 +63,6 @@ void StatsCollector::collectStats()
 
    // push new stats to front
    statsList.push_front(currentStats);
-
-   mutexLock.unlock();
 }
 
 /**
@@ -70,7 +70,7 @@ void StatsCollector::collectStats()
  */
 void StatsCollector::getStatsSince(uint64_t lastStatsMS, HighResStatsList& outStatsList)
 {
-   SafeMutexLock mutexLock(&mutex);
+   std::lock_guard<Mutex> mutexLock(mutex);
 
    // Note: Newer stats in the internal list are pushed at the front side, but
    // newer stats on the outStatsList are pushed to the back side.
@@ -83,6 +83,4 @@ void StatsCollector::getStatsSince(uint64_t lastStatsMS, HighResStatsList& outSt
 
       outStatsList.push_back(*iter);
    }
-
-   mutexLock.unlock();
 }

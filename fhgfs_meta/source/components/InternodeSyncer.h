@@ -26,6 +26,7 @@ class InternodeSyncer : public PThread
       static bool downloadAndSyncNodes();
       static bool downloadAndSyncTargetMappings();
       static bool downloadAndSyncTargetStatesAndBuddyGroups();
+      static bool downloadAndSyncCapacityPools();
 
       static void downloadAndSyncClients(bool requeue);
 
@@ -58,11 +59,11 @@ class InternodeSyncer : public PThread
       virtual void run();
       void syncLoop();
 
-      void updateMetaCapacityPools();
-      void updateMetaBuddyCapacityPools();
-      void updateStorageCapacityPools();
-      void updateTargetBuddyCapacityPools();
-      bool downloadCapacityPools(CapacityPoolQueryType poolType, UInt16List* outListNormal,
+      static bool updateMetaCapacityPools();
+      static bool updateMetaBuddyCapacityPools();
+      static bool updateStorageCapacityPools();
+      static bool updateTargetBuddyCapacityPools();
+      static bool downloadCapacityPools(CapacityPoolQueryType poolType, UInt16List* outListNormal,
          UInt16List* outListLow, UInt16List* outListEmergency);
       void publishNodeCapacity();
 

@@ -293,8 +293,9 @@ bool MgmtdTargetStateStore::autoOfflineTargets(const unsigned pofflineTimeoutMS,
             LogContext(logContext).log(LogTopic_STATESYNC, Log_ERR,
                "Tried to switch mirror group members, "
                "but refusing to switch due to secondary " + nodeTypeStr(false) + " state. "
-               "Secondary " + nodeTypeStr(false) + " ID: " + StringTk::uintToStr(*targetIDIter) +
-               "; secondary state: " + TargetStateStore::stateToStr(secondaryTargetState) );
+               "Current secondary " + nodeTypeStr(false)
+               + " ID: " + StringTk::uintToStr(secondaryTargetID)
+               + "; secondary state: " + TargetStateStore::stateToStr(secondaryTargetState) );
             continue;
          }
 

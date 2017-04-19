@@ -35,7 +35,7 @@ class PersonalWorkQueue
          for(WorkListIter iter = workList.begin(); iter != workList.end(); iter++)
             delete(*iter);
       }
-      
+
 
    private:
       WorkList workList;

@@ -24,6 +24,7 @@ enum LogTopic
 {
    LogTopic_GENERAL=0,       // default log topic
    LogTopic_STATESYNC=1, // everything related to offline detection
+   LogTopic_WORKQUEUES=2, // En/dequeueing of work items
    LogTopic_INVALID
 };
 

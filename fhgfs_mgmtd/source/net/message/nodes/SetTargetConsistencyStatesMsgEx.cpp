@@ -36,5 +36,7 @@ bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
 
    ctx.sendResponse(SetTargetConsistencyStatesRespMsg(result) );
 
+   stateStore->saveStatesToFile();
+
    return true;
 }

@@ -1,7 +1,6 @@
 #include "MultiWorkQueue.h"
 #include "PersonalWorkQueue.h"
 
-
 MultiWorkQueue::MultiWorkQueue()
 {
    numPendingWorks = 0;
@@ -29,9 +28,7 @@ MultiWorkQueue::~MultiWorkQueue()
 Work* MultiWorkQueue::waitForDirectWork(HighResolutionStats& newStats,
    PersonalWorkQueue* personalWorkQueue)
 {
-   Work* work;
-
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   std::lock_guard<Mutex> mutexLock(mutex);
 
    HighResolutionStatsTk::addHighResIncStats(newStats, stats);
    stats.rawVals.busyWorkers--;
@@ -44,18 +41,33 @@ Work* MultiWorkQueue::waitForDirectWork(HighResolutionStats& newStats,
    // personal is always first
    if(unlikely(!personalWorkQueue->getIsWorkListEmpty() ) )
    { // we got something in our personal queue
-      work = personalWorkQueue->getAndPopFirstWork();
+      Work* work = personalWorkQueue->getAndPopFirstWork();
+#ifdef BEEGFS_DEBUG_PROFILING
+      const auto workAgeMS = work->getAgeTime()->elapsedMS();
+      if (workAgeMS > 10)
+         LOG_TOP(WORKQUEUES, DEBUG, "Fetching personal work item.", work,
+               as("age (ms)", workAgeMS));
+      else
+         LOG_TOP(WORKQUEUES, DEBUG, "Fetching personal work item.", work,
+               as("age (us)", work->getAgeTime()->elapsedMicro()));
+#endif
+      return work;
    }
    else
    {
-      work = directWorkList->getAndPopNextWork();
-
+      Work* work = directWorkList->getAndPopNextWork();
       numPendingWorks--;
+#ifdef BEEGFS_DEBUG_PROFILING
+      const auto workAgeMS = work->getAgeTime()->elapsedMS();
+      if (workAgeMS > 10)
+         LOG_TOP(WORKQUEUES, DEBUG, "Fetching direct work item.",
+               work, as("age (ms)", workAgeMS));
+      else
+         LOG_TOP(WORKQUEUES, DEBUG, "Fetching direct work item.",
+               work, as("age (us)", work->getAgeTime()->elapsedMicro()));
+#endif
+      return work;
    }
-
-   mutexLock.unlock(); // U N L O C K
-
-   return work;
 }
 
 /**
@@ -67,9 +79,7 @@ Work* MultiWorkQueue::waitForDirectWork(HighResolutionStats& newStats,
 Work* MultiWorkQueue::waitForAnyWork(HighResolutionStats& newStats,
    PersonalWorkQueue* personalWorkQueue)
 {
-   Work* work;
-
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   std::lock_guard<Mutex> mutexLock(mutex);
 
    HighResolutionStatsTk::addHighResIncStats(newStats, stats);
    stats.rawVals.busyWorkers--;
@@ -97,7 +107,17 @@ Work* MultiWorkQueue::waitForAnyWork(HighResolutionStats& newStats,
    // personal is always first
    if(unlikely(!personalWorkQueue->getIsWorkListEmpty() ) )
    { // we got something in our personal queue
-      work = personalWorkQueue->getAndPopFirstWork();
+      Work* work = personalWorkQueue->getAndPopFirstWork();
+#ifdef BEEGFS_DEBUG_PROFILING
+      const auto workAgeMS = work->getAgeTime()->elapsedMS();
+      if (workAgeMS > 10)
+         LOG_TOP(WORKQUEUES, DEBUG, "Fetching personal work item.",
+               work, as("age (ms)", workAgeMS));
+      else
+         LOG_TOP(WORKQUEUES, DEBUG, "Fetching personal work item.",
+               work, as("age (us)", work->getAgeTime()->elapsedMicro()));
+#endif
+      return work;
    }
    else
    {
@@ -114,11 +134,21 @@ Work* MultiWorkQueue::waitForAnyWork(HighResolutionStats& newStats,
 
          if(!currentWorkList->getIsEmpty() )
          { // this queue contains work for us
-            work = currentWorkList->getAndPopNextWork();
-
+            Work* work = currentWorkList->getAndPopNextWork();
             numPendingWorks--;
 
-            goto unlock_and_exit;
+#ifdef BEEGFS_DEBUG_PROFILING
+            const std::string direct = (i == QueueWorkType_DIRECT) ? "direct" : "indirect";
+            const auto workAgeMS = work->getAgeTime()->elapsedMS();
+            if (workAgeMS > 10)
+               LOG_TOP(WORKQUEUES, DEBUG, "Fetching direct work item.",
+                  work, as("age (ms)", workAgeMS));
+            else
+               LOG_TOP(WORKQUEUES, DEBUG, "Fetching direct work item.",
+                  work, as("age (us)", work->getAgeTime()->elapsedMicro()));
+#endif
+
+            return work;
          }
       }
 
@@ -128,12 +158,6 @@ Work* MultiWorkQueue::waitForAnyWork(HighResolutionStats& newStats,
          "All queues are empty. "
          "numPendingWorks: " + StringTk::uint64ToStr(numPendingWorks) );
    }
-
-
-unlock_and_exit:
-   mutexLock.unlock(); // U N L O C K
-
-   return work;
 }
 
 /**
@@ -144,13 +168,11 @@ unlock_and_exit:
  */
 void MultiWorkQueue::incNumWorkers()
 {
-   SafeMutexLock mutexLock(&mutex);
+   std::lock_guard<Mutex> mutesLock(mutex);
 
    /* note: we increase number of busy workers here, because this value will be decreased
       by 1 when the worker calls waitFor...Work(). */
    stats.rawVals.busyWorkers++;
-
-   mutexLock.unlock();
 }
 
 /**
@@ -184,7 +206,7 @@ void MultiWorkQueue::setIndirectWorkList(AbstractWorkContainer* newWorkList)
 void MultiWorkQueue::getStatsAsStr(std::string& outIndirectQueueStats,
    std::string& outDirectQueueStats, std::string& outBusyStats)
 {
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   std::lock_guard<Mutex> mutexLock(mutex);
 
    // get queue stats
    indirectWorkList->getStatsAsStr(outIndirectQueueStats);
@@ -202,6 +224,4 @@ void MultiWorkQueue::getStatsAsStr(std::string& outIndirectQueueStats,
       "(reset every second)" << std::endl;
 
    outBusyStats = busyStream.str();
-
-   mutexLock.unlock(); // U N L O C K
 }

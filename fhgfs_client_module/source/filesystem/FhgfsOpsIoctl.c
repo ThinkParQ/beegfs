@@ -621,6 +621,7 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
    if (get_user(userFilename, &mkfileArg->filename))
       return -EFAULT;
 
+   if (chunksize != 0)
    { // check if chunksize is valid
       if(unlikely( (chunksize < STRIPEPATTERN_MIN_CHUNKSIZE) ||
                    !MathTk_isPowerOfTwo(chunksize) ) )

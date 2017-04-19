@@ -111,10 +111,7 @@ void InternodeSyncer::syncLoop()
 
       if(doCapacityPoolsUpdate)
       {
-         updateMetaCapacityPools();
-         updateMetaBuddyCapacityPools();
-         updateStorageCapacityPools();
-         updateTargetBuddyCapacityPools();
+         downloadAndSyncCapacityPools();
 
          lastCapacityUpdateT.setToNow();
       }
@@ -166,7 +163,15 @@ void InternodeSyncer::syncLoop()
    }
 }
 
-void InternodeSyncer::updateMetaCapacityPools()
+bool InternodeSyncer::downloadAndSyncCapacityPools()
+{
+   return updateMetaCapacityPools() &&
+      updateMetaBuddyCapacityPools() &&
+      updateStorageCapacityPools() &&
+      updateTargetBuddyCapacityPools();
+}
+
+bool InternodeSyncer::updateMetaCapacityPools()
 {
    NodeCapacityPools* pools = Program::getApp()->getMetaCapacityPools();
 
@@ -178,12 +183,13 @@ void InternodeSyncer::updateMetaCapacityPools()
       &listNormal, &listLow, &listEmergency);
 
    if(!downloadRes)
-      return;
+      return false;
 
    pools->syncPoolsFromLists(listNormal, listLow, listEmergency);
+   return true;
 }
 
-void InternodeSyncer::updateMetaBuddyCapacityPools()
+bool InternodeSyncer::updateMetaBuddyCapacityPools()
 {
    NodeCapacityPools* pools = Program::getApp()->getMetaBuddyCapacityPools();
 
@@ -195,12 +201,13 @@ void InternodeSyncer::updateMetaBuddyCapacityPools()
       &listNormal, &listLow, &listEmergency);
 
    if(!downloadRes)
-      return;
+      return false;
 
    pools->syncPoolsFromLists(listNormal, listLow, listEmergency);
+   return true;
 }
 
-void InternodeSyncer::updateStorageCapacityPools()
+bool InternodeSyncer::updateStorageCapacityPools()
 {
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
@@ -215,7 +222,7 @@ void InternodeSyncer::updateStorageCapacityPools()
       &listNormal, &listLow, &listEmergency);
 
    if(!downloadRes)
-      return;
+      return false;
 
    TargetMap targetMap;
 
@@ -225,9 +232,10 @@ void InternodeSyncer::updateStorageCapacityPools()
       targetMapper->getMapping(targetMap);
 
    pools->syncPoolsFromLists(listNormal, listLow, listEmergency, targetMap);
+   return true;
 }
 
-void InternodeSyncer::updateTargetBuddyCapacityPools()
+bool InternodeSyncer::updateTargetBuddyCapacityPools()
 {
    NodeCapacityPools* pools = Program::getApp()->getStorageBuddyCapacityPools();
 
@@ -239,9 +247,10 @@ void InternodeSyncer::updateTargetBuddyCapacityPools()
       &listNormal, &listLow, &listEmergency);
 
    if(!downloadRes)
-      return;
+      return false;
 
    pools->syncPoolsFromLists(listNormal, listLow, listEmergency);
+   return true;
 }
 
 /**

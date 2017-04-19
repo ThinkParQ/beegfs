@@ -62,6 +62,7 @@ class InternodeSyncer : public PThread
       void logDemotionFlags(const DemotionFlags& demotionFlags, NodeType nodeType);
 
       void saveTargetMappings();
+      void saveStates();
 
       void dropIdleConns();
       unsigned dropIdleConnsByStore(NodeStoreServersEx* nodes);

@@ -134,6 +134,9 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    bool isPrimaryInterface = true; // used to set expiration for non-primary interfaces;
       // "primary" means: first interface in the list that is supported by client and server
 
+   if(unlikely(Thread_isSignalPending() ) )
+      return NULL; // no need to try if a signal is pending
+
    Mutex_lock(&this->mutex); // L O C K
 
    if(!this->availableConns && (this->establishedConns == this->maxConns) )

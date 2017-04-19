@@ -575,9 +575,10 @@ static void __commkit_cleanup_generic(CommKitContext* context, struct CommKitTar
          (info->nodeResult == -FhgfsOpsErr_AGAIN &&
             (context->ops->retryFlags & CK_RETRY_LOOP_EAGAIN) ) ) )
    { // comm error occurred => check whether we can do a retry
-      if( App_getConnRetriesEnabled(context->app) &&
-          ( (!context->maxNumRetries) ||
-            (context->currentRetryNum < context->maxNumRetries) ) )
+      if (Thread_isSignalPending())
+         info->nodeResult = -FhgfsOpsErr_INTERRUPTED;
+      else if (App_getConnRetriesEnabled(context->app) &&
+            (!context->maxNumRetries || context->currentRetryNum < context->maxNumRetries))
       { // we have retries left
          context->numRetryWaiters++;
          info->state = CommKitState_RETRYWAIT;

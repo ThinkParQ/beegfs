@@ -57,15 +57,11 @@ void Worker::workLoop(QueueWorkType workType)
 
    while(!getSelfTerminate() || !maySelfTerminateNow() )
    {
-      //log.log(Log_DEBUG, "Waiting for work...");
-
       Work* work = waitForWorkByType(stats, personalWorkQueue, workType);
 
-      //log.log(Log_DEBUG, "Got work");
-
-      #ifdef BEEGFS_DEBUG_PROFILING
-         TimeFine workStartTime;
-      #endif
+#ifdef BEEGFS_DEBUG_PROFILING
+      TimeFine workStartTime;
+#endif
 
       HighResolutionStatsTk::resetStats(&stats); // prepare stats
 
@@ -76,18 +72,37 @@ void Worker::workLoop(QueueWorkType workType)
       stats.incVals.workRequests = 1;
       HighResolutionStatsTk::addHighResIncStats(*work->getHighResolutionStats(), stats);
 
-      #ifdef BEEGFS_DEBUG_PROFILING
-         TimeFine workEndTime;
-         int workElapsedMS = workEndTime.elapsedSinceMS(&workStartTime);
-         int workElapsedMicro = workEndTime.elapsedSinceMicro(&workStartTime);
+#ifdef BEEGFS_DEBUG_PROFILING
+      TimeFine workEndTime;
+      const auto workElapsedMS = workEndTime.elapsedSinceMS(&workStartTime);
+      const auto workLatencyMS = workEndTime.elapsedSinceMS(work->getAgeTime());
 
-         if(workEndTime.elapsedSinceMS(&workStartTime) >= 10)
-            LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Work processed. Elapsed ms: " +
-               StringTk::intToStr(workElapsedMS) );
+      if (workElapsedMS >= 10)
+      {
+         if (workLatencyMS >= 10)
+            LOG_TOP(WORKQUEUES, DEBUG, "Work processed.",
+                  as("Elapsed ms", workElapsedMS), as("Total latency (ms)", workLatencyMS));
          else
-            LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Work processed. Elapsed us: " +
-               StringTk::intToStr(workElapsedMicro) );
-      #endif
+            LOG_TOP(WORKQUEUES, DEBUG, "Work processed.", as("Elapsed ms", workElapsedMS),
+                  as("Total latency (us)", workEndTime.elapsedSinceMicro(work->getAgeTime())));
+      }
+      else
+      {
+         if (workLatencyMS >= 10)
+         {
+            LOG_TOP(WORKQUEUES, DEBUG, "Work processed.",
+                  as("Elapsed us", workEndTime.elapsedSinceMicro(&workStartTime)),
+                  as("Total latency (ms)", workEndTime.elapsedSinceMS(work->getAgeTime())));
+
+         }
+         else
+         {
+            LOG_TOP(WORKQUEUES, DEBUG, "Work processed.",
+                  as("Elapsed us", workEndTime.elapsedSinceMicro(&workStartTime)),
+                  as("Total latency (us)", workEndTime.elapsedSinceMicro(work->getAgeTime())));
+         }
+      }
+#endif
 
       // cleanup
       delete(work);

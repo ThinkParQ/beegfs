@@ -42,6 +42,7 @@ void InternodeSyncer::run()
    }
 
    saveTargetMappings();
+   saveStates();
 }
 
 void InternodeSyncer::syncLoop()
@@ -126,6 +127,8 @@ void InternodeSyncer::syncLoop()
          // if target states have changed, inform other nodes about it
          if (statesModified)
             app->getHeartbeatMgr()->notifyAsyncRefreshTargetStates();
+
+         saveStates();
 
          lastStatesUpdateT.setToNow();
       }
@@ -678,6 +681,16 @@ void InternodeSyncer::updateTargetBuddyCapacityPools()
 }
 
 
+void InternodeSyncer::saveStates()
+{
+   App* app = Program::getApp();
+   auto* targetStateStore = app->getTargetStateStore();
+   auto* metaStateStore = app->getMetaStateStore();
+
+   targetStateStore->saveStatesToFile();
+   metaStateStore->saveStatesToFile();
+}
+
 /**
  * Saves targetStrID->numID mappings (from targetNumIDMapper) and target->node mappings (from
  * targetMapper).
@@ -689,8 +702,6 @@ void InternodeSyncer::saveTargetMappings()
    TargetMapper* targetMapper = app->getTargetMapper();
    MirrorBuddyGroupMapper* storageMirrorGroupMapper = app->getStorageBuddyGroupMapper();
    MirrorBuddyGroupMapper* metaMirrorGroupMapper = app->getMetaBuddyGroupMapper();
-   MgmtdTargetStateStore* targetStateStore = app->getTargetStateStore();
-   MgmtdTargetStateStore* metaStateStore = app->getMetaStateStore();
 
    if(targetNumIDMapper->isMapperDirty() )
       targetNumIDMapper->saveToFile();
@@ -704,9 +715,6 @@ void InternodeSyncer::saveTargetMappings()
    if (metaMirrorGroupMapper->isMapperDirty() )
       metaMirrorGroupMapper->saveToFile();
 
-   targetStateStore->saveStatesToFile();
-
-   metaStateStore->saveStatesToFile();
 }
 
 /**

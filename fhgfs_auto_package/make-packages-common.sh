@@ -18,6 +18,7 @@ opentk_package="beegfs_opentk_lib" # deletes the libopentk.so, so needs to be la
 export CONCURRENCY=${MAKE_CONCURRENCY:-4}
 PACKAGEDIR="/tmp/beegfs_packages-${DATE}/"
 
+DO_CLEAN=true
 
 # print usage information
 print_usage()
@@ -39,7 +40,8 @@ print_usage()
 	echo "  -D     Disable beegfs-admon package build."
 	echo "  -C     Build client packages only."
 	echo "  -x     Build with BEEGFS_DEBUG."
-   echo "  -l F   log to specific file"
+        echo "  -l F   log to specific file"
+        echo "  -K     keep previously built files (no clean)"
 	echo
 	echo "EXAMPLE:"
 	echo "  $ `basename $0` -j 4 -p /tmp/my_beegfs_packages"
@@ -67,7 +69,7 @@ CLEAN_ONLY=0
 CLIENT_ONLY=0
 LOGFILE=
 
-while getopts "hcdm:v:DCxj:p:l:" opt; do
+while getopts "hcdm:v:DCxj:p:l:K" opt; do
 	case $opt in
 	h)
 		print_usage
@@ -99,16 +101,19 @@ while getopts "hcdm:v:DCxj:p:l:" opt; do
 		export CONCURRENCY="$OPTARG"
 		export MAKE_CONCURRENCY="$OPTARG"
 		;;
-   l)
-      if [[ "$OPTARG" == /* ]]; then
-         LOGFILE="$OPTARG"
-      else
-         LOGFILE="$PWD/$OPTARG"
-      fi
-      ;;
+        l)
+                if [[ "$OPTARG" == /* ]]; then
+                    LOGFILE="$OPTARG"
+                else
+                    LOGFILE="$PWD/$OPTARG"
+                fi
+                ;;
 	p)
 		PACKAGEDIR="$OPTARG"
 		;;
+        K)
+                DO_CLEAN=false
+                ;;
         :)
                 echo "Option -$OPTARG requires an argument." >&2
                 print_usage
@@ -166,17 +171,23 @@ make_dep_lib()
 
 	echo ${lib}
 	pwd
-	run_cmd "make -C ${lib}/${EXTRA_DIR}/build clean >${LOGFILE:-/dev/null}"
+	if ${DO_CLEAN}
+        then
+                run_cmd "make -C ${lib}/${EXTRA_DIR}/build clean >${LOGFILE:-/dev/null}"
+        fi 
 	run_cmd "make -C ${lib}/${EXTRA_DIR}/build -j $make_concurrency $targets >${LOGFILE:-/dev/null}"
 }
 
 # clean packages up here first, do not do it below, as we need
 # common and opentk
-for package in $packages $thirdparty $opentk $common; do
-	echo $package clean
-	make -C ${package}/${EXTRA_DIR}/build clean --silent
-done
-	
+if ${DO_CLEAN}
+then
+   for package in $packages $thirdparty $opentk $common; do
+   	echo $package clean
+   	make -C ${package}/${EXTRA_DIR}/build clean --silent
+   done
+fi
+
 if [ ${CLEAN_ONLY} -eq 1 ]; then
 	exit 0
 fi

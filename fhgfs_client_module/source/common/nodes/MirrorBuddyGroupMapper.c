@@ -212,31 +212,18 @@ void __MirrorBuddyGroupMapper_syncGroupsFromListsUnlocked(MirrorBuddyGroupMapper
    }
 
    // remove all unmarked (aka deleted) groups from the map
+   buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
+   while (!MirrorBuddyGroupMapIter_end(&buddyGroupMapIter))
    {
-      int32_t lastMarkedKey = -1;
+      MirrorBuddyGroup* group = MirrorBuddyGroupMapIter_value(&buddyGroupMapIter);
+      uint16_t key = MirrorBuddyGroupMapIter_key(&buddyGroupMapIter);
 
-      buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
-      for( /* iter init'ed above */;
-          !MirrorBuddyGroupMapIter_end(&buddyGroupMapIter);
-          MirrorBuddyGroupMapIter_next(&buddyGroupMapIter))
+      MirrorBuddyGroupMapIter_next(&buddyGroupMapIter);
+
+      if (!group->marked)
       {
-         MirrorBuddyGroup* group = MirrorBuddyGroupMapIter_value(&buddyGroupMapIter);
-         if (group->marked)
-         {
-            lastMarkedKey = MirrorBuddyGroupMapIter_key(&buddyGroupMapIter);
-            continue;
-         }
-
-         // rewind the iterator a bit, since we are about to invalidate it
-
-         MirrorBuddyGroupMap_erase(&this->mirrorBuddyGroups,
-               MirrorBuddyGroupMapIter_key(&buddyGroupMapIter));
+         MirrorBuddyGroupMap_erase(&this->mirrorBuddyGroups, key);
          MirrorBuddyGroup_put(group);
-
-         if (lastMarkedKey != -1)
-            buddyGroupMapIter = MirrorBuddyGroupMap_find(&this->mirrorBuddyGroups, lastMarkedKey);
-         else
-            buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
       }
    }
 }

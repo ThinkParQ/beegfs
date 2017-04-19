@@ -4,7 +4,6 @@
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/Work.h>
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 #include <common/toolkit/NamedException.h>
 #include <common/toolkit/HighResolutionStats.h>
@@ -12,6 +11,8 @@
 #include <common/Common.h>
 #include "ListWorkContainer.h"
 #include "PersonalWorkQueue.h"
+
+#include <mutex>
 
 
 #define MULTIWORKQUEUE_DEFAULT_USERID  (~0) // (usually similar to NETMESSAGE_DEFAULT_USERID)
@@ -84,7 +85,11 @@ class MultiWorkQueue
    public:
       void addDirectWork(Work* work, unsigned userID = MULTIWORKQUEUE_DEFAULT_USERID)
       {
-         SafeMutexLock mutexLock(&mutex);
+#ifdef BEEGFS_DEBUG_PROFILING
+         LOG_TOP(WORKQUEUES, DEBUG, "Adding direct work item.", work);
+#endif
+
+         std::lock_guard<Mutex> mutexLock(mutex);
 
          directWorkList->addWork(work, userID);
 
@@ -92,21 +97,21 @@ class MultiWorkQueue
 
          newWorkCond.signal();
          newDirectWorkCond.signal();
-
-         mutexLock.unlock();
       }
 
       void addIndirectWork(Work* work, unsigned userID = MULTIWORKQUEUE_DEFAULT_USERID)
       {
-         SafeMutexLock mutexLock(&mutex);
+#ifdef BEEGFS_DEBUG_PROFILING
+         LOG_TOP(WORKQUEUES, DEBUG, "Adding indirect work item.", work);
+#endif
+
+         std::lock_guard<Mutex> mutexLock(mutex);
 
          indirectWorkList->addWork(work, userID);
 
          numPendingWorks++;
 
          newWorkCond.signal();
-
-         mutexLock.unlock();
       }
 
       void addPersonalWork(Work* work, PersonalWorkQueue* personalQ)
@@ -114,7 +119,7 @@ class MultiWorkQueue
          /* note: this is in the here (instead of the PersonalWorkQueue) because the MultiWorkQueue
             mutex also syncs the personal queue. */
 
-         SafeMutexLock mutexLock(&mutex);
+         std::lock_guard<Mutex> mutexLock(mutex);
 
          personalQ->addWork(work);
 
@@ -123,52 +128,30 @@ class MultiWorkQueue
          // we assume this method is rarely used, so we just wake up all wokers (inefficient)
          newDirectWorkCond.broadcast();
          newWorkCond.broadcast();
-
-         mutexLock.unlock();
       }
-      
+
       size_t getDirectWorkListSize()
       {
-         SafeMutexLock mutexLock(&mutex);
-
-         size_t retVal = directWorkList->getSize();
-
-         mutexLock.unlock();
-
-         return retVal;
+         std::lock_guard<Mutex> mutexLock(mutex);
+         return directWorkList->getSize();
       }
 
       size_t getIndirectWorkListSize()
       {
-         SafeMutexLock mutexLock(&mutex);
-
-         size_t retVal = indirectWorkList->getSize();
-
-         mutexLock.unlock(); 
-
-         return retVal;
+         std::lock_guard<Mutex> mutexLock(mutex);
+         return indirectWorkList->getSize();
       }
-      
+
       bool getIsPersonalQueueEmpty(PersonalWorkQueue* personalQ)
       {
-         SafeMutexLock mutexLock(&mutex);
-
-         bool retVal = personalQ->getIsWorkListEmpty();
-
-         mutexLock.unlock();
-
-         return retVal;
+         std::lock_guard<Mutex> mutexLock(mutex);
+         return personalQ->getIsWorkListEmpty();
       }
 
       size_t getNumPendingWorks()
       {
-         SafeMutexLock mutexLock(&mutex);
-
-         size_t retVal = numPendingWorks;
-
-         mutexLock.unlock();
-
-         return retVal;
+         std::lock_guard<Mutex> mutexLock(mutex);
+         return numPendingWorks;
       }
 
       /**
@@ -176,7 +159,7 @@ class MultiWorkQueue
        */
       void getAndResetStats(HighResolutionStats* outStats)
       {
-         SafeMutexLock mutexLock(&mutex);
+         std::lock_guard<Mutex> mutexLock(mutex);
 
          *outStats = stats;
          outStats->rawVals.queuedRequests = numPendingWorks;
@@ -184,8 +167,6 @@ class MultiWorkQueue
          /* note: we only reset incremental stats vals, because otherwise we would lose info
             like number of busyWorkers */
          HighResolutionStatsTk::resetIncStats(&stats);
-
-         mutexLock.unlock();
       }
 
 

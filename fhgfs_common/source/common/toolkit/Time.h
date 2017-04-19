@@ -164,6 +164,11 @@ class Time
          return Time().elapsedSinceMS(this);
       }
 
+      virtual unsigned elapsedMicro() const
+      {
+         return Time().elapsedSinceMicro(this);
+      }
+
       static clockid_t getClockID()
       {
          return clockID;

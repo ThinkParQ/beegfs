@@ -1584,7 +1584,8 @@ bool App::downloadMgmtInfo(TargetConsistencyState& outInitialConsistencyState)
       // download all mgmt info the HBM cares for
       if (!InternodeSyncer::downloadAndSyncNodes() ||
           !InternodeSyncer::downloadAndSyncTargetMappings() ||
-          !InternodeSyncer::downloadAndSyncTargetStatesAndBuddyGroups() )
+          !InternodeSyncer::downloadAndSyncTargetStatesAndBuddyGroups() ||
+          !InternodeSyncer::downloadAndSyncCapacityPools())
          continue;
 
       InternodeSyncer::downloadAndSyncClients(false);

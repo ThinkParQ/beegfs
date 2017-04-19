@@ -2,6 +2,7 @@
 #define WORK_H_
 
 #include <common/toolkit/HighResolutionStats.h>
+#include <common/toolkit/TimeFine.h>
 #include <common/Common.h>
 
 class Work;
@@ -34,6 +35,16 @@ class Work
       {
          return &stats;
       }
+
+#ifdef BEEGFS_DEBUG_PROFILING
+      TimeFine* getAgeTime()
+      {
+         return &age;
+      }
+
+   private:
+      TimeFine age;
+#endif
 };
 
 #endif /*WORK_H_*/
