@@ -37,5 +37,7 @@ void StorageResyncStartedMsgEx::deleteMirrorSessions(uint16_t targetID)
 
       SessionLocalFileStore* sessionLocalFiles = session->getLocalFiles();
       sessionLocalFiles->removeAllMirrorSessions(targetID);
+
+      sessions->releaseSession(session);
    }
 }

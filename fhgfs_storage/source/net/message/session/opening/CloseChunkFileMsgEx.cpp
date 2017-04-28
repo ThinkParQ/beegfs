@@ -17,9 +17,6 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
    App* app = Program::getApp();
    Config* config = app->getConfig();
    SessionStore* sessions = app->getSessions();
-   Session* session = sessions->referenceSession(getSessionID(), true);
-   SessionLocalFileStore* sessionLocalFiles = session->getLocalFiles();
-   SessionLocalFile* sessionLocalFile = NULL;
 
    uint16_t targetID;
    bool removeRes;
@@ -31,6 +28,9 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
    std::string fileHandleID(getFileHandleID() );
    bool isMirrorSession = isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_BUDDYMIRROR);
 
+   Session* session;
+   SessionLocalFileStore* sessionLocalFiles;
+   SessionLocalFile* sessionLocalFile = NULL;
 
    // select the right targetID
 
@@ -63,6 +63,9 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
 
       goto send_response;
    }
+
+   session = sessions->referenceSession(getSessionID(), true);
+   sessionLocalFiles = session->getLocalFiles();
 
    removeRes = sessionLocalFiles->removeSession(
       fileHandleID, targetID, isMirrorSession, &sessionLocalFile);

@@ -1025,6 +1025,8 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, ReadfileS
    recvRes = __commkit_readfile_receive(context, currentState, dataLenBuf, sizeof(int64_t), true);
    if(recvRes < 0)
       return recvRes;
+   if (recvRes == 0)
+      return -ECOMM;
 
    // got the length info response
    Serialization_deserializeInt64(&ctx, &lengthInfo);
