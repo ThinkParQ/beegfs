@@ -13,7 +13,8 @@ AckStoreMapIter AckStoreMap_find(AckStoreMap* this, const char* searchKey)
 
 AckStoreMapIter AckStoreMap_begin(AckStoreMap* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->rbTree.treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->rbTree.treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    AckStoreMapIter iter;
    AckStoreMapIter_init(&iter, this, treeElem);

@@ -695,6 +695,7 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
    {
       // The first run in this mgmtd directory - just set the flag.
       formatProperties[propertiesKey] = "1";
+      stateStore->saveStatesToFile();
       return;
    }
 
@@ -711,6 +712,7 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
       ::unlink(stateStore->getResyncSetStorePath().c_str());
    }
 
+   stateStore->saveStatesToFile();
    formatProperties[propertiesKey] = "1";
 }
 

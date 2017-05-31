@@ -15,7 +15,8 @@ TargetStateInfoMapIter TargetStateInfoMap_find(TargetStateInfoMap* this,
 
 TargetStateInfoMapIter TargetStateInfoMap_begin(TargetStateInfoMap* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->rbTree.treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->rbTree.treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    TargetStateInfoMapIter iter;
    TargetStateInfoMapIter_init(&iter, this, treeElem);

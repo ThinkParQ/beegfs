@@ -14,7 +14,8 @@ RBTreeIter PointerRBTree_find(RBTree* this, const void* searchKey)
 
 RBTreeIter PointerRBTree_begin(RBTree* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    RBTreeIter iter;
    PointerRBTreeIter_init(&iter, this, treeElem);

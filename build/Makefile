@@ -163,6 +163,7 @@ CXXFLAGS_DEBUG = -O1 -D_FORTIFY_SOURCE=2 \
 LDFLAGS = -std=c++0x \
    -rdynamic \
    -pthread -lrt \
+   -Wl,-rpath,'$$ORIGIN/../lib' \
    $(USER_LDFLAGS)
 
 ifeq ($(BEEGFS_DEBUG),)
@@ -311,7 +312,7 @@ else
    endif
 
    ifneq ($(realpath $(BEEGFS_THIRDPARTY_PATH)/build/libssl.a),)
-      $(info [NOTE] Using packages OpenSSL)
+      $(info [NOTE] Using packaged OpenSSL)
       $(call define-dep-lib, openssl,\
          -isystem $(OPENSSL_INC_PATH),\
          $(BEEGFS_THIRDPARTY_PATH)/build/libssl.a $(BEEGFS_THIRDPARTY_PATH)/build/libcrypto.a)

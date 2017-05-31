@@ -13,7 +13,8 @@ StrCpyMapIter StrCpyMap_find(StrCpyMap* this, const char* searchKey)
 
 StrCpyMapIter StrCpyMap_begin(StrCpyMap* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->rbTree.treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->rbTree.treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    StrCpyMapIter iter;
    StrCpyMapIter_init(&iter, this, treeElem);

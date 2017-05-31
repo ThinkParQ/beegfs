@@ -38,7 +38,8 @@ class MetaStore
       bool referenceInode(const std::string& entryID, bool isBuddyMirrored,
          MetaFileHandle& outFileInode, DirInode*& outDirInode);
 
-      FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags, MetaFileHandle& outFile);
+      FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags, MetaFileHandle& outFile,
+         bool checkDisposalFirst = false);
       void closeFile(EntryInfo* entryInfo, MetaFileHandle file, unsigned accessFlags,
          unsigned* outNumHardlinks, unsigned* outNumRefs);
 

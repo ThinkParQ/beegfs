@@ -230,6 +230,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "sysACLsEnabled",                   "false");
 
    _Config_configMapRedefine(this, "quotaEnabled",                     "false");
+   _Config_configMapRedefine(this, "sysRenameEbusyAsXdev",             "false");
 }
 
 bool _Config_applyConfigMap(Config* this, bool enableException)
@@ -498,6 +499,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       else
       if(!strcmp(keyStr, "sysACLsEnabled") )
          this->sysACLsEnabled = StringTk_strToBool(valueStr);
+      else
+      if (!strcmp(keyStr, "sysRenameEbusyAsXdev"))
+         this->sysRenameEbusyAsXdev = StringTk_strToBool(valueStr);
       else
       if(!strcmp(keyStr, "quotaEnabled") )
          this->quotaEnabled = StringTk_strToBool(valueStr);

@@ -15,7 +15,8 @@ UInt16MapIter UInt16Map_find(UInt16Map* this, const uint16_t searchKey)
 
 UInt16MapIter UInt16Map_begin(UInt16Map* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->rbTree.treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->rbTree.treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    UInt16MapIter iter;
    UInt16MapIter_init(&iter, this, treeElem);

@@ -71,7 +71,7 @@ int ModeMigrate::doExecute()
       if (this->rootFD < 0)
       {
          std::cerr << "Failed to open search path: " << strerror(errno) << std::endl;
-         return retVal;
+         return APPCODE_RUNTIME_ERROR;
       }
    }
 
@@ -511,7 +511,7 @@ void ModeMigrate::printHelpFind()
    std::cout << "  --nodeid=<nodeID>      Find files on targets attached to this nodeID." << std::endl;
    std::cout << "  --nodetype=<nodetype>  Find files on the given nodetype (meta, storage)." << std::endl;
    std::cout << "                         (Default: storage)" << std::endl;
-   std::cout << "  --nomirrors            Do not include mirror targets in search." << std::endl;
+   std::cout << "  --nomirrors            Do not include buddy mirrored files in search." << std::endl;
 
    std::cout << std::endl;
    std::cout << " Note: Either targetID or nodeID must be specified." << std::endl;

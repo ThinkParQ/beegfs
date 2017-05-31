@@ -206,6 +206,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes) throw (Invalid
       IGNORE_CONFIG_CLIENT_VALUE("tuneDirSubentryCacheValidityMS")
       IGNORE_CONFIG_CLIENT_VALUE("tuneFileSubentryCacheValidityMS")
       IGNORE_CONFIG_CLIENT_VALUE("tuneCoherentBuffers")
+      IGNORE_CONFIG_CLIENT_VALUE("sysRenameEbusyAsXdev")
       if(testConfigMapKeyMatch(iter, "runDaemonized", addDashes) )
          runDaemonized = StringTk::strToBool(iter->second);
       else

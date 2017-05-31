@@ -37,9 +37,9 @@ void* PointerRBTreeIter_next(RBTreeIter* this)
 {
    struct rb_node* next = rb_next(&this->treeElem->treenode);
 
-   this->treeElem = container_of(next, RBTreeElem, treenode);
+   this->treeElem = next ? container_of(next, RBTreeElem, treenode) : NULL;
 
-   return this->treeElem ? this->treeElem->value : NULL;
+   return this->treeElem;
 }
 
 void* PointerRBTreeIter_key(RBTreeIter* this)

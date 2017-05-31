@@ -375,9 +375,26 @@ bool MetaStore::moveReferenceToMetaFileStoreUnlocked(const std::string& parentEn
  * @param accessFlags OPENFILE_ACCESS_... flags
  */
 FhgfsOpsErr MetaStore::openFile(EntryInfo* entryInfo, unsigned accessFlags,
-   MetaFileHandle& outInode)
+   MetaFileHandle& outInode, bool checkDisposalFirst)
 {
    UniqueRWLock lock(rwlock, SafeRWLock_READ);
+
+   // session restore must load disposed files with disposal as parent entry id - if the file is
+   // disposed any other parent id will also work, but will make that parent id unremovable for
+   // as long as the file is opened.
+   if (unlikely(checkDisposalFirst))
+   {
+      auto eiDisposal = *entryInfo;
+      eiDisposal.setParentEntryID(META_DISPOSALDIR_ID_STR);
+
+      FileInode* inode;
+      auto openRes = this->fileStore.openFile(&eiDisposal, accessFlags, inode, true);
+      if (inode)
+      {
+         outInode = {inode, nullptr};
+         return openRes;
+      }
+   }
 
    /* check the MetaStore fileStore map here, but most likely the file will not be in this map,
     * but is either in the per-directory-map or has to be loaded from disk */

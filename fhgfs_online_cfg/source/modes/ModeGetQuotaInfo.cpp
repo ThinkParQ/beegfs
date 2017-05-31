@@ -554,7 +554,7 @@ bool ModeGetQuotaInfo::printQuotaForRange(QuotaDataMap* usedQuota, QuotaDataMap*
    std::string& defaultSizeLimitValue, std::string& defaultInodeLimit,
    QuotaInodeSupport quotaInodeSupport)
 {
-   bool allValid = false;
+   bool allValid = true;
 
    for(unsigned id = this->cfg.cfgIDRangeStart; id <= this->cfg.cfgIDRangeEnd; id++)
    {

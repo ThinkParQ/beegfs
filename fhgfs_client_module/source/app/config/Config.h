@@ -233,6 +233,8 @@ struct Config
 
    bool     quotaEnabled;
 
+   /* workaround for rename of closed files on nfs */
+   bool sysRenameEbusyAsXdev;
 
 
    // internals

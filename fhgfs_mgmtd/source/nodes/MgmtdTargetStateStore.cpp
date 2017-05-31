@@ -343,7 +343,7 @@ bool MgmtdTargetStateStore::resolvePrimaryResync()
       mbgm->switchover(*groupIDIt);
    }
 
-   return false;
+   return !groupsToSwitch.empty();
 }
 
 
@@ -552,8 +552,8 @@ bool MgmtdTargetStateStore::setTargetsGood(const UInt16Vector& ids)
             *node, &msg, NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
       if (!commRes)
       {
-         LOG_TOP(STATESYNC, ERR, "Unable to set primar " + nodeTypeStr(false) +
-               " to target state good.", id);
+         LOG_TOP(STATESYNC, ERR, "Unable to set primary " + nodeTypeStr(false) +
+               " to state good.", id);
          continue;
       }
 

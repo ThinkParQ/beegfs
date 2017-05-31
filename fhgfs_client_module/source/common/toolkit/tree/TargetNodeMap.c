@@ -15,7 +15,8 @@ TargetNodeMapIter TargetNodeMap_find(TargetNodeMap* this, const uint16_t searchK
 
 TargetNodeMapIter TargetNodeMap_begin(TargetNodeMap* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->rbTree.treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->rbTree.treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    TargetNodeMapIter iter;
    TargetNodeMapIter_init(&iter, this, treeElem);

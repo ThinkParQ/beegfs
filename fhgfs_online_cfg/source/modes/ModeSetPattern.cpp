@@ -241,6 +241,10 @@ void ModeSetPattern::printHelp()
    std::cout << "                               limitations of enterprise features." << std::endl;
    std::cout << "  --force                      Allow buddy mirror pattern to be set, even if no" << std::endl;
    std::cout << "                               groups have been defined." << std::endl;
+   std::cout << "  --unmounted                  If this is specified then the given path is" << std::endl;
+   std::cout << "                               relative to the root directory of a possibly" << std::endl;
+   std::cout << "                               unmounted BeeGFS. (Symlinks will not be resolved" << std::endl;
+   std::cout << "                               in this case.)" << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
    std::cout << " This mode sets a new striping configuration for a certain directory. The new" << std::endl;

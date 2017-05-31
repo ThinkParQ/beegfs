@@ -13,7 +13,7 @@ bool SessionFile::operator==(const SessionFile& other) const
 
 bool SessionFile::relinkInode(MetaStore& store)
 {
-   auto openRes = store.openFile(&entryInfo, accessFlags, inode);
+   auto openRes = store.openFile(&entryInfo, accessFlags, inode, true);
 
    if (openRes == FhgfsOpsErr_SUCCESS)
       return true;

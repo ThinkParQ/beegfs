@@ -1919,6 +1919,17 @@ int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    LOG_DEBUG_FORMATTED(log, Log_DEBUG, logContext, "remoting complete. result: %d", (int)renameRes);
 
 
+   if (unlikely(retVal == -EBUSY && app->cfg->sysRenameEbusyAsXdev))
+   {
+      const EntryInfo* fromEntryInfo = FhgfsInode_getEntryInfo(fhgfsFromEntryInode);
+
+      Logger_logFormatted(log, Log_NOTICE, logContext, "Rewriting EBUSY to EXDEV: "
+            "%s fromDirID: %s oldName: %s toDirID: %s newName: %s EntryID: %s",
+            FhgfsOpsErr_toErrString(renameRes),
+            fromDirInfo->entryID, oldName, toDirInfo->entryID, newName, fromEntryInfo->entryID);
+      retVal = -EXDEV;
+   }
+
    // clean-up
 
    return retVal;

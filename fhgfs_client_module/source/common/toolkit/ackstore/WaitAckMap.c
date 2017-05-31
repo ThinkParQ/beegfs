@@ -13,7 +13,8 @@ WaitAckMapIter WaitAckMap_find(WaitAckMap* this, const char* searchKey)
 
 WaitAckMapIter WaitAckMap_begin(WaitAckMap* this)
 {
-   RBTreeElem* treeElem = container_of(rb_first(&this->rbTree.treeroot), RBTreeElem, treenode);
+   struct rb_node* node = rb_first(&this->rbTree.treeroot);
+   RBTreeElem* treeElem = node ? container_of(node, RBTreeElem, treenode) : NULL;
 
    WaitAckMapIter iter;
    WaitAckMapIter_init(&iter, this, treeElem);

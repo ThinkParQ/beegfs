@@ -118,8 +118,7 @@ class ModificationEventFlusher: public PThread
        */
       bool disableLoggingLocally(bool fromWorker)
       {
-         if ( this->loggingEnabled.read() != 0 )
-            this->loggingEnabled.setZero();
+         loggingEnabled.setZero();
 
          stallAllWorkers(fromWorker, true);
 
