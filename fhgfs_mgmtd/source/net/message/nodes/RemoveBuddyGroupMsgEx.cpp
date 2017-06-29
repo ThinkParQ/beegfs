@@ -1,5 +1,6 @@
 #include "RemoveBuddyGroupMsgEx.h"
 
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/RemoveBuddyGroupRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <program/Program.h>
@@ -27,6 +28,12 @@ static FhgfsOpsErr removeGroupOnRemoteNode(Node& node, const uint16_t groupID, c
 bool RemoveBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
 {
    LOG_DBG(DEBUG, "Received RemoveBuddyGroupMsg.", ctx.peerName());
+
+   if (Program::getApp()->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
 
    if (type != NODETYPE_Storage)
    {

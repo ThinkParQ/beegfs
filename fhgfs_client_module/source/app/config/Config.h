@@ -60,6 +60,7 @@ const char* Config_logTypeNumToStr(LogType logType);
 static inline char* Config_getCfgFile(Config* this);
 static inline int Config_getLogLevel(Config* this);
 static inline LogType Config_getLogTypeNum(Config* this);
+static inline void Config_setLogTypeNum(Config* this, LogType logType);
 static inline bool Config_getLogClientID(Config* this);
 static inline char* Config_getLogHelperdIP(Config* this);
 static inline bool Config_getConnUseSDP(Config* this);
@@ -254,6 +255,11 @@ int Config_getLogLevel(Config* this)
 LogType Config_getLogTypeNum(Config* this)
 {
    return this->logTypeNum;
+}
+
+void Config_setLogTypeNum(Config* this, LogType logType)
+{
+   this->logTypeNum = logType;
 }
 
 bool Config_getLogClientID(Config* this)

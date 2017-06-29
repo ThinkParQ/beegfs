@@ -1,4 +1,5 @@
 #include <common/net/message/nodes/RemoveNodeRespMsg.h>
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/storage/StorageErrors.h>
 #include <common/toolkit/MessagingTk.h>
 #include <program/Program.h>
@@ -15,6 +16,13 @@ bool RemoveNodeMsgEx::processIncoming(ResponseContext& ctx)
 
    bool nodeRemoved = false;
    NodeHandle node;
+
+   if (app->isShuttingDown())
+   {
+      if (!wantsAck())
+         ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
 
    // delete node based on type
 

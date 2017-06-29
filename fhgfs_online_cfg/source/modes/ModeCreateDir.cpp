@@ -59,14 +59,14 @@ int ModeCreateDir::execute()
       for (auto it = settings.preferredNodes->begin(); it != settings.preferredNodes->end(); ++it)
       {
          const uint16_t node = *it;
-         bool nodeExists = entryInfo.getIsBuddyMirrored()
+         bool nodeExists = entryInfo.getIsBuddyMirrored() && !settings.noMirroring
             ? metaBuddyGroupMapper->getPrimaryTargetID(node) != 0
             : metaNodes->referenceNode(NumNodeID(node)) != nullptr;
 
          if (!nodeExists)
          {
             nodeFailures = true;
-            std::cerr << "Unknown " << (entryInfo.getIsBuddyMirrored() ? "buddy group" : "node")
+            std::cerr << "Unknown " << ((entryInfo.getIsBuddyMirrored() && !settings.noMirroring) ? "buddy group" : "node")
                  << " " << node << std::endl;
          }
       }
@@ -100,6 +100,8 @@ void ModeCreateDir::printHelp()
    std::cout << " Optional:" << std::endl;
    std::cout << "  --nodes=<nodelist>     Comma-separated list of metadata node IDs" << std::endl;
    std::cout << "                         to choose from for the new dir." << std::endl;
+   std::cout << "                         When using mirroring, this is the buddy" << std::endl;
+   std::cout << "                         mirror group id, rather than a node id." << std::endl;
    std::cout << "  --access=<mode>        The octal permissions value for user, " << std::endl;
    std::cout << "                         group and others. (Default: 0755)" << std::endl;
    std::cout << "  --uid=<userid_num>     User ID of the dir owner." << std::endl;
@@ -110,8 +112,8 @@ void ModeCreateDir::printHelp()
    std::cout << "USAGE:" << std::endl;
    std::cout << " This mode creates a new directory." << std::endl;
    std::cout << std::endl;
-   std::cout << " Example: Create new directory on node \"storage01\"" << std::endl;
-   std::cout << "  $ beegfs-ctl --createdir --nodes=storage01 /mnt/beegfs/mydir" << std::endl;
+   std::cout << " Example: Create new directory on node id \"1\"" << std::endl;
+   std::cout << "  $ beegfs-ctl --createdir --nodes=1 /mnt/beegfs/mydir" << std::endl;
 }
 
 /**

@@ -91,6 +91,15 @@ class TargetStateStore
          safeLock.unlock(); // U N L O C K
       }
 
+      void setReachabilityState(uint16_t id, TargetReachabilityState state)
+      {
+         SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE);
+
+         statesMap[id].reachabilityState = state;
+
+         safeLock.unlock();
+      }
+
 
    protected:
 

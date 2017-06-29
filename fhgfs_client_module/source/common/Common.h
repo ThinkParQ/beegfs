@@ -16,8 +16,15 @@
 #include <stdarg.h>
 #include <linux/types.h>
 #include <linux/stddef.h>
+#ifdef KERNEL_HAS_CRED_H
+#include <linux/cred.h>
+#endif
 //#include <linux/compiler.h>
 #include <asm/div64.h>
+
+#ifdef KERNEL_HAS_SCHED_SIG_H
+#include <linux/sched/signal.h>
+#endif
 
 #include <common/FhgfsTypes.h>
 #include <os/OsDeps.h>

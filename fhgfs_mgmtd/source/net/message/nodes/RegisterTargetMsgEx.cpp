@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/RegisterTargetRespMsg.h>
 #include <common/storage/StorageErrors.h>
 #include <common/toolkit/MessagingTk.h>
@@ -11,8 +12,15 @@ bool RegisterTargetMsgEx::processIncoming(ResponseContext& ctx)
 
    LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a RegisterTargetMsg from: " + ctx.peerName() );
 
-   App* app = Program::getApp();
-   Config* cfg = app->getConfig();
+   const App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
+
+   const Config* cfg = app->getConfig();
    NumericIDMapper* targetNumIDMapper = app->getTargetNumIDMapper();
 
    std::string targetID = getTargetID();

@@ -13,6 +13,7 @@
 #include <common/nodes/TargetMapper.h>
 #include <common/toolkit/AcknowledgmentStore.h>
 #include <common/toolkit/NetFilter.h>
+#include <common/threading/Atomics.h>
 #include <common/Common.h>
 #include <components/quota/QuotaManager.h>
 #include <components/DatagramListener.h>
@@ -25,7 +26,6 @@
 #include <nodes/MgmtdTargetStateStore.h>
 #include <testing/TestRunner.h>
 #include "config/Config.h"
-
 
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
@@ -50,6 +50,13 @@ typedef WorkerList::iterator WorkerListIter;
 // forward declarations
 class LogContext;
 
+enum AppShutdownState {
+   App_RUNNING,            // App is running normally
+   App_SHUTDOWN_CLEAN,     // Shutdown has been requested (e.g. SIGINT)
+   App_SHUTDOWN_IMMEDIATE  // Forceful shutdown (e.g. component exception)
+};
+
+
 class App : public AbstractApp
 {
    public:
@@ -58,7 +65,7 @@ class App : public AbstractApp
 
       virtual void run();
 
-      void stopComponents();
+      void shutDown();
       void handleComponentException(std::exception& e);
 
    private:
@@ -79,6 +86,8 @@ class App : public AbstractApp
       uint16_t localNodeNumID; // 0 means invalid/undefined
       std::string localNodeID;
       std::shared_ptr<Node> localNode;
+
+      AtomicSizeT shuttingDown; // AppShutdownState
 
       NodeStoreServersEx* mgmtNodes;
       NodeStoreServersEx* metaNodes;
@@ -121,6 +130,8 @@ class App : public AbstractApp
       bool runComponentTests();
       bool runIntegrationTests();
 
+      void stopComponents();
+
       void workersInit() throw(ComponentInitException);
       void workersStart();
       void workersStop();
@@ -147,6 +158,9 @@ class App : public AbstractApp
 
       void registerSignalHandler();
       static void signalHandler(int sig);
+
+      void notifyWorkers();
+      void setPrimariesPOffline();
 
    public:
       // inliners
@@ -362,6 +376,11 @@ class App : public AbstractApp
       QuotaManager* getQuotaManager()
       {
          return quotaManager;
+      }
+
+      bool isShuttingDown() const
+      {
+         return shuttingDown.read() != App_RUNNING;
       }
 };
 

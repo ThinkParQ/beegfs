@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/ChangeTargetConsistencyStatesRespMsg.h>
 #include <common/nodes/TargetStateStore.h>
 #include <program/Program.h>
@@ -11,6 +12,13 @@ bool ChangeTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
       + ctx.peerName() );
 
    App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmdt shutting down."));
+      return true;
+   }
+
    MgmtdTargetStateStore* stateStore;
    MirrorBuddyGroupMapper* mirrorBuddyGroupMapper;
 

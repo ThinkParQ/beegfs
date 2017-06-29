@@ -1,4 +1,5 @@
 #include <common/net/message/storage/SetStorageTargetInfoRespMsg.h>
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <program/Program.h>
 
 #include "SetStorageTargetInfoMsgEx.h"
@@ -11,6 +12,13 @@ bool SetStorageTargetInfoMsgEx::processIncoming(ResponseContext& ctx)
    FhgfsOpsErr result;
 
    App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
+
    InternodeSyncer* internodeSyncer = app->getInternodeSyncer();
 
    const StorageTargetInfoList& targetInfoList = getStorageTargetInfos();

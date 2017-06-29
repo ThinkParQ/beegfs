@@ -77,8 +77,8 @@ sqlite:
 		ar -r $(SQLITE_LIB_IN) $(SQLITE_OBJ_IN);              \
 	fi
 
-	# copy lib
-	cp $(SQLITE_LIB_IN) $(SQLITE_LIB_OUT) 
+	# symlink lib
+	ln -sf $(SQLITE_LIB_IN) $(SQLITE_LIB_OUT)
 
 openssl:
 	# we delete the old folders first here, to be sure to remove old object files,
@@ -93,9 +93,9 @@ openssl:
 		$(MAKE);                                         \
 	fi
 
-	# copy libs
-	cp $(OPENSSL_LIB_IN) $(OPENSSL_LIB_OUT)
-	cp $(CRYPTO_LIB_IN) $(CRYPTO_LIB_OUT)
+	# symlink libs
+	ln -sf $(OPENSSL_LIB_IN) $(OPENSSL_LIB_OUT)
+	ln -sf $(CRYPTO_LIB_IN) $(CRYPTO_LIB_OUT)
 
 cppunit:
 	# note: 'configure' complains about wrong arguments to 'dirname',
@@ -110,8 +110,8 @@ cppunit:
 		./configure $(BUILDTYPE) $(cppunit_host)  &&     \
 		$(MAKE) DESTDIR=$(CPPUNIT_INSTALL_PATH) install; \
 	fi
-	# copy lib
-	cp $(CPPUNIT_LIB_IN) $(CPPUNIT_LIB_OUT)
+	# symlink lib
+	ln -sf $(CPPUNIT_LIB_IN) $(CPPUNIT_LIB_OUT)
 
 mongoose:
 	# we run make clean first here, to be sure to remove old object files
@@ -120,8 +120,8 @@ mongoose:
 		$(MAKE) clean && \
 		$(MAKE) $(make_host); \
 	fi
-	# copy lib
-	cp $(MONGOOSE_LIB_IN) $(MONGOOSE_LIB_OUT)
+	# symlink lib
+	ln -sf $(MONGOOSE_LIB_IN) $(MONGOOSE_LIB_OUT)
 
 premake:
 	if [ ! -d $(PREMAKE_VER_PATH) ]; then                    \
@@ -146,8 +146,8 @@ ticpp: premake
 		$(MAKE) $(make_host) config=release        && \
 		cd $(BUILD_PATH);                             \
 	fi
-	# copy lib
-	cp $(TICPP_LIB_IN) $(TICPP_LIB_OUT)
+	# symlink lib
+	ln -sf $(TICPP_LIB_IN) $(TICPP_LIB_OUT)
 
 clean: clean_sqlite clean_openssl clean_cppunit clean_mongoose clean_premake clean_ticpp
 

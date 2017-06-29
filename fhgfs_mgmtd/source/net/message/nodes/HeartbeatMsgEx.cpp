@@ -13,6 +13,10 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    //LOG_DEBUG_CONTEXT(log, Log_DEBUG, std::string("Received a HeartbeatMsg from: ") + peer);
 
    App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+      return true;
+
    NodeCapacityPools* metaCapacityPools = app->getMetaCapacityPools();
    HeartbeatManager* heartbeatMgr = app->getHeartbeatMgr();
 

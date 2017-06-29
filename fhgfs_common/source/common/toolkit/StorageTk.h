@@ -27,7 +27,10 @@
 #define STORAGETK_TARGETID_FILENAME          "targetID" /* contains first-run targetID */
 #define STORAGETK_TARGETNUMID_FILENAME       "targetNumID" /* contains first-run targetNumID */
 #define STORAGETK_SESSIONS_BACKUP_FILE_NAME  "sessions" /* contains session backup information */
-#define STORAGETK_MSESSIONS_BACKUP_FILE_NAME "msessions" /* mirror session backup information */
+/* mirror session backup information */
+#define STORAGETK_MSESSIONS_BACKUP_FILE_NAME "mirroredSessions" 
+/* old file name for mirror session backup information, for compatibility */
+#define STORAGETK_MSESSIONS_OLD_BACKUP_FILE_NAME "msessions" 
 
 
 #define STORAGETK_FILEID_TIMESTAMP_SHIFTBITS  32 /* timestamp is shifted by this number of bits */

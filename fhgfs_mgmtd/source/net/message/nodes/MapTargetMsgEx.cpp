@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/MapTargetsRespMsg.h>
 #include <common/nodes/NumNodeID.h>
 #include <common/storage/StorageErrors.h>
@@ -19,6 +20,12 @@ bool MapTargetsMsgEx::processIncoming(ResponseContext& ctx)
    InternodeSyncer* syncer = app->getInternodeSyncer();
 
    NumNodeID nodeID = getNodeID();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmdt shutting down."));
+      return true;
+   }
 
    FhgfsOpsErr responseError = FhgfsOpsErr_SUCCESS;
 

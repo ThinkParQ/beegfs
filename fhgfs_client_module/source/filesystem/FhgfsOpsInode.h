@@ -31,7 +31,12 @@ typedef struct FhgfsInodeComparisonInfo FhgfsInodeComparisonInfo;
       unsigned flags);
 #endif // KERNEL_HAS_ATOMIC_OPEN
 
+#ifdef KERNEL_HAS_STATX
+extern int FhgfsOps_getattr(const struct path* path, struct kstat* kstat, u32 request_mask,
+      unsigned int query_flags);
+#else
 extern int FhgfsOps_getattr(struct vfsmount* mnt, struct dentry* dentry, struct kstat* kstat);
+#endif
 extern int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr);
 
 extern ssize_t FhgfsOps_listxattr(struct dentry* dentry, char* value, size_t size);

@@ -176,6 +176,6 @@ $(src)/common/net/sock/ibv/IBVSocket.o: CC+=-include $(OFED_INCLUDE_PATH)/linux/
 $(src)/common/net/sock/ibv/IBVBuffer.o: CC+=-include $(OFED_INCLUDE_PATH)/linux/compat-2.6.h
 endif
 
-$(src)/common/net/sock/ibv/IBVSocket.o: CC+=-I$(OFED_INCLUDE_PATH)
-$(src)/common/net/sock/ibv/IBVBuffer.o: CC+=-I$(OFED_INCLUDE_PATH)
+$(src)/common/net/sock/ibv/IBVSocket.o: CC+=-I$(OFED_INCLUDE_PATH) -I$(OFED_INCLUDE_PATH)/uapi
+$(src)/common/net/sock/ibv/IBVBuffer.o: CC+=-I$(OFED_INCLUDE_PATH) -I$(OFED_INCLUDE_PATH)/uapi
 endif

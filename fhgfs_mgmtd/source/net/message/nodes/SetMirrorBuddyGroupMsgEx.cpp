@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/SetMirrorBuddyGroupRespMsg.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/toolkit/MessagingTk.h>
@@ -14,6 +15,13 @@ bool SetMirrorBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
    LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetMirrorBuddyGroupMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
+
    InternodeSyncer* internodeSyncer = app->getInternodeSyncer();
    MirrorBuddyGroupMapper* buddyGroupMapper;
 

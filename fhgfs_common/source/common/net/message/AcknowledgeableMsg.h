@@ -33,6 +33,7 @@ class AcknowledgeableMsg : public NetMessage
       // setters & getters
 
       const char* getAckID() const { return ackID; }
+      bool wantsAck() const { return ackIDLen != 0; }
 
       /**
        * @param ackID just a reference

@@ -32,13 +32,14 @@ static struct kmem_cache* FhgfsInodeCache = NULL;
 static void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode);
 
 static __always_inline int maybeRefreshInode(struct inode* inode, bool whenCacheInvalid,
-   bool withFileSize)
+   bool withFileSize, bool force)
 {
    App* app = FhgfsOps_getApp(inode->i_sb);
    Config* cfg = app->cfg;
 
    if(unlikely(!FhgfsOps_getIsRootInited(inode->i_sb) && inode->i_ino == BEEGFS_INODE_ROOT_INO)
-      || (!FhgfsInode_isCacheValid(BEEGFS_INODE(inode), inode->i_mode, cfg) && whenCacheInvalid) )
+      || (!FhgfsInode_isCacheValid(BEEGFS_INODE(inode), inode->i_mode, cfg) && whenCacheInvalid)
+      || unlikely(force))
    {
       FhgfsIsizeHints iSizeHints;
       int refreshRes;
@@ -101,7 +102,7 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
       (because the kernel doesn't do lookup/revalidate for the root inode) */
 
    {
-      int refreshRes = maybeRefreshInode(parentDir, true, false);
+      int refreshRes = maybeRefreshInode(parentDir, true, false, false);
 
       // root permissions might have changed now => recheck permissions
       if (!refreshRes)
@@ -233,8 +234,21 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
 }
 
 
+#ifdef KERNEL_HAS_STATX
+int FhgfsOps_getattr(const struct path* path, struct kstat* kstat, u32 request_mask,
+      unsigned int query_flags)
+{
+   struct vfsmount* mnt = path->mnt;
+   struct dentry* dentry = path->dentry;
+
+   bool mustQuery = (query_flags & AT_STATX_SYNC_TYPE) == AT_STATX_FORCE_SYNC;
+
+#else
 int FhgfsOps_getattr(struct vfsmount* mnt, struct dentry* dentry, struct kstat* kstat)
 {
+   const bool mustQuery = false;
+
+#endif
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Config* cfg = App_getConfig(app);
    const char* logContext = "FhgfsOps_getattr";
@@ -262,7 +276,7 @@ int FhgfsOps_getattr(struct vfsmount* mnt, struct dentry* dentry, struct kstat* 
       can never be up-to-date, so that would also be quite useless. */
 
    retVal = maybeRefreshInode(inode,
-      isRoot || FhgfsInode_getIsFileOpen(fhgfsInode) || refreshOnGetAttr, true);
+      isRoot || FhgfsInode_getIsFileOpen(fhgfsInode) || refreshOnGetAttr, true, mustQuery);
 
    if(!retVal)
    {
@@ -299,7 +313,7 @@ ssize_t FhgfsOps_listxattr(struct dentry* dentry, char* value, size_t size)
 
    FhgfsInode* fhgfsInode = BEEGFS_INODE(dentry->d_inode);
 
-   int refreshRes = maybeRefreshInode(dentry->d_inode, true, false);
+   int refreshRes = maybeRefreshInode(dentry->d_inode, true, false, false);
    if (refreshRes)
       return refreshRes;
 
@@ -344,7 +358,7 @@ ssize_t FhgfsOps_getxattr(struct inode* inode, const char* name, void* value, si
    FhgfsOpsErr remotingRes;
    ssize_t resSize;
 
-   int refreshRes = maybeRefreshInode(inode, true, false);
+   int refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return refreshRes;
 
@@ -386,7 +400,7 @@ int FhgfsOps_removexattrInode(struct inode* inode, const char* name)
 
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
 
-   int refreshRes = maybeRefreshInode(inode, true, false);
+   int refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return refreshRes;
 
@@ -420,7 +434,7 @@ int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* value, 
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    FhgfsOpsErr remotingRes;
 
-   int refreshRes = maybeRefreshInode(inode, true, false);
+   int refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return refreshRes;
 
@@ -451,7 +465,7 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
 
-   int refreshRes = maybeRefreshInode(inode, true, false);
+   int refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return ERR_PTR(refreshRes);
 
@@ -520,7 +534,7 @@ int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
 
-   int refreshRes = maybeRefreshInode(inode, true, false);
+   int refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return refreshRes;
 

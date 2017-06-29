@@ -20,6 +20,8 @@ PACKAGEDIR="/tmp/beegfs_packages-${DATE}/"
 
 DO_CLEAN=true
 
+LANG=en # make sure language is english, as we grep for certain strings
+
 # print usage information
 print_usage()
 {

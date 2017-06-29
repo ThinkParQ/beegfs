@@ -1,11 +1,13 @@
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/DummyWork.h>
+#include <common/components/worker/IncSyncedCounterWork.h>
 #include <common/components/ComponentInitException.h>
 #include <common/net/sock/RDMASocket.h>
 #include <common/nodes/LocalNode.h>
 #include <common/nodes/NodeFeatureFlags.h>
 #include <common/nodes/DynamicPoolLimits.h>
 #include <common/toolkit/StorageTk.h>
+#include <common/toolkit/SynchronizedCounter.h>
 #include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include <testing/StartupTests.h>
@@ -29,7 +31,8 @@ unsigned const APP_FEATURES[] =
 };
 
 
-App::App(int argc, char** argv)
+App::App(int argc, char** argv) :
+   shuttingDown(App_RUNNING)
 {
    this->argc = argc;
    this->argv = argv;
@@ -169,6 +172,8 @@ void App::run()
 
 void App::runNormal()
 {
+   const int SHUTDOWN_CHECK_TIMEOUT_SECS = 5;
+
    // init data objects & storage
 
    initDataObjects(argc, argv);
@@ -231,10 +236,22 @@ void App::runNormal()
    if(!integrationTestsRes)
       return;
 
+   while (shuttingDown.read() == App_RUNNING)
+      ::sleep(SHUTDOWN_CHECK_TIMEOUT_SECS);
+
+   if (shuttingDown.read() == App_SHUTDOWN_CLEAN)
+   {
+      shutDown();
+   }
+   else // App_SHUTDOWN_IMMEDIATE
+   {
+      internodeSyncer->selfTerminate();
+      waitForComponentTermination(internodeSyncer);
+   }
+
    // wait for termination
 
    joinComponents();
-
 
    log->log(Log_CRITICAL, "All components stopped. Exiting now!");
 }
@@ -671,7 +688,7 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
       MgmtdTargetStateStore* stateStore) throw(ComponentInitException)
 {
    if (stateStore->loadStatesFromFile())
-   {
+   {  // file could be read, so no need to proceed further
       LOG(NOTICE, "Loaded storage target states.", as("NodeType", stateStore->nodeTypeStr(true)));
       return;
    }
@@ -700,8 +717,15 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
    }
 
    if (formatProperties[propertiesKey] == "1")
-      throw ComponentInitException("Could not load target or node states. NodeType: "
-            + stateStore->nodeTypeStr(true) + ".");
+      throw ComponentInitException(
+            "Could not load target or node states. "
+            "The target and node states before the last shutdown are unknown. "
+            "If you want to start beegfs-mgmtd please manually create the files "
+            + mgmtdPath->str() + "/" CONFIG_STORAGETARGETSTATES_FILENAME " "
+            "and " + mgmtdPath->str() + "/" CONFIG_METANODESTATES_FILENAME " "
+            "with empty contents. "
+            "The states will be recovered from the currently known states of the servers. "
+            "NodeType: " + stateStore->nodeTypeStr(true) + ".");
 
    // The first run after an update - read the old file, and set the flag.
    if (targetStateStore->loadResyncSetFromFile())
@@ -777,9 +801,6 @@ void App::stopComponents()
 
    workersStop();
 
-   if(internodeSyncer)
-      internodeSyncer->selfTerminate();
-
    if(quotaManager)
       quotaManager->selfTerminate();
 
@@ -818,7 +839,7 @@ void App::handleComponentException(std::exception& e)
 
    log.log(2, "Shutting down...");
 
-   stopComponents();
+   shuttingDown.set(App_SHUTDOWN_IMMEDIATE);
 }
 
 
@@ -835,7 +856,6 @@ void App::joinComponents()
    waitForComponentTermination(dgramListener);
    waitForComponentTermination(heartbeatMgr);
    waitForComponentTermination(streamListener);
-   waitForComponentTermination(internodeSyncer);
 
    if(quotaManager)
       waitForComponentTermination(quotaManager);
@@ -953,6 +973,40 @@ void App::logInfos()
    }
 }
 
+void App::shutDown()
+{
+   getInternodeSyncer()->selfTerminate();
+   waitForComponentTermination(internodeSyncer);
+
+   if (storageBuddyGroupMapper->getSize() != 0
+         || metaBuddyGroupMapper->getSize() != 0)
+   {
+      setPrimariesPOffline();
+
+      notifyWorkers();
+
+      getHeartbeatMgr()->notifyAsyncRefreshTargetStates();
+
+      int toWaitSecs = cfg->getSysTargetOfflineTimeoutSecs();
+      LOG(NOTICE, "Shutdown in progress: Buddy groups frozen - waiting for clients to acknowledge.",
+            as("Timeout (sec)", toWaitSecs));
+
+      // POffline-Timeout = 0.5*OfflineTimeout; therefore clientTiemout here is 2*POfflineTimeout
+      const int sleepTimeoutSecs = 1;
+
+      while (toWaitSecs > 0)
+      {
+         if (shuttingDown.read() == App_SHUTDOWN_IMMEDIATE)
+            break;
+
+         ::sleep(sleepTimeoutSecs);
+         toWaitSecs -= sleepTimeoutSecs;
+      }
+   }
+
+   stopComponents();
+}
+
 void App::daemonize() throw(InvalidConfigException)
 {
    int nochdir = 1; // 1 to keep working directory
@@ -976,10 +1030,9 @@ void App::registerSignalHandler()
 
 void App::signalHandler(int sig)
 {
-   App* app = Program::getApp();
+   signal(sig, SIG_DFL); // reset the handler to its default.
 
-   Logger* log = app->getLogger();
-   const char* logContext = "App::signalHandler";
+   App* app = Program::getApp();
 
    // note: this might deadlock if the signal was thrown while the logger mutex is locked by the
    //    application thread (depending on whether the default mutex style is recursive). but
@@ -991,27 +1044,67 @@ void App::signalHandler(int sig)
    //    but it is very unlikely that the application thread holds the log mutex, because it
    //    joins the component threads and so it doesn't do anything else but sleeping!
 
+   std::string signalStr;
+
    switch(sig)
    {
       case SIGINT:
-      {
-         signal(sig, SIG_DFL); // reset the handler to its default
-         log->log(1, logContext, "Received a SIGINT. Shutting down...");
-      } break;
-
+         signalStr = "SIGINT";
+         break;
       case SIGTERM:
-      {
-         signal(sig, SIG_DFL); // reset the handler to its default
-         log->log(1, logContext, "Received a SIGTERM. Shutting down...");
-      } break;
-
+         signalStr = "SIGTERM";
+         break;
       default:
-      {
-         signal(sig, SIG_DFL); // reset the handler to its default
-         log->log(1, logContext, "Received an unknown signal. Shutting down...");
-      } break;
+         signalStr = "(unknown)";
+         break;
    }
 
-   app->stopComponents();
+   switch (app->shuttingDown.read())
+   {
+      case App_RUNNING:
+         LOG(CRITICAL, "Received a signal " + signalStr + ". Clean shutdown initiated. "
+               "Send another one to shutdown immediately.");
+         app->shuttingDown.set(App_SHUTDOWN_CLEAN);
+         signal(sig, App::signalHandler); // re-arm the signal handler
+         break;
+      case App_SHUTDOWN_CLEAN:
+         LOG(CRITICAL, "Received a second signal. Forcing immediate shutdown.",
+               as("Signal", signalStr));
+         app->shuttingDown.set(App_SHUTDOWN_IMMEDIATE);
+         break;
+      default:
+         break;
+   }
 }
 
+void App::notifyWorkers()
+{
+   SynchronizedCounter notified;
+   for (auto workerIt = workerList.begin(); workerIt != workerList.end(); ++workerIt)
+   {
+      PersonalWorkQueue* personalQ = (*workerIt)->getPersonalWorkQueue();
+      workQueue->addPersonalWork(new IncSyncedCounterWork(&notified), personalQ);
+   }
+
+   notified.waitForCount(workerList.size());
+}
+
+void App::setPrimariesPOffline()
+{
+   UInt16List storageGroupIDs;
+   UInt16List storagePrimaries;
+   UInt16List storageSecondaries;
+   storageBuddyGroupMapper->getMappingAsLists(storageGroupIDs, storagePrimaries,
+         storageSecondaries);
+
+   for (auto it = storagePrimaries.begin(); it != storagePrimaries.end(); ++it)
+      targetStateStore->setReachabilityState(*it, TargetReachabilityState_POFFLINE);
+
+   UInt16List metaGroupIDs;
+   UInt16List metaPrimaries;
+   UInt16List metaSecondaries;
+   metaBuddyGroupMapper->getMappingAsLists(metaGroupIDs, metaPrimaries, metaSecondaries);
+
+   for (auto it = metaPrimaries.begin(); it != metaPrimaries.end(); ++it)
+      metaStateStore->setReachabilityState(*it, TargetReachabilityState_POFFLINE);
+}

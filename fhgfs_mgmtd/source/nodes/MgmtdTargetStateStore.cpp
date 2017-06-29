@@ -619,6 +619,14 @@ bool MgmtdTargetStateStore::loadStatesFromFile()
       return false;
    }
 
+   if (readRes.second.size() == 0) // file was empty
+   {
+      LOG(WARNING, "Found empty target states file. "
+          "Proceeding without last known target states.",
+          as("NodeType", Node::nodeTypeToStr(nodeType)));
+      return true;
+   }
+
    Deserializer des(&readRes.second[0], readRes.second.size());
 
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
@@ -629,6 +637,9 @@ bool MgmtdTargetStateStore::loadStatesFromFile()
       LOG(ERR, "Could not deserialze states.", as("NodeStates", Node::nodeTypeToStr(nodeType)));
       return false;
    }
+
+   LOG(NOTICE, "Loaded storage target states.",
+       as("NodeType", Node::nodeTypeToStr(nodeType)));
 
    // Set all targets / nodes to POFFLINE to prevent switchover before we have report from anyone.
    setAllStatesUnlocked(TargetReachabilityState_POFFLINE);

@@ -79,18 +79,7 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
       FhgfsOpsHelper_logOp(Log_SPAM, app, dentry, inode, logContext);
 
    if(!inode || !parentInode || is_bad_inode(inode) )
-   {
-      if(inode && S_ISDIR(inode->i_mode) )
-      {
-         if(have_submounts(dentry) )
-            goto cleanup_put_parent;
-
-         shrink_dcache_parent(dentry);
-      }
-
-      d_drop(dentry);
       goto cleanup_put_parent;
-   }
 
    // active dentry => remote-stat and local-compare
 
@@ -132,8 +121,6 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
 
    bool cacheValid = FhgfsInode_isCacheValid(fhgfsInode, inode->i_mode, cfg);
-   int isValid = 0; // quasi-boolean (return value)
-   bool needDrop = false;
 
    FhgfsIsizeHints iSizeHints;
 
@@ -142,10 +129,7 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
 
 
    if (cacheValid)
-   {
-      isValid = 1;
-      return isValid;
-   }
+      return 1;
 
    if(IS_ROOT(dentry) )
       fhgfsStatPtr = NULL;
@@ -181,10 +165,7 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
       FhgfsInode_entryInfoReadUnlock(parentFhgfsInode); // UNLOCK parentInfo
 
       if (unlikely(remotingRes != FhgfsOpsErr_SUCCESS) )
-      {
-         needDrop = true;
-         goto out;
-      }
+         return 0;
 
       if (outInfo.revalidateRes != FhgfsOpsErr_SUCCESS)
       {
@@ -192,8 +173,7 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
             Logger_logErrFormatted(log, logContext, "Unexpected revalidate info missing: %s",
                entryInfo->fileName);
 
-         needDrop = true;
-         goto out;
+         return 0;
       }
 
       // check the stat result here and set fhgfsStatPtr accordingly
@@ -209,21 +189,11 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
                entryInfo->fileName);
 
          // now its getting difficult as there is an unexpected error
-         needDrop = true;
-         goto out;
+         return 0;
       }
    }
 
-   if (!__FhgfsOps_refreshInode(app, inode, fhgfsStatPtr, &iSizeHints) )
-      isValid = 1;
-   else
-      isValid = 0;
-
-out:
-   if (needDrop)
-      d_drop(dentry);
-
-   return isValid;
+   return !__FhgfsOps_refreshInode(app, inode, fhgfsStatPtr, &iSizeHints);
 }
 
 /**

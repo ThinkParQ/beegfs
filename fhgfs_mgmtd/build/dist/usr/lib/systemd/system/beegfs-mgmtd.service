@@ -12,5 +12,9 @@ Type=forking
 # We disable PIDFile= because it doesn't work with multi-mode configurations
 #PIDFile=/var/run/beegfs-mgmtd.pid
 
+# If the sysTargetOfflineTimeoutSecs in beegfs-mgmtd.conf is set over 240, this value needs to be
+# adjusted accordingly. Recommendation: sysTargetOfflineTimeoutSecs + 60
+TimeoutStopSec=300
+
 [Install]
 WantedBy=multi-user.target

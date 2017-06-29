@@ -1,4 +1,5 @@
 #include <common/net/message/storage/quota/SetDefaultQuotaRespMsg.h>
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/storage/quota/QuotaData.h>
 #include <components/quota/QuotaManager.h>
 #include <program/Program.h>
@@ -13,6 +14,12 @@ bool SetDefaultQuotaMsgEx::processIncoming(ResponseContext& ctx)
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
    Logger* log = app->getLogger();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
 
    if(cfg->getQuotaEnableEnforcement() )
    {

@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
 #include <nodes/MgmtdTargetStateStore.h>
 #include <program/Program.h>
@@ -11,6 +12,13 @@ bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
       + ctx.peerName() );
 
    App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
+
    MgmtdTargetStateStore* stateStore;
 
    const NodeType nodeType = getNodeType();

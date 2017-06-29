@@ -359,7 +359,7 @@ FhgfsOpsErr __MessagingTk_requestResponseNodeRetry(App* app, RequestResponseNode
 
       // check target state
 
-      if(rrNode->targetStates)
+      if (rrNode->peer.isMirrorGroup && rrNode->targetStates)
       {
          CombinedTargetState state;
          bool getStateRes = TargetStateStore_getState(rrNode->targetStates, nodeID.value,

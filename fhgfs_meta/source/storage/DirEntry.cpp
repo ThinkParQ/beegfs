@@ -861,7 +861,7 @@ FhgfsOpsErr DirEntry::storeInitialDirEntry(const std::string& dirEntryPath)
    std::string namePath = dirEntryPath + '/' + this->name;
    FhgfsOpsErr result = this->storeInitialDirEntryName(logContext, idPath, namePath, isDir);
 
-   if (getIsBuddyMirrored())
+   if (result == FhgfsOpsErr_SUCCESS && getIsBuddyMirrored())
       if (auto* resync = BuddyResyncer::getSyncChangeset())
       {
          if (!isDir)

@@ -1620,10 +1620,14 @@ bool App::restoreSessions()
 
    std::string path = this->metaPathStr  + "/" + std::string(STORAGETK_SESSIONS_BACKUP_FILE_NAME);
    std::string mpath = this->metaPathStr  + "/" + std::string(STORAGETK_MSESSIONS_BACKUP_FILE_NAME);
+   std::string oldMpath = this->metaPathStr  + "/"
+       + std::string(STORAGETK_MSESSIONS_OLD_BACKUP_FILE_NAME);
 
    bool pathRes = StorageTk::pathExists(path);
    bool mpathRes = StorageTk::pathExists(mpath);
-   if (!pathRes && !mpathRes)
+   bool oldMpathRes = StorageTk::pathExists(oldMpath);
+
+   if (!pathRes && !mpathRes && !oldMpathRes)
       return false;
 
    if (pathRes)
@@ -1631,24 +1635,44 @@ bool App::restoreSessions()
       bool loadRes = this->sessions->loadFromFile(path, *metaStore);
       if (!loadRes)
       {
-         log->logErr("Could not restore all sessions");
+         LOG_TOP(GENERAL, CRITICAL, "Could not restore all sessions.");
          retVal = false;
       }
    }
 
-   if (mpathRes)
+   if(mpathRes && oldMpathRes)
    {
-      bool loadRes = this->mirroredSessions->loadFromFile(mpath, *metaStore);
-      if (!loadRes)
+      // if both the old and the new file exists, log and exit
+      throw ComponentInitException("Found both msessions (old) and "
+         "mirroredSessions files. One of them needs to be deleted before proceeding. Aborting.");
+   }   
+   else if(oldMpathRes)
+   {
+      LOG_TOP(GENERAL, NOTICE, "Old mirrored sessions file (msessions) found. Renaming.");
+      if(rename(oldMpath.c_str(),mpath.c_str()) == -1)
       {
-         log->logErr("Could not restore all mirrored sessions");
+         LOG_TOP(GENERAL, WARNING, "Couldn't rename msessions file.");
+      }
+      mpathRes = StorageTk::pathExists(mpath);
+   }
+
+
+   if(mpathRes)
+   {
+      bool loadRes = false;
+
+      loadRes = this->mirroredSessions->loadFromFile(mpath, *metaStore);
+
+      if(!loadRes)
+      {
+         log->logErr("Could not restore all mirrored sessions.");
          retVal = false;
       }
    }
 
-   log->log(Log_NOTICE, "Restored "
+   LOG_TOP(GENERAL, NOTICE, "Restored "
          + StringTk::uintToStr(sessions->getSize()) + " sessions and "
-         + StringTk::uintToStr(mirroredSessions->getSize()) + " mirrored sessions");
+         + StringTk::uintToStr(mirroredSessions->getSize()) + " mirrored sessions.");
 
    return retVal;
 }

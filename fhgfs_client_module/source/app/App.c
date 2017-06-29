@@ -324,6 +324,13 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    if(strlen(interfacesFilename) &&
       !Config_loadStringListFile(interfacesFilename, &this->allowedInterfaces) )
    {
+      // if loading of file failed, we need to set LogType Syslog as fallback here, because
+      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
+      // but that's initialized later.
+      // Of course, using printk could be another option here, but the code calling this function
+      // proceeds with some more log messages, that should be logged to log file if possible, but
+      // need to be redirected to syslog in this case here as well
+      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured interfaces file: %s", interfacesFilename);
       return false;
@@ -334,6 +341,13 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    if(strlen(preferredMetaFile) &&
       !Config_loadUInt16ListFile(this->cfg, preferredMetaFile, &this->preferredMetaNodes) )
    {
+      // if loading of file failed, we need to set LogType Syslog as fallback here, because
+      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
+      // but that's initialized later.
+      // Of course, using printk could be another option here, but the code calling this function
+      // proceeds with some more log messages, that should be logged to log file if possible, but
+      // need to be redirected to syslog in this case here as well
+      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured preferred meta nodes file: %s", preferredMetaFile);
       return false;
@@ -343,6 +357,13 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    if(strlen(preferredStorageFile) &&
       !Config_loadUInt16ListFile(this->cfg, preferredStorageFile, &this->preferredStorageTargets) )
    {
+      // if loading of file failed, we need to set LogType Syslog as fallback here, because
+      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
+      // but that's initialized later.
+      // Of course, using printk could be another option here, but the code calling this function
+      // proceeds with some more log messages, that should be logged to log file if possible, but
+      // need to be redirected to syslog in this case here as well
+      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured preferred storage nodes file: %s", preferredStorageFile);
       return false;
@@ -443,7 +464,9 @@ bool __App_initInodeOperations(App* this)
    this->fileInodeOps->permission  = FhgfsOps_permission;
    this->fileInodeOps->setattr     = FhgfsOps_setattr;
 
+#ifdef KERNEL_HAS_GENERIC_READLINK
    this->symlinkInodeOps->readlink    = generic_readlink; // default is fine for us currently
+#endif
 #ifdef KERNEL_HAS_GET_LINK
    this->symlinkInodeOps->get_link    = FhgfsOps_get_link;
 #else

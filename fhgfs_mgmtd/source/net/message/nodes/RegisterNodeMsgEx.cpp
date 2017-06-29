@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/RegisterNodeRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/VersionTk.h>
@@ -12,6 +13,13 @@ bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
    LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a RegisterNodeMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
+
+   if (app->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
+
    NodeType nodeType = getNodeType();
    std::string nodeID(getNodeID() );
 
@@ -119,7 +127,6 @@ send_response:
 
    return true;
 }
-
 
 
 /**

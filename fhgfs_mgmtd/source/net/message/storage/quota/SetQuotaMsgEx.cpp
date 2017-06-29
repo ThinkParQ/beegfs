@@ -1,6 +1,7 @@
 #include <common/app/log/LogContext.h>
 #include <common/Common.h>
 #include <common/net/message/storage/quota/SetQuotaRespMsg.h>
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <program/Program.h>
 
 #include "SetQuotaMsgEx.h"
@@ -12,6 +13,12 @@ bool SetQuotaMsgEx::processIncoming(ResponseContext& ctx)
    LogContext log("SetQuotaMsg incoming");
 
    LOG_DEBUG_CONTEXT(log, 4, "Received a SetQuotaMsg from: " + ctx.peerName() );
+
+   if (Program::getApp()->isShuttingDown())
+   {
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
+      return true;
+   }
 
    int respVal = processQuotaLimits();
 
