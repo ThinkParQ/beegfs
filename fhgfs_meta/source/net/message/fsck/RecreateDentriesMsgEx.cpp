@@ -135,9 +135,6 @@ bool RecreateDentriesMsgEx::processIncoming(ResponseContext& ctx)
                + iter->getID());
       }
 
-      if (iter->getIsBuddyMirrored())
-         BuddyCommTk::setBuddyNeedsResyncState(true);
-
       metaStore->releaseDir(dirID);
    }
 

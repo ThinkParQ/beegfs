@@ -331,8 +331,7 @@ FhgfsOpsErr MetaStore::checkRenameOverwrite(EntryInfo* fromEntry, EntryInfo* ove
  */
 FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
       const std::string& newEntryName, const char* buf, uint32_t bufLen,
-      std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo, FileIDLock& newFileLock,
-      FileIDLock& oldFileLock)
+      std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo)
 {
    // note: we do not allow newEntry to be a file if the old entry was a directory (and vice versa)
    const char* logContext = "rename(): Insert remote entry";
@@ -362,12 +361,6 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
          retVal = checkRes;
          goto outUnlock;
       }
-
-      // if we overwrite an existing dentry, the inode behind the dentry will be either updated or
-      // unlinked, thus requiring a lock.
-      if (toParent.getIsBuddyMirrored() && overWriteInfo.getIsInlined())
-         oldFileLock = {Program::getApp()->getMirroredSessions()->getEntryLockStore(),
-               overWriteInfo.getEntryID()};
 
       // only unlink the dir-entry-name here, so we can still restore it from dir-entry-id
       FhgfsOpsErr unlinkRes = toParent.unlinkDirEntryUnlocked(newEntryName, overWrittenEntry,
@@ -416,19 +409,6 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
    {
       if (!toParent.entries.getFileEntryInfo(newEntryName, newFileInfo))
          retVal = FhgfsOpsErr_INTERNAL;
-   }
-
-   if (retVal == FhgfsOpsErr_SUCCESS)
-   {
-      // since this entry ID was not previously present on this node, and toParent is locked for
-      // write, no other thread can lock the entry ID.
-      // beware: the caller is responsible for locking an inlined file inode for the name if both
-      // source and target live on the same node!
-      if (toParent.getIsBuddyMirrored() && fromFileInfo->getIsInlined() &&
-            (!fromFileInfo->getIsBuddyMirrored() ||
-               fromFileInfo->getOwnerNodeID() != toParent.ownerNodeID))
-         newFileLock = {Program::getApp()->getMirroredSessions()->getEntryLockStore(),
-               newFileInfo.getEntryID()};
    }
 
    if (overWrittenEntry && retVal == FhgfsOpsErr_SUCCESS)

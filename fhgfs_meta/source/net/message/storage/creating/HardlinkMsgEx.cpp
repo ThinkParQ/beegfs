@@ -9,12 +9,15 @@
 
 #include "HardlinkMsgEx.h"
 
-std::tuple<DirIDLock, ParentNameLock, ParentNameLock> HardlinkMsgEx::lock(EntryLockStore& store)
+std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx::lock(
+      EntryLockStore& store)
 {
    // NOTE: normally we'd need to also lock on the MDS holding the destination file,
    // but we don't support hardlinks to different servers, yet
    ParentNameLock fromLock;
    ParentNameLock toLock;
+
+   FileIDLock fileLock;
 
    DirIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
 
@@ -37,10 +40,27 @@ std::tuple<DirIDLock, ParentNameLock, ParentNameLock> HardlinkMsgEx::lock(EntryL
       fromLock = {&store, getFromDirInfo()->getEntryID(), getFromName()};
    }
 
+   // hardlinking modifies the file inode link count, so we have to lock the file. if we can't
+   // reference the directory, or if the file does not exist, we can continue - the directory is
+   // locked, so the file cannot suddenly appear after we return here.
+   auto dir = Program::getApp()->getMetaStore()->referenceDir(getFromDirInfo()->getEntryID(),
+         getFromInfo()->getIsBuddyMirrored(), true);
+   if (dir)
+   {
+      EntryInfo fromInfo;
+
+      dir->getFileEntryInfo(getFromName(), fromInfo);
+      if (DirEntryType_ISFILE(fromInfo.getEntryType()))
+         fileLock = {&store, fromInfo.getEntryID()};
+
+      Program::getApp()->getMetaStore()->releaseDir(dir->getID());
+   }
+
    return std::make_tuple(
          std::move(dirLock),
          std::move(fromLock),
-         std::move(toLock));
+         std::move(toLock),
+         std::move(fileLock));
 }
 
 bool HardlinkMsgEx::processIncoming(ResponseContext& ctx)

@@ -8,7 +8,7 @@
 #include <storage/MetaStore.h>
 #include <net/message/MirroredMessage.h>
 
-class RmLocalDirMsgEx : public MirroredMessage<RmLocalDirMsg, DirIDLock>
+class RmLocalDirMsgEx : public MirroredMessage<RmLocalDirMsg, std::tuple<HashDirLock, DirIDLock>>
 {
    public:
       typedef ErrorCodeResponseState<RmLocalDirRespMsg, NETMSGTYPE_RmLocalDir> ResponseState;
@@ -18,11 +18,13 @@ class RmLocalDirMsgEx : public MirroredMessage<RmLocalDirMsg, DirIDLock>
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 
-      DirIDLock lock(EntryLockStore& store) override;
+      std::tuple<HashDirLock, DirIDLock> lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getDelEntryInfo()->getIsBuddyMirrored(); }
 
    private:
+      ResponseContext* rctx;
+
       std::unique_ptr<ResponseState> rmDir();
 
       bool forwardToSecondary(ResponseContext& ctx) override;

@@ -12,7 +12,8 @@
 
 // Called from fhgfs-ctl (online_cfg) to create a file on a specific node.
 
-std::tuple<DirIDLock, ParentNameLock> MkFileWithPatternMsgEx::lock(EntryLockStore& store)
+std::tuple<DirIDLock, ParentNameLock, FileIDLock> MkFileWithPatternMsgEx::lock(
+      EntryLockStore& store)
 {
    // no need to lock the created file as well, since
    //  a) no other operation can create the same file id
@@ -20,8 +21,9 @@ std::tuple<DirIDLock, ParentNameLock> MkFileWithPatternMsgEx::lock(EntryLockStor
    //  c) if bulk resync gets the file while it is incomplete, individual resync will get it again
    DirIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
    ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getNewFileName());
+   FileIDLock fileLock(&store, entryID);
 
-   return std::make_tuple(std::move(dirLock), std::move(dentryLock));
+   return std::make_tuple(std::move(dirLock), std::move(dentryLock), std::move(fileLock));
 }
 
 bool MkFileWithPatternMsgEx::processIncoming(ResponseContext& ctx)

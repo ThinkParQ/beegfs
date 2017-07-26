@@ -25,6 +25,10 @@
 #include <common/net/message/fsck/UpdateFileAttribsRespMsg.h>
 #include <common/net/message/fsck/UpdateDirAttribsMsg.h>
 #include <common/net/message/fsck/UpdateDirAttribsRespMsg.h>
+
+#include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
+#include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
+
 #include <common/net/message/storage/creating/MkDirMsg.h>
 #include <common/net/message/storage/creating/MkDirRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkFileMsg.h>
@@ -39,8 +43,75 @@
 
 #include "MsgHelperRepair.h"
 
+template<typename RepairItemT>
+static bool setSecondaryBad(uint16_t groupID, std::set<NumNodeID>& secondariesWithRepair,
+      const std::list<RepairItemT>& args, std::list<RepairItemT>& failed)
+{
+   auto* bgm = Program::getApp()->getMetaMirrorBuddyGroupMapper();
+   NumNodeID secondary(bgm->getSecondaryTargetID(groupID));
+
+   if (secondariesWithRepair.count(secondary))
+      return true;
+
+   auto setRes = MsgHelperRepair::setNodeState(secondary, TargetConsistencyState_BAD);
+   if (setRes == FhgfsOpsErr_SUCCESS)
+   {
+      secondariesWithRepair.insert(NumNodeID(bgm->getSecondaryTargetID(groupID)));
+      return true;
+   }
+
+   LOG(ERR, "Failed to set secondary consistency state, not attempting repair action.",
+         groupID, setRes);
+   failed = args;
+   return false;
+}
+
+
+
+FhgfsOpsErr MsgHelperRepair::setNodeState(NumNodeID node, TargetConsistencyState state)
+{
+   std::list<uint16_t> targets(1, node.val());
+   std::list<uint8_t> states(1, state);
+   SetTargetConsistencyStatesMsg msg(NODETYPE_Meta, &targets, &states, false);
+
+   {
+      char* respBuf;
+      NetMessage* respMsg;
+
+      auto secondary = Program::getApp()->getMetaNodes()->referenceNode(node);
+
+      auto commRes = MessagingTk::requestResponse(*secondary, &msg,
+            NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
+      if (commRes == FhgfsOpsErr_SUCCESS)
+      {
+         delete respMsg;
+         free(respBuf);
+      }
+   }
+
+   {
+      char* respBuf;
+      NetMessage* respMsg;
+
+      auto mgmt = Program::getApp()->getMgmtNodes()->referenceFirstNode();
+
+      auto commRes = MessagingTk::requestResponse(*mgmt, &msg,
+            NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
+      if (!commRes)
+         return FhgfsOpsErr_COMMUNICATION;
+
+      auto result = static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg)->getResult();
+
+      delete respMsg;
+      free(respBuf);
+
+      return result;
+   }
+}
+
 void MsgHelperRepair::deleteDanglingDirEntries(NumNodeID node, bool isBuddyMirrored,
-   FsckDirEntryList* dentries, FsckDirEntryList* failedDeletes)
+   FsckDirEntryList* dentries, FsckDirEntryList* failedDeletes,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    DeleteDirEntriesMsg deleteDirEntriesMsg(dentries);
 
@@ -48,7 +119,11 @@ void MsgHelperRepair::deleteDanglingDirEntries(NumNodeID node, bool isBuddyMirro
    RequestResponseArgs rrArgs(nullptr, &deleteDirEntriesMsg, NETMSGTYPE_DeleteDirEntriesResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *dentries, *failedDeletes))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -74,7 +149,8 @@ void MsgHelperRepair::deleteDanglingDirEntries(NumNodeID node, bool isBuddyMirro
 }
 
 void MsgHelperRepair::createDefDirInodes(NumNodeID node, bool isBuddyMirrored,
-   const std::vector<std::tuple<std::string, bool>>& entries, FsckDirInodeList* createdInodes)
+   const std::vector<std::tuple<std::string, bool>>& entries, FsckDirInodeList* createdInodes,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    StringList failedInodeIDs;
 
@@ -84,7 +160,15 @@ void MsgHelperRepair::createDefDirInodes(NumNodeID node, bool isBuddyMirrored,
    RequestResponseArgs rrArgs(nullptr, &createDefDirInodesMsgEx, NETMSGTYPE_CreateDefDirInodesResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, {}, *createdInodes))
+      {
+         for (auto it = entries.begin(); it != entries.end(); ++it)
+            failedInodeIDs.push_back(std::get<0>(*it));
+         return;
+      }
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -112,15 +196,20 @@ void MsgHelperRepair::createDefDirInodes(NumNodeID node, bool isBuddyMirrored,
 }
 
 void MsgHelperRepair::correctInodeOwnersInDentry(NumNodeID node, bool isBuddyMirrored,
-   FsckDirEntryList* dentries, NumNodeIDList* owners, FsckDirEntryList* failedCorrections)
+   FsckDirEntryList* dentries, NumNodeIDList* owners, FsckDirEntryList* failedCorrections,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    FixInodeOwnersInDentryMsg fixInodeOwnersMsg(*dentries, *owners);
 
    RequestResponseNode rrNode(node, Program::getApp()->getMetaNodes());
-   RequestResponseArgs rrArgs(nullptr, &fixInodeOwnersMsg, NETMSGTYPE_FixInodeOwnersResp);
+   RequestResponseArgs rrArgs(nullptr, &fixInodeOwnersMsg, NETMSGTYPE_FixInodeOwnersInDentryResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *dentries, *failedCorrections))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -146,7 +235,8 @@ void MsgHelperRepair::correctInodeOwnersInDentry(NumNodeID node, bool isBuddyMir
 }
 
 void MsgHelperRepair::correctInodeOwners(NumNodeID node, bool isBuddyMirrored,
-   FsckDirInodeList* dirInodes, FsckDirInodeList* failedCorrections)
+   FsckDirInodeList* dirInodes, FsckDirInodeList* failedCorrections,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    FixInodeOwnersMsg fixInodeOwnersMsg(dirInodes);
 
@@ -154,7 +244,11 @@ void MsgHelperRepair::correctInodeOwners(NumNodeID node, bool isBuddyMirrored,
    RequestResponseArgs rrArgs(nullptr, &fixInodeOwnersMsg, NETMSGTYPE_FixInodeOwnersResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *dirInodes, *failedCorrections))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -355,9 +449,17 @@ bool MsgHelperRepair::createLostAndFound(NodeHandle& outReferencedNode,
 }
 
 void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lostAndFoundInfo,
-   FsckDirInodeList* dirInodes, FsckDirInodeList* failedInodes, FsckDirEntryList* createdDentries)
+   FsckDirInodeList* dirInodes, FsckDirInodeList* failedInodes, FsckDirEntryList* createdDentries,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    const char* logContext = "MsgHelperRepair (linkToLostAndFound)";
+
+   if (lostAndFoundInfo->getIsBuddyMirrored() &&
+         !setSecondaryBad(lostAndFoundInfo->getOwnerNodeID().val(), secondariesWithRepair,
+            {}, *createdDentries))
+   {
+      return;
+   }
 
    bool commRes;
    char *respBuf = NULL;
@@ -402,9 +504,16 @@ void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lost
 
 void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lostAndFoundInfo,
    FsckFileInodeList* fileInodes, FsckFileInodeList* failedInodes,
-   FsckDirEntryList* createdDentries)
+   FsckDirEntryList* createdDentries, std::set<NumNodeID>& secondariesWithRepair)
 {
    const char* logContext = "MsgHelperRepair (linkToLostAndFound)";
+
+   if (lostAndFoundInfo->getIsBuddyMirrored() &&
+         !setSecondaryBad(lostAndFoundInfo->getOwnerNodeID().val(), secondariesWithRepair,
+            *fileInodes, *failedInodes))
+   {
+      return;
+   }
 
    bool commRes;
    char *respBuf = NULL;
@@ -448,7 +557,7 @@ void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lost
 }
 
 void MsgHelperRepair::createContDirs(NumNodeID node, bool isBuddyMirrored, FsckDirInodeList* inodes,
-   StringList* failedCreates)
+   StringList* failedCreates, std::set<NumNodeID>& secondariesWithRepair)
 {
    // create a string list with the IDs
    std::vector<CreateEmptyContDirsMsg::Item> items;
@@ -458,10 +567,18 @@ void MsgHelperRepair::createContDirs(NumNodeID node, bool isBuddyMirrored, FsckD
    CreateEmptyContDirsMsg createContDirsMsg(std::move(items));
 
    RequestResponseNode rrNode(node, Program::getApp()->getMetaNodes());
-   RequestResponseArgs rrArgs(nullptr, &createContDirsMsg, NETMSGTYPE_CreateEmptyContDirs);
+   RequestResponseArgs rrArgs(nullptr, &createContDirsMsg, NETMSGTYPE_CreateEmptyContDirsResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, {}, *failedCreates))
+      {
+         for (auto it = inodes->begin(); it != inodes->end(); ++it)
+            failedCreates->push_back(it->getID());
+         return;
+      }
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -488,7 +605,7 @@ void MsgHelperRepair::createContDirs(NumNodeID node, bool isBuddyMirrored, FsckD
 }
 
 void MsgHelperRepair::updateFileAttribs(NumNodeID node, bool isBuddyMirrored, FsckFileInodeList* inodes,
-   FsckFileInodeList* failedUpdates)
+   FsckFileInodeList* failedUpdates, std::set<NumNodeID>& secondariesWithRepair)
 {
    UpdateFileAttribsMsg updateFileAttribsMsg(inodes);
 
@@ -496,7 +613,11 @@ void MsgHelperRepair::updateFileAttribs(NumNodeID node, bool isBuddyMirrored, Fs
    RequestResponseArgs rrArgs(nullptr, &updateFileAttribsMsg, NETMSGTYPE_UpdateFileAttribsResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *inodes, *failedUpdates))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -521,7 +642,8 @@ void MsgHelperRepair::updateFileAttribs(NumNodeID node, bool isBuddyMirrored, Fs
 }
 
 void MsgHelperRepair::updateDirAttribs(NumNodeID node, bool isBuddyMirrored,
-   FsckDirInodeList* inodes, FsckDirInodeList* failedUpdates)
+   FsckDirInodeList* inodes, FsckDirInodeList* failedUpdates,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    UpdateDirAttribsMsg updateDirAttribsMsg(inodes);
 
@@ -529,7 +651,11 @@ void MsgHelperRepair::updateDirAttribs(NumNodeID node, bool isBuddyMirrored,
    RequestResponseArgs rrArgs(nullptr, &updateDirAttribsMsg, NETMSGTYPE_UpdateDirAttribsResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *inodes, *failedUpdates))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -555,7 +681,8 @@ void MsgHelperRepair::updateDirAttribs(NumNodeID node, bool isBuddyMirrored,
 }
 
 void MsgHelperRepair::recreateFsIDs(NumNodeID node, bool isBuddyMirrored,
-   FsckDirEntryList* dentries, FsckDirEntryList* failedEntries)
+   FsckDirEntryList* dentries, FsckDirEntryList* failedEntries,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    const char* logContext = "MsgHelperRepair (recreateFsIDs)";
 
@@ -565,7 +692,11 @@ void MsgHelperRepair::recreateFsIDs(NumNodeID node, bool isBuddyMirrored,
    RequestResponseArgs rrArgs(nullptr, &recreateFsIDsMsg, NETMSGTYPE_RecreateFsIDsResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *dentries, *failedEntries))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -594,7 +725,8 @@ void MsgHelperRepair::recreateFsIDs(NumNodeID node, bool isBuddyMirrored,
 }
 
 void MsgHelperRepair::recreateDentries(NumNodeID node, bool isBuddyMirrored, FsckFsIDList* fsIDs,
-   FsckFsIDList* failedCreates, FsckDirEntryList* createdDentries, FsckFileInodeList* createdInodes)
+   FsckFsIDList* failedCreates, FsckDirEntryList* createdDentries, FsckFileInodeList* createdInodes,
+   std::set<NumNodeID>& secondariesWithRepair)
 {
    const char* logContext = "MsgHelperRepair (recreateDentries)";
 
@@ -604,7 +736,11 @@ void MsgHelperRepair::recreateDentries(NumNodeID node, bool isBuddyMirrored, Fsc
    RequestResponseArgs rrArgs(nullptr, &recreateDentriesMsg, NETMSGTYPE_RecreateDentriesResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, *fsIDs, *failedCreates))
+         return;
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 
@@ -748,7 +884,7 @@ bool MsgHelperRepair::moveChunk(Node& node, FsckChunk& chunk, const std::string&
 }
 
 void MsgHelperRepair::deleteFileInodes(NumNodeID node, bool isBuddyMirrored,
-   FsckFileInodeList& inodes, StringList& failedDeletes)
+   FsckFileInodeList& inodes, StringList& failedDeletes, std::set<NumNodeID>& secondariesWithRepair)
 {
    std::vector<RemoveInodesMsg::Item> items;
 
@@ -761,7 +897,15 @@ void MsgHelperRepair::deleteFileInodes(NumNodeID node, bool isBuddyMirrored,
    RequestResponseArgs rrArgs(nullptr, &removeInodesMsg, NETMSGTYPE_RemoveInodesResp);
 
    if (isBuddyMirrored)
+   {
       rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, {}, failedDeletes))
+      {
+         for (auto it = inodes.begin(); it != inodes.end(); ++it)
+            failedDeletes.push_back(it->getID());
+         return;
+      }
+   }
 
    FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
 

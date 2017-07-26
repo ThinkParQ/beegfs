@@ -142,7 +142,7 @@ bool LocalConnWorker::processIncomingData(
          return false;
       }
 
-      NetMessage::ResponseContext rctx(NULL, workerEndpoint, bufOut, bufOutLen, &stats);
+      NetMessage::ResponseContext rctx(NULL, workerEndpoint, bufOut, bufOutLen, &stats, true);
       bool processRes = msg->processIncoming(rctx);
       if(!processRes)
       {

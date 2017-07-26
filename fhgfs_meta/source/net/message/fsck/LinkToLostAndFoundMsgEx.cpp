@@ -112,9 +112,6 @@ void LinkToLostAndFoundMsgEx::linkDirInodes(FsckDirInodeList* outFailedInodes,
                ownerNodeID, FsckDirEntryType_DIRECTORY, false, localNodeNumID,
                saveDevice, saveInode, lostAndFoundInfo->getIsBuddyMirrored());
             outCreatedDirEntries->push_back(newFsckDirEntry);
-
-            if (iter->getIsBuddyMirrored())
-               BuddyCommTk::setBuddyNeedsResyncState(true);
          }
       }
 

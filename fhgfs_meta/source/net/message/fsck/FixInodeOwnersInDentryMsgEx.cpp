@@ -63,8 +63,6 @@ bool FixInodeOwnersInDentryMsgEx::processIncoming(ResponseContext& ctx)
             " entryName: " + entryName);
          failedEntries.push_back(*dentryIter);
       }
-      else if (dentryIter->getIsBuddyMirrored())
-         BuddyCommTk::setBuddyNeedsResyncState(true);
 
       if (parentDirInodeIsTemp)
          SAFE_DELETE(parentDirInode);

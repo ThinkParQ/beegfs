@@ -9,12 +9,71 @@
 
 #include "MovingFileInsertMsgEx.h"
 
+std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock> MovingFileInsertMsgEx::lock(
+      EntryLockStore& store)
+{
+   // we must not lock the directory if it is owned by the current node. if it is, the
+   // current message was also sent by the local node, specifically by a rename msg, which
+   // also locks the directory for write
+   if (rctx->isLocallyGenerated())
+      return {};
+
+   DirIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
+
+   ParentNameLock nameLock(&store, getToDirInfo()->getEntryID(), getNewName());
+
+   FileIDLock newLock;
+   FileIDLock unlinkedLock;
+
+   auto dir = Program::getApp()->getMetaStore()->referenceDir(getToDirInfo()->getEntryID(),
+         getToDirInfo()->getIsBuddyMirrored(), true);
+   if (dir)
+   {
+      FileInode newInode;
+      Deserializer des(getSerialBuf(), getSerialBufLen());
+      newInode.deserializeMetaData(des);
+      if (des.good())
+      {
+         std::string unlinkedID = newInode.getEntryID();
+
+         EntryInfo unlinkedInfo;
+         dir->getFileEntryInfo(getNewName(), unlinkedInfo);
+         if (DirEntryType_ISFILE(unlinkedInfo.getEntryType()))
+            unlinkedID = unlinkedInfo.getEntryID();
+
+         if (newInode.getEntryID() < unlinkedID)
+         {
+            newLock = {&store, newInode.getEntryID()};
+            unlinkedLock = {&store, unlinkedID};
+         }
+         else if (newInode.getEntryID() == unlinkedID)
+         {
+            newLock = {&store, newInode.getEntryID()};
+         }
+         else
+         {
+            unlinkedLock = {&store, unlinkedID};
+            newLock = {&store, newInode.getEntryID()};
+         }
+      }
+
+      Program::getApp()->getMetaStore()->releaseDir(dir->getID());
+   }
+
+   return std::make_tuple(
+         std::move(newLock),
+         std::move(unlinkedLock),
+         std::move(dirLock),
+         std::move(nameLock));
+}
 
 bool MovingFileInsertMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("MovingFileInsertMsg incoming");
 
    LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a MovingFileInsertMsg from: " + ctx.peerName() );
+
+   rctx = &ctx;
 
    return BaseType::processIncoming(ctx);
 }
@@ -39,9 +98,7 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
       return boost::make_unique<MovingFileInsertResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
    FhgfsOpsErr moveRes = metaStore->moveRemoteFileInsert(
-      fromFileInfo, *toDir, newName,
-      getSerialBuf(), getSerialBufLen(), &unlinkInode, newFileInfo, std::get<0>(lockState),
-      std::get<1>(lockState));
+      fromFileInfo, *toDir, newName, getSerialBuf(), getSerialBufLen(), &unlinkInode, newFileInfo);
    if (moveRes != FhgfsOpsErr_SUCCESS)
    {
       metaStore->releaseDir(toDir->getID());

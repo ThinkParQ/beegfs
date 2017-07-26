@@ -44,8 +44,6 @@ bool FixInodeOwnersMsgEx::processIncoming(ResponseContext& ctx)
             + entryID);
          failedInodes.push_back(*iter);
       }
-      else if (iter->getIsBuddyMirrored())
-         BuddyCommTk::setBuddyNeedsResyncState(true);
    }
 
    ctx.sendResponse(FixInodeOwnersRespMsg(&failedInodes) );

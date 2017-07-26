@@ -125,9 +125,9 @@ class NetMessage
 
          public:
             ResponseContext(struct sockaddr_in* fromAddr, Socket* sock, char* respBuf,
-               unsigned bufLen, HighResolutionStats* stats)
+               unsigned bufLen, HighResolutionStats* stats, bool locallyGenerated = false)
                : fromAddr(fromAddr), socket(sock), responseBuffer(respBuf),
-                 responseBufferLength(bufLen), stats(stats)
+                 responseBufferLength(bufLen), stats(stats), locallyGenerated(locallyGenerated)
             {}
 
             void sendResponse(const NetMessage& response) const
@@ -148,12 +148,15 @@ class NetMessage
                return fromAddr ? Socket::ipaddrToStr(&fromAddr->sin_addr) : socket->getPeername();
             }
 
+            bool isLocallyGenerated() const { return locallyGenerated; }
+
          private:
             struct sockaddr_in* fromAddr;
             Socket* socket;
             char* responseBuffer;
             unsigned responseBufferLength;
             HighResolutionStats* stats;
+            bool locallyGenerated;
       };
 
       /**

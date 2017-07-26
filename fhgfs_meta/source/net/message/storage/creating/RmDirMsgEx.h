@@ -9,14 +9,15 @@
 
 
 class RmDirMsgEx : public MirroredMessage<RmDirMsg,
-   std::tuple<DirIDLock, DirIDLock, ParentNameLock>>
+   std::tuple<HashDirLock, DirIDLock, DirIDLock, ParentNameLock>>
 {
    public:
       typedef ErrorCodeResponseState<RmDirRespMsg, NETMSGTYPE_RmDir> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<DirIDLock, DirIDLock, ParentNameLock> lock(EntryLockStore& store) override;
+      std::tuple<HashDirLock, DirIDLock, DirIDLock, ParentNameLock>
+         lock(EntryLockStore& store) override;
 
       static FhgfsOpsErr rmRemoteDirInode(EntryInfo* delEntryInfo);
 

@@ -29,6 +29,7 @@
 #include <common/net/message/nodes/GetNodesRespMsg.h>
 #include <common/net/message/nodes/GetTargetMappingsRespMsg.h>
 #include <common/net/message/nodes/GetTargetStatesRespMsg.h>
+#include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
 #include <net/message/nodes/HeartbeatMsgEx.h>
 
 // storage messages
@@ -71,6 +72,7 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_GetMirrorBuddyGroupsResp: { msg = new GetMirrorBuddyGroupsRespMsg(); } break;
       case NETMSGTYPE_GetTargetMappingsResp: { msg = new GetTargetMappingsRespMsg(); } break;
       case NETMSGTYPE_GetTargetStatesResp: { msg = new GetTargetStatesRespMsg(); } break;
+      case NETMSGTYPE_SetTargetConsistencyStatesResp: { msg = new SetTargetConsistencyStatesRespMsg(); } break;
 
       // storage messages
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;

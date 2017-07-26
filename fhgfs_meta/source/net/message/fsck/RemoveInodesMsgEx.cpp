@@ -42,8 +42,6 @@ bool RemoveInodesMsgEx::processIncoming(ResponseContext& ctx)
 
       if (rmRes != FhgfsOpsErr_SUCCESS)
          failedIDList.push_back(entryID);
-      else if (isBuddyMirrored)
-         BuddyCommTk::setBuddyNeedsResyncState(true);
    }
 
    ctx.sendResponse(RemoveInodesRespMsg(std::move(failedIDList)));

@@ -955,6 +955,19 @@ void ModeCheckFS::checkAndRepair()
       return;
    }
 
+   for (auto it = secondariesSetBad.begin(); it != secondariesSetBad.end(); ++it)
+   {
+      auto secondary = *it;
+
+      FsckTkEx::fsckOutput(">>> Setting metadata node " + StringTk::intToStr(secondary.val())
+            + " to needs-resync", OutputOptions_LINEBREAK);
+
+      auto setRes = MsgHelperRepair::setNodeState(secondary, TargetConsistencyState_NEEDS_RESYNC);
+      if (setRes != FhgfsOpsErr_SUCCESS)
+         FsckTkEx::fsckOutput(std::string("Failed: ") + FhgfsOpsErrTk::toErrString(setRes),
+               OutputOptions_LINEBREAK);
+   }
+
    if(errorCount > 0)
       FsckTkEx::fsckOutput(">>> Found " + StringTk::int64ToStr(errorCount) + " errors <<< ",
          OutputOptions_ADDLINEBREAKBEFORE | OutputOptions_LINEBREAK);
@@ -990,7 +1003,8 @@ void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry,
 
    case FsckRepairAction_DELETEDENTRY: {
       MsgHelperRepair::deleteDanglingDirEntries(fsckEntry.getSaveNodeID(),
-            fsckEntry.getIsBuddyMirrored(), &entries, &failedEntries);
+            fsckEntry.getIsBuddyMirrored(), &entries, &failedEntries,
+            secondariesSetBad);
 
       if(failedEntries.empty() )
       {
@@ -1007,7 +1021,8 @@ void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry,
       // create mirrored inodes iff the dentry was mirrored. if a contdir with the same id exists,
       // a previous check will have created an inode for it, leaving this dentry not dangling.
       MsgHelperRepair::createDefDirInodes(fsckEntry.getSaveNodeID(), fsckEntry.getIsBuddyMirrored(),
-            {std::make_tuple(fsckEntry.getID(), fsckEntry.getIsBuddyMirrored())}, &createdInodes);
+            {std::make_tuple(fsckEntry.getID(), fsckEntry.getIsBuddyMirrored())}, &createdInodes,
+            secondariesSetBad);
 
       this->database->getDirInodesTable()->insert(createdInodes);
 
@@ -1038,7 +1053,7 @@ void ModeCheckFS::repairWrongInodeOwner(FsckDirInode& inode, UserPrompter& promp
       FsckDirInodeList failed;
 
       MsgHelperRepair::correctInodeOwners(inode.getSaveNodeID(), inode.getIsBuddyMirrored(),
-            &inodes, &failed);
+            &inodes, &failed, secondariesSetBad);
 
       if(failed.empty() )
          this->database->getDirInodesTable()->update(inodes);
@@ -1073,7 +1088,8 @@ void ModeCheckFS::repairWrongInodeOwnerInDentry(std::pair<db::DirEntry, NumNodeI
       FsckDirEntryList failed;
 
       MsgHelperRepair::correctInodeOwnersInDentry(fsckEntry.getSaveNodeID(),
-            fsckEntry.getIsBuddyMirrored(), &dentries, &owners, &failed);
+            fsckEntry.getIsBuddyMirrored(), &dentries, &owners, &failed,
+            secondariesSetBad);
 
       if(failed.empty() )
          this->database->getDentryTable()->updateFieldsExceptParent(dentries);
@@ -1109,7 +1125,7 @@ void ModeCheckFS::repairOrphanedDirInode(FsckDirInode& inode, UserPrompter& prom
       FsckDirInodeList failed;
 
       MsgHelperRepair::linkToLostAndFound(*this->lostAndFoundNode, &this->lostAndFoundInfo, &inodes,
-         &failed, &created);
+         &failed, &created, secondariesSetBad);
 
       if(failed.empty() )
          this->database->getDentryTable()->insert(created);
@@ -1147,7 +1163,7 @@ void ModeCheckFS::repairOrphanedFileInode(FsckFileInode& inode, UserPrompter& pr
       StringList failed;
 
       MsgHelperRepair::deleteFileInodes(inode.getSaveNodeID(), inode.getIsBuddyMirrored(), inodes,
-            failed);
+            failed, secondariesSetBad);
 
       if(failed.empty() )
          this->database->getFileInodesTable()->remove(inodes);
@@ -1224,7 +1240,7 @@ void ModeCheckFS::repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt
       StringList failed;
 
       MsgHelperRepair::createContDirs(inode.getSaveNodeID(), inode.getIsBuddyMirrored(), &inodes,
-            &failed);
+            &failed, secondariesSetBad);
 
       if(failed.empty() )
       {
@@ -1256,7 +1272,8 @@ void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt)
    case FsckRepairAction_CREATEDEFAULTDIRINODE: {
       FsckDirInodeList createdInodes;
       MsgHelperRepair::createDefDirInodes(dir.getSaveNodeID(), dir.getIsBuddyMirrored(),
-            {std::make_tuple(dir.getID(), dir.getIsBuddyMirrored())}, &createdInodes);
+            {std::make_tuple(dir.getID(), dir.getIsBuddyMirrored())}, &createdInodes,
+            secondariesSetBad);
 
       this->database->getDirInodesTable()->insert(createdInodes);
 
@@ -1288,7 +1305,7 @@ void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::InodeA
       FsckFileInodeList failed;
 
       MsgHelperRepair::updateFileAttribs(error.first.getSaveNodeID(),
-            error.first.getIsBuddyMirrored(), &inodes, &failed);
+            error.first.getIsBuddyMirrored(), &inodes, &failed, secondariesSetBad);
 
       if(failed.empty() )
          this->database->getFileInodesTable()->update(inodes);
@@ -1325,7 +1342,7 @@ void ModeCheckFS::repairWrongDirAttribs(std::pair<FsckDirInode, checks::InodeAtt
       error.first.setNumHardLinks(error.second.nlinks);
 
       MsgHelperRepair::updateDirAttribs(error.first.getSaveNodeID(),
-            error.first.getIsBuddyMirrored(), &inodes, &failed);
+            error.first.getIsBuddyMirrored(), &inodes, &failed, secondariesSetBad);
 
       if(failed.empty() )
          this->database->getDirInodesTable()->update(inodes);
@@ -1391,7 +1408,7 @@ void ModeCheckFS::repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, UserProm
       FsckDirEntryList failed;
 
       MsgHelperRepair::recreateFsIDs(fsckEntry.getSaveNodeID(), fsckEntry.getIsBuddyMirrored(),
-            &dentries, &failed);
+            &dentries, &failed, secondariesSetBad);
 
       if(failed.empty() )
       {
@@ -1430,7 +1447,7 @@ void ModeCheckFS::repairOrphanedDentryByIDFile(FsckFsID& id, UserPrompter& promp
       FsckFileInodeList createdInodes;
 
       MsgHelperRepair::recreateDentries(id.getSaveNodeID(), id.getIsBuddyMirrored(), &fsIDs,
-            &failed, &createdDentries, &createdInodes);
+            &failed, &createdDentries, &createdInodes, secondariesSetBad);
 
       if(failed.empty() )
       {

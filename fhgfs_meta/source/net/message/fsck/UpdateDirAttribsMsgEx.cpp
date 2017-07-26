@@ -44,8 +44,6 @@ bool UpdateDirAttribsMsgEx::processIncoming(ResponseContext& ctx)
             "entryID: " + dirID);
          failedInodes.push_back(*iter);
       }
-      else if (iter->getIsBuddyMirrored())
-         BuddyCommTk::setBuddyNeedsResyncState(true);
    }
 
    ctx.sendResponse(UpdateDirAttribsRespMsg(&failedInodes) );

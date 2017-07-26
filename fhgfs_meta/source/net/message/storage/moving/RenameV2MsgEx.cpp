@@ -25,65 +25,99 @@
 
 #include <boost/scoped_array.hpp>
 
-std::tuple<DirIDLock, DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> RenameV2MsgEx::lock(
-   EntryLockStore& store)
+RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
 {
-   ParentNameLock fromNameLock;
-   ParentNameLock toNameLock;
-   DirIDLock fromDirLock;
-   DirIDLock toDirLock;
-
-   // we have to lock the file as well, because concurrent modifications of file attributes may
-   // race with the moving operation between two servers.
-   FileIDLock fileLock;
-
-   EntryInfo fromFileInfo;
+   RenameV2Locks result;
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
+   // take care about lock ordering! see MirroredMessage::lock()
+   // since directories are locked for read, and by the same id as the (parent,name) tuples,the
+   // same ordering applies.
+   if (getFromDirInfo()->getEntryID() < getToDirInfo()->getEntryID())
+   {
+      result.fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
+      result.toDirLock = {&store, getToDirInfo()->getEntryID(), true};
+
+      result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+      result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+   }
+   else if (getFromDirInfo()->getEntryID() == getToDirInfo()->getEntryID())
+   {
+      result.fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
+
+      if (getOldName() < getNewName())
+      {
+         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+         result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+      }
+      else if (getOldName() == getNewName())
+      {
+         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+      }
+      else
+      {
+         result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+      }
+   }
+   else
+   {
+      result.toDirLock = {&store, getToDirInfo()->getEntryID(), true};
+      result.fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
+
+      result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+      result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+   }
+
+   EntryInfo fromFileInfo;
+   EntryInfo toFileInfo;
+
    DirInode* fromDir = metaStore->referenceDir(getFromDirInfo()->getEntryID(),
          getFromDirInfo()->getIsBuddyMirrored(), true);
+   // if the directory could not be referenced it does not exist on the current node. this will
+   // cause the operation to fail lateron during executeLocally() when we reference the same
+   // directory again. since we cannot do anything without having access to the source directory,
+   // and since no directory with the same id as the source directory can appear after the source
+   // directory has been removed, we can safely unlock everything right here and continue without
+   // blocking other workers on the (probably live) target directory.
    if (!fromDir)
       return {};
    else
    {
       fromDir->getFileEntryInfo(getOldName(), fromFileInfo);
+      if (getFromDirInfo()->getEntryID() == getToDirInfo()->getEntryID())
+         fromDir->getFileEntryInfo(getNewName(), toFileInfo);
+
       metaStore->releaseDir(getFromDirInfo()->getEntryID());
    }
 
-   // take care about lock ordering! see MirroredMessage::lock()
-   // since directories are locked for read, and by the same id as the (parent,name) tuples,the
-   // same ordering applies.
-   if (getFromDirInfo()->getEntryID() < getToDirInfo()->getEntryID()
-         || (getFromDirInfo()->getEntryID() == getToDirInfo()->getEntryID()
-               && getOldName() < getNewName()))
-   {
-      fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
-      if (getFromDirInfo()->getEntryID() != getToDirInfo()->getEntryID())
-         toDirLock = {&store, getToDirInfo()->getEntryID(), true};
-
-      fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-      if (getOldName() != getNewName())
-         toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
-   }
-   else
-   {
-      toDirLock = {&store, getToDirInfo()->getEntryID(), true};
-      if (getFromDirInfo()->getEntryID() != getToDirInfo()->getEntryID())
-         fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
-
-      toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
-      if (getOldName() != getNewName())
-         fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-   }
-
    if (DirEntryType_ISFILE(fromFileInfo.getEntryType()) && fromFileInfo.getIsInlined())
-      fileLock = {&store, fromFileInfo.getEntryID()};
+   {
+      if (DirEntryType_ISFILE(toFileInfo.getEntryType()) && toFileInfo.getIsInlined())
+      {
+         if (fromFileInfo.getEntryID() < toFileInfo.getEntryID())
+         {
+            result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+            result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
+         }
+         else if (fromFileInfo.getEntryID() == toFileInfo.getEntryID())
+         {
+            result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+         }
+         else
+         {
+            result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
+            result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+         }
+      }
+      else
+      {
+         result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+      }
+   }
 
-   return std::make_tuple(
-         std::move(fromDirLock), std::move(toDirLock),
-         std::move(fromNameLock), std::move(toNameLock),
-         std::move(fileLock));
+   return result;
 }
 
 bool RenameV2MsgEx::processIncoming(ResponseContext& ctx)
@@ -264,7 +298,8 @@ FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInf
 
          rmDirEntry->getEntryInfo(parentID, 0, &removedInfo);
 
-         updateRenamedDirInode(&removedInfo, toDirInfo);
+         if (!hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
+            updateRenamedDirInode(&removedInfo, toDirInfo);
       }
       else
       {

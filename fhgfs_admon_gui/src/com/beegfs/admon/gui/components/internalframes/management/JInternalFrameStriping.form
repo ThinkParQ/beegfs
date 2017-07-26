@@ -308,7 +308,7 @@
                     <Component class="javax.swing.JComboBox" name="jComboStripingStripePattern">
                       <Properties>
                         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.RADConnectionPropertyEditor">
-                          <Connection code="new javax.swing.DefaultComboBoxModel&lt;&gt;(new String[] { &quot;RAID 0&quot;, &quot;RAID 10&quot;, &quot;BuddyMirror&quot; })" type="code"/>
+                          <Connection code="new javax.swing.DefaultComboBoxModel&lt;&gt;(new String[] { &quot;RAID 0&quot;, &quot;BuddyMirror&quot; })" type="code"/>
                         </Property>
                       </Properties>
                       <AuxValues>

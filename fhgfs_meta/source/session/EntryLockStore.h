@@ -196,6 +196,16 @@ struct ValueLockHash<std::pair<std::string, std::string> >
    }
 };
 
+template<>
+struct ValueLockHash<std::pair<unsigned, unsigned>>
+{
+   uint32_t operator()(std::pair<unsigned, unsigned> pair) const
+   {
+      // optimized for the inode/dentries hash dir structure of 2 fragments of 7 bits each
+      return std::hash<unsigned>()((pair.first << 8) | pair.second);
+   }
+};
+
 typedef ValueLockStore<std::pair<std::string, std::string>, Mutex, 1024> ParentNameLockStore;
 typedef ParentNameLockStore::ValueLock ParentNameLockData;
 
@@ -205,21 +215,27 @@ typedef DirIDLockStore::ValueLock DirIDLockData;
 typedef ValueLockStore<std::string, Mutex, 1024> FileIDLockStore;
 typedef FileIDLockStore::ValueLock FileIDLockData;
 
+typedef ValueLockStore<std::pair<unsigned, unsigned>, Mutex, 1024> HashDirLockStore;
+typedef HashDirLockStore::ValueLock HashDirLockData;
+
 class EntryLockStore
 {
    public:
       ParentNameLockData* lock(const std::string& parentID, const std::string& name);
       FileIDLockData* lock(const std::string& fileID);
       DirIDLockData* lock(const std::string& dirID, const bool writeLock);
+      HashDirLockData* lock(std::pair<unsigned, unsigned> hashDir);
 
       void unlock(ParentNameLockData* parentNameLock);
       void unlock(FileIDLockData* fileIDLock);
       void unlock(DirIDLockData* dirIDLock);
+      void unlock(HashDirLockData* hashDirLock);
 
    private:
       ParentNameLockStore parentNameLocks;
       FileIDLockStore fileLocks;
       DirIDLockStore dirLocks;
+      HashDirLockStore hashDirLocks;
 };
 
 #endif /* ENTRYLOCKSTORE_H_ */

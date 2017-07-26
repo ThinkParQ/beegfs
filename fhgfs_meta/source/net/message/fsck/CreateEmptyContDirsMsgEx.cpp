@@ -57,9 +57,6 @@ bool CreateEmptyContDirsMsgEx::processIncoming(ResponseContext& ctx)
       }
 
       metaStore->releaseDir(dirID);
-
-      if (isBuddyMirrored)
-         BuddyCommTk::setBuddyNeedsResyncState(true);
    }
 
    ctx.sendResponse(CreateEmptyContDirsRespMsg(&failedIDs) );

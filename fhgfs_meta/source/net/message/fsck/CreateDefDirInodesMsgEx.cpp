@@ -52,9 +52,6 @@ bool CreateDefDirInodesMsgEx::processIncoming(ResponseContext& ctx)
             statData.getNumHardlinks(), stripeTargets, FsckStripePatternType_RAID0,
             ownerNodeID, isBuddyMirrored, true, false);
          createdInodes.push_back(fsckDirInode);
-
-         if (isBuddyMirrored)
-            BuddyCommTk::setBuddyNeedsResyncState(true);
       }
       else
          failedInodeIDs.push_back(inodeID);

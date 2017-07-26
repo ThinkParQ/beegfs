@@ -27,7 +27,7 @@ bool RmDirMsgEx::processIncoming(ResponseContext& ctx)
    return true;
 }
 
-std::tuple<DirIDLock, DirIDLock, ParentNameLock> RmDirMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, DirIDLock, DirIDLock, ParentNameLock> RmDirMsgEx::lock(EntryLockStore& store)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    EntryInfo delEntryInfo;
@@ -44,6 +44,10 @@ std::tuple<DirIDLock, DirIDLock, ParentNameLock> RmDirMsgEx::lock(EntryLockStore
 
    DirIDLock parentDirLock;
    DirIDLock delDirLock;
+   HashDirLock hashLock;
+
+   if (resyncJob && resyncJob->isRunning())
+      hashLock = {&store, MetaStorageTk::getMetaInodeHash(delEntryInfo.getEntryID())};
 
    // lock directories in deadlock-avoidance order, see MirroredMessage::lock()
    if (delEntryInfo.getEntryID() < getParentInfo()->getEntryID())
@@ -64,6 +68,7 @@ std::tuple<DirIDLock, DirIDLock, ParentNameLock> RmDirMsgEx::lock(EntryLockStore
    ParentNameLock parentNameLock(&store, getParentInfo()->getEntryID(), getDelDirName());
 
    return std::make_tuple(
+         std::move(hashLock),
          std::move(parentDirLock),
          std::move(delDirLock),
          std::move(parentNameLock));

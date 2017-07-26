@@ -44,8 +44,6 @@ bool UpdateFileAttribsMsgEx::processIncoming(ResponseContext& ctx)
                "entryID: " + iter->getID());
             failedInodes.push_back(*iter);
          }
-         else if (iter->getIsBuddyMirrored())
-            BuddyCommTk::setBuddyNeedsResyncState(true);
 
          /* only release it here, as refreshDynAttribs() also takes an inode reference and can
           * do the reference from in-memory data then */

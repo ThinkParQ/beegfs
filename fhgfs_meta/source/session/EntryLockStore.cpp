@@ -28,6 +28,13 @@ DirIDLockData* EntryLockStore::lock(const std::string& dirID, const bool writeLo
    return &lock;
 }
 
+HashDirLockData* EntryLockStore::lock(std::pair<unsigned, unsigned> hashDir)
+{
+   HashDirLockData& lock = hashDirLocks.getLockFor(hashDir);
+   lock.getLock().lock();
+   return &lock;
+}
+
 void EntryLockStore::unlock(ParentNameLockData* parentNameLockData)
 {
    parentNameLockData->getLock().unlock();
@@ -44,4 +51,10 @@ void EntryLockStore::unlock(DirIDLockData* dirIDLockData)
 {
    dirIDLockData->getLock().unlock();
    dirLocks.putLock(*dirIDLockData);
+}
+
+void EntryLockStore::unlock(HashDirLockData* hashDirLockData)
+{
+   hashDirLockData->getLock().unlock();
+   hashDirLocks.putLock(*hashDirLockData);
 }

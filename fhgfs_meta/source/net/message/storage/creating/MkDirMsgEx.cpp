@@ -21,6 +21,8 @@ bool MkDirMsgEx::processIncoming(ResponseContext& ctx)
 
    App* app = Program::getApp();
 
+   entryID = StorageTk::generateFileID(app->getLocalNode().getNumID());
+
    BaseType::processIncoming(ctx);
 
    // update operation counters
@@ -46,12 +48,20 @@ std::unique_ptr<MirroredMessageResponseState> MkDirMsgEx::executeLocally(Respons
    return std::move(result);
 }
 
-std::tuple<DirIDLock, ParentNameLock> MkDirMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, DirIDLock, ParentNameLock> MkDirMsgEx::lock(EntryLockStore& store)
 {
+   HashDirLock hashLock;
+
+   // during resync we must lock the hash dir of the new inode even if the inode will be created on
+   // a different node because we select the target node for the inode only after we have locked our
+   // structures.
+   if (resyncJob && resyncJob->isRunning())
+      hashLock = {&store, MetaStorageTk::getMetaInodeHash(entryID)};
+
    DirIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
    ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getNewDirName());
 
-   return std::make_tuple(std::move(dirLock), std::move(dentryLock));
+   return std::make_tuple(std::move(hashLock), std::move(dirLock), std::move(dentryLock));
 }
 
 std::unique_ptr<MkDirMsgEx::ResponseState> MkDirMsgEx::mkDirPrimary(ResponseContext& ctx)
@@ -132,7 +142,6 @@ std::unique_ptr<MkDirMsgEx::ResponseState> MkDirMsgEx::mkDirPrimary(ResponseCont
 
    const uint16_t ownerNodeID = newOwnerNodes[0];
    const std::string parentEntryID = parentInfo->getEntryID();
-   const std::string entryID = StorageTk::generateFileID(app->getLocalNode().getNumID());
    int entryInfoFlags = isBuddyMirrored ? ENTRYINFO_FEATURE_BUDDYMIRRORED : 0;
 
    int mode = getMode();

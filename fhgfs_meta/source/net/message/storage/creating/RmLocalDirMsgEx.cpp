@@ -1,12 +1,24 @@
 #include <program/Program.h>
 #include <common/net/message/storage/creating/RmLocalDirRespMsg.h>
+#include <common/toolkit/MetaStorageTk.h>
 
 #include "RmLocalDirMsgEx.h"
 
 
-DirIDLock RmLocalDirMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, DirIDLock> RmLocalDirMsgEx::lock(EntryLockStore& store)
 {
-   return {&store, getDelEntryInfo()->getEntryID(), true};
+   HashDirLock hashLock;
+
+   // if we are currently under modsync, we must lock the hash dir from which we are removing the
+   // inode. otherwise bulk sync may interfere with mod sync and cause the resync to fail.
+   // do not lock the hash dir if we are removing the inode from the same meta node as the dentry,
+   // RmDir will have already locked the hash dir.
+   if (!rctx->isLocallyGenerated() && resyncJob && resyncJob->isRunning())
+      hashLock = {&store, MetaStorageTk::getMetaInodeHash(getDelEntryInfo()->getEntryID())};
+
+   return std::make_tuple(
+         std::move(hashLock),
+         DirIDLock(&store, getDelEntryInfo()->getEntryID(), true));
 }
 
 bool RmLocalDirMsgEx::processIncoming(ResponseContext& ctx)
@@ -16,6 +28,8 @@ bool RmLocalDirMsgEx::processIncoming(ResponseContext& ctx)
 
    LOG_DEBUG(logContext, 4, "Received a RmLocalDirMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
+
+   rctx = &ctx;
 
    return BaseType::processIncoming(ctx);
 }

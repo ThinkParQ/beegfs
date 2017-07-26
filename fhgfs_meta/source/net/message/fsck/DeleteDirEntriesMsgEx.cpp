@@ -58,8 +58,6 @@ bool DeleteDirEntriesMsgEx::processIncoming(ResponseContext& ctx)
             entryName + "; Err: " + FhgfsOpsErrTk::toErrString(unlinkRes));
           failedEntries.push_back(*iter);
       }
-      else if (iter->getIsBuddyMirrored())
-         BuddyCommTk::setBuddyNeedsResyncState(true);
    }
 
    ctx.sendResponse(DeleteDirEntriesRespMsg(&failedEntries) );

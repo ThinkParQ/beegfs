@@ -368,7 +368,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelStriping.add(jLabelStripingStripePattern, gridBagConstraints);
 
-      jComboStripingStripePattern.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "RAID 0", "RAID 10", "BuddyMirror" }));
+      jComboStripingStripePattern.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "RAID 0", "BuddyMirror" }));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
       gridBagConstraints.gridy = 3;
@@ -535,12 +535,6 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
          if(Long.bitCount(int_cs) != 1)
          {
             String msg = "The chunk size must be a numeric value of power of 2!";
-            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
-         }
-         else
-         if(pattern == StripePatternEnum.STRIPE_PATTERN_RAID_10.ordinal() )
-         {
-            String msg = "The strippe pattern RAID10 is not supported anymore!";
             JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
          }
          else

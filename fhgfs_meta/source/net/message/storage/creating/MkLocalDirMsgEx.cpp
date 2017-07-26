@@ -4,10 +4,18 @@
 
 #include "MkLocalDirMsgEx.h"
 
-std::tuple<> MkLocalDirMsgEx::lock(EntryLockStore& store)
+HashDirLock MkLocalDirMsgEx::lock(EntryLockStore& store)
 {
-   // we need not lock anything here, because the inode ID will be completely unknown to anyone
-   // until we finish processing here *and* on the metadata server that sent this message.
+   // we usually need not lock anything here, because the inode ID will be completely unknown to
+   // anyone until we finish processing here *and* on the metadata server that sent this message.
+   // during resync though we need to lock the hash dir to avoid interefence between bulk resync and
+   // mod resync.
+
+   // do not lock the hash dir if we are creating the inode on the same meta node as the dentry,
+   // MkDir will have already locked the hash dir.
+   if (!rctx->isLocallyGenerated() && resyncJob && resyncJob->isRunning())
+      return {&store, MetaStorageTk::getMetaInodeHash(getEntryInfo()->getEntryID())};
+
    return {};
 }
 
@@ -19,6 +27,8 @@ bool MkLocalDirMsgEx::processIncoming(ResponseContext& ctx)
          as("entryID", entryInfo->getEntryID()),
          as("entryName", entryInfo->getFileName()));
    (void) entryInfo;
+
+   rctx = &ctx;
 
    return BaseType::processIncoming(ctx);
 }

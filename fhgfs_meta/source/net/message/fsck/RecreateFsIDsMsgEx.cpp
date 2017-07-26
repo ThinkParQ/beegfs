@@ -59,9 +59,6 @@ bool RecreateFsIDsMsgEx::processIncoming(ResponseContext& ctx)
          failedEntries.push_back(*iter);
          continue;
       }
-
-      if (iter->getIsBuddyMirrored())
-         BuddyCommTk::setBuddyNeedsResyncState(true);
    }
 
    ctx.sendResponse(RecreateFsIDsRespMsg(&failedEntries) );

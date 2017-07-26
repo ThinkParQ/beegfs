@@ -23,9 +23,12 @@ class MirroredMessage : public BaseT
    protected:
       typedef MirroredMessage BaseType;
 
+      BuddyResyncJob* resyncJob;
       LockStateT lockState;
 
-      MirroredMessage() {}
+      MirroredMessage():
+         resyncJob(nullptr)
+      {}
 
       virtual FhgfsOpsErr processSecondaryResponse(NetMessage& resp) = 0;
 
@@ -38,10 +41,12 @@ class MirroredMessage : public BaseT
 
       // IMPORTANT NOTE ON LOCKING ORDER:
       //  * always take locks the order
+      //     - HashDirLock
       //     - DirIDLock
       //     - ParentNameLock
       //     - FileIDLock
       //  * always take locks of each type with the order induced by:
+      //     - HashDirLock: id
       //     - DirIDLock: (id, forWrite)
       //     - ParentNameLock: (parentID, name)
       //     - FileIDLock: id
@@ -55,7 +60,6 @@ class MirroredMessage : public BaseT
       {
          Session* session = nullptr;
          bool isNewState = true;
-         BuddyResyncJob* resyncJob = nullptr;
 
          if (isMirrored() && !this->hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
          {
@@ -179,14 +183,6 @@ class MirroredMessage : public BaseT
          // pairs with the memory barrier before acquireMirrorStateSlot
          __sync_synchronize();
 
-         if (responsePtr && buddyCommSuccessful)
-            responsePtr->sendResponse(ctx);
-         else if (!buddyCommSuccessful)
-            ctx.sendResponse(
-                  GenericResponseMsg(
-                     GenericRespMsgCode_INDIRECTCOMMERR_NOTAGAIN,
-                     "Communication with secondary failed"));
-
          if (BuddyResyncer::getSyncChangeset())
          {
             if (isMirrored() &&
@@ -197,6 +193,14 @@ class MirroredMessage : public BaseT
             else
                BuddyResyncer::abandonSyncChangeset();
          }
+
+         if (responsePtr && buddyCommSuccessful)
+            responsePtr->sendResponse(ctx);
+         else if (!buddyCommSuccessful)
+            ctx.sendResponse(
+                  GenericResponseMsg(
+                     GenericRespMsgCode_INDIRECTCOMMERR_NOTAGAIN,
+                     "Communication with secondary failed"));
 
          lockState = {};
       }

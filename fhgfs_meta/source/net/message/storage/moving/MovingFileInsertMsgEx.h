@@ -68,34 +68,21 @@ class MovingFileInsertResponseState : public MirroredMessageResponseState
 };
 
 class MovingFileInsertMsgEx : public MirroredMessage<MovingFileInsertMsg,
-   std::tuple<FileIDLock, FileIDLock, DirIDLock>>
+   std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock>>
 {
    public:
       typedef MovingFileInsertResponseState ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, FileIDLock, DirIDLock> lock(EntryLockStore& store) override
-      {
-         // the created file need not be locked, because only the requestor of the move operations
-         // knows the new parent of the file, and only knows it for certain once the origin server
-         // has acknowledged the operation.
-         // we must not lock the directory if it is owned by the current node. if it is, the
-         // current message was also sent by the local node, specifically by a RmDirMsgEx, which
-         // also locks the directory for write
-         uint16_t localID = Program::getApp()->getMetaBuddyGroupMapper()->getLocalGroupID();
-         if (getToDirInfo()->getOwnerNodeID().val() == localID)
-            return {};
-
-         return std::make_tuple(
-               FileIDLock(), // new file inode
-               FileIDLock(), // (maybe) overwritten file inode
-               DirIDLock(&store, getToDirInfo()->getEntryID(), true));
-      }
+      std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock>
+         lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getToDirInfo()->getIsBuddyMirrored(); }
 
    private:
+      ResponseContext* rctx;
+
       StringVector xattrNames;
       EntryInfo newFileInfo;
       MsgHelperXAttr::StreamXAttrState streamState;

@@ -385,6 +385,20 @@ class StorageTk
       }
 
       /**
+       * @return (hashDir1, hashDir2)
+       */
+      static std::pair<unsigned, unsigned> getHash(const std::string& entryID,
+         size_t numHashesLevel1, size_t numHashesLevel2)
+      {
+         uint16_t hashLevel1;
+         uint16_t hashLevel2;
+
+         getHashes(entryID, numHashesLevel1, numHashesLevel2, hashLevel1, hashLevel2);
+
+         return {hashLevel1, hashLevel2};
+      }
+
+      /**
        * @return hashDir1/hashDir2/entryID
        */
       static std::string getBaseHashPath(const std::string entryID,

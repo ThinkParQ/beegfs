@@ -9,7 +9,8 @@
 
 // Move directory to another meta-data server
 
-class MovingDirInsertMsgEx : public MirroredMessage<MovingDirInsertMsg, DirIDLock>
+class MovingDirInsertMsgEx : public MirroredMessage<MovingDirInsertMsg,
+   std::tuple<DirIDLock, ParentNameLock>>
 {
    public:
       typedef ErrorCodeResponseState<MovingDirInsertRespMsg, NETMSGTYPE_MovingDirInsert>
@@ -17,21 +18,25 @@ class MovingDirInsertMsgEx : public MirroredMessage<MovingDirInsertMsg, DirIDLoc
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      DirIDLock lock(EntryLockStore& store) override
+      std::tuple<DirIDLock, ParentNameLock> lock(EntryLockStore& store) override
       {
          // we must not lock the directory if it is owned by the current node. if it is, the
          // current message was also sent by the local node, specifically by a RmDirMsgEx, which
          // also locks the directory for write
-         uint16_t localID = Program::getApp()->getMetaBuddyGroupMapper()->getLocalGroupID();
-         if (getToDirInfo()->getOwnerNodeID().val() == localID)
+         if (rctx->isLocallyGenerated())
             return {};
 
-         return {&store, getToDirInfo()->getEntryID(), true};
+         DirIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
+         ParentNameLock nameLock(&store, getToDirInfo()->getEntryID(), getNewName());
+
+         return std::make_tuple(std::move(dirLock), std::move(nameLock));
       }
 
       bool isMirrored() override { return getToDirInfo()->getIsBuddyMirrored(); }
 
    private:
+      ResponseContext* rctx;
+
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 

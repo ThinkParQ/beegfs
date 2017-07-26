@@ -126,4 +126,25 @@ class ParentNameLock : UniqueEntryLockBase<ParentNameLockData>
       }
 };
 
+class HashDirLock : UniqueEntryLockBase<HashDirLockData>
+{
+   public:
+      HashDirLock() = default;
+
+      HashDirLock(const HashDirLock&) = delete;
+      HashDirLock& operator=(const HashDirLock&) = delete;
+
+      HashDirLock(HashDirLock&& src) : BaseType(std::move(src)) {}
+      HashDirLock& operator=(HashDirLock&& src)
+      {
+         BaseType::operator=(std::move(src));
+         return *this;
+      }
+
+      HashDirLock(EntryLockStore* entryLockStore, std::pair<unsigned, unsigned> hashDir)
+         : UniqueEntryLockBase<HashDirLockData>(entryLockStore, hashDir)
+      {
+      }
+};
+
 #endif /* ENTRYLOCK_H_ */

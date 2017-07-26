@@ -49,6 +49,8 @@ class ModeCheckFS : public Mode
       EntryInfo lostAndFoundInfo;
       boost::shared_ptr<FsckDirInode> lostAndFoundInode;
 
+      std::set<NumNodeID> secondariesSetBad;
+
       int initDatabase();
       void printHeaderInformation();
       void disposeUnusedFiles();

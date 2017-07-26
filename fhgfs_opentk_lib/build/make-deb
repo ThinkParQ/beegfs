@@ -47,7 +47,7 @@ chmod +x debian/rules
 # do that itself yet
 # NOTE: package not signed yet! (-us -uc)
 yes | debuild -us -uc 2>&1 | egrep -v "dir-or-file-in-opt | file-in-unusual-dir"
-debuild clean
+[ "${DEBIAN_VERSION}" = "9" ] && yes | debuild -- clean || debuild clean
 
 if [ -z "$DEBIAN_ARCHIVE_DIR" ]; then
 	DEBIAN_ARCHIVE_DIR=`mktemp -d /tmp/debian_archive.XXXXXXXXX`

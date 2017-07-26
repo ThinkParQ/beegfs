@@ -28,6 +28,18 @@ class MetaStorageTk
       }
 
       /**
+       * Get directory for a (non-inlined) inode.
+       *
+       * @param inodePath path to inodes subdir of general storage directory
+       * @param fileName entryID of the inode
+       */
+      static std::pair<unsigned, unsigned> getMetaInodeHash(const std::string& fileName)
+      {
+         return StorageTk::getHash(fileName,
+            META_INODES_LEVEL1_SUBDIR_NUM, META_INODES_LEVEL2_SUBDIR_NUM);
+      }
+
+      /**
        * Get path to a contents directory (i.e. the dir containing the dentries by name).
        *
        * @param dirEntryID entryID of the directory for which the caller wants the contents path

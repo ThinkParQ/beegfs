@@ -10,14 +10,15 @@
 #include <net/message/MirroredMessage.h>
 
 class HardlinkMsgEx : public MirroredMessage<HardlinkMsg,
-   std::tuple<DirIDLock, ParentNameLock, ParentNameLock>>
+   std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock>>
 {
    public:
       typedef ErrorCodeResponseState<HardlinkRespMsg, NETMSGTYPE_Hardlink> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<DirIDLock, ParentNameLock, ParentNameLock> lock(EntryLockStore& store) override;
+      std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock>
+         lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getToDirInfo()->getIsBuddyMirrored(); }
 

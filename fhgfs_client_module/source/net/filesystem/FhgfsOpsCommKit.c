@@ -1316,12 +1316,21 @@ void FhgfsOpsCommKit_writefileV2bCommunicate(App* app, RemotingIOInfo* ioInfo,
 static enum CKTargetBadAction __commkit_fsync_selectedTargetBad(CommKitContext* context,
    struct CommKitTargetInfo* info, const CombinedTargetState* targetState)
 {
-   if(targetState->consistencyState != TargetConsistencyState_BAD)
-      return CK_CONTINUE_TARGET;
-
-   if(StripePattern_getPatternType(context->ioInfo->pattern) == STRIPEPATTERN_BuddyMirror &&
+   // we must not try to fsync a secondary that is currently offline, but we should fsync
+   // secondaries that are needs-resync (because a resync might be running, but our file was already
+   // resynced). we will also try to fsync a secondary that is poffline, just in case it comes back
+   // to online.
+   // bad targets should be silently ignored just like offline targets because they might do
+   // who-knows-what with our request and produce spurious errors.
+   if (StripePattern_getPatternType(context->ioInfo->pattern) == STRIPEPATTERN_BuddyMirror &&
          info->useBuddyMirrorSecond)
-      info->nodeResult = -FhgfsOpsErr_SUCCESS;
+   {
+      if (targetState->reachabilityState == TargetReachabilityState_OFFLINE ||
+            targetState->consistencyState == TargetConsistencyState_BAD)
+         info->nodeResult = -FhgfsOpsErr_SUCCESS;
+      else if (targetState->consistencyState == TargetConsistencyState_NEEDS_RESYNC)
+         return CK_CONTINUE_TARGET;
+   }
 
    return CK_SKIP_TARGET;
 }

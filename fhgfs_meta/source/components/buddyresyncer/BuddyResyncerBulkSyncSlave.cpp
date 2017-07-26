@@ -40,6 +40,14 @@ void BuddyResyncerBulkSyncSlave::syncLoop()
       if (candidate.getType() == MetaSyncDirType::InodesHashDir ||
             candidate.getType() == MetaSyncDirType::DentriesHashDir)
       {
+         // lock the hash path in accordance with MkLocalDir, RmLocalDir and RmDir.
+         const auto& hashDir = candidate.getRelativePath();
+         auto slash1 = hashDir.find('/');
+         auto slash2 = hashDir.find('/', slash1 + 1);
+         auto hash1 = StringTk::strHexToUInt(hashDir.substr(slash1 + 1, slash2 - slash1 - 1));
+         auto hash2 = StringTk::strHexToUInt(hashDir.substr(slash2 + 1));
+         HashDirLock hashLock = {lockStore, {hash1, hash2}};
+
          const FhgfsOpsErr resyncRes = resyncDirectory(candidate, "");
          if (resyncRes == FhgfsOpsErr_SUCCESS)
             continue;

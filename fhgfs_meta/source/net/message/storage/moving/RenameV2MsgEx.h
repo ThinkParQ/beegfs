@@ -8,16 +8,54 @@
 #include <storage/DirEntry.h>
 #include <storage/MetaStore.h>
 
-class RenameV2MsgEx : public MirroredMessage<RenameMsg,
-   std::tuple<DirIDLock, DirIDLock, ParentNameLock, ParentNameLock, FileIDLock>>
+struct RenameV2Locks
+{
+   ParentNameLock fromNameLock;
+   ParentNameLock toNameLock;
+   DirIDLock fromDirLock;
+   DirIDLock toDirLock;
+   // source file must be locked because concurrent modifications of file attributes may
+   // race with the moving operation between two servers.
+   FileIDLock fromFileLock;
+   // if target exists, the target file must be unlocked to exclude concurrent operations on
+   // target (eg close, setxattr, ...)
+   FileIDLock unlinkedFileLock;
+
+   RenameV2Locks() = default;
+
+   RenameV2Locks(const RenameV2Locks&) = delete;
+   RenameV2Locks& operator=(const RenameV2Locks&) = delete;
+
+   RenameV2Locks(RenameV2Locks&& other)
+   {
+      swap(other);
+   }
+
+   RenameV2Locks& operator=(RenameV2Locks&& other)
+   {
+      RenameV2Locks(std::move(other)).swap(*this);
+      return *this;
+   }
+
+   void swap(RenameV2Locks& other)
+   {
+      std::swap(fromNameLock, other.fromNameLock);
+      std::swap(toNameLock, other.toNameLock);
+      std::swap(fromDirLock, other.fromDirLock);
+      std::swap(toDirLock, other.toDirLock);
+      std::swap(fromFileLock, other.fromFileLock);
+      std::swap(unlinkedFileLock, other.unlinkedFileLock);
+   }
+};
+
+class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
 {
    public:
       typedef ErrorCodeResponseState<RenameRespMsg, NETMSGTYPE_Rename> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<DirIDLock, DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> lock(
-         EntryLockStore& store) override;
+      RenameV2Locks lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getFromDirInfo()->getIsBuddyMirrored(); }
 

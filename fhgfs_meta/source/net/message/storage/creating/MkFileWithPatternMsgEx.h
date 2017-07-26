@@ -14,7 +14,7 @@
  * or from ioctl calls.
  */
 class MkFileWithPatternMsgEx : public MirroredMessage<MkFileWithPatternMsg,
-   std::tuple<DirIDLock, ParentNameLock>>
+   std::tuple<DirIDLock, ParentNameLock, FileIDLock>>
 {
    public:
       typedef ErrorAndEntryResponseState<MkFileWithPatternRespMsg, NETMSGTYPE_MkFileWithPattern>
@@ -22,7 +22,7 @@ class MkFileWithPatternMsgEx : public MirroredMessage<MkFileWithPatternMsg,
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<DirIDLock, ParentNameLock> lock(EntryLockStore& store) override;
+      std::tuple<DirIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
 
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;

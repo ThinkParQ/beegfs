@@ -8,7 +8,7 @@
 #include <session/EntryLock.h>
 #include <storage/MetaStore.h>
 
-class MkLocalDirMsgEx : public MirroredMessage<MkLocalDirMsg, std::tuple<>>
+class MkLocalDirMsgEx : public MirroredMessage<MkLocalDirMsg, HashDirLock>
 {
    public:
       typedef ErrorCodeResponseState<MkLocalDirRespMsg, NETMSGTYPE_MkLocalDir> ResponseState;
@@ -18,11 +18,13 @@ class MkLocalDirMsgEx : public MirroredMessage<MkLocalDirMsg, std::tuple<>>
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 
-      std::tuple<> lock(EntryLockStore& store) override;
+      HashDirLock lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getEntryInfo()->getIsBuddyMirrored(); }
 
    private:
+      ResponseContext* rctx;
+
       bool forwardToSecondary(ResponseContext& ctx) override;
 
       FhgfsOpsErr processSecondaryResponse(NetMessage& resp) override

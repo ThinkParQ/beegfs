@@ -2,7 +2,7 @@ Source: beegfs-client
 Section: misc
 Priority: optional
 Maintainer: BeeGFS Maintainers <packages@beegfs.com>
-Build-Depends: debhelper (>= 7.0.0), lsb-release, module-init-tools
+Build-Depends: debhelper (>= 7.0.0), lsb-release, kmod
 Standards-Version: 3.8.0
 
 Package: beegfs-client
