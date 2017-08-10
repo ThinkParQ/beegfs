@@ -144,6 +144,9 @@ namespace BuddyCommTk
             LogContext(__func__).log(Log_CRITICAL,
                "Management node did not accept needs-resync state for node "
                + buddyNodeID.str() + ".");
+
+         SAFE_FREE(respBuf);
+         SAFE_DELETE(respMsg);
       }
    }
 

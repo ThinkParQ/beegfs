@@ -6,6 +6,7 @@ import com.beegfs.admon.gui.common.tools.GuiTk;
 import com.beegfs.admon.gui.common.tools.HttpTk;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
@@ -44,7 +45,7 @@ public class JInternalFrameKnownProblems extends javax.swing.JInternalFrame impl
    @Override
    public final String getFrameTitle()
    {
-      return "Known Problems";
+	   return Main.getLocal().getString("Known Problems");
    }
 
    private void startKnownProblemsUpdate()
@@ -192,7 +193,7 @@ public class JInternalFrameKnownProblems extends javax.swing.JInternalFrame impl
 
          if (!problems)
          {
-            JLabel label = new JLabel("No known problems.");
+        	 JLabel label = new JLabel(Main.getLocal().getString("No known problems."));
             label.setAlignmentX(JLabel.CENTER_ALIGNMENT);
             label.setHorizontalAlignment(JLabel.CENTER);
             label.setHorizontalTextPosition(JLabel.CENTER);

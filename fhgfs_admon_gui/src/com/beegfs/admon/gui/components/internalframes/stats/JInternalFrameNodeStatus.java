@@ -17,6 +17,8 @@ import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
 
+import com.beegfs.admon.gui.program.Main;
+
 
 
 public class JInternalFrameNodeStatus extends javax.swing.JInternalFrame implements
@@ -409,11 +411,11 @@ public class JInternalFrameNodeStatus extends javax.swing.JInternalFrame impleme
       String newTitle;
       if(group.isEmpty() )
       {
-         newTitle = this.nodeType.type() + " nodes status";
+         newTitle = this.nodeType.type() + Main.getLocal().getString("nodes status");
       }
       else
       {
-         newTitle = this.nodeType.type() + " nodes status (Group : " + this.group + ")";
+         newTitle = this.nodeType.type() + Main.getLocal().getString("nodes status (Group : " + this.group + ")");
       }
       return newTitle;
    }

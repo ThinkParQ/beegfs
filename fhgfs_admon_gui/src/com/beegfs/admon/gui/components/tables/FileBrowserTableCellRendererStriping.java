@@ -6,6 +6,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.table.TableCellRenderer;
+import com.beegfs.admon.gui.program.Main;
 
 public class FileBrowserTableCellRendererStriping extends JButton implements TableCellRenderer
 {
@@ -23,13 +24,13 @@ public class FileBrowserTableCellRendererStriping extends JButton implements Tab
       FilenameObject obj = (FilenameObject) value;
       if (obj.isDirectory())
       {
-         setText("Settings");
+    	  setText(Main.getLocal().getString("Settings"));
          this.setForeground(Color.BLUE);
          this.setHorizontalAlignment(JLabel.CENTER);
       }
       else
       {
-         setText("Display");
+    	  setText(Main.getLocal().getString("Display"));
          this.setForeground(Color.BLUE);
          this.setHorizontalAlignment(JLabel.CENTER);
       }

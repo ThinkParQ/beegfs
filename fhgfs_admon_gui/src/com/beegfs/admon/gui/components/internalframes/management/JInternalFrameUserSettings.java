@@ -29,10 +29,10 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
         setTitle(getFrameTitle());
         setFrameIcon(GuiTk.getFrameIcon());
         if (Main.getSession().getInfoAutologinDisabled()) {
-            jButtonAutologinInfo.setText("Enable passwordless autologin for \"Information\" user");
+        	jButtonAutologinInfo.setText(Main.getLocal().getString("Enable passwordless autologin"));
         }
         else {
-            jButtonAutologinInfo.setText("Disable passwordless autologin for \"Information\" user");
+        	jButtonAutologinInfo.setText(Main.getLocal().getString("Disable passwordless autologin"));
         }
   }
 
@@ -114,17 +114,17 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       jPanelFrame.setPreferredSize(new java.awt.Dimension(936, 273));
       jPanelFrame.setLayout(new java.awt.BorderLayout(5, 5));
 
-      jPanelPasswords.setBorder(javax.swing.BorderFactory.createTitledBorder("Change Passwords"));
+      jPanelPasswords.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Change Passwords")));
       jPanelPasswords.setPreferredSize(new java.awt.Dimension(936, 174));
       jPanelPasswords.setLayout(new javax.swing.BoxLayout(jPanelPasswords, javax.swing.BoxLayout.LINE_AXIS));
 
-      jPanel2.setBorder(javax.swing.BorderFactory.createTitledBorder("Information user"));
+      jPanel2.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Information user")));
       jPanel2.setMinimumSize(new java.awt.Dimension(450, 200));
       jPanel2.setPreferredSize(new java.awt.Dimension(450, 200));
       jPanel2.setLayout(new java.awt.GridBagLayout());
 
       jLabelInfoAdminPW.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelInfoAdminPW.setText("Current \"Administrator\" password : ");
+      jLabelInfoAdminPW.setText(Main.getLocal().getString("Current Administrator password : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -149,7 +149,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       jPanel2.add(jPasswordFieldInfoNewPW, gridBagConstraints);
 
       jLabelInfoNewPW.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelInfoNewPW.setText("New \"Information\" password : ");
+      jLabelInfoNewPW.setText(Main.getLocal().getString("New Information password : "));
       jLabelInfoNewPW.setMaximumSize(new java.awt.Dimension(204, 15));
       jLabelInfoNewPW.setMinimumSize(new java.awt.Dimension(204, 15));
       jLabelInfoNewPW.setPreferredSize(new java.awt.Dimension(204, 15));
@@ -169,7 +169,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       jPanel2.add(jPasswordFieldInfoNewPWConfirm, gridBagConstraints);
 
       jLabelInfoNewPWConfirm.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelInfoNewPWConfirm.setText("Confirm New \"Information\" password : ");
+      jLabelInfoNewPWConfirm.setText(Main.getLocal().getString("Confirm New Information password : "));
       jLabelInfoNewPWConfirm.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
       jLabelInfoNewPWConfirm.setMaximumSize(new java.awt.Dimension(259, 15));
       jLabelInfoNewPWConfirm.setMinimumSize(new java.awt.Dimension(259, 15));
@@ -181,7 +181,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanel2.add(jLabelInfoNewPWConfirm, gridBagConstraints);
 
-      jButtonChangeInformation.setText("Change");
+      jButtonChangeInformation.setText(Main.getLocal().getString("Change"));
       jButtonChangeInformation.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -199,13 +199,13 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       jPanelPasswords.add(jPanel2);
       jPanelPasswords.add(filler1);
 
-      jPanel3.setBorder(javax.swing.BorderFactory.createTitledBorder("Administration user"));
+      jPanel3.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Administration user")));
       jPanel3.setMinimumSize(new java.awt.Dimension(450, 200));
       jPanel3.setPreferredSize(new java.awt.Dimension(450, 200));
       jPanel3.setLayout(new java.awt.GridBagLayout());
 
       jLabelAdminOldPW.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelAdminOldPW.setText("Current \"Administrator\" password : ");
+      jLabelAdminOldPW.setText(Main.getLocal().getString("Current Administrator password : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -230,7 +230,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       jPanel3.add(jPasswordFieldAdminNewPW, gridBagConstraints);
 
       jLabelAdminNewPW.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelAdminNewPW.setText("New \"Administrator\" password : ");
+      jLabelAdminNewPW.setText(Main.getLocal().getString("New Administrator password : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -247,7 +247,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       jPanel3.add(jPasswordFieldAdminNewPWConfirm, gridBagConstraints);
 
       jLabelAdminNewPWConfirm.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelAdminNewPWConfirm.setText("Confirm New \"Administrator\" password : ");
+      jLabelAdminNewPWConfirm.setText(Main.getLocal().getString("Confirm New Administrator password : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 2;
@@ -255,7 +255,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanel3.add(jLabelAdminNewPWConfirm, gridBagConstraints);
 
-      jButtonChangeAdmin.setText("Change");
+      jButtonChangeAdmin.setText(Main.getLocal().getString("Change"));
       jButtonChangeAdmin.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -274,10 +274,10 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
 
       jPanelFrame.add(jPanelPasswords, java.awt.BorderLayout.CENTER);
 
-      jPanelAutologin.setBorder(javax.swing.BorderFactory.createTitledBorder("Passwordless autologin for \"Information\" user"));
+      jPanelAutologin.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Passwordless autologin for Information user")));
       jPanelAutologin.setLayout(new java.awt.GridBagLayout());
 
-      jLabelAutologinInfo.setText("Current \"Administrator\" password : ");
+      jLabelAutologinInfo.setText(Main.getLocal().getString("Current Administrator password : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -293,7 +293,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelAutologin.add(jPasswordFieldIAutologinInfo, gridBagConstraints);
 
-      jButtonAutologinInfo.setText("Submit");
+      jButtonAutologinInfo.setText(Main.getLocal().getString("Submit"));
       jButtonAutologinInfo.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -350,17 +350,17 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
                 parser.update();
                 boolean success = Boolean.parseBoolean(parser.getValue("success"));
                 if (success) {
-                    JOptionPane.showMessageDialog(null, "The password was changed.", "Password changed", JOptionPane.INFORMATION_MESSAGE);
+                   JOptionPane.showMessageDialog(null, Main.getLocal().getString("The password was changed."), Main.getLocal().getString("Password changed"), JOptionPane.INFORMATION_MESSAGE);
                 }
                 else {
-                    JOptionPane.showMessageDialog(null, "The password could not be changed. Please make sure that you supplied the right Administrator password", "Password unchanged", JOptionPane.ERROR_MESSAGE);
+                   JOptionPane.showMessageDialog(null, Main.getLocal().getString("The password could not be changed. Please make sure that you supplied the right Administrator password"), Main.getLocal().getString("Password unchanged"), JOptionPane.ERROR_MESSAGE);
                 }
             } catch (CommunicationException e) {
-                LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+                LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
             }
         }
         else {
-          JOptionPane.showMessageDialog(null, "New passwords do not match", "New passwords do not match", JOptionPane.ERROR_MESSAGE);
+        	JOptionPane.showMessageDialog(null, Main.getLocal().getString("New passwords do not match"), Main.getLocal().getString("New passwords do not match"), JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_jButtonChangeInformationActionPerformed
 
@@ -384,17 +384,17 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
                 parser.update();
                 boolean success = Boolean.parseBoolean(parser.getValue("success"));
                 if (success) {
-                    JOptionPane.showMessageDialog(null, "The password was changed.", "Password changed", JOptionPane.INFORMATION_MESSAGE);
+                	JOptionPane.showMessageDialog(null, Main.getLocal().getString("The password was changed."), Main.getLocal().getString("Password changed"), JOptionPane.INFORMATION_MESSAGE);
                 }
                 else {
-                    JOptionPane.showMessageDialog(null, "The password could not be changed. Please make sure that you supplied the right Administrator password", "Password unchanged", JOptionPane.ERROR_MESSAGE);
+                	JOptionPane.showMessageDialog(null, Main.getLocal().getString("The password could not be changed. Please make sure that you supplied the right Administrator password"), Main.getLocal().getString("Password unchanged"), JOptionPane.ERROR_MESSAGE);
                 }
             } catch (CommunicationException e) {
-                LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+                LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
             }
         }
         else {
-          JOptionPane.showMessageDialog(null, "New passwords do not match", "New passwords do not match", JOptionPane.ERROR_MESSAGE);
+        	JOptionPane.showMessageDialog(null, Main.getLocal().getString("New passwords do not match"), Main.getLocal().getString("New passwords do not match"), JOptionPane.ERROR_MESSAGE);
         }
     }//GEN-LAST:event_jButtonChangeAdminActionPerformed
 
@@ -422,21 +422,21 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
                 boolean success = Boolean.parseBoolean(parser.getValue("success"));
                 if (success) {
                     if (Main.getSession().getInfoAutologinDisabled()) {
-                        JOptionPane.showMessageDialog(null, "Passwordless autologin for Information user successfully enabled", "Operation performed", JOptionPane.INFORMATION_MESSAGE);
+                        JOptionPane.showMessageDialog(null, Main.getLocal().getString("Passwordless autologin for Information user successfully enabled"), Main.getLocal().getString("Operation performed"), JOptionPane.INFORMATION_MESSAGE);
                         Main.getSession().setInfoAutologinDisabled(false);
-                        jButtonAutologinInfo.setText("Disable passwordless autologin for \"Information\" user");
+                        jButtonAutologinInfo.setText(Main.getLocal().getString("Disable passwordless autologin for Information user"));
                     }
                     else {
-                        JOptionPane.showMessageDialog(null, "Passwordless autologin for Information user successfully disabled", "Operation performed", JOptionPane.INFORMATION_MESSAGE);
+                        JOptionPane.showMessageDialog(null, Main.getLocal().getString("Passwordless autologin for Information user successfully disabled"), Main.getLocal().getString("Operation performed"), JOptionPane.INFORMATION_MESSAGE);
                         Main.getSession().setInfoAutologinDisabled(true);
-                        jButtonAutologinInfo.setText("Enable passwordless autologin for \"Information\" user");
+                        jButtonAutologinInfo.setText(Main.getLocal().getString("Enable passwordless autologin for Information user"));
                     }
                 }
                 else {
-                    JOptionPane.showMessageDialog(null, "Could not perform operation. Please make sure that you supplied the right Administrator password", "Operation failed", JOptionPane.ERROR_MESSAGE);
+                	JOptionPane.showMessageDialog(null, Main.getLocal().getString("Could not perform operation. Please make sure that you supplied the right Administrator password"), Main.getLocal().getString("Operation failed"), JOptionPane.ERROR_MESSAGE);
                 }
             } catch (CommunicationException e) {
-                LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+                LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
             }
     }//GEN-LAST:event_jButtonAutologinInfoActionPerformed
 
@@ -470,7 +470,7 @@ public class JInternalFrameUserSettings extends javax.swing.JInternalFrame
 
    @Override
     public final String getFrameTitle() {
-        return "User Settings";
+	   return Main.getLocal().getString("User Settings");
     }
 
 }

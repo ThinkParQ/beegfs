@@ -85,7 +85,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          jComboBoxSendType.setSelectedIndex(Integer.parseInt(data.get("sendType")));
 
          lastSendmailPath = data.get("sendmailPath");
-         lastSmtpServer = data.get("smtpServer");
+         lastSmtpServer = data.get(Main.getLocal().getString("smtpServer"));
          if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SOCKET.ordinal())
          {
             jTextFieldSmtp.setText(lastSmtpServer);
@@ -102,6 +102,10 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
 
          setMailSettings(jCheckBoxEnable.isSelected(), true);
          setLabelAfterComboboxChanged();
+         jTextFieldSender.setText(data.get(Main.getLocal().getString("sender")));
+         jTextFieldRecipient.setText(data.get(Main.getLocal().getString("recipient")));
+         jTextFieldDelay.setText(data.get(Main.getLocal().getString("delay")));
+         jTextFieldResend.setText(data.get(Main.getLocal().getString("resendTime")));
 
          boolean overrideActive = Boolean.parseBoolean(data.get("overrideActive"));
          setMailSettings(!overrideActive, false);
@@ -109,7 +113,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -168,7 +172,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          if (errors.isEmpty())
          {
             JOptionPane.showMessageDialog(null,
-                    "Configuration successfully written", "Success",
+                    Main.getLocal().getString("Configuration successfully written"), Main.getLocal().getString("Success"),
                     JOptionPane.INFORMATION_MESSAGE);
          }
          else
@@ -180,7 +184,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
                errorStr.append(System.lineSeparator());
             }
 
-            JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+            JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                     JOptionPane.ERROR_MESSAGE);
          }
       }
@@ -190,7 +194,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -221,11 +225,11 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       try
       {
          TreeMap<String, String> data = parser.getTreeMap();
-         jTextFieldScript.setText(data.get("scriptPath"));
+         jTextFieldScript.setText(data.get(Main.getLocal().getString("scriptPath")));
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -244,13 +248,13 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          if (!Boolean.parseBoolean(data.get("success")))
          {
             JOptionPane.showMessageDialog(Main.getMainWindow(),
-                    "Couldn't communicate with SMTP server.", "eMail send failure",
+            		Main.getLocal().getString("Couldn't communicate with SMTP server."), Main.getLocal().getString("eMail send failure"),
                     JOptionPane.ERROR_MESSAGE);
          }
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -286,7 +290,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          ArrayList<String> errors = parser.getVector("errors");
          if (errors.isEmpty())
          {
-            JOptionPane.showMessageDialog(null, "Configuration successfully written", "Success",
+        	 JOptionPane.showMessageDialog(null, Main.getLocal().getString("Configuration successfully written"), Main.getLocal().getString("Success"),
                     JOptionPane.INFORMATION_MESSAGE);
          }
          else
@@ -297,7 +301,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
                errorStr.append(error);
                errorStr.append(System.lineSeparator());
             }
-            JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+            JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                     JOptionPane.ERROR_MESSAGE);
          }
       }
@@ -307,7 +311,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -417,7 +421,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
 
       jTabbedPaneSettings.setPreferredSize(new java.awt.Dimension(839, 292));
 
-      jPanelMail.setBorder(javax.swing.BorderFactory.createTitledBorder("Mail Notifications"));
+      jPanelMail.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Mail Notifications")));
       jPanelMail.setMinimumSize(new java.awt.Dimension(732, 310));
       jPanelMail.setPreferredSize(new java.awt.Dimension(732, 310));
       jPanelMail.setLayout(new java.awt.GridBagLayout());
@@ -465,7 +469,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jComboBoxSendType, gridBagConstraints);
 
-      jLabelSmtp.setText("Smtp server to use for sending mails:");
+      jLabelSmtp.setText(Main.getLocal().getString("Smtp server to use for sending mails :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 3;
@@ -489,7 +493,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldSender, gridBagConstraints);
 
-      jLabelSender.setText("Sender eMail address to use:");
+      jLabelSender.setText(Main.getLocal().getString("Sender eMail address to use :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 4;
@@ -505,7 +509,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldRecipient, gridBagConstraints);
 
-      jLabelRecipient.setText("Recipient address, to which notifications are sent:");
+      jLabelRecipient.setText(Main.getLocal().getString("Recipient address, to which notifications are sent :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 5;
@@ -521,7 +525,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldDelay, gridBagConstraints);
 
-      jLabelDelay.setText("Minimum amount of time between a event and the mail notification in seconds:");
+      jLabelDelay.setText(Main.getLocal().getString("Minimum amount of time between a event and the mail notification in seconds :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 6;
@@ -537,7 +541,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jTextFieldResend, gridBagConstraints);
 
-      jLabelResend.setText("Amount of time after which an already sent eMail is resent as reminder in minutes:");
+      jLabelResend.setText(Main.getLocal().getString("Amount of time after which an already sent eMail is resent as reminder in minutes :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 7;
@@ -545,7 +549,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jLabelResend, gridBagConstraints);
 
-      jButtonSubmitMail.setText("Submit");
+      jButtonSubmitMail.setText(Main.getLocal().getString("Submit"));
       jButtonSubmitMail.setMaximumSize(new java.awt.Dimension(100, 30));
       jButtonSubmitMail.setMinimumSize(new java.awt.Dimension(100, 30));
       jButtonSubmitMail.setPreferredSize(new java.awt.Dimension(100, 30));
@@ -563,7 +567,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelMail.add(jButtonSubmitMail, gridBagConstraints);
 
-      jButtonSendEMail.setText("Send eMail");
+      jButtonSendEMail.setText(Main.getLocal().getString("Send eMail"));
       jButtonSendEMail.setMaximumSize(new java.awt.Dimension(100, 30));
       jButtonSendEMail.setMinimumSize(new java.awt.Dimension(100, 30));
       jButtonSendEMail.setPreferredSize(new java.awt.Dimension(100, 30));
@@ -583,7 +587,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
 
       jLabelDisableInfo.setForeground(java.awt.Color.red);
       jLabelDisableInfo.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-      jLabelDisableInfo.setText("This dialog is disabled by the admon configuration file (override).");
+      jLabelDisableInfo.setText(Main.getLocal().getString("This dialog is disabled by the admon configuration file (override)."));
       jLabelDisableInfo.setRequestFocusEnabled(false);
       jLabelDisableInfo.setVerifyInputWhenFocusTarget(false);
       gridBagConstraints = new java.awt.GridBagConstraints();
@@ -593,7 +597,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.anchor = java.awt.GridBagConstraints.NORTH;
       jPanelMail.add(jLabelDisableInfo, gridBagConstraints);
 
-      jLabelEnable.setText("Enable eMail notifications:");
+      jLabelEnable.setText(Main.getLocal().getString("Enable eMail notifications :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -601,12 +605,12 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelMail.add(jLabelEnable, gridBagConstraints);
 
-      jTabbedPaneSettings.addTab("Mail Notifications", jPanelMail);
+      jTabbedPaneSettings.addTab(Main.getLocal().getString("Mail Notifications"), jPanelMail);
 
-      jPanelScripts.setBorder(javax.swing.BorderFactory.createTitledBorder("Run Script"));
+      jPanelScripts.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Run Script")));
       jPanelScripts.setLayout(new java.awt.GridBagLayout());
 
-      jButtonSubmitScript.setText("Submit");
+      jButtonSubmitScript.setText(Main.getLocal().getString("Submit"));
       jButtonSubmitScript.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -626,7 +630,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       jTextArea3.setColumns(20);
       jTextArea3.setLineWrap(true);
       jTextArea3.setRows(5);
-      jTextArea3.setText("Please define a script to run whenever a node is reported as down. The script must reside on the server, where the beegfs-admon process is running. Please make sure your script contains a valid header (e.g. \"#!/bin/bash\").\n\nThe following variables are automatically passed to the script :\n\n$1 : The service, which is reported (can be meta or storage)\n$2 : The hostname of the reported node\n\nTo stop script execution please submit an empty line.");
+      jTextArea3.setText(Main.getLocal().getString("Please define a script to run whenever a node is reported as down."));
       jTextArea3.setWrapStyleWord(true);
       jTextArea3.setBorder(null);
       gridBagConstraints = new java.awt.GridBagConstraints();
@@ -639,7 +643,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.weighty = 1.0;
       jPanelScripts.add(jTextArea3, gridBagConstraints);
 
-      jLabel6.setText("Path to script : ");
+      jLabel6.setText(Main.getLocal().getString("Path to script : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -655,7 +659,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelScripts.add(jTextFieldScript, gridBagConstraints);
 
-      jTabbedPaneSettings.addTab("Run Script", jPanelScripts);
+      jTabbedPaneSettings.addTab(Main.getLocal().getString("Run Script"), jPanelScripts);
 
       jPanelFrame.add(jTabbedPaneSettings, java.awt.BorderLayout.CENTER);
 
@@ -732,6 +736,6 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
    @Override
    public final String getFrameTitle()
    {
-      return "Notification Settings";
+	   return Main.getLocal().getString("Notification Settings");
    }
 }

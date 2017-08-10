@@ -11,6 +11,7 @@ import com.beegfs.admon.gui.common.tools.GuiTk;
 import com.beegfs.admon.gui.common.tools.HttpTk;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
@@ -136,8 +137,8 @@ public class JInternalFrameShowQuota extends javax.swing.JInternalFrame implemen
       @Override
       public void run()
       {
-         pBarThread = new ProgressBarThread(jProgressBarLoadData, "Load quota ...", THREAD_NAME  +
-            "ProgressBar");
+         pBarThread = new ProgressBarThread(jProgressBarLoadData, Main.getLocal().getString("Load quota ..."), THREAD_NAME  +
+            Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
 
          jComboBoxIDType.setEnabled(false);
@@ -161,7 +162,7 @@ public class JInternalFrameShowQuota extends javax.swing.JInternalFrame implemen
             }
             catch (CommunicationException ex)
             {
-               LOGGER.log(Level.FINEST, "Internal error.", ex);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), ex);
             }
             finally
             {
@@ -170,11 +171,11 @@ public class JInternalFrameShowQuota extends javax.swing.JInternalFrame implemen
          }
          catch (InterruptedException ex)
          {
-            LOGGER.log(Level.FINEST, "Internal error.", ex);
+            LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), ex);
          }
          catch (CommunicationException ex)
          {
-            LOGGER.log(Level.FINEST, "Communication error.", ex);
+            LOGGER.log(Level.FINEST, Main.getLocal().getString("Communication error."), ex);
          }
          finally
          {
@@ -359,21 +360,21 @@ public class JInternalFrameShowQuota extends javax.swing.JInternalFrame implemen
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelControll.add(jComboBoxIDType, gridBagConstraints);
 
-      jCheckBoxZeroValue.setText("Show quota with 0 value");
+      jCheckBoxZeroValue.setText(Main.getLocal().getString("Show quota with 0 value"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
       gridBagConstraints.gridy = 0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelControll.add(jCheckBoxZeroValue, gridBagConstraints);
 
-      jCheckBoxSystemUser.setText("Show system users");
+      jCheckBoxSystemUser.setText(Main.getLocal().getString("Show system users"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 2;
       gridBagConstraints.gridy = 0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 15);
       jPanelControll.add(jCheckBoxSystemUser, gridBagConstraints);
 
-      jButtonRefresh.setText("Refresh quota");
+      jButtonRefresh.setText(Main.getLocal().getString("Refresh quota"));
       jButtonRefresh.setMaximumSize(new java.awt.Dimension(130, 30));
       jButtonRefresh.setMinimumSize(new java.awt.Dimension(130, 30));
       jButtonRefresh.setPreferredSize(new java.awt.Dimension(130, 30));
@@ -385,8 +386,7 @@ public class JInternalFrameShowQuota extends javax.swing.JInternalFrame implemen
       jPanelControll.add(jButtonRefresh, gridBagConstraints);
 
       jPanelHeader.add(jPanelControll, java.awt.BorderLayout.CENTER);
-
-      jProgressBarLoadData.setString("Load quota ...");
+      jProgressBarLoadData.setString(Main.getLocal().getString("Load quota ..."));
       jProgressBarLoadData.setStringPainted(true);
       jPanelHeader.add(jProgressBarLoadData, java.awt.BorderLayout.NORTH);
 
@@ -489,6 +489,6 @@ public class JInternalFrameShowQuota extends javax.swing.JInternalFrame implemen
    @Override
    public final String getFrameTitle()
    {
-      return "Show quota";
+      return Main.getLocal().getString("Show quota");
    }
 }

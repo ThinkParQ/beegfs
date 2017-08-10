@@ -13,6 +13,8 @@ import java.awt.HeadlessException;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -20,6 +22,8 @@ import javax.naming.ConfigurationException;
 import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import com.beegfs.admon.gui.program.Main;
+
 
 
 public class Main
@@ -31,6 +35,10 @@ public class Main
    private static Session session;
    private static final double JAVA_MIN_VERSION = 1.7;
    private static final String BEEGFS_VERSION = "@VERSION@";
+
+   private  static Locale locale; 
+
+   private  static  ResourceBundle zh; 
 
    /**
     * @param args the command line arguments
@@ -78,6 +86,25 @@ public class Main
 
       if(initConfigFromFile())
       {
+          
+          System.out.println("##"+config.getAdmonLocal()+"##");
+          if(config.getAdmonLocal().equals( "Chinese"))
+          {
+
+
+
+       	     Main.locale = new Locale("zh", "CN");
+
+       	     Main.zh = ResourceBundle.getBundle("Message", locale);
+          }
+          else
+          {
+         	 Main.locale = new Locale("en", "US");
+       	
+         	 Main.zh = ResourceBundle.getBundle("Message", locale);
+          }
+          
+
          //create session
          session = new Session();
          mainWindow = new MainWindow();
@@ -108,6 +135,14 @@ public class Main
    {
       return Main.config;
    }
+
+   
+   public  static ResourceBundle getLocal()
+   {
+
+	   return Main.zh;
+   }
+   
 
    public static Session getSession()
    {

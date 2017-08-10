@@ -72,9 +72,9 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
 
          if (errorOccured)
          {
-            JOptionPane.showMessageDialog(null, "Error during retrieving the striping Information! "
-                    + "Please check the path and make sure all servers are running.",
-                    "Get striping information", JOptionPane.ERROR_MESSAGE);
+        	 JOptionPane.showMessageDialog(null, Main.getLocal().getString("Error during retrieving the striping Information! ")
+        			 + Main.getLocal().getString("Please check the path and make sure all servers are running."),
+        			 Main.getLocal().getString("Get striping information"), JOptionPane.ERROR_MESSAGE);
          }
          else
          {
@@ -88,11 +88,11 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
       catch (java.lang.NullPointerException npe)
       {
-         LOGGER.log(Level.FINEST, "Internal error.", npe);
+         LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), npe);
       }
    }
 
@@ -200,7 +200,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       jPanelPath.setPreferredSize(new java.awt.Dimension(1000, 80));
       jPanelPath.setLayout(new java.awt.GridBagLayout());
 
-      jLabelGetPath.setText("Get information on path :");
+      jLabelGetPath.setText(Main.getLocal().getString("Get information on path :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -226,7 +226,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelPath.add(jTextFieldGetPath, gridBagConstraints);
 
-      jButtonGetPath.setText("Get");
+      jButtonGetPath.setText(Main.getLocal().getString("Get"));
       jButtonGetPath.setMaximumSize(new java.awt.Dimension(110, 30));
       jButtonGetPath.setMinimumSize(new java.awt.Dimension(110, 30));
       jButtonGetPath.setPreferredSize(new java.awt.Dimension(110, 30));
@@ -244,7 +244,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelPath.add(jButtonGetPath, gridBagConstraints);
 
-      jButtonFileBrowser.setText("File browser");
+      jButtonFileBrowser.setText(Main.getLocal().getString("File browser"));
       jButtonFileBrowser.setMaximumSize(new java.awt.Dimension(110, 30));
       jButtonFileBrowser.setMinimumSize(new java.awt.Dimension(110, 30));
       jButtonFileBrowser.setPreferredSize(new java.awt.Dimension(110, 30));
@@ -267,12 +267,12 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       jPanelCenter.setPreferredSize(new java.awt.Dimension(1100, 300));
       jPanelCenter.setLayout(new javax.swing.BoxLayout(jPanelCenter, javax.swing.BoxLayout.LINE_AXIS));
 
-      jPanelStriping.setBorder(javax.swing.BorderFactory.createTitledBorder("Striping Information"));
+      jPanelStriping.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Striping Information")));
       jPanelStriping.setMinimumSize(new java.awt.Dimension(400, 300));
       jPanelStriping.setPreferredSize(new java.awt.Dimension(480, 280));
       jPanelStriping.setLayout(new java.awt.GridBagLayout());
 
-      jLabelTextStripingPath.setText("Path :");
+      jLabelTextStripingPath.setText(Main.getLocal().getString("Path :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -291,7 +291,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelStriping.add(jLabelStripingPath, gridBagConstraints);
 
-      jLabelStripingChunkSize.setText("Chunk size :");
+      jLabelStripingChunkSize.setText(Main.getLocal().getString("Chunk size :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 2;
@@ -299,7 +299,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelStriping.add(jLabelStripingChunkSize, gridBagConstraints);
 
-      jLabelStripingChunkCount.setText("Default # of targets :");
+      jLabelStripingChunkCount.setText(Main.getLocal().getString("Default # of targets :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -317,7 +317,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelStriping.add(jTextFieldStripingChunkSize, gridBagConstraints);
 
-      jLabelStripingChunkSizeUnit.setText("bytes");
+      jLabelStripingChunkSizeUnit.setText(Main.getLocal().getString("bytes"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 2;
       gridBagConstraints.gridy = 2;
@@ -342,7 +342,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelStriping.add(jTextFieldStripingChunkCount, gridBagConstraints);
 
-      jButtonStripingChange.setText("Change");
+      jButtonStripingChange.setText(Main.getLocal().getString("Change"));
       jButtonStripingChange.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonStripingChange.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonStripingChange.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -360,7 +360,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 25, 5);
       jPanelStriping.add(jButtonStripingChange, gridBagConstraints);
 
-      jLabelStripingStripePattern.setText("Stripe pattern:");
+      jLabelStripingStripePattern.setText(Main.getLocal().getString("Stripe pattern:"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 3;
@@ -378,7 +378,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelStriping.add(jComboStripingStripePattern, gridBagConstraints);
 
-      jLabelStripingMetaMirroring.setText("Metadata Mirroring:");
+      jLabelStripingMetaMirroring.setText(Main.getLocal().getString("Metadata Mirroring:"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 4;
@@ -397,13 +397,13 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       jPanelCenter.add(jPanelStriping);
       jPanelCenter.add(filler1);
 
-      jPanelLocation.setBorder(javax.swing.BorderFactory.createTitledBorder("Location"));
+      jPanelLocation.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Location")));
       jPanelLocation.setMinimumSize(new java.awt.Dimension(400, 300));
       jPanelLocation.setPreferredSize(new java.awt.Dimension(480, 280));
       jPanelLocation.setLayout(new java.awt.GridBagLayout());
 
       jLabelMeta.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelMeta.setText("Metadata target:");
+      jLabelMeta.setText(Main.getLocal().getString("Metadata target:"));
       jLabelMeta.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
@@ -426,7 +426,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       jPanelLocation.add(jLabelMetaID, gridBagConstraints);
 
       jLabelMetaMirror.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelMetaMirror.setText("Mirror metadata target:");
+      jLabelMetaMirror.setText(Main.getLocal().getString("Mirror metadata target:"));
       jLabelMetaMirror.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
@@ -449,7 +449,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       jPanelLocation.add(jLabelMetaMirrorID, gridBagConstraints);
 
       jLabelStorage.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelStorage.setText("Storage targets:");
+      jLabelStorage.setText(Main.getLocal().getString("Storage targets:"));
       jLabelStorage.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
@@ -459,7 +459,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       jPanelLocation.add(jLabelStorage, gridBagConstraints);
 
       jLabelStorageMirror.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-      jLabelStorageMirror.setText("Mirror storage targets:");
+      jLabelStorageMirror.setText(Main.getLocal().getString("Mirror storage targets:"));
       jLabelStorageMirror.setHorizontalTextPosition(javax.swing.SwingConstants.RIGHT);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
@@ -526,16 +526,16 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
 
          if (cs.isEmpty() || dnn.isEmpty() || int_cs < STRIPEPATTERN_MIN_CHUNKSIZE || int_dnn <= 0)
          {
-            String msg = "Values 'chunk size' and 'default # of nodes' must be numeric. The " +
-               "'default # of nodes' must be greater than zero and the chunk size must be" +
-               "greater then " + STRIPEPATTERN_MIN_CHUNKSIZE + "!";
-            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+            String msg = Main.getLocal().getString("Values 'chunk size' and 'default # of nodes' must be numeric. The ") +
+               Main.getLocal().getString("'default # of nodes' must be greater than zero and the chunk size must be") +
+               Main.getLocal().getString("greater then ") + STRIPEPATTERN_MIN_CHUNKSIZE + "!";
+            JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
          }
          else
          if(Long.bitCount(int_cs) != 1)
          {
-            String msg = "The chunk size must be a numeric value of power of 2!";
-            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+            String msg = Main.getLocal().getString("The chunk size must be a numeric value of power of 2!");
+            JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
          }
          else
          {
@@ -559,9 +559,9 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
 
             if (errorOccured)
             {
-               JOptionPane.showMessageDialog(null, "Error during changing the striping "
-                  + "Information! Please check the path and make sure all servers are"
-                  + "running.", "Set striping information", JOptionPane.ERROR_MESSAGE);
+            	JOptionPane.showMessageDialog(null, Main.getLocal().getString("Error during changing the striping ")
+             + Main.getLocal().getString("Information! Please check the path and make sure all servers are")
+             + Main.getLocal().getString("running."), Main.getLocal().getString("Set striping information"), JOptionPane.ERROR_MESSAGE);
             }
             else
             {
@@ -573,21 +573,21 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
                }
                else
                {
-                  String msg = "Authentication failed!";
-                  JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+                  String msg = Main.getLocal().getString("Authentication failed!");
+                  JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
                }
             }
          }
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
       catch (NumberFormatException e)
       {
-         String msg = "Values 'chunk size' and 'default # of nodes' must be numeric and greater "
-         + "than zero !";
-         JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+         String msg = Main.getLocal().getString("Values 'chunk size' and 'default # of nodes' must be numeric and greater ")
+         + Main.getLocal().getString("than zero !");
+         JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
       }
    }//GEN-LAST:event_jButtonStripingChangeActionPerformed
 
@@ -646,7 +646,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
    @Override
    public final String getFrameTitle()
    {
-      return "Striping Information";
+	   return Main.getLocal().getString("Striping Information");
    }
 
    void updateLocationPanel(XMLParser parser) throws CommunicationException
@@ -663,13 +663,12 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       GridBagConstraints gbcText = new GridBagConstraints();
       gbcText.anchor = GridBagConstraints.EAST;
       gbcText.insets = new Insets(5, 5, 5, 5);
-
       boolean doMetaMirroring = Boolean.parseBoolean(parser.getValue("metaMirroring", "settings"));
       if(doMetaMirroring)
       {
          gbcText.gridx = gridX;
          gbcText.gridy = gridY;
-         jLabelMeta = new JLabel("Metadata Mirror Group:");
+         jLabelMeta = new JLabel(Main.getLocal().getString("Metadata Mirror Group:"));
          jPanelLocation.add(jLabelMeta, gbcText);
 
          gridX++;
@@ -689,7 +688,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
          gridX++;
          gbcIDs.gridx = gridX;
          gbcIDs.gridy = gridY;
-         jLabelMetaID = new JLabel(parser.getValue("meta"));
+         jLabelMetaID = new JLabel(parser.getValue(Main.getLocal().getString("meta")));
          jPanelLocation.add(jLabelMetaID, gbcIDs);
 
 
@@ -708,7 +707,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
       }
       else
       {
-         jLabelMeta = new JLabel("Metadata target:");
+         jLabelMeta = new JLabel(Main.getLocal().getString("Metadata target:"));
          jPanelLocation.add(jLabelMeta, gbcText);
 
          gridX++;
@@ -717,7 +716,6 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
          jLabelMetaID = new JLabel(parser.getValue("meta"));
          jPanelLocation.add(jLabelMetaID, gbcIDs);
       }
-
       boolean isDirectory = Boolean.parseBoolean(parser.getValue("isDir", "settings"));
       if(!isDirectory)
       {
@@ -745,7 +743,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
             gridY++;
             gbcText.gridx = gridX;
             gbcText.gridy = gridY;
-            jLabelStorage = new JLabel("Storage Mirror Groups:");
+            jLabelStorage = new JLabel(Main.getLocal().getString("Storage Mirror Groups:"));
             jPanelLocation.add(jLabelStorage, gbcText);
 
             gridX++;
@@ -759,7 +757,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
          gridY++;
          gbcText.gridx = gridX;
          gbcText.gridy = gridY;
-         jLabelStorage = new JLabel("Storage targets:");
+         jLabelStorage = new JLabel(Main.getLocal().getString("Storage targets:"));
          jPanelLocation.add(jLabelStorage, gbcText);
 
          gridX++;
@@ -777,7 +775,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
             gridX = 0;
             gbcText.gridx = gridX;
             gbcText.gridy = gridY;
-            jLabelStorageMirror = new JLabel("Mirror storage target:");
+            jLabelStorageMirror = new JLabel(Main.getLocal().getString("Mirror storage target:"));
             jPanelLocation.add(jLabelStorageMirror, gbcText);
 
             gridX++;

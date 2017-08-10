@@ -3,6 +3,7 @@ package com.beegfs.admon.gui.components.frames;
 
 import com.beegfs.admon.gui.common.enums.MetaOpsEnum;
 import com.beegfs.admon.gui.common.enums.StatsTypeEnum;
+import com.beegfs.admon.gui.program.Main;
 import static com.beegfs.admon.gui.common.enums.StatsTypeEnum.STATS_CLIENT_METADATA;
 import static com.beegfs.admon.gui.common.enums.StatsTypeEnum.STATS_CLIENT_STORAGE;
 import static com.beegfs.admon.gui.common.enums.StatsTypeEnum.STATS_USER_METADATA;
@@ -212,7 +213,7 @@ public class JFrameStatsFilter extends javax.swing.JFrame
       jPanelFilters.setLayout(new java.awt.GridLayout(1, 0));
       jPanelFrame.add(jPanelFilters, java.awt.BorderLayout.CENTER);
 
-      jButtonOk.setText("OK");
+      jButtonOk.setText(Main.getLocal().getString("OK"));
       jButtonOk.setMaximumSize(new java.awt.Dimension(54, 50));
       jButtonOk.setPreferredSize(new java.awt.Dimension(80, 30));
       jButtonOk.addActionListener(new java.awt.event.ActionListener()
@@ -227,7 +228,7 @@ public class JFrameStatsFilter extends javax.swing.JFrame
       fillerButtons.setRequestFocusEnabled(false);
       jPanelButtons.add(fillerButtons);
 
-      jButtonCancel.setText("Cancel");
+      jButtonCancel.setText(Main.getLocal().getString("Cancel"));
       jButtonCancel.setPreferredSize(new java.awt.Dimension(80, 30));
       jButtonCancel.addActionListener(new java.awt.event.ActionListener()
       {

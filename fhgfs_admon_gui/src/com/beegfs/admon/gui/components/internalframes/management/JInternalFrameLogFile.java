@@ -7,6 +7,7 @@ import com.beegfs.admon.gui.common.tools.GuiTk;
 import com.beegfs.admon.gui.common.tools.HttpTk;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedWriter;
@@ -45,7 +46,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
 
    private void loadLogFile()
    {
-      jTextPaneLogfile.setText("Waiting for data...");
+      jTextPaneLogfile.setText(Main.getLocal().getString("Waiting for data..."));
       final XMLParser parser = new XMLParser(HttpTk.generateAdmonUrl("/XML_LogFile"), true,
          THREAD_NAME);
       parser.start();
@@ -66,7 +67,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
             } 
             catch (CommunicationException e)
             {
-               LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
                {
                   e,
                   true
@@ -130,7 +131,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
       jPanelFrame.setPreferredSize(new java.awt.Dimension(792, 409));
       jPanelFrame.setLayout(new java.awt.BorderLayout(5, 5));
 
-      jButtonReload.setText("Reload");
+      jButtonReload.setText(Main.getLocal().getString("Reload"));
       jButtonReload.setMaximumSize(new java.awt.Dimension(100, 30));
       jButtonReload.setMinimumSize(new java.awt.Dimension(100, 30));
       jButtonReload.setPreferredSize(new java.awt.Dimension(100, 30));
@@ -144,7 +145,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
       jPanelButtons.add(jButtonReload);
       jPanelButtons.add(filler1);
 
-      jButtonSave.setText("Save to file");
+      jButtonSave.setText(Main.getLocal().getString("Save to file"));
       jButtonSave.setMaximumSize(new java.awt.Dimension(100, 30));
       jButtonSave.setMinimumSize(new java.awt.Dimension(100, 30));
       jButtonSave.setPreferredSize(new java.awt.Dimension(100, 30));
@@ -192,7 +193,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
     private void jButtonSaveActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonSaveActionPerformed
       JFileChooser chooser = new JFileChooser();
       chooser.setMultiSelectionEnabled(false);
-      chooser.setDialogTitle("Save log file");
+      chooser.setDialogTitle(Main.getLocal().getString("Save log file"));
       chooser.setDialogType(JFileChooser.SAVE_DIALOG);
       boolean showDialog = true;
       boolean writeFile = false;
@@ -204,8 +205,8 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
             File f = chooser.getSelectedFile();
             if (f.exists())
             {
-               if (JOptionPane.showConfirmDialog(null,"The file " + f.getName() +
-                  " exists. Do you really want to overwrite it?", "File exists",
+            	if (JOptionPane.showConfirmDialog(null,Main.getLocal().getString("The file ") + f.getName() +
+            	Main.getLocal().getString("exists. Do you really want to overwrite it?"), Main.getLocal().getString("File exists"),
                   JOptionPane.YES_NO_OPTION) == JOptionPane.OK_OPTION)
                {
                   if ( f.canWrite() )
@@ -215,9 +216,9 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
                   }
                   else
                   {
-                     JOptionPane.showMessageDialog(this, "The file " + f.getName() +
-                        " can not be written! Do you have permissions to write?",
-                        "File cannot be written", JOptionPane.ERROR_MESSAGE);
+                     JOptionPane.showMessageDialog(this, Main.getLocal().getString("The file ") + f.getName() +
+                        Main.getLocal().getString("can not be written! Do you have permissions to write?"),
+                		Main.getLocal().getString("File cannot be written"), JOptionPane.ERROR_MESSAGE);
                      showDialog = true;
                   }
                }
@@ -231,9 +232,9 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
                }
                else
                {
-                  JOptionPane.showMessageDialog(this, "The file " + f.getName() +
-                     " can not be written! Do you have permissions to write?",
-                     "File cannot be written", JOptionPane.ERROR_MESSAGE);
+                  JOptionPane.showMessageDialog(this, Main.getLocal().getString("The file ") + f.getName() +
+                     Main.getLocal().getString("can not be written! Do you have permissions to write?"),
+                     Main.getLocal().getString("File cannot be written"), JOptionPane.ERROR_MESSAGE);
                   showDialog = true;
                }
             }
@@ -248,7 +249,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
                   bw.write(jTextPaneLogfile.getText());
                   bw.close();
                } catch (IOException e) {
-                  LOGGER.log(Level.SEVERE, "IO Exception occured while saving log file",
+                  LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO Exception occured while saving log file"),
                      new Object[]{e, true});
                }
                finally
@@ -261,7 +262,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
                      }
                      catch (IOException ex)
                      {
-                        LOGGER.log(Level.SEVERE, "IO Exception occured while saving log file",
+                        LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO Exception occured while saving log file"),
                            new Object[]{ex, true});
                      }
                   }
@@ -290,7 +291,7 @@ public class JInternalFrameLogFile extends javax.swing.JInternalFrame implements
    @Override
    public final String getFrameTitle()
    {
-      return "BeeGFS Installation Log File";
+	   return Main.getLocal().getString("BeeGFS Installation Log File");
    }
 
 }

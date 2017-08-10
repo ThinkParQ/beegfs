@@ -6,6 +6,8 @@ import javax.swing.DefaultCellEditor;
 import javax.swing.JOptionPane;
 import javax.swing.JTextField;
 
+import com.beegfs.admon.gui.program.Main;
+
 
 
 public class ValueUnitCellEditor extends DefaultCellEditor
@@ -22,8 +24,8 @@ public class ValueUnitCellEditor extends DefaultCellEditor
    {
       if(!UnitTk.strToValueUnitOfSize(getCellEditorValue().toString()).isValid() )
       {
-         JOptionPane.showMessageDialog(null, "The input is invalid. Valid units are Byte, KiB," +
-            "MiB, GiB, TiB." + System.lineSeparator() + "Example: 500 MiB", "Invalid value",
+         JOptionPane.showMessageDialog(null, Main.getLocal().getString("The input is invalid. Valid units are Byte, KiB,") +
+            "MiB, GiB, TiB." + System.lineSeparator() + Main.getLocal().getString("Example: 500 MiB"), Main.getLocal().getString("Invalid value"),
             JOptionPane.ERROR_MESSAGE);
          return false;
       }

@@ -69,7 +69,7 @@ public class JTreeMenu extends JTree
       this.nodes = newNodes;
 
       DefaultTreeModel model = (DefaultTreeModel) this.getModel();
-      DefaultMutableTreeNode topNode = new DefaultMutableTreeNode("Menu");
+      DefaultMutableTreeNode topNode = new DefaultMutableTreeNode(Main.getLocal().getString("Menu"));
       model.setRoot(topNode);
 
       rebuildTree();
@@ -93,11 +93,11 @@ public class JTreeMenu extends JTree
          for (int rootIndex = 0; rootIndex < rootNode.getChildCount(); rootIndex++)
          {
             DefaultMutableTreeNode tmpNode = (DefaultMutableTreeNode)rootNode.getChildAt(rootIndex);
-            if(tmpNode.toString().equalsIgnoreCase("Metadata nodes"))
+            if(tmpNode.toString().equalsIgnoreCase(Main.getLocal().getString("Metadata nodes")))
             {
                for (int index = 0; index < tmpNode.getChildCount(); index++)
                {
-                  if(tmpNode.getChildAt(index).toString().equalsIgnoreCase("Node details"))
+            	  if(tmpNode.getChildAt(index).toString().equalsIgnoreCase(Main.getLocal().getString("Node details")))
                   {
                      parentNode = (DefaultMutableTreeNode)tmpNode.getChildAt(index);
                      break;
@@ -155,11 +155,11 @@ public class JTreeMenu extends JTree
          for (int rootIndex = 0; rootIndex < rootNode.getChildCount(); rootIndex++)
          {
             DefaultMutableTreeNode tmpNode = (DefaultMutableTreeNode)rootNode.getChildAt(rootIndex);
-            if(tmpNode.toString().equalsIgnoreCase("Storage nodes"))
+            if(tmpNode.toString().equalsIgnoreCase(Main.getLocal().getString("Storage nodes")))
             {
                for (int index = 0; index < tmpNode.getChildCount(); index++)
                {
-                  if(tmpNode.getChildAt(index).toString().equalsIgnoreCase("Node details"))
+            	  if(tmpNode.getChildAt(index).toString().equalsIgnoreCase(Main.getLocal().getString("Node details")))
                   {
                      parentNode = (DefaultMutableTreeNode)tmpNode.getChildAt(index);
                      break;
@@ -227,14 +227,14 @@ public class JTreeMenu extends JTree
       }
 
       // First check the submenu we are in, especially if we are in meta or storage nodes
-      if (submenu.equalsIgnoreCase("metadata nodes") && (Main.getSession().getIsInfo()))
+      if (submenu.equalsIgnoreCase(Main.getLocal().getString("metadata nodes")) && (Main.getSession().getIsInfo()))
       {
-         if (item.equalsIgnoreCase("overview"))
+    	 if (item.equalsIgnoreCase(Main.getLocal().getString("overview")))
          {
             frame = new JInternalFrameMetaNodesOverview();
          }
          else
-         if (!item.equalsIgnoreCase("Node details"))
+         if (!item.equalsIgnoreCase(Main.getLocal().getString("Node details")))
          {
             frame = new JInternalFrameMetaNode(this.nodes.getNode(
                NodeTypesEnum.METADATA, nodeNumID));
@@ -244,14 +244,14 @@ public class JTreeMenu extends JTree
             return true;
          }
       }
-      else if (submenu.equalsIgnoreCase("storage nodes") && (Main.getSession().getIsInfo()))
+      else if (submenu.equalsIgnoreCase(Main.getLocal().getString("storage nodes")) && (Main.getSession().getIsInfo()))
       {
-         if (item.equalsIgnoreCase("overview"))
+    	 if (item.equalsIgnoreCase(Main.getLocal().getString("overview")))
          {
             frame = new JInternalFrameStorageNodesOverview();
          }
          else
-         if (!item.equalsIgnoreCase("Node details"))
+         if (!item.equalsIgnoreCase(Main.getLocal().getString("Node details")))
          {
             frame = new JInternalFrameStorageNode(this.nodes.getNode(
                NodeTypesEnum.STORAGE, nodeNumID));
@@ -261,13 +261,13 @@ public class JTreeMenu extends JTree
             return true;
          }
       }
-      else if (submenu.equalsIgnoreCase("Client statistics") && (Main.getSession().getIsInfo()))
+      else if (submenu.equalsIgnoreCase(Main.getLocal().getString("Client statistics")) && (Main.getSession().getIsInfo()))
       {
-         if (item.equalsIgnoreCase("metadata") )
+    	 if (item.equalsIgnoreCase(Main.getLocal().getString("metadata")) )
          {
             frame = new JInternalFrameStats(STATS_CLIENT_METADATA);
          }
-         else if (item.equalsIgnoreCase("storage") )
+    	 else if (item.equalsIgnoreCase(Main.getLocal().getString("storage")) )
          {
             frame = new JInternalFrameStats(STATS_CLIENT_STORAGE);
          }
@@ -276,13 +276,13 @@ public class JTreeMenu extends JTree
             return true;
          }
       }
-      else if (submenu.equalsIgnoreCase("User statistics") && (Main.getSession().getIsInfo()))
+      else if (submenu.equalsIgnoreCase(Main.getLocal().getString("User statistics")) && (Main.getSession().getIsInfo()))
       {
-         if (item.equalsIgnoreCase("metadata") )
+    	 if (item.equalsIgnoreCase(Main.getLocal().getString("metadata")) )
          {
             frame = new JInternalFrameStats(STATS_USER_METADATA);
          }
-         else if (item.equalsIgnoreCase("storage") )
+    	 else if (item.equalsIgnoreCase(Main.getLocal().getString("storage")) )
          {
             frame = new JInternalFrameStats(STATS_USER_STORAGE);
          }
@@ -307,40 +307,40 @@ public class JTreeMenu extends JTree
             return true;
          }
       } */ // if not we can directly have a look at the last par
-      else if (item.equalsIgnoreCase("known problems") && (Main.getSession().getIsInfo()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("known problems")) && (Main.getSession().getIsInfo()))
       {
          frame = new JInternalFrameKnownProblems();
       }
-      else if (item.equalsIgnoreCase("stripe settings") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("stripe settings")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameStriping();
       }
-      else if (item.equalsIgnoreCase("file browser") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("file browser")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameFileBrowser();
       }
-      else if (item.equalsIgnoreCase("configuration") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("configuration")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameInstallationConfig();
       }
-      else if (item.equalsIgnoreCase("install") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("install")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameInstall();
       }
-      else if (item.equalsIgnoreCase("uninstall") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("uninstall")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameUninstall();
       }
-      else if (item.equalsIgnoreCase("start/stop daemon") &&
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("start/stop daemon")) &&
          (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameStartStop();
       }
-      else if (item.equalsIgnoreCase("view log file") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("view log file")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameRemoteLogFiles(nodes);
       }
-      else if (item.equalsIgnoreCase("installation log file") && (Main.getSession().getIsAdmin()))
+      else if (item.equalsIgnoreCase(Main.getLocal().getString("installation log file")) && (Main.getSession().getIsAdmin()))
       {
          frame = new JInternalFrameLogFile();
       }
@@ -361,7 +361,7 @@ public class JTreeMenu extends JTree
    final public void rebuildTree()
    {
       // delete everything
-      TreePath topPath = this.getNextMatch("Menu", 0, null);
+	   TreePath topPath = this.getNextMatch(Main.getLocal().getString("Menu"), 0, null);
       DefaultMutableTreeNode topNode = (DefaultMutableTreeNode) topPath.getLastPathComponent();
       DefaultTreeModel model = (DefaultTreeModel) this.getModel();
 
@@ -370,34 +370,34 @@ public class JTreeMenu extends JTree
          DefaultMutableTreeNode n = (DefaultMutableTreeNode) topNode.getChildAt(i);
          model.removeNodeFromParent(n);
       }
- 
-      DefaultMutableTreeNode menuNode = new DefaultMutableTreeNode("Metadata nodes");
+
+      DefaultMutableTreeNode menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("Metadata nodes"));
       model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-      model.insertNodeInto(new DefaultMutableTreeNode("Overview"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Overview")), menuNode, menuNode.
          getChildCount());
-      model.insertNodeInto(new DefaultMutableTreeNode("Node details"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Node details")), menuNode, menuNode.
          getChildCount());
 
-      menuNode = new DefaultMutableTreeNode("Storage nodes");
+      menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("Storage nodes"));
       model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-      model.insertNodeInto(new DefaultMutableTreeNode("Overview"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Overview")), menuNode, menuNode.
          getChildCount());
-      model.insertNodeInto(new DefaultMutableTreeNode("Node details"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Node details")), menuNode, menuNode.
          getChildCount());
 
-      menuNode = new DefaultMutableTreeNode("Client statistics");
+      menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("Client statistics"));
       model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-      model.insertNodeInto(new DefaultMutableTreeNode("Metadata"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Metadata")), menuNode, menuNode.
          getChildCount());
       model.
-         insertNodeInto(new DefaultMutableTreeNode("Storage"), menuNode, menuNode.getChildCount());
+         insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Storage")), menuNode, menuNode.getChildCount());
 
-      menuNode = new DefaultMutableTreeNode("User statistics");
+      menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("User statistics"));
       model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-      model.insertNodeInto(new DefaultMutableTreeNode("Metadata"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Metadata")), menuNode, menuNode.
          getChildCount());
       model.
-         insertNodeInto(new DefaultMutableTreeNode("Storage"), menuNode, menuNode.getChildCount());
+      	 insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Storage")), menuNode, menuNode.getChildCount());
 
       /*
       menuNode = new DefaultMutableTreeNode("Quota");
@@ -408,35 +408,35 @@ public class JTreeMenu extends JTree
          .getChildCount());
       */
 
-      menuNode = new DefaultMutableTreeNode("Management");
+      menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("Management"));
       model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-      model.insertNodeInto(new DefaultMutableTreeNode("Known Problems"), menuNode, menuNode.
+      model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Known Problems")), menuNode, menuNode.
          getChildCount());
 
       if (Main.getSession().getIsAdmin())
       {
-         model.insertNodeInto(new DefaultMutableTreeNode("Start/Stop Daemon"), menuNode,
+    	  model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Start/Stop Daemon")), menuNode,
             menuNode.getChildCount());
-         model.insertNodeInto(new DefaultMutableTreeNode("View Log File"), menuNode,
+    	  model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("View Log File")), menuNode,
             menuNode.getChildCount());
 
 
-         menuNode = new DefaultMutableTreeNode("FS Operations");
+    	  menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("FS Operations"));
          model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-         model.insertNodeInto(new DefaultMutableTreeNode("Stripe Settings"), menuNode, menuNode.
+         model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Stripe Settings")), menuNode, menuNode.
             getChildCount());
-         model.insertNodeInto(new DefaultMutableTreeNode("File Browser"), menuNode, menuNode.
+         model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("File Browser")), menuNode, menuNode.
             getChildCount());
 
-         menuNode = new DefaultMutableTreeNode("Installation");
+         menuNode = new DefaultMutableTreeNode(Main.getLocal().getString("Installation"));
          model.insertNodeInto(menuNode, topNode, topNode.getChildCount() );
-         model.insertNodeInto(new DefaultMutableTreeNode("Configuration"), menuNode, menuNode.
+         model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Configuration")), menuNode, menuNode.
             getChildCount());
-         model.insertNodeInto(new DefaultMutableTreeNode("Install"), menuNode, menuNode.
+         model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Install")), menuNode, menuNode.
             getChildCount());
-         model.insertNodeInto(new DefaultMutableTreeNode("Uninstall"), menuNode, menuNode.
+         model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Uninstall")), menuNode, menuNode.
             getChildCount());
-         model.insertNodeInto(new DefaultMutableTreeNode("Installation Log File"), menuNode,
+         model.insertNodeInto(new DefaultMutableTreeNode(Main.getLocal().getString("Installation Log File")), menuNode,
             menuNode.getChildCount());
       }
       

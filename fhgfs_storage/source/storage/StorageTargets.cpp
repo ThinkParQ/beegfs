@@ -474,6 +474,9 @@ void StorageTargets::setBuddyNeedsResyncState(uint16_t targetID, bool needsResyn
 
       if ( (FhgfsOpsErr)respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
          LogContext(logContext).log(Log_CRITICAL, "Management node did not accept target states.");
+
+      SAFE_FREE(respBuf);
+      SAFE_DELETE(respMsg);
    }
 }
 

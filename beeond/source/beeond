@@ -122,6 +122,10 @@ print_usage_and_exit()
    echo "                        directory\" you have to provide an additional config"
    echo "                        file beegfs-meta.conf containing the line"
    echo "                        storeUseExtendedAttribs = false"
+   echo "         -k          => enable storage target mirroring"
+   echo "                        Note: Needs an even number of storage servers (-s)."
+   echo "         -j          => enable metadata server mirroring"
+   echo "                        Note: Needs an even number of metadata servers (-m)."
    echo "         -q          => Suppress INFO messages, only print ERRORs."
    echo ""
    echo "   stop:"
@@ -1075,6 +1079,22 @@ unmount_clients()
   fi
 }
 
+# Blocks until all targets are online/good
+# Parameters: nodetype numNodes
+wait_online_good()
+{
+   local NODE_TYPE=$1
+   local NUM_NODES=$2
+
+   local CTLCMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
+         --listtargets --nodetype=${NODE_TYPE} --state"
+
+   while [ ! "$(${CTLCMD} | grep "Online\s\+Good" -c)" = "${NUM_NODES}" ]
+   do
+      sleep 1
+   done
+}
+
 ### main functions ###
 do_start()
 {
@@ -1083,9 +1103,11 @@ do_start()
    PREFER_LOCAL="false"
    QUIET="false"
    USE_TMPFS="false"
+   STORAGE_MIRROR="false"
+   META_MIRROR="false"
    PORT_SHIFT=${DEFAULT_PORT_SHIFT}
 
-   while getopts ":c:d:f:Fi:m:n:p:lL:Pb:s:qr" opt; do
+   while getopts ":c:d:f:Fi:m:n:p:lL:Pb:s:qrkj" opt; do
       case $opt in
          n)
             HOSTFILE=$OPTARG
@@ -1144,6 +1166,12 @@ do_start()
          r)
             USE_TMPFS="true"
          ;;
+         k)
+            STORAGE_MIRROR="true"
+         ;;
+         j)
+            META_MIRROR="true"
+         ;;
          \?)
             echo "ERROR: invalid option: -$OPTARG" >&2
             print_usage_and_exit
@@ -1158,6 +1186,12 @@ do_start()
    check_hostfile
    check_datapath
    check_mountpoint
+
+   if [ "${STORAGE_MIRROR}" = "true" -a "${PREFER_LOCAL}" = true ]
+   then
+      print_error_and_exit "Options -k and -l are mutually exclusive."
+   fi
+
 
    print_info "Using status information file: ${STATUSFILE}"
 
@@ -1242,13 +1276,65 @@ do_start()
 
    # port shift and config path may be empty, but that's ok
    start_meta_servers "${METANODES}" "${DATA_PATH}" "${MGMTD}" "${PORT_SHIFT}" "${CONFIGPATH}"
- 
-  # give the management daemon some time to get all information from servers
-   sleep 8
+
+   # give the management daemon some time to get all information from servers
+   wait_online_good storage "${NUM_STORAGE_SERVER}"
+   wait_online_good meta "${NUM_META_SERVER}"
+
+   # enable mirroring
+   if [ "${STORAGE_MIRROR}" = "true" ]
+   then
+      ${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} --addmirrorgroup \
+            --nodetype=storage --automatic --force > /dev/null
+
+      if [ $? -ne 0 ]
+      then
+         print_error_and_exit "Unable to create storage target buddy mirror groups."
+      fi
+
+      # all metadata servers need to know about the storage mirror groups
+      sleep 8
+   fi
+
+   if [ "${META_MIRROR}" = "true" ]
+   then
+      ${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} --addmirrorgroup \
+            --nodetype=meta --automatic --force > /dev/null
+
+      if [ $? -ne 0 ]
+      then
+         print_error_and_exit "Unable to create metadata server buddy mirror groups."
+      fi
+
+      # all metadata servers need to know about the newly created mirror groups
+      sleep 8
+
+      ${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} --mirrormd > /dev/null
+
+      if [ $? -ne 0 ]
+      then
+         print_error_and_exit "Unable to enable metadata mirroring."
+      fi
+
+      # wait for initial resync
+      wait_online_good meta "${NUM_META_SERVER}"
+   fi
 
    # take all hosts as client
    # port shift and config path may be empty, but that's ok
    start_clients "${ALLNODES}" "${MGMTD}" "${MOUNTPOINT}" "${PORT_SHIFT}" "${CONFIGPATH}"
+
+   if [ "${STORAGE_MIRROR}" = "true" ]
+   then
+      ${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} --setpattern --buddymirror \
+          --chunksize=512k --numtargets=4 "${MOUNTPOINT}" > /dev/null
+
+      if [ $? -ne 0 ]
+      then
+         print_error_and_exit "Unable to enable mirroring pattern."
+      fi
+   fi
+
 }
 
 do_stop()

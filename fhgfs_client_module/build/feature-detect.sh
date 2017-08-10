@@ -109,6 +109,11 @@ check_function \
    KERNEL_HAS_KREF_READ \
    linux/kref.h
 
+check_function \
+   file_dentry "struct dentry* (const struct file *file)" \
+   KERNEL_HAS_FILE_DENTRY \
+   linux/fs.h
+
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to
 # detect and remove again.

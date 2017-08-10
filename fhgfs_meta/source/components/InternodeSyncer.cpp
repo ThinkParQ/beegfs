@@ -492,7 +492,7 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
    App* app = Program::getApp();
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    SessionStore* sessions = app->getSessions();
-   SessionStore* mirroredSessions = app->getSessions();
+   SessionStore* mirroredSessions = app->getMirroredSessions();
 
    SessionList removedSessions;
    NumNodeIDList unremovableSessions;

@@ -272,7 +272,7 @@ public class JInternalFrameFileBrowser extends javax.swing.JInternalFrame implem
             {
                moreToCome = false;
                jLabelInfo.setText("");
-               String msg = "Error occured while retrieving file list!";
+               String msg = Main.getLocal().getString("Error occured while retrieving file list!");
                LOGGER.log(Level.SEVERE, msg, true);
             }
             if (pathStr.isEmpty())
@@ -281,10 +281,10 @@ public class JInternalFrameFileBrowser extends javax.swing.JInternalFrame implem
             }
             ValueUnit<SizeUnitEnum> totalSizeVU = UnitTk.byteToXbyte(totalSize);
             DecimalFormat decimalFormat = new DecimalFormat("0.00");
-            String infoText = "Showing " + totalFolder + " folders and "
-                    + totalFiles + " files with a total size of " +
+            String infoText = Main.getLocal().getString("Showing ") + totalFolder + Main.getLocal().getString("folders and ")
+                    + totalFiles + Main.getLocal().getString("files with a total size of ") +
                 decimalFormat.format(totalSizeVU.getValue()) +
-                totalSizeVU.getUnitString() + " in " + pathStr;
+                totalSizeVU.getUnitString() + Main.getLocal().getString("in ") + pathStr;
             jLabelInfo.setText(infoText);
          }
       }
@@ -302,15 +302,15 @@ public class JInternalFrameFileBrowser extends javax.swing.JInternalFrame implem
 
       private final String[] columnNames =
       {
-         "Name",
-         "Size/Entries",
-         "Permissions",
-         "Last status changed",
-         "Last modified",
-         "Last accessed",
-         "User",
-         "Group",
-         "Settings"
+         Main.getLocal().getString("Name"),
+         Main.getLocal().getString("Size/Entries"),
+         Main.getLocal().getString("Permissions"),
+         Main.getLocal().getString("Last status changed"),
+         Main.getLocal().getString("Last modified"),
+         Main.getLocal().getString("Last accessed"),
+         Main.getLocal().getString("User"),
+         Main.getLocal().getString("Group"),
+         Main.getLocal().getString("Settings"),
       };
 
       private final Class<?>[] types =
@@ -455,6 +455,6 @@ public class JInternalFrameFileBrowser extends javax.swing.JInternalFrame implem
    @Override
    public final String getFrameTitle()
    {
-      return "File Browser";
+	   return Main.getLocal().getString("File Browser");
    }
 }

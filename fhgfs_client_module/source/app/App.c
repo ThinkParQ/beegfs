@@ -552,6 +552,7 @@ bool __App_initLocalNodeInfo(App* this)
 
    if(!NicAddressList_length(&nicList) )
    {
+      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErr(this->logger, logContext, "Couldn't find any usable NIC");
       NicAddressList_uninit(&nicList);
 

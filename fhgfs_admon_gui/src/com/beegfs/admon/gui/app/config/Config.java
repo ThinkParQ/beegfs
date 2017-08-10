@@ -15,10 +15,15 @@ import java.util.logging.Level;
 import javax.naming.ConfigurationException;
 
 
+
+import java.util.Locale;
+import java.util.ResourceBundle;
+
 public class Config
 {
    public static final Level DEFAULT_LOG_LEVEL = Level.INFO;
    private static final String DEFAULT_ADMON_HOST = "localhost";
+   private static final String DEFAULT_ADMON_LOCAL = "English";
    private static final int DEFAULT_ADMON_HTTP_PORT = 8000;
    private static final int DEFAULT_RESOLUTION_X = 2048;
    private static final int DEFAULT_RESOLUTION_Y = 2048;
@@ -28,6 +33,7 @@ public class Config
 
    // set default values
    private String admonHost = null;
+   private String admonLocal = null; 
    private String logFile = null;
    private String cfgFile = null;
    private int admonHttpPort = 0;
@@ -86,6 +92,12 @@ public class Config
             if(key.equalsIgnoreCase(PropertyEnum.PROPERTY_ADMON_HTTP_PORT.getArgsKey()))
             {
                this.admonHttpPort = Integer.parseInt(value);
+            }
+            else
+            if(key.equalsIgnoreCase(PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getArgsKey()))
+            {
+               this.admonLocal = value;
+               System.out.println("##"+value+"##");
             }
             else
             if(key.equalsIgnoreCase(PropertyEnum.PROPERTY_ADMON_GUI_LOG_FILE.getArgsKey()))
@@ -166,6 +178,12 @@ public class Config
          this.setLogLevel(Integer.parseInt(value));
       }
 
+      value = System.getProperty(PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getKey());
+      if((value != null) &&  (this.admonLocal == null))
+      {
+         this.setAdmonLocal(value);
+      }
+
       value = System.getProperty(PropertyEnum.PROPERTY_ADMON_GUI_RESOLUTION.getKey());
       if((value != null) &&  (this.resolutionX == 0 || this.resolutionY == 0))
       {
@@ -193,6 +211,16 @@ public class Config
       }
 
       return this.admonHttpPort;
+   }
+
+   public String getAdmonLocal()
+   {
+      if (this.admonLocal == null)
+      {
+         return DEFAULT_ADMON_LOCAL;
+      }
+
+      return this.admonLocal;
    }
 
    public String getResolution()
@@ -322,6 +350,10 @@ public class Config
       this.admonHost = host;
    }
 
+   public void setAdmonLocal(String local)
+   {
+      this.admonLocal = local;
+   }
    public void setAdmonHttpPort(int port)
    {
       admonHttpPort = port;
@@ -419,6 +451,8 @@ public class Config
          String newPort = props.getProperty(PropertyEnum.PROPERTY_ADMON_HTTP_PORT.getConfigKey());
          String newResolution = props.getProperty(
             PropertyEnum.PROPERTY_ADMON_GUI_RESOLUTION.getConfigKey());
+         String newLocal = props.getProperty(
+                 PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getConfigKey());
          String newLogLevel = props.getProperty(
             PropertyEnum.PROPERTY_ADMON_GUI_LOG_LEVEL.getConfigKey());
          String newLogFile = props.getProperty(
@@ -434,6 +468,11 @@ public class Config
          if (newPort != null && (this.admonHttpPort == 0))
          {
             this.admonHttpPort = Integer.parseInt(newPort);
+         }
+
+         if (newLocal != null && (this.admonLocal == null))
+         {
+            this.admonLocal = newLocal;
          }
 
          if (newResolution != null && ((this.resolutionX == 0) || (this.resolutionY == 0)))
@@ -462,6 +501,7 @@ public class Config
 
          this.admonHost = DEFAULT_ADMON_HOST;
          this.admonHttpPort = DEFAULT_ADMON_HTTP_PORT;
+         this.admonLocal = DEFAULT_ADMON_LOCAL;
          this.resolutionX = DEFAULT_RESOLUTION_X;
          this.resolutionY = DEFAULT_RESOLUTION_Y;
          this.logFile = FilePathsEnum.DEFAULT_LOG_FILE.getPath();
@@ -559,6 +599,9 @@ public class Config
       p.setProperty(PropertyEnum.PROPERTY_ADMON_GUI_LOG_FILE.getConfigKey(), getLogFile());
       p.setProperty(PropertyEnum.PROPERTY_ADMON_GUI_LOG_LEVEL.getConfigKey(),
          Integer.toString(getLogLevelNumeric()));
+
+      p.setProperty(PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getConfigKey(), getAdmonLocal());
+
       p.setProperty(PropertyEnum.PROPERTY_ADMON_GUI_RESOLUTION.getConfigKey(), getResolution());
       return writeConfigFile(f,p);
    }
@@ -582,6 +625,11 @@ public class Config
       builder.append(String.format("%-50s%s%n",
          PropertyEnum.PROPERTY_ADMON_GUI_LOG_LEVEL.getArgsKey() +
          "=0|1|2|3|4|5", "The log level. Level 5 prints the most log messages."));
+
+      builder.append(String.format("%-50s%s%n",
+              PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getArgsKey() +
+              "=English|Chinese", "The local is used to set the language environment"));
+
       builder.append(String.format("%-50s%s%n",
          PropertyEnum.PROPERTY_ADMON_GUI_RESOLUTION.getArgsKey() +
          "=$RESOLUTION_Xx$RESOLUTION_Y", "The resolution in pixels for the X- and Y- axis of the"));

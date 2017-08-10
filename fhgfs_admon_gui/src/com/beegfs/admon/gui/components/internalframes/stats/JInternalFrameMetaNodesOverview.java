@@ -15,6 +15,7 @@ import com.beegfs.admon.gui.components.charts.LineChart;
 import com.beegfs.admon.gui.components.charts.LineTrace;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -61,7 +62,7 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
    {
       this.group = group;
       initComponents();
-      setTitle("Metadata nodes overview (Group : " + group + ")");
+      setTitle(Main.getLocal().getString("Metadata nodes overview (Group : " + group + ")"));
       setFrameIcon(GuiTk.getFrameIcon());
    }
 
@@ -198,17 +199,17 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
                ValueUnit<TimeUnitEnum> vu = UnitTk.strToValueUnitOfTime(timeSpanStr);
                long timeSpan = UnitTk.timeSpanToMinutes(vu);
 
-               GuiTk.addTracePointsToChart(workRequests, workRequestsChart, "Work Requests",
+               GuiTk.addTracePointsToChart(workRequests, workRequestsChart, Main.getLocal().getString("Work Requests"),
                         timeSpan, false, ColorLineTraceEnum.COLOR_META_OPS.color(),
                         new ArrayList<Integer>(0));
                GuiTk.addTracePointsToChart(queuedWorkRequests, queuedWorkRequestsChart,
-                        "Queued Work Requests", timeSpan, false,
+            		   Main.getLocal().getString("Queued Work Requests"), timeSpan, false,
                         ColorLineTraceEnum.COLOR_META_OPS.color(), new ArrayList<Integer>(0));
 
             }
             catch (CommunicationException e)
             {
-               LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
                {
                   e,
                   true
@@ -258,7 +259,7 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
       setIconifiable(true);
       setMaximizable(true);
       setResizable(true);
-      setTitle("Metadata nodes overview");
+      setTitle(Main.getLocal().getString("Metadata nodes overview"));
       setDoubleBuffered(true);
       setPreferredSize(new java.awt.Dimension(780, 686));
       addInternalFrameListener(new javax.swing.event.InternalFrameListener()
@@ -294,10 +295,10 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
       jPanelFrame.setPreferredSize(new java.awt.Dimension(764, 648));
       jPanelFrame.setLayout(new java.awt.BorderLayout(5, 5));
 
-      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder("General information"));
+      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("General information")));
       jPanelGeneral.setLayout(new java.awt.GridBagLayout());
 
-      jLabelNodeCountText.setText("Number of metadata nodes : ");
+      jLabelNodeCountText.setText(Main.getLocal().getString("Number of metadata nodes : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 5;
       gridBagConstraints.gridy = 0;
@@ -318,14 +319,14 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelGeneral.add(jLabelRootNode, gridBagConstraints);
 
-      jLabelRodeNodeText.setText("Root metadata node :");
+      jLabelRodeNodeText.setText(Main.getLocal().getString("Root metadata node :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 7;
       gridBagConstraints.gridy = 0;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelGeneral.add(jLabelRodeNodeText, gridBagConstraints);
 
-      jLabelStatus.setText("Status:");
+      jLabelStatus.setText(Main.getLocal().getString("Status:"));
       jLabelStatus.addMouseListener(new java.awt.event.MouseAdapter()
       {
          public void mouseClicked(java.awt.event.MouseEvent evt)
@@ -404,12 +405,12 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
 
       jPanelFrame.add(jPanelGeneral, java.awt.BorderLayout.NORTH);
 
-      jPanelWorkRequests.setBorder(javax.swing.BorderFactory.createTitledBorder("Work Requests"));
+      jPanelWorkRequests.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Work Requests")));
       jPanelWorkRequests.setLayout(new java.awt.BorderLayout(5, 5));
 
       jPanelRequests.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
 
-      jLabelTimeSpan.setText("Show the last ");
+      jLabelTimeSpan.setText(Main.getLocal().getString("Show the last "));
       jPanelRequests.add(jLabelTimeSpan);
 
       jComboBoxTimeSpan.setModel(new DefaultComboBoxModel<>(com.beegfs.admon.gui.common.tools.DefinesTk.CHART_TIME_INTERVAL.toArray(new String[1])));
@@ -439,13 +440,13 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
 
       ArrayList<ChartPoint> workRequests = new ArrayList<>(0);
 
-      LineTrace workRequestsTrace = new LineTrace("Work Requests",
+      LineTrace workRequestsTrace = new LineTrace(Main.getLocal().getString("Work Requests"),
          ColorLineTraceEnum.COLOR_META_OPS.color(), workRequests);
 
       LineTrace[] workRequestTraces = new LineTrace[DEFAULT_TRACE_COUNT];
       workRequestTraces[0] = workRequestsTrace;
 
-      workRequestsChart = new LineChart("Work Requests", "", "", 600, workRequestTraces, false,
+      workRequestsChart = new LineChart(Main.getLocal().getString("Work Requests"), "", "", 600, workRequestTraces, false,
          false);
 
       jPanelWorkRequestsGraph.add(workRequestsChart);
@@ -457,13 +458,13 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
 
       ArrayList<ChartPoint> queuedWorkRequests = new ArrayList<>(0);
 
-      LineTrace queuedWorkRequestsTrace = new LineTrace("Queued Work Requests",
+      LineTrace queuedWorkRequestsTrace = new LineTrace(Main.getLocal().getString("Queued Work Requests"),
          ColorLineTraceEnum.COLOR_META_OPS.color(), queuedWorkRequests);
 
       LineTrace[] queuedWorkRequestTraces = new LineTrace[DEFAULT_TRACE_COUNT];
       queuedWorkRequestTraces[0] = queuedWorkRequestsTrace;
 
-      queuedWorkRequestsChart = new LineChart("Queued Work Requests", "", "", 600,
+      queuedWorkRequestsChart = new LineChart(Main.getLocal().getString("Queued Work Requests"), "", "", 600,
          queuedWorkRequestTraces, false, false);
 
       jPanelQueuedWorkRequestsGraph.add(queuedWorkRequestsChart);
@@ -583,7 +584,7 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
    @Override
    public final String getFrameTitle()
    {
-      return "Metadata Nodes Overview";
+	   return Main.getLocal().getString("Metadata Nodes Overview");
    }
 
    private void showStatusDetails()
@@ -608,7 +609,7 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
       }
       catch (CommunicationException ex)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             ex,
             true

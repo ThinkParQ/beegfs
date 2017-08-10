@@ -6,6 +6,7 @@ import com.beegfs.admon.gui.common.tools.GuiTk;
 import com.beegfs.admon.gui.common.tools.HttpTk;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.util.logging.Logger;
 
 
@@ -37,7 +38,7 @@ public class JInternalFrameRemoteLogFiles extends javax.swing.JInternalFrame
    @Override
    public final String getFrameTitle()
    {
-      return "Log Files";
+	   return Main.getLocal().getString("Log Files");
    }
 
    /**
@@ -102,11 +103,11 @@ public class JInternalFrameRemoteLogFiles extends javax.swing.JInternalFrame
       jPanelFrame.setPreferredSize(new java.awt.Dimension(867, 348));
       jPanelFrame.setLayout(new java.awt.BorderLayout(5, 5));
 
-      jTabbedPaneChooser.addTab("Management Daemon", remoteLogFileTabPanelMgmtd);
-      jTabbedPaneChooser.addTab("Metadata Daemon", remoteLogFileTabPanelMeta);
-      jTabbedPaneChooser.addTab("Storage Daemon", remoteLogFileTabPanelStorage);
-      jTabbedPaneChooser.addTab("Admon Daemon", remoteLogFileTabPanelAdmon);
-      jTabbedPaneChooser.addTab("Client", remoteLogFileTabPanelClient);
+      jTabbedPaneChooser.addTab(Main.getLocal().getString("Management Daemon"), remoteLogFileTabPanelMgmtd);
+      jTabbedPaneChooser.addTab(Main.getLocal().getString("Metadata Daemon"), remoteLogFileTabPanelMeta);
+      jTabbedPaneChooser.addTab(Main.getLocal().getString("Storage Daemon"), remoteLogFileTabPanelStorage);
+      jTabbedPaneChooser.addTab(Main.getLocal().getString("Admon Daemon"), remoteLogFileTabPanelAdmon);
+      jTabbedPaneChooser.addTab(Main.getLocal().getString("Client"), remoteLogFileTabPanelClient);
 
       jPanelFrame.add(jTabbedPaneChooser, java.awt.BorderLayout.CENTER);
       jTabbedPaneChooser.getAccessibleContext().setAccessibleName("");

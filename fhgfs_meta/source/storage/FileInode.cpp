@@ -2623,7 +2623,7 @@ FhgfsOpsErr FileInode::removeXAttr(EntryInfo* entryInfo, const std::string& xAtt
    }
 
    // FIXME: should resync only this xattr ON THE INODE
-   if (getIsBuddyMirrored())
+   if (getIsBuddyMirroredUnlocked())
       if (auto* resync = BuddyResyncer::getSyncChangeset())
          resync->addModification(metaFilename, MetaSyncFileType::Inode);
 
@@ -2654,7 +2654,7 @@ FhgfsOpsErr FileInode::setXAttr(EntryInfo* entryInfo, const std::string& xAttrNa
    }
 
    // FIXME: should resync only this xattr ON THE INODE
-   if (getIsBuddyMirrored())
+   if (getIsBuddyMirroredUnlocked())
       if (auto* resync = BuddyResyncer::getSyncChangeset())
          resync->addModification(metaFilename, MetaSyncFileType::Inode);
 

@@ -3,6 +3,7 @@ package com.beegfs.admon.gui.components.dialogs;
 import com.beegfs.admon.gui.common.enums.FilePathsEnum;
 import static com.beegfs.admon.gui.common.tools.DefinesTk.DEFAULT_ENCODING_UTF8;
 import com.beegfs.admon.gui.common.tools.GuiTk;
+import com.beegfs.admon.gui.program.Main;
 import java.awt.Point;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
@@ -48,12 +49,12 @@ public class JDialogEULA extends javax.swing.JDialog
       }
       catch (FileNotFoundException e)
       {
-         jTextAreaEula.setText("BeeGFS EULA not found!");
+    	  jTextAreaEula.setText(Main.getLocal().getString("BeeGFS EULA not found!"));
          LOGGER.log(Level.WARNING, "BeeGFS EULA file not found.", e);
       }
       catch (IOException e)
       {
-         jTextAreaEula.setText("BeeGFS EULA not readable!");
+    	  jTextAreaEula.setText(Main.getLocal().getString("BeeGFS EULA not readable!"));
          LOGGER.log(Level.WARNING, "BeeGFS EULA file not readable.", e);
       }
       finally
@@ -67,7 +68,7 @@ public class JDialogEULA extends javax.swing.JDialog
          }
          catch (IOException | NullPointerException e)
          {
-            LOGGER.log(Level.FINEST, "Could not close BeeGFS EULA file.", e);
+            LOGGER.log(Level.FINEST, Main.getLocal().getString("Could not close BeeGFS EULA file."), e);
          }
       }
       
@@ -110,7 +111,7 @@ public class JDialogEULA extends javax.swing.JDialog
       jPanelControls.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 0, 10));
       jPanelControls.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 10, 0));
 
-      jCheckBoxAccept.setText("I accept the terms of the license agreement");
+      jCheckBoxAccept.setText(Main.getLocal().getString("I accept the terms of the license agreement"));
       jCheckBoxAccept.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -121,7 +122,7 @@ public class JDialogEULA extends javax.swing.JDialog
       jPanelControls.add(jCheckBoxAccept);
       jPanelControls.add(filler1);
 
-      jButtonAbort.setText("Abort");
+      jButtonAbort.setText(Main.getLocal().getString("Abort"));
       jButtonAbort.setPreferredSize(new java.awt.Dimension(70, 30));
       jButtonAbort.addActionListener(new java.awt.event.ActionListener()
       {
@@ -132,7 +133,7 @@ public class JDialogEULA extends javax.swing.JDialog
       });
       jPanelControls.add(jButtonAbort);
 
-      jButtonOK.setText("OK");
+      jButtonOK.setText(Main.getLocal().getString("OK"));
       jButtonOK.setPreferredSize(new java.awt.Dimension(70, 30));
       jButtonOK.addActionListener(new java.awt.event.ActionListener()
       {
@@ -176,7 +177,7 @@ public class JDialogEULA extends javax.swing.JDialog
        }
        else
        {
-          JOptionPane.showMessageDialog(null, "You must confirm the BeeGFS Eula in order to install the software.", "License agreement not accepted", JOptionPane.ERROR_MESSAGE);
+          JOptionPane.showMessageDialog(null, Main.getLocal().getString("You must confirm the BeeGFS Eula in order to install the software."), Main.getLocal().getString("License agreement not accepted"), JOptionPane.ERROR_MESSAGE);
        }
     }//GEN-LAST:event_jButtonOKActionPerformed
 

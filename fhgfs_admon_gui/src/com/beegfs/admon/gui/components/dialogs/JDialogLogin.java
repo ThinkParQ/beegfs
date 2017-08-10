@@ -33,7 +33,7 @@ public class JDialogLogin extends javax.swing.JDialog
    {
       super(parent, modal);
       initComponents();
-      setTitle("Login@" + Main.getConfig().getAdmonHost());
+      setTitle(Main.getLocal().getString("Login@") + Main.getConfig().getAdmonHost());
       this.setIconImage(GuiTk.getFrameIcon().getImage());
       this.setLocationRelativeTo(null);
       this.jPasswordFieldPW.requestFocus();
@@ -59,7 +59,7 @@ public class JDialogLogin extends javax.swing.JDialog
       jButtonLogin = new javax.swing.JButton();
 
       setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-      setTitle("Login");
+      setTitle(Main.getLocal().getString("Login"));
       setAlwaysOnTop(true);
       setBackground(java.awt.Color.white);
       setBounds(new java.awt.Rectangle(0, 0, 0, 0));
@@ -93,7 +93,8 @@ public class JDialogLogin extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelDialog.add(jLabelLogo, gridBagConstraints);
 
-      jLabelUsername.setText("Username : ");
+      jLabelUsername.setText(Main.getLocal().getString("Username") + ":");
+
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -101,7 +102,7 @@ public class JDialogLogin extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelDialog.add(jLabelUsername, gridBagConstraints);
 
-      jLabelPassword.setText("Password : ");
+      jLabelPassword.setText(Main.getLocal().getString("Password") + ":");
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -145,7 +146,7 @@ public class JDialogLogin extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(10, 0, 10, 10);
       jPanelDialog.add(jPasswordFieldPW, gridBagConstraints);
 
-      jButtonLogin.setText("Login");
+      jButtonLogin.setText(Main.getLocal().getString("Login"));
       jButtonLogin.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -176,39 +177,39 @@ public class JDialogLogin extends javax.swing.JDialog
           String pw = CryptTk.getMD5(jPasswordFieldPW.getPassword());
           if (doLogin(username, pw))
           { // login successful
-             LOGGER.log(Level.INFO, "Login successful on host {0} as user {1}",
+             LOGGER.log(Level.INFO, Main.getLocal().getString("Login successful on host {0} as user {1}"),
                 new Object[]{Main.getConfig().getAdmonHost(), username});
-             this.dispose();
-          }
-          else
-          {
-             this.setVisible(false);
-             JOptionPane.showMessageDialog(Main.getMainWindow(), "Passwort is incorrect!",
-                     "Authentication failed", JOptionPane.ERROR_MESSAGE);
-             LOGGER.log(Level.WARNING, "Passwort for user {0} is incorrect! Tried to login on " +
-                "host {1}", new Object[]{username, Main.getConfig().getAdmonHost()});
-             this.setVisible(true);
-          }
-       }
-       catch (CommunicationException e)
-       {
-          this.setVisible(false);
-          JOptionPane.showMessageDialog(Main.getMainWindow(),
-                  "Unable to communicate with the remote backend: "
-                  + Main.getConfig().getAdmonHost() + ".",
-                  "Communication Error", JOptionPane.ERROR_MESSAGE);
-          this.setVisible(true);
-          LOGGER.log(Level.SEVERE, "Communication Error", e);
-       }
-       catch (WrongBackendVersionException e)
-       {
-          this.setVisible(false);
-          String errMsg = "The version of the GUI and the version of the backend daemon do not "
-                  + "match. Please download the appropriate GUI version from "
-                  + HttpTk.generateAdmonUrl("/beegfs-admon-gui.jar");
-          JOptionPane.showMessageDialog(Main.getMainWindow(), errMsg, "Wrong Software Version",
-                  JOptionPane.ERROR_MESSAGE);
-          LOGGER.log(Level.SEVERE, "Wrong backend version.");
+            this.dispose();
+         }
+         else
+         {
+            this.setVisible(false);
+            JOptionPane.showMessageDialog(Main.getMainWindow(), Main.getLocal().getString("Passwort is incorrect!"),
+                Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
+             LOGGER.log(Level.WARNING, Main.getLocal().getString("Passwort for user {0} is incorrect! Tried to login on ") +
+                Main.getLocal().getString("host {1}"), new Object[]{username, Main.getConfig().getAdmonHost()});
+            this.setVisible(true);
+         }
+      }
+      catch (CommunicationException e)
+      {
+         this.setVisible(false);
+         JOptionPane.showMessageDialog(Main.getMainWindow(),
+             Main.getLocal().getString("Unable to communicate with the remote backend: ")
+             + Main.getConfig().getAdmonHost() + ".",
+             Main.getLocal().getString("Communication Error"), JOptionPane.ERROR_MESSAGE);
+         this.setVisible(true);
+          LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error"), e);
+      }
+      catch (WrongBackendVersionException e)
+      {
+         this.setVisible(false);
+         String errMsg = Main.getLocal().getString("The version of the GUI and the version of the backend daemon do not ")
+             + Main.getLocal().getString("match. Please download the appropriate GUI version from ")
+             + HttpTk.generateAdmonUrl("/beegfs-admon-gui.jar");
+          JOptionPane.showMessageDialog(Main.getMainWindow(), errMsg, Main.getLocal().getString("Wrong Software Version"),
+             JOptionPane.ERROR_MESSAGE);
+          LOGGER.log(Level.SEVERE, Main.getLocal().getString("Wrong backend version."));
           this.setVisible(true);
        }
     }//GEN-LAST:event_jButtonLoginActionPerformed
@@ -220,7 +221,7 @@ public class JDialogLogin extends javax.swing.JDialog
       boolean updateSuccess = parser.update();
       if (!updateSuccess)
       {
-         throw new CommunicationException("Communication error during requesting URL: " +
+         throw new CommunicationException(Main.getLocal().getString("Communication error during requesting URL: ") +
             HttpTk.generateAdmonUrl("/XML_GetNonce"));
       }
 
@@ -237,7 +238,7 @@ public class JDialogLogin extends javax.swing.JDialog
       updateSuccess = parser.update();
       if (!updateSuccess)
       {
-         throw new CommunicationException("Communication error during requesting URL: " + url);
+         throw new CommunicationException(Main.getLocal().getString("Communication error during requesting URL: ") + url);
       }
 
       data = parser.getTreeMap();
@@ -252,7 +253,7 @@ public class JDialogLogin extends javax.swing.JDialog
          updateSuccess = parser.update();
          if (!updateSuccess)
          {
-            throw new CommunicationException("Communication error during requesting URL: " + url);
+            throw new CommunicationException(Main.getLocal().getString("Communication error during requesting URL: ") + url);
          }
 
          data = parser.getTreeMap();
@@ -331,7 +332,7 @@ public class JDialogLogin extends javax.swing.JDialog
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error", e);
+       LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error"), e);
       }
 
       if (!Main.getSession().getInfoAutologinDisabled())

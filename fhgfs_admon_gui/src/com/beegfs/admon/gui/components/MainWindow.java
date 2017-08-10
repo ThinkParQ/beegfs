@@ -49,14 +49,14 @@ public class MainWindow extends javax.swing.JFrame
 
    private void showNotLoggedIn()
    {
-      JOptionPane.showMessageDialog(null, "You must be logged in to view this information!",
-         "Not authenticated", JOptionPane.ERROR_MESSAGE);
+      JOptionPane.showMessageDialog(null, Main.getLocal().getString("You must be logged in to view this information!"),
+         Main.getLocal().getString("Not authenticated"), JOptionPane.ERROR_MESSAGE);
    }
 
    private void showNotAdmin()
    {
-      JOptionPane.showMessageDialog(null, "You must be logged in with an adminstrative account to "
-         + "view this information!", "Not authenticated", JOptionPane.ERROR_MESSAGE);
+      JOptionPane.showMessageDialog(null, Main.getLocal().getString("You must be logged in with an adminstrative account to ")
+         + Main.getLocal().getString("view this information!"), Main.getLocal().getString("Not authenticated"), JOptionPane.ERROR_MESSAGE);
    }
 
    public StatusPanel getStatusPanel()
@@ -71,12 +71,12 @@ public class MainWindow extends javax.swing.JFrame
 
    public void setLoggedIn(boolean admin)
    {
-      this.setTitle("BeeGFS admon @ " + Main.getConfig().getAdmonHost() + ":" +
+    this.setTitle(Main.getLocal().getString("BeeGFS admon @ ") + Main.getConfig().getAdmonHost() + ":" +
               Main.getConfig().getAdmonHttpPort());
-      jMenuItemLogin.setText("Logout");
+      jMenuItemLogin.setText(Main.getLocal().getString("Logout"));
       if (admin)
       {
-         jLabelUser.setText("Administrator");
+    	  jLabelUser.setText(Main.getLocal().getString("Administrator"));
          activateAdminMenus();
          jLabelQuickAdmin.setVisible(false);
          jPasswordFieldQuickAdmin.setVisible(false);
@@ -110,7 +110,7 @@ public class MainWindow extends javax.swing.JFrame
 
       initComponents();
 
-      this.setTitle("BeeGFS admon");
+      this.setTitle(Main.getLocal().getString("BeeGFS admon"));
       this.getContentPane().setBackground(BeegfsLookAndFeel.getMenuBackground());
       jDesktopPaneContent.setBackground(java.awt.Color.WHITE);
       jScrollPaneDesktop.getHorizontalScrollBar().addAdjustmentListener(
@@ -195,9 +195,9 @@ public class MainWindow extends javax.swing.JFrame
 
       jToolBar.setRollover(true);
 
-      jLabelUserText.setText("Currently logged in : ");
+      jLabelUserText.setText(Main.getLocal().getString("Currently logged in : "));
 
-      jLabelQuickAdmin.setText("Administrative Login : ");
+      jLabelQuickAdmin.setText(Main.getLocal().getString("Administrative Login : "));
 
       jPasswordFieldQuickAdmin.addActionListener(new java.awt.event.ActionListener()
       {
@@ -304,9 +304,9 @@ public class MainWindow extends javax.swing.JFrame
 
    jMenuBar.setBorder(new javax.swing.border.SoftBevelBorder(javax.swing.border.BevelBorder.RAISED));
 
-   jMenuAdmon.setText("Admon");
+   jMenuAdmon.setText(Main.getLocal().getString("Admon"));
 
-   jMenuItemConnSettings.setText("Change Settings");
+   jMenuItemConnSettings.setText(Main.getLocal().getString("Change Settings"));
    jMenuItemConnSettings.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -316,7 +316,7 @@ public class MainWindow extends javax.swing.JFrame
    });
    jMenuAdmon.add(jMenuItemConnSettings);
 
-   jMenuItemLogin.setText("Login");
+   jMenuItemLogin.setText(Main.getLocal().getString("Login"));
    jMenuItemLogin.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -326,7 +326,7 @@ public class MainWindow extends javax.swing.JFrame
    });
    jMenuAdmon.add(jMenuItemLogin);
 
-   jMenuItemClose.setText("Close");
+   jMenuItemClose.setText(Main.getLocal().getString("Close"));
    jMenuItemClose.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -338,9 +338,9 @@ public class MainWindow extends javax.swing.JFrame
 
    jMenuBar.add(jMenuAdmon);
 
-   jMenuAdministration.setText("Administration");
+   jMenuAdministration.setText(Main.getLocal().getString("Administration"));
 
-   jMenuItemUserSettings.setText("User Settings");
+   jMenuItemUserSettings.setText(Main.getLocal().getString("User Settings"));
    jMenuItemUserSettings.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -350,7 +350,7 @@ public class MainWindow extends javax.swing.JFrame
    });
    jMenuAdministration.add(jMenuItemUserSettings);
 
-   jMenuItemMailSettings.setText("Mail Settings");
+   jMenuItemMailSettings.setText(Main.getLocal().getString("Mail Settings"));
    jMenuItemMailSettings.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -362,9 +362,9 @@ public class MainWindow extends javax.swing.JFrame
 
    jMenuBar.add(jMenuAdministration);
 
-   jMenuWindow.setText("Windows");
+   jMenuWindow.setText(Main.getLocal().getString("Windows"));
 
-   jMenuItemTile.setText("Tile");
+   jMenuItemTile.setText(Main.getLocal().getString("Tile"));
    jMenuItemTile.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -374,7 +374,7 @@ public class MainWindow extends javax.swing.JFrame
    });
    jMenuWindow.add(jMenuItemTile);
 
-   jMenuItemMinimize.setText("Minimize All");
+   jMenuItemMinimize.setText(Main.getLocal().getString("Minimize All"));
    jMenuItemMinimize.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -386,7 +386,7 @@ public class MainWindow extends javax.swing.JFrame
 
    jMenuBar.add(jMenuWindow);
 
-   jMenuAbout.setText("About");
+   jMenuAbout.setText(Main.getLocal().getString("About"));
    jMenuAbout.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -395,7 +395,7 @@ public class MainWindow extends javax.swing.JFrame
       }
    });
 
-   JMenuItemAbout.setText("About");
+   JMenuItemAbout.setText(Main.getLocal().getString("About"));
    JMenuItemAbout.addActionListener(new java.awt.event.ActionListener()
    {
       public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -448,10 +448,10 @@ public class MainWindow extends javax.swing.JFrame
     private void jMenuItemLoginActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemLoginActionPerformed
       if (Main.getSession().getIsInfo())
       {
-         this.setTitle("BeeGFS admon");
+    	 this.setTitle(Main.getLocal().getString("BeeGFS admon"));
          Main.getSession().setIsInfo(false);
          Main.getSession().setIsAdmin(false);
-         jMenuItemLogin.setText("Login");
+         jMenuItemLogin.setText(Main.getLocal().getString("Login"));
          loginDialog.setVisible(true);
       }
       else
@@ -497,24 +497,24 @@ public class MainWindow extends javax.swing.JFrame
     private void jPasswordFieldQuickAdminActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jPasswordFieldQuickAdminActionPerformed
       try
       {
-         String username = "Administrator";
+         String username = Main.getLocal().getString("Administrator");
          String pw = CryptTk.getMD5(jPasswordFieldQuickAdmin.getPassword());
          if (!loginDialog.doLogin(username, pw))
          {
-            JOptionPane.showMessageDialog(this, "Authentication as Administrator failed",
-               "Authentication failed", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, Main.getLocal().getString("Authentication as Administrator failed"),
+               Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
          }
       }
       catch (WrongBackendVersionException e)
       {
-         LOGGER.log(Level.SEVERE, "Wrong backend version", e);
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Wrong backend version"), e);
       }
       catch (CommunicationException e)
       {
-         JOptionPane.showMessageDialog(Main.getMainWindow(), "Unable to communicate with the "
-            + "remote backend.", "Communication Error", JOptionPane.ERROR_MESSAGE);
-         LOGGER.log(Level.SEVERE, "Communication Error: Unable to communicate with the "
-            + "remote backend.", e);
+         JOptionPane.showMessageDialog(Main.getMainWindow(), Main.getLocal().getString("Unable to communicate with the ")
+            + Main.getLocal().getString("remote backend."), Main.getLocal().getString("Communication Error"), JOptionPane.ERROR_MESSAGE);
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error: Unable to communicate with the ")
+            + Main.getLocal().getString("remote backend."), e);
       }
     }//GEN-LAST:event_jPasswordFieldQuickAdminActionPerformed
 

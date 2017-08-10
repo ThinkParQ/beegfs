@@ -126,7 +126,7 @@ struct dentry* FhgfsOps_mount(struct file_system_type *fs_type,
  */
 int FhgfsOps_flush(struct file *file, fl_owner_t id)
 {
-   struct dentry* dentry = file->f_dentry;
+   struct dentry* dentry = file_dentry(file);
    struct inode* inode = file_inode(file);
 
    App* app = FhgfsOps_getApp(dentry->d_sb);

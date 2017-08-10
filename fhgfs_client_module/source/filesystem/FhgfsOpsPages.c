@@ -946,13 +946,14 @@ int FhgfsOpsPages_readpageSync(struct file* file, struct page* page)
  */
 int FhgfsOpsPages_readpage(struct file* file, struct page* page)
 {
-   App* app = FhgfsOps_getApp(file->f_dentry->d_sb);
+   App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    struct inode* inode = file_inode(file);
    int writeBackRes;
 
    int retVal;
 
-   FhgfsOpsHelper_logOpDebug(app, file->f_dentry, inode, __func__, "page-index: %lu", page->index);
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__,
+         "page-index: %lu", page->index);
    IGNORE_UNUSED_VARIABLE(app);
 
    writeBackRes = FhgfsOpsPages_writeBackPage(inode, page);
@@ -964,7 +965,7 @@ int FhgfsOpsPages_readpage(struct file* file, struct page* page)
 
    retVal = _FhgfsOpsPages_readpages(file, file->f_mapping, NULL, page);
 
-   FhgfsOpsHelper_logOpDebug(app, file->f_dentry, inode, __func__, "page-index: %lu retVal: %d",
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "page-index: %lu retVal: %d",
       page->index, retVal);
 
    return retVal;
@@ -972,7 +973,7 @@ int FhgfsOpsPages_readpage(struct file* file, struct page* page)
 outErr:
    unlock_page(page);
 
-   FhgfsOpsHelper_logOpDebug(app, file->f_dentry, inode, __func__, "page-index: %lu retVal: %d",
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "page-index: %lu retVal: %d",
       page->index, retVal);
 
    return retVal;
@@ -1072,7 +1073,7 @@ int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
 int FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
    struct list_head* pageList, unsigned numPages)
 {
-   struct dentry* dentry = file->f_dentry;
+   struct dentry* dentry = file_dentry(file);
    struct inode* inode = mapping->host;
    App* app = FhgfsOps_getApp(dentry->d_sb);
 

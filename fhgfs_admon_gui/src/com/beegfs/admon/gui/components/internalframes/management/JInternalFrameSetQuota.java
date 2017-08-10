@@ -19,6 +19,7 @@ import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameUpdateableInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
 import com.beegfs.admon.gui.components.tables.ValueUnitCellEditor;
+import com.beegfs.admon.gui.program.Main;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.StringTokenizer;
@@ -157,13 +158,13 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
          {
             markInvalidRows(errors);
 
-            JOptionPane.showMessageDialog(null, "The marked rows are invalid and this quota " +
-               "limits are ignored.", "Errors occured", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, Main.getLocal().getString("The marked rows are invalid and this quota ") +
+            	Main.getLocal().getString("limits are ignored."), Main.getLocal().getString("Errors occured"), JOptionPane.ERROR_MESSAGE);
          }
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -228,7 +229,7 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
       {
          int valueCounter = 0;
          StringBuilder errorStr = new StringBuilder(DEFAULT_STRING_LENGTH);
-         errorStr.append("Some lines of the file are not valid:");
+         errorStr.append(Main.getLocal().getString("Some lines of the file are not valid:"));
          errorStr.append(System.lineSeparator());
          for (int failedLine : failedLines)
          {
@@ -243,7 +244,7 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
             }
          }
 
-         JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+         JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                     JOptionPane.ERROR_MESSAGE);
       }
    }
@@ -297,8 +298,8 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
       @Override
       public void run()
       {
-         pBarThread = new ProgressBarThread(jProgressBarLoadData, "Load quota ...", THREAD_NAME  +
-            "ProgressBar");
+       pBarThread = new ProgressBarThread(jProgressBarLoadData, Main.getLocal().getString("Load quota ..."), THREAD_NAME  +
+      Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
 
          jComboBoxIDType.setEnabled(false);
@@ -324,7 +325,7 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
             }
             catch (CommunicationException ex)
             {
-               LOGGER.log(Level.FINEST, "Internal error.", ex);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), ex);
             }
             finally
             {
@@ -333,11 +334,11 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
          }
          catch (InterruptedException ex)
          {
-            LOGGER.log(Level.FINEST, "Internal error.", ex);
+            LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), ex);
          }
          catch (CommunicationException ex)
          {
-            LOGGER.log(Level.FINEST, "Communication error.", ex);
+            LOGGER.log(Level.FINEST, Main.getLocal().getString("Communication error."), ex);
          }
          finally
          {
@@ -639,7 +640,7 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 15);
       jPanelControll.add(jComboBoxQueryType, gridBagConstraints);
 
-      jButtonLoad.setText("Load from server");
+      jButtonLoad.setText(Main.getLocal().getString("Load from server"));
       jButtonLoad.setMaximumSize(new java.awt.Dimension(140, 30));
       jButtonLoad.setMinimumSize(new java.awt.Dimension(140, 30));
       jButtonLoad.setPreferredSize(new java.awt.Dimension(140, 30));
@@ -650,7 +651,7 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
       gridBagConstraints.insets = new java.awt.Insets(5, 15, 5, 5);
       jPanelControll.add(jButtonLoad, gridBagConstraints);
 
-      jButtonLoadFile.setText("Load from File");
+      jButtonLoadFile.setText(Main.getLocal().getString("Load from File"));
       jButtonLoadFile.setMaximumSize(new java.awt.Dimension(140, 30));
       jButtonLoadFile.setMinimumSize(new java.awt.Dimension(140, 30));
       jButtonLoadFile.setPreferredSize(new java.awt.Dimension(140, 30));
@@ -661,7 +662,7 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 15);
       jPanelControll.add(jButtonLoadFile, gridBagConstraints);
 
-      jButtonSave.setText("Set quota limits");
+      jButtonSave.setText(Main.getLocal().getString("Set quota limits"));
       jButtonSave.setMaximumSize(new java.awt.Dimension(140, 30));
       jButtonSave.setMinimumSize(new java.awt.Dimension(140, 30));
       jButtonSave.setPreferredSize(new java.awt.Dimension(140, 30));
@@ -801,6 +802,6 @@ public class JInternalFrameSetQuota extends javax.swing.JInternalFrame implement
    @Override
    public final String getFrameTitle()
    {
-      return "Set quota";
+	   return Main.getLocal().getString("Set quota");
    }
 }

@@ -17,6 +17,7 @@ import com.beegfs.admon.gui.components.charts.LineTrace;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
 import com.beegfs.admon.gui.components.tables.CenteredTableCellRenderer;
+import com.beegfs.admon.gui.program.Main;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeMap;
@@ -186,19 +187,18 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
                ValueUnit<TimeUnitEnum> vu = UnitTk.strToValueUnitOfTime(timeSpanStr);
                long timeSpan = UnitTk.timeSpanToMinutes(vu);
 
-
-               GuiTk.addTracePointsToChart(readVals, chart, "Read", timeSpan, false,
+               GuiTk.addTracePointsToChart(readVals, chart, Main.getLocal().getString("Read"), timeSpan, false,
                         ColorLineTraceEnum.COLOR_READ.color(), tracesLength);
-               GuiTk.addTracePointsToChart(averageReadVals, chart, "Average Read", timeSpan, true,
+               GuiTk.addTracePointsToChart(averageReadVals, chart, Main.getLocal().getString("Average Read"), timeSpan, true,
                         ColorLineTraceEnum.COLOR_AVERAGE_READ.color(), tracesLength);
-               GuiTk.addTracePointsToChart(writeVals, chart, "Write", timeSpan, false,
+               GuiTk.addTracePointsToChart(writeVals, chart, Main.getLocal().getString("Write"), timeSpan, false,
                         ColorLineTraceEnum.COLOR_WRITE.color(), tracesLength);
-               GuiTk.addTracePointsToChart(averageWriteVals, chart, "Average Write", timeSpan, true,
+               GuiTk.addTracePointsToChart(averageWriteVals, chart, Main.getLocal().getString("Average Write"), timeSpan, true,
                        ColorLineTraceEnum.COLOR_AVERAGE_WRITE.color(), tracesLength);
             }
             catch (CommunicationException e)
             {
-               LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
                {
                   e,
                   true
@@ -206,7 +206,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
             }
             catch (java.lang.NullPointerException | java.lang.InterruptedException npe)
             {
-               LOGGER.log(Level.FINEST, "Internal error.", npe);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), npe);
             }
          }
          parser.shouldStop();
@@ -291,7 +291,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
       jSplitPanePerfStorage.setDividerLocation(250);
       jSplitPanePerfStorage.setOrientation(javax.swing.JSplitPane.VERTICAL_SPLIT);
 
-      jPanelDiskPerf.setBorder(javax.swing.BorderFactory.createTitledBorder("Throughput"));
+      jPanelDiskPerf.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Throughput")));
       jPanelDiskPerf.setPreferredSize(new java.awt.Dimension(400, 250));
       jPanelDiskPerf.setLayout(new java.awt.BorderLayout());
 
@@ -299,7 +299,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
       jPanelControll.setRequestFocusEnabled(false);
       jPanelControll.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
 
-      jLabelTimeSpan.setText("Show the last ");
+      jLabelTimeSpan.setText(Main.getLocal().getString("Show the last "));
       jPanelControll.add(jLabelTimeSpan);
 
       jComboBoxTimeSpan.setModel(new DefaultComboBoxModel<>(com.beegfs.admon.gui.common.tools.DefinesTk.CHART_TIME_INTERVAL.toArray(new String[1])));
@@ -328,14 +328,13 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
       ArrayList<ChartPoint> averageReadVals = new ArrayList<>(0);
       ArrayList<ChartPoint> writeVals = new ArrayList<>(0);
       ArrayList<ChartPoint> averageWriteVals = new ArrayList<>(0);
-
-      LineTrace readTrace = new LineTrace("Read",
+      LineTrace readTrace = new LineTrace(Main.getLocal().getString("Read"),
          ColorLineTraceEnum.COLOR_READ.color(), readVals);
-      LineTrace writeTrace = new LineTrace("Write",
+      LineTrace writeTrace = new LineTrace(Main.getLocal().getString("Write"),
          ColorLineTraceEnum.COLOR_WRITE.color(), writeVals);
-      LineTrace averageReadTrace = new LineTrace("Average Read",
+      LineTrace averageReadTrace = new LineTrace(Main.getLocal().getString("Average Read"),
          ColorLineTraceEnum.COLOR_AVERAGE_READ.color(), averageReadVals);
-      LineTrace averageWriteTrace = new LineTrace("Average Write",
+      LineTrace averageWriteTrace = new LineTrace(Main.getLocal().getString("Average Write"),
          ColorLineTraceEnum.COLOR_AVERAGE_WRITE.color(), averageWriteVals);
 
       LineTrace[] traces = new LineTrace[DEFAULT_TRACE_COUNT];
@@ -344,7 +343,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
       traces[2] = averageReadTrace;
       traces[3] = averageWriteTrace;
 
-      chart = new LineChart("Throughput (MiB/s)", "","", 600, traces);
+      chart = new LineChart(Main.getLocal().getString("Throughput (MiB/s)"), "","", 600, traces);
 
       jPanelDiskPerfGraph.add(chart);
 
@@ -352,7 +351,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
 
       jSplitPanePerfStorage.setLeftComponent(jPanelDiskPerf);
 
-      jPanelStorageTargets.setBorder(javax.swing.BorderFactory.createTitledBorder("Storage Targets"));
+      jPanelStorageTargets.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Storage Targets")));
       jPanelStorageTargets.setMinimumSize(new java.awt.Dimension(0, 0));
       jPanelStorageTargets.setPreferredSize(new java.awt.Dimension(400, 200));
       jPanelStorageTargets.setLayout(new java.awt.BorderLayout());
@@ -367,7 +366,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
          },
          new String []
          {
-            "Target ID", "Storage path", "Total disk space", "Used disk space", "Free disk space"
+            Main.getLocal().getString("Target ID"), Main.getLocal().getString("Storage path"), Main.getLocal().getString("Total disk space"), Main.getLocal().getString("Used disk space"), Main.getLocal().getString("Free disk space")
          }
       ));
       jTableTargets.setMinimumSize(new java.awt.Dimension(0, 0));
@@ -380,11 +379,11 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
 
       jPanelFrame.add(jSplitPanePerfStorage, java.awt.BorderLayout.CENTER);
 
-      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder("General Information"));
+      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("General Information")));
       jPanelGeneral.setLayout(new java.awt.GridBagLayout());
 
       jLabelNodeIDText.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-      jLabelNodeIDText.setText("Node ID : ");
+      jLabelNodeIDText.setText(Main.getLocal().getString("Node ID : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -401,7 +400,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
       jPanelGeneral.add(jLabelNodeID, gridBagConstraints);
 
       jLabelStatusText.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-      jLabelStatusText.setText("Status : ");
+      jLabelStatusText.setText(Main.getLocal().getString("Status : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 2;
       gridBagConstraints.gridy = 0;
@@ -495,7 +494,7 @@ public class JInternalFrameStorageNode extends javax.swing.JInternalFrame implem
    @Override
    public final String getFrameTitle()
    {
-      return "Storage Node: " + node.getTypedNodeID();
+	   return Main.getLocal().getString("Storage Node: ") + node.getTypedNodeID();
    }
 
    public Node getNode()

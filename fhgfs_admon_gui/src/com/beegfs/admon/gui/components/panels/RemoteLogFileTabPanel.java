@@ -6,6 +6,7 @@ import com.beegfs.admon.gui.common.enums.NodeTypesEnum;
 import com.beegfs.admon.gui.common.exceptions.CommunicationException;
 import com.beegfs.admon.gui.common.nodes.Node;
 import com.beegfs.admon.gui.common.nodes.TypedNodes;
+import com.beegfs.admon.gui.program.Main;
 import static com.beegfs.admon.gui.common.tools.DefinesTk.DEFAULT_ENCODING_UTF8;
 import com.beegfs.admon.gui.components.internalframes.management.JInternalFrameRemoteLogFiles;
 import java.io.BufferedWriter;
@@ -93,7 +94,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
 
       jPanelControll.setLayout(new java.awt.GridBagLayout());
 
-      jButtonFatch.setText("Fetch");
+      jButtonFatch.setText(Main.getLocal().getString("Fetch"));
       jButtonFatch.setMaximumSize(new java.awt.Dimension(100, 30));
       jButtonFatch.setMinimumSize(new java.awt.Dimension(100, 30));
       jButtonFatch.setPreferredSize(new java.awt.Dimension(100, 30));
@@ -116,7 +117,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
       gridBagConstraints.insets = new java.awt.Insets(5, 1, 5, 10);
       jPanelControll.add(jComboBoxNodes, gridBagConstraints);
 
-      jButtonSave.setText("Save to file");
+      jButtonSave.setText(Main.getLocal().getString("Save to file"));
       jButtonSave.setMaximumSize(new java.awt.Dimension(100, 30));
       jButtonSave.setMinimumSize(new java.awt.Dimension(100, 30));
       jButtonSave.setPreferredSize(new java.awt.Dimension(100, 30));
@@ -128,7 +129,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
       gridBagConstraints.insets = new java.awt.Insets(5, 10, 5, 10);
       jPanelControll.add(jButtonSave, gridBagConstraints);
 
-      jLabelRestrict.setText("Restrict to the last");
+      jLabelRestrict.setText(Main.getLocal().getString("Restrict to the last"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 2;
       gridBagConstraints.gridy = 0;
@@ -146,7 +147,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
       gridBagConstraints.insets = new java.awt.Insets(5, 1, 5, 1);
       jPanelControll.add(jTextFieldLines, gridBagConstraints);
 
-      jLabelLines.setText("lines (0 for all lines)");
+      jLabelLines.setText(Main.getLocal().getString("lines (0 for all lines)"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 4;
       gridBagConstraints.gridy = 0;
@@ -154,7 +155,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
       gridBagConstraints.insets = new java.awt.Insets(5, 1, 5, 10);
       jPanelControll.add(jLabelLines, gridBagConstraints);
 
-      jLabelNode.setText("Node :");
+      jLabelNode.setText(Main.getLocal().getString("Node :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -229,11 +230,11 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
       }
       catch (NumberFormatException ex)
       {
-         LOGGER.log(Level.SEVERE, "Couldn't parse NodeNumID from string: {0}", typedNodeID);
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Couldn't parse NodeNumID from string: {0}"), typedNodeID);
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]{e, true});
       }
       return logFile;
    }
@@ -254,8 +255,8 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
             File f = chooser.getSelectedFile();
             if (f.exists())
             {
-               if (JOptionPane.showConfirmDialog(null, "The file " + f.getName() +
-                       " exists. Do you really want to overwrite it?", "File exists",
+               if (JOptionPane.showConfirmDialog(null, Main.getLocal().getString("The file ") + f.getName() +
+                       Main.getLocal().getString("exists. Do you really want to overwrite it?"), Main.getLocal().getString("File exists"),
                        JOptionPane.YES_NO_OPTION) == JOptionPane.OK_OPTION)
                {
                   if (f.canWrite())
@@ -265,9 +266,9 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
                   }
                   else
                   {
-                     JOptionPane.showMessageDialog(this, "The file " + f.getName() +
-                             " can not be written! Do you have permissions to write?",
-                             "File cannot be written", JOptionPane.ERROR_MESSAGE);
+                     JOptionPane.showMessageDialog(this, Main.getLocal().getString("The file ") + f.getName() +
+                             Main.getLocal().getString("can not be written! Do you have permissions to write?"),
+                             Main.getLocal().getString("File cannot be written"), JOptionPane.ERROR_MESSAGE);
                      showDialog = true;
                   }
                }
@@ -281,9 +282,9 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
                }
                else
                {
-                  JOptionPane.showMessageDialog(this, "The file " + f.getName() +
-                          " can not be written! Do you have permissions to write?",
-                          "File cannot be written", JOptionPane.ERROR_MESSAGE);
+                  JOptionPane.showMessageDialog(this, Main.getLocal().getString("The file ") + f.getName() +
+                          Main.getLocal().getString("can not be written! Do you have permissions to write?"),
+                          Main.getLocal().getString("File cannot be written"), JOptionPane.ERROR_MESSAGE);
                   showDialog = true;
                }
             }
@@ -300,7 +301,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
                }
                catch (IOException e)
                {
-                  LOGGER.log(Level.SEVERE, "IO Exception occured while saving log file",
+                  LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO Exception occured while saving log file"),
                           new Object[]{e, true});
                }
                finally
@@ -313,7 +314,7 @@ public class RemoteLogFileTabPanel extends javax.swing.JPanel
                      }
                      catch (IOException ex)
                      {
-                        LOGGER.log(Level.SEVERE, "IO Exception occured while saving log file",
+                        LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO Exception occured while saving log file"),
                           new Object[]{ex, true});
                      }
                   }

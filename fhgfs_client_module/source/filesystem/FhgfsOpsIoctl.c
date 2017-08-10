@@ -43,7 +43,7 @@ static long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *
  */
 long FhgfsOpsIoctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    struct inode *inode = file_inode(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
@@ -129,7 +129,7 @@ long FhgfsOpsIoctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
  */
 long FhgfsOpsIoctl_compatIoctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -159,7 +159,7 @@ long FhgfsOpsIoctl_compatIoctl(struct file *file, unsigned int cmd, unsigned lon
  */
 static long FhgfsOpsIoctl_getCfgFile(struct file *file, void __user *argp)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -199,7 +199,7 @@ static long FhgfsOpsIoctl_getCfgFile(struct file *file, void __user *argp)
  */
 static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -248,7 +248,7 @@ static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp
  */
 static long FhgfsOpsIoctl_testIsFhGFS(struct file *file, void __user *argp)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -272,7 +272,7 @@ static long FhgfsOpsIoctl_testIsFhGFS(struct file *file, void __user *argp)
  */
 static long FhgfsOpsIoctl_getMountID(struct file *file, void __user *argp)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -308,7 +308,7 @@ static long FhgfsOpsIoctl_getMountID(struct file *file, void __user *argp)
  */
 static long FhgfsOpsIoctl_getStripeInfo(struct file *file, void __user *argp)
 {
-   struct dentry* dentry = file->f_dentry;
+   struct dentry* dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -401,7 +401,7 @@ static long getStripePatternImpl(struct file* file, uint32_t targetIdx,
    uint32_t* primaryNodeID, uint32_t* secondaryNodeID,
    char __user* primaryNodeStrID, char __user* secondaryNodeStrID)
 {
-   struct dentry* dentry = file->f_dentry;
+   struct dentry* dentry = file_dentry(file);
    App* app = FhgfsOps_getApp(dentry->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
@@ -550,7 +550,7 @@ static long FhgfsOpsIoctl_getStripeTargetV2(struct file *file, void __user *argp
  */
 long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
 {
-   struct dentry* dentry = file->f_dentry;
+   struct dentry* dentry = file_dentry(file);
    struct inode* parentInode = file_inode(file);
    FhgfsInode* fhgfsParentInode = BEEGFS_INODE(parentInode);
 
@@ -682,7 +682,7 @@ err_cleanup_lock:
  */
 static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, bool isV2)
 {
-   struct dentry *dentry = file->f_dentry;
+   struct dentry *dentry = file_dentry(file);
    struct inode *inode = file_inode(file);
 
    App* app = FhgfsOps_getApp(dentry->d_sb);

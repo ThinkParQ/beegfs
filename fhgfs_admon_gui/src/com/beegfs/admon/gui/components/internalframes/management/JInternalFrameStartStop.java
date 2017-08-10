@@ -54,7 +54,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
    @Override
    public final String getFrameTitle()
    {
-      return "Start/Stop BeeGFS Services";
+      return Main.getLocal().getString("Start/Stop BeeGFS Services");
    }
 
 
@@ -90,12 +90,12 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
          super();
          if (status == STATUS_RUNNING)
          {
-            this.setText("Running");
+            this.setText(Main.getLocal().getString("Running"));
             this.setForeground(GuiTk.getGreen());
          }
          else
          {
-            this.setText("Stopped");
+            this.setText(Main.getLocal().getString("Stopped"));
             this.setForeground(GuiTk.getRed());
          }
          node = nodeID;
@@ -110,12 +110,12 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       {
          if (status == STATUS_RUNNING)
          {
-            this.setText("Running");
+            this.setText(Main.getLocal().getString("Running"));
             this.setForeground(new Color(0, 140, 50));
          }
          else
          {
-            this.setText("Stopped");
+            this.setText(Main.getLocal().getString("Stopped"));
             this.setForeground(new Color(180, 0, 30));
          }
          this.revalidate();
@@ -132,7 +132,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       JButtonStart(String nodeID)
       {
          super();
-         this.setText("Start");
+         this.setText(Main.getLocal().getString("Start"));
          node = nodeID;
       }
 
@@ -152,7 +152,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       JButtonStop(String nodeID)
       {
          super();
-         this.setText("Stop");
+         this.setText(Main.getLocal().getString("Stop"));
          node = nodeID;
       }
 
@@ -180,7 +180,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
          stoppedHosts = new ArrayList<>(0);
 
          pBarThread = new ProgressBarThread(jProgressBar,
-            "Status check in progress... please be patient", THREAD_NAME + "ProgressBar");
+            Main.getLocal().getString("Status check in progress... please be patient"), THREAD_NAME + Main.getLocal().getString("ProgressBar"));
       }
 
       @Override
@@ -202,7 +202,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]
             {
                e,
                true
@@ -404,23 +404,23 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
          this.host = labelStatus.getNode();
          if (service.equals(NodeTypesEnum.METADATA.shortType()))
          {
-            desc = "BeeGFS metadata server";
+            desc = Main.getLocal().getString("BeeGFS metadata server");
          }
          else if (service.equals(NodeTypesEnum.STORAGE.shortType()))
          {
-            desc = "BeeGFS storage server";
+            desc = Main.getLocal().getString("BeeGFS storage server");
          }
          else if (service.equals(NodeTypesEnum.MANAGMENT.shortType()))
          {
-            desc = "BeeGFS management daemon";
+            desc = Main.getLocal().getString("BeeGFS management daemon");
          }
          else if (service.equals(NodeTypesEnum.CLIENT.shortType()))
          {
-            desc = "BeeGFS client";
+            desc = Main.getLocal().getString("BeeGFS client");
          }
          else if (service.equals(NodeTypesEnum.ADMON.shortType()))
          {
-            desc = "Administration and monitoring daemon";
+            desc = Main.getLocal().getString("Administration and monitoring daemon");
          }
          else
          {
@@ -455,8 +455,8 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
 
       private void restartAdmon()
       {
-         pBarThread = new ProgressBarThread(jProgressBar, "Restarting " + desc, THREAD_NAME +
-            "ProgressBar");
+         pBarThread = new ProgressBarThread(jProgressBar, Main.getLocal().getString("Restarting ") + desc, THREAD_NAME +
+            Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
 
          try
@@ -479,20 +479,19 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             if (!authenticated)
             {
                JOptionPane.showMessageDialog(null,
-                  "Operation cannot be performed due to failed authentication",
-                  "Authentication failed", JOptionPane.ERROR_MESSAGE);
+             Main.getLocal().getString("Operation cannot be performed due to failed authentication"),
+             Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
                LOGGER.log(Level.SEVERE,
-                  "Authentication failed. You are not allowed to perform this operation!", true);
+             Main.getLocal().getString("Authentication failed. You are not allowed to perform this operation!"), true);
                return;
             }
-
             JOptionPane.showMessageDialog(null,
-               "Restart of Administration and Monitoring daemon finished", "Finished",
+               Main.getLocal().getString("Restart of Administration and Monitoring daemon finished"), Main.getLocal().getString("Finished"),
                JOptionPane.INFORMATION_MESSAGE);
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]
             {
                e,
                true
@@ -502,8 +501,8 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
 
       private void startSingleService()
       {
-         pBarThread = new ProgressBarThread(jProgressBar, "Starting " + desc + " on host " + host,
-            THREAD_NAME + "ProgressBar");
+         pBarThread = new ProgressBarThread(jProgressBar, Main.getLocal().getString("Starting ") + desc + Main.getLocal().getString("on host ") + host,
+            THREAD_NAME + Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
 
          try
@@ -527,10 +526,10 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             if (!authenticated)
             {
                JOptionPane.showMessageDialog(null,
-                  "Operation cannot be performed due to failed authentication",
-                  "Authentication failed", JOptionPane.ERROR_MESSAGE);
+                  Main.getLocal().getString("Operation cannot be performed due to failed authentication"),
+                  Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
                LOGGER.log(Level.SEVERE,
-                  "Authentication failed. You are not allowed to perform this operation!", true);
+                  Main.getLocal().getString("Authentication failed. You are not allowed to perform this operation!"), true);
                return;
             }
 
@@ -544,14 +543,14 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             else
             {
                // there can only be one element
-               String errorStr = "Failed to start " + desc + " on host " + failedHosts.get(0) + ".";
-               JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+               String errorStr = Main.getLocal().getString("Failed to start ") + desc + Main.getLocal().getString("on host ") + failedHosts.get(0) + ".";
+               JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                   JOptionPane.ERROR_MESSAGE);
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]
             {
                e,
                true
@@ -561,8 +560,8 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
 
       private void stopSingleService()
       {
-         pBarThread = new ProgressBarThread(jProgressBar, "Stopping " + desc + " on host " + host,
-            THREAD_NAME + "ProgressBar");
+         pBarThread = new ProgressBarThread(jProgressBar, Main.getLocal().getString("Stopping ") + desc + Main.getLocal().getString("on host ") + host,
+            THREAD_NAME + Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
 
          try
@@ -585,10 +584,10 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             if (!authenticated)
             {
                JOptionPane.showMessageDialog(null,
-                  "Operation cannot be performed due to failed authentication",
-                  "Authentication failed", JOptionPane.ERROR_MESSAGE);
-               LOGGER.log(Level.SEVERE,
-                  "Authentication failed. You are not allowed to perform this operation!", true);
+                  Main.getLocal().getString("Operation cannot be performed due to failed authentication"),
+                  Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
+                  LOGGER.log(Level.SEVERE,
+                  Main.getLocal().getString("Authentication failed. You are not allowed to perform this operation!"), true);
                return;
             }
 
@@ -602,14 +601,14 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             else
             {
                // there can only be one element
-               String errorStr = "Failed to stop " + desc + " on host " + failedHosts.get(0) + ".";
-               JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+               String errorStr = Main.getLocal().getString("Failed to stop ") + desc + Main.getLocal().getString("on host ") + failedHosts.get(0) + ".";
+               JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                   JOptionPane.ERROR_MESSAGE);
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]
             {
                e,
                true
@@ -619,8 +618,8 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
 
       private void startAllService()
       {
-         pBarThread = new ProgressBarThread(jProgressBar, "Starting " + desc + " on all hosts",
-            THREAD_NAME + "ProgressBar");
+         pBarThread = new ProgressBarThread(jProgressBar, Main.getLocal().getString("Starting ") + desc + Main.getLocal().getString("on all hosts"),
+            THREAD_NAME + Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
 
          try
@@ -643,10 +642,10 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             if (!authenticated)
             {
                JOptionPane.showMessageDialog(null,
-                  "Operation cannot be performed due to failed authentication",
-                  "Authentication failed", JOptionPane.ERROR_MESSAGE);
+                  Main.getLocal().getString("Operation cannot be performed due to failed authentication"),
+                  Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
                LOGGER.log(Level.SEVERE,
-                  "Authentication failed. You are not allowed to perform this operation!", true);
+                  Main.getLocal().getString("Authentication failed You are not allowed to perform this operation!"), true);
                return;
             }
 
@@ -690,23 +689,23 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
                   for (String hostString : failedHosts)
                   {
                      errorStr.append(System.lineSeparator());
-                     errorStr.append("Failed to start ");
+                     errorStr.append(Main.getLocal().getString("Failed to start "));
                      errorStr.append(desc);
-                     errorStr.append(" on host ");
+                     errorStr.append(Main.getLocal().getString("on host "));
                      errorStr.append(hostString);
                   }
                }
                catch (NullPointerException e)
                {
-                  errorStr = new StringBuilder("Failed to stop hosts.");
+            	   errorStr = new StringBuilder(Main.getLocal().getString("Failed to stop hosts."));
                }
-               JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+               JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                   JOptionPane.ERROR_MESSAGE);
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]
             {
                e,
                true
@@ -740,10 +739,10 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
             if (!authenticated)
             {
                JOptionPane.showMessageDialog(null,
-                  "Operation cannot be performed due to failed authentication",
-                  "Authentication failed", JOptionPane.ERROR_MESSAGE);
+            	Main.getLocal().getString("Operation cannot be performed due to failed authentication"),
+            	Main.getLocal().getString("Authentication failed"), JOptionPane.ERROR_MESSAGE);
                LOGGER.log(Level.SEVERE,
-                  "Authentication failed. You are not allowed to perform this operation!", true);
+                  Main.getLocal().getString("Authentication failed. You are not allowed to perform this operation!"), true);
                return;
             }
 
@@ -787,23 +786,23 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
                   for (String hostString : failedHosts)
                   {
                      errorStr.append(System.lineSeparator());
-                     errorStr.append("Failed to stop ");
+                     errorStr.append(Main.getLocal().getString("Failed to stop "));
                      errorStr.append(desc);
-                     errorStr.append(" on host ");
+                     errorStr.append(Main.getLocal().getString("on host "));
                      errorStr.append(hostString);
                   }
                }
                catch (java.lang.NullPointerException e)
                {
-                  errorStr = new StringBuilder("Failed to stop nodes.");
+            	   errorStr = new StringBuilder(Main.getLocal().getString("Failed to stop nodes."));
                }
-               JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+               JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                   JOptionPane.ERROR_MESSAGE);
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication error occured"), new Object[]
             {
                e,
                true
@@ -896,7 +895,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       jPanelControll.setPreferredSize(new java.awt.Dimension(620, 40));
       jPanelControll.setLayout(new java.awt.GridBagLayout());
 
-      jComboBoxNodeType.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "1 - Management Daemon", "2 - Metadata Daemon", "3 - Storage Daemon", "4 - Client" }));
+      jComboBoxNodeType.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { Main.getLocal().getString("1 - Management Daemon"), Main.getLocal().getString("2 - Metadata Daemon"), Main.getLocal().getString("3 - Storage Daemon"), Main.getLocal().getString("4 - Client") }));
       jComboBoxNodeType.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -910,7 +909,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 15);
       jPanelControll.add(jComboBoxNodeType, gridBagConstraints);
 
-      jButtonStartAll.setText("Start all");
+      jButtonStartAll.setText(Main.getLocal().getString("Start all"));
       jButtonStartAll.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonStartAll.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonStartAll.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -927,7 +926,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       gridBagConstraints.insets = new java.awt.Insets(5, 15, 5, 5);
       jPanelControll.add(jButtonStartAll, gridBagConstraints);
 
-      jButtonStopAll.setText("Stop all");
+      jButtonStopAll.setText(Main.getLocal().getString("Stop all"));
       jButtonStopAll.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonStopAll.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonStopAll.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -944,7 +943,7 @@ public class JInternalFrameStartStop extends javax.swing.JInternalFrame implemen
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 15);
       jPanelControll.add(jButtonStopAll, gridBagConstraints);
 
-      jButtonRestartAdmon.setText("Restart Admon");
+      jButtonRestartAdmon.setText(Main.getLocal().getString("Restart Admon"));
       jButtonRestartAdmon.setMaximumSize(new java.awt.Dimension(130, 30));
       jButtonRestartAdmon.setMinimumSize(new java.awt.Dimension(130, 30));
       jButtonRestartAdmon.setPreferredSize(new java.awt.Dimension(130, 30));

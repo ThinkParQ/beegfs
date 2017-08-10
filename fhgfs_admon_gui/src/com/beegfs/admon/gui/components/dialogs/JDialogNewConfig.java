@@ -4,6 +4,9 @@ import com.beegfs.admon.gui.common.enums.PropertyEnum;
 import com.beegfs.admon.gui.common.tools.GuiTk;
 import com.beegfs.admon.gui.program.Main;
 import java.io.File;
+import java.util.Locale;
+import java.util.ResourceBundle;
+
 import javax.swing.JOptionPane;
 
 public class JDialogNewConfig extends javax.swing.JDialog
@@ -26,6 +29,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       jTextFieldPort.setText(String.valueOf(Main.getConfig().getAdmonHttpPort()));
       jTextResolution.setText(Main.getConfig().getResolution());
       jComboBoxLogLevel.setSelectedIndex(Main.getConfig().getLogLevelNumeric());
+      jComboBoxLocal.setSelectedItem(Main.getConfig().getAdmonLocal());
    }
 
    /**
@@ -51,9 +55,11 @@ public class JDialogNewConfig extends javax.swing.JDialog
       jTextResolution = new javax.swing.JTextField();
       jLabelLogLevel = new javax.swing.JLabel();
       jComboBoxLogLevel = new javax.swing.JComboBox<>();
+      jLabelLocal = new javax.swing.JLabel();
+      jComboBoxLocal = new javax.swing.JComboBox<>();
 
       setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-      setTitle("Write GUI configuration");
+      setTitle(Main.getLocal().getString("Write GUI configuration"));
 
       jPanelDialog.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
       jPanelDialog.setLayout(new java.awt.GridBagLayout());
@@ -62,7 +68,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       jTextArea1.setColumns(20);
       jTextArea1.setLineWrap(true);
       jTextArea1.setRows(2);
-      jTextArea1.setText("Please provide some information on how to connect to the BeeGFS administration and monitoring daemon.");
+      jTextArea1.setText(Main.getLocal().getString("Please provide some information on how to connect to the BeeGFS administration and monitoring daemon."));
       jTextArea1.setWrapStyleWord(true);
       jScrollPaneDescription.setViewportView(jTextArea1);
 
@@ -77,7 +83,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(0, 0, 10, 0);
       jPanelDialog.add(jScrollPaneDescription, gridBagConstraints);
 
-      jLabelHostname.setText("Hostname where the daemon runs : ");
+      jLabelHostname.setText(Main.getLocal().getString("Hostname where the daemon runs : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -85,7 +91,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelDialog.add(jLabelHostname, gridBagConstraints);
 
-      jLabelPort.setText("HTTP-Port the daemon uses : ");
+      jLabelPort.setText(Main.getLocal().getString("HTTP-Port the daemon uses : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 2;
@@ -115,7 +121,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelDialog.add(jTextFieldHostname, gridBagConstraints);
 
-      jButtonSave.setText("Save");
+      jButtonSave.setText(Main.getLocal().getString("Save"));
       jButtonSave.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonSave.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonSave.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -128,12 +134,12 @@ public class JDialogNewConfig extends javax.swing.JDialog
       });
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 1;
-      gridBagConstraints.gridy = 5;
+      gridBagConstraints.gridy = 6; 
       gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelDialog.add(jButtonSave, gridBagConstraints);
 
-      jButtonClose.setText("Abort");
+      jButtonClose.setText(Main.getLocal().getString("Abort"));
       jButtonClose.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonClose.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonClose.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -146,12 +152,12 @@ public class JDialogNewConfig extends javax.swing.JDialog
       });
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 2;
-      gridBagConstraints.gridy = 5;
+      gridBagConstraints.gridy = 6; 
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 10, 10);
       jPanelDialog.add(jButtonClose, gridBagConstraints);
 
-      jLabelResolution.setText("Internal desktop resolution: ");
+      jLabelResolution.setText(Main.getLocal().getString("Internal desktop resolution: "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 3;
@@ -170,7 +176,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelDialog.add(jTextResolution, gridBagConstraints);
 
-      jLabelLogLevel.setText("Log level: ");
+      jLabelLogLevel.setText(Main.getLocal().getString("Log level: "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 4;
@@ -189,6 +195,26 @@ public class JDialogNewConfig extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelDialog.add(jComboBoxLogLevel, gridBagConstraints);
 
+      jLabelLocal.setText(Main.getLocal().getString("Language: "));
+      gridBagConstraints = new java.awt.GridBagConstraints();
+      gridBagConstraints.gridx = 0;
+      gridBagConstraints.gridy = 5;
+      gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
+      gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
+      jPanelDialog.add(jLabelLocal, gridBagConstraints);
+
+      jComboBoxLocal.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { Main.getLocal().getString("English"), Main.getLocal().getString("Chinese") }));
+      gridBagConstraints = new java.awt.GridBagConstraints();
+      gridBagConstraints.gridx = 1;
+      gridBagConstraints.gridy = 5;
+      gridBagConstraints.gridwidth = 2;
+      gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+      gridBagConstraints.anchor = java.awt.GridBagConstraints.WEST;
+      gridBagConstraints.weightx = 1.0;
+      gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
+      jPanelDialog.add(jComboBoxLocal, gridBagConstraints);
+
+
       getContentPane().add(jPanelDialog, java.awt.BorderLayout.CENTER);
 
       pack();
@@ -205,22 +231,23 @@ public class JDialogNewConfig extends javax.swing.JDialog
       }
       catch (NumberFormatException e)
       {
-         JOptionPane.showMessageDialog(null, "Please provide a number as port value", 
-            "Wrong port value", JOptionPane.ERROR_MESSAGE);
+         JOptionPane.showMessageDialog(null, Main.getLocal().getString("Please provide a number as port value"),
+               Main.getLocal().getString("Wrong port value"), JOptionPane.ERROR_MESSAGE);
          return;
       }
 
       boolean validResolution = Main.getConfig().setResolution(jTextResolution.getText());
       if(!validResolution)
       {
-         JOptionPane.showMessageDialog(null, "Please provide a valid resolution value. Example: " +
-            "2048x2048 ", "Wrong resolution value", JOptionPane.ERROR_MESSAGE);
+    	  JOptionPane.showMessageDialog(null, Main.getLocal().getString("Please provide a valid resolution value. Example: ") +
+    		"2048x2048 ", Main.getLocal().getString("Wrong resolution value"), JOptionPane.ERROR_MESSAGE);
          return;
       }
 
       Main.getConfig().setAdmonHost(hostname);
       Main.getConfig().setAdmonHttpPort(port);
       Main.getConfig().setLogLevel(jComboBoxLogLevel.getSelectedIndex());
+      Main.getConfig().setAdmonLocal(jComboBoxLocal.getSelectedItem().toString());
 
       String cfgFile = System.getProperty(PropertyEnum.PROPERTY_ADMON_GUI_CFG_FILE.getKey());
       if (cfgFile == null)
@@ -234,7 +261,7 @@ public class JDialogNewConfig extends javax.swing.JDialog
       }
       else
       {
-         JOptionPane.showMessageDialog(null, "Could not write configuration file", "Write failed",
+    	  JOptionPane.showMessageDialog(null, Main.getLocal().getString("Could not write configuration file"), Main.getLocal().getString("Write failed"),
             JOptionPane.ERROR_MESSAGE);
       }
 }//GEN-LAST:event_jButtonSaveActionPerformed
@@ -252,8 +279,10 @@ public class JDialogNewConfig extends javax.swing.JDialog
    private javax.swing.JButton jButtonClose;
    private javax.swing.JButton jButtonSave;
    private javax.swing.JComboBox<String> jComboBoxLogLevel;
+   private javax.swing.JComboBox<String> jComboBoxLocal;
    private javax.swing.JLabel jLabelHostname;
    private javax.swing.JLabel jLabelLogLevel;
+   private javax.swing.JLabel jLabelLocal;
    private javax.swing.JLabel jLabelPort;
    private javax.swing.JLabel jLabelResolution;
    private javax.swing.JPanel jPanelDialog;

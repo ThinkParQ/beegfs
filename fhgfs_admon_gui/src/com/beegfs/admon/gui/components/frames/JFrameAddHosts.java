@@ -3,6 +3,7 @@ package com.beegfs.admon.gui.components.frames;
 import com.beegfs.admon.gui.common.enums.UpdateDataTypeEnum;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameUpdateableInterface;
 import java.util.ArrayList;
+import com.beegfs.admon.gui.program.Main;
 
 
 public class JFrameAddHosts extends javax.swing.JFrame
@@ -66,7 +67,7 @@ public class JFrameAddHosts extends javax.swing.JFrame
 
       jPanelButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 20, 0));
 
-      jButtonAdd.setText("Add");
+      jButtonAdd.setText(Main.getLocal().getString("Add"));
       jButtonAdd.setMaximumSize(new java.awt.Dimension(70, 30));
       jButtonAdd.setMinimumSize(new java.awt.Dimension(70, 30));
       jButtonAdd.setPreferredSize(new java.awt.Dimension(100, 32));
@@ -79,7 +80,7 @@ public class JFrameAddHosts extends javax.swing.JFrame
       });
       jPanelButtons.add(jButtonAdd);
 
-      jButtonCancel.setText("Cancel");
+      jButtonCancel.setText(Main.getLocal().getString("Cancel"));
       jButtonCancel.setPreferredSize(new java.awt.Dimension(100, 32));
       jButtonCancel.addActionListener(new java.awt.event.ActionListener()
       {
@@ -116,7 +117,7 @@ public class JFrameAddHosts extends javax.swing.JFrame
       jTextArea1.setColumns(20);
       jTextArea1.setLineWrap(true);
       jTextArea1.setRows(5);
-      jTextArea1.setText("Please insert the names of the hosts to add.\n\nCou can leave remaining fields blank.");
+      jTextArea1.setText(Main.getLocal().getString("Please insert the names of the hosts to add.\n\nCou can leave remaining fields blank."));
       jTextArea1.setWrapStyleWord(true);
       jTextArea1.setBorder(null);
       jScrollPaneDescription.setViewportView(jTextArea1);

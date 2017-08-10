@@ -15,6 +15,7 @@ import com.beegfs.admon.gui.components.charts.LineChart;
 import com.beegfs.admon.gui.components.charts.LineTrace;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.util.ArrayList;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -161,18 +162,18 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
                ValueUnit<TimeUnitEnum> vu = UnitTk.strToValueUnitOfTime(timeSpanStr);
                long timeSpan = UnitTk.timeSpanToMinutes(vu);
 
-               GuiTk.addTracePointsToChart(readVals, chart, "Read", timeSpan, false,
+               GuiTk.addTracePointsToChart(readVals, chart, Main.getLocal().getString("Read"), timeSpan, false,
                         ColorLineTraceEnum.COLOR_READ.color(), tracesLength);
-               GuiTk.addTracePointsToChart(averageReadVals, chart, "Average Read", timeSpan, true,
+               GuiTk.addTracePointsToChart(averageReadVals, chart, Main.getLocal().getString("Average Read"), timeSpan, true,
                         ColorLineTraceEnum.COLOR_AVERAGE_READ.color(), tracesLength);
-               GuiTk.addTracePointsToChart(writeVals, chart, "Write", timeSpan, false,
+               GuiTk.addTracePointsToChart(writeVals, chart, Main.getLocal().getString("Write"), timeSpan, false,
                         ColorLineTraceEnum.COLOR_WRITE.color(), tracesLength);
-               GuiTk.addTracePointsToChart(averageWriteVals, chart, "Average Write", timeSpan, true,
+               GuiTk.addTracePointsToChart(averageWriteVals, chart, Main.getLocal().getString("Average Write"), timeSpan, true,
                         ColorLineTraceEnum.COLOR_AVERAGE_WRITE.color(), tracesLength);
             }
             catch (CommunicationException e)
             {
-               LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
                {
                   e,
                   true
@@ -180,7 +181,7 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
             }
             catch (java.lang.NullPointerException | java.lang.InterruptedException npe)
             {
-               LOGGER.log(Level.FINEST, "Internal error.", npe);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), npe);
             }
          }
          parser.shouldStop();
@@ -267,12 +268,12 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
       jPanelFrame.setPreferredSize(new java.awt.Dimension(814, 601));
       jPanelFrame.setLayout(new java.awt.BorderLayout(5, 5));
 
-      jPanelDiskPerf.setBorder(javax.swing.BorderFactory.createTitledBorder("Throughput"));
+      jPanelDiskPerf.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Throughput")));
       jPanelDiskPerf.setLayout(new java.awt.BorderLayout());
 
       jPanelControll.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
 
-      jLabelTimeSpan.setText("Show the last ");
+      jLabelTimeSpan.setText(Main.getLocal().getString("Show the last "));
       jPanelControll.add(jLabelTimeSpan);
 
       jComboBoxTimeSpan.setModel(new DefaultComboBoxModel<>(com.beegfs.admon.gui.common.tools.DefinesTk.CHART_TIME_INTERVAL.toArray(new String[1])));
@@ -300,33 +301,31 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
       ArrayList<ChartPoint> averageReadVals = new ArrayList<>(0);
       ArrayList<ChartPoint> writeVals = new ArrayList<>(0);
       ArrayList<ChartPoint> averageWriteVals = new ArrayList<>(0);
-
-      LineTrace readTrace = new LineTrace("Read", ColorLineTraceEnum.COLOR_READ.color(), readVals);
-      LineTrace writeTrace = new LineTrace("Write", ColorLineTraceEnum.COLOR_WRITE.color(),
+      LineTrace readTrace = new LineTrace(Main.getLocal().getString("Read"), ColorLineTraceEnum.COLOR_READ.color(), readVals);
+      LineTrace writeTrace = new LineTrace(Main.getLocal().getString("Write"), ColorLineTraceEnum.COLOR_WRITE.color(),
          writeVals);
-      LineTrace averageReadTrace = new LineTrace("Average Read",
+      LineTrace averageReadTrace = new LineTrace(Main.getLocal().getString("Average Read"),
          ColorLineTraceEnum.COLOR_AVERAGE_READ.color(), averageReadVals);
-      LineTrace averageWriteTrace = new LineTrace("Average Write",
+      LineTrace averageWriteTrace = new LineTrace(Main.getLocal().getString("Average Write"),
          ColorLineTraceEnum.COLOR_AVERAGE_WRITE.color(), averageWriteVals);
-
       LineTrace[] traces = new LineTrace[DEFAULT_TRACE_COUNT];
       traces[0] = readTrace;
       traces[1] = writeTrace;
       traces[2] = averageReadTrace;
       traces[3] = averageWriteTrace;
 
-      chart = new LineChart("Throughput (MiB/s)", "", "", 600, traces);
+      chart = new LineChart(Main.getLocal().getString("Throughput (MiB/s)"), "", "", 600, traces);
 
       jPanelDiskPerfGraph.add(chart);
 
       jPanelFrame.add(jPanelDiskPerf, java.awt.BorderLayout.CENTER);
 
-      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder("General information"));
+      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("General information")));
       jPanelGeneral.setMinimumSize(new java.awt.Dimension(830, 40));
       jPanelGeneral.setPreferredSize(new java.awt.Dimension(818, 40));
       jPanelGeneral.setLayout(new java.awt.GridBagLayout());
 
-      jLabelStatus.setText("Status:");
+      jLabelStatus.setText(Main.getLocal().getString("Status:"));
       jLabelStatus.addMouseListener(new java.awt.event.MouseAdapter()
       {
          public void mouseClicked(java.awt.event.MouseEvent evt)
@@ -403,7 +402,7 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 30);
       jPanelGeneral.add(jLabelStatusFailCount, gridBagConstraints);
 
-      jLabelDiskSpaceText.setText("Disk space :");
+      jLabelDiskSpaceText.setText(Main.getLocal().getString("Disk space :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 5;
       gridBagConstraints.gridy = 0;
@@ -421,7 +420,7 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelGeneral.add(jLabelDiskSpace, gridBagConstraints);
 
-      jLabelUsedDiskSpaceText.setText("Used disk space :");
+      jLabelUsedDiskSpaceText.setText(Main.getLocal().getString("Used disk space :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 7;
       gridBagConstraints.gridy = 0;
@@ -439,7 +438,7 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelGeneral.add(jLabelUsedDiskSpace, gridBagConstraints);
 
-      jLabelFreeDiskSpaceText.setText("Free disk space :");
+      jLabelFreeDiskSpaceText.setText(Main.getLocal().getString("Free disk space :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 9;
       gridBagConstraints.gridy = 0;
@@ -567,7 +566,7 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
    @Override
    public final String getFrameTitle()
    {
-      return "Storage Nodes Overview";
+	   return Main.getLocal().getString("Storage Nodes Overview");
    }
 
    private void showStatusDetails()
@@ -592,7 +591,7 @@ public class JInternalFrameStorageNodesOverview extends javax.swing.JInternalFra
       }
       catch (CommunicationException ex)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             ex,
             true

@@ -51,7 +51,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
    @Override
    public final String getFrameTitle()
    {
-      return "Install BeeGFS";
+	   return Main.getLocal().getString("Install BeeGFS");
    }
 
    private static class OverviewTable extends JTable
@@ -63,10 +63,10 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
          super();
 
          DefaultTableModel defModel = new DefaultTableModelImpl();
-         defModel.addColumn("Type");
-         defModel.addColumn("Host");
-         defModel.addColumn("Architecture");
-         defModel.addColumn("Distribution");
+         defModel.addColumn(Main.getLocal().getString("Type"));
+         defModel.addColumn(Main.getLocal().getString("Host"));
+         defModel.addColumn(Main.getLocal().getString("Architecture"));
+         defModel.addColumn(Main.getLocal().getString("Distribution"));
          setModel(defModel);
 
          InstallTableCellRenderer renderer = new InstallTableCellRenderer();
@@ -151,7 +151,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
          }
          else
          {
-            getDialog().addLine("Connection to hosts failed.", true);
+            getDialog().addLine(Main.getLocal().getString("Connection to hosts failed."), true);
          }
 
          errorOccured = errorOccured || this.checkClientDependencies();
@@ -180,13 +180,13 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
             {
                e,
                true
             });
             this.getDialog().addLine(
-               "Installation cannot be performed due to communication problems");
+            	Main.getLocal().getString("Installation cannot be performed due to communication problems"));
             this.getDialog().setFinished();
             this.shouldStop();
          }
@@ -246,25 +246,24 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
                clientsString += ", " + nodeInfo[1];
             }
          }
-
          this.getDialog().addLine("--------------------------------------------");
-         this.getDialog().addLine("starting installation...");
+         this.getDialog().addLine(Main.getLocal().getString("starting installation..."));
          this.getDialog().addLine("--------------------------------------------");
-         this.getDialog().addLine("Managment server: " + mgmtdString);
-         this.getDialog().addLine("Metadata server: " + metaString);
-         this.getDialog().addLine("Storage server: " + storageString);
-         this.getDialog().addLine("Clients: " + clientsString);
+         this.getDialog().addLine(Main.getLocal().getString("Managment server: ") + mgmtdString);
+         this.getDialog().addLine(Main.getLocal().getString("Metadata server: ") + metaString);
+         this.getDialog().addLine(Main.getLocal().getString("Storage server: ") + storageString);
+         this.getDialog().addLine(Main.getLocal().getString("Clients: ") + clientsString);
          this.getDialog().addLine("--------------------------------------------");
          this.getDialog().addLine("--------------------------------------------");
          this.getDialog().addLine(" ");
 
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
-         LOGGER.log(Level.INFO, "starting installation...", true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("starting installation..."), true);
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
-         LOGGER.log(Level.INFO, "Managment server: " + mgmtdString, true);
-         LOGGER.log(Level.INFO, "Metadata server: " + metaString, true);
-         LOGGER.log(Level.INFO, "Storage server: " + storageString, true);
-         LOGGER.log(Level.INFO, "Clients: " + clientsString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Managment server: ") + mgmtdString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Metadata server: ") + metaString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Storage server: ") + storageString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Clients: ") + clientsString, true);
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
          LOGGER.log(Level.INFO, " ", true);
@@ -287,35 +286,34 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
                   this.getDialog().addLine(" ");
                   this.getDialog().addLine("--------------------------------------------");
                   this.getDialog().addLine(
-                     "WARNING: Linux kernel build directory not found. Please " +
-                      "check if the kernel module development packages are installed " +
-                      "for the current kernel version. (RHEL: kernel-devel; SLES: " +
-                      "linux-kernel-headers, kernel-source; Debian: linux-headers). If " +
-                      "a custom kernel is used ignore this warning!");
-                  this.getDialog().addLine("The kernel build directory is missing on the " +
-                      "following nodes:" + System.getProperty(
+                	Main.getLocal().getString("WARNING: Linux kernel build directory not found. Please ") +
+                	Main.getLocal().getString("check if the kernel module development packages are installed ") +
+                	Main.getLocal().getString("for the current kernel version. (RHEL: kernel-devel; SLES: ") +
+                      "linux-kernel-headers, kernel-source; Debian: linux-headers)." +
+                 Main.getLocal().getString("If a custom kernel is used ignore this warning!"));
+                  this.getDialog().addLine(Main.getLocal().getString("The kernel build directory is missing on the ") +
+                 Main.getLocal().getString("following nodes:") + System.getProperty(
                          PropertyEnum.PROPERTY_LINE_SEPARATOR.getKey()) + hostList);
                   this.getDialog().addLine("--------------------------------------------");
                }
             }
             else
             {
-               LOGGER.log(Level.WARNING, "Couldn't get client dependency check results!", true);
-               this.getDialog().addLine("Couldn't get client dependency check results!");
-               this.getDialog().setFinished();
+               LOGGER.log(Level.WARNING, Main.getLocal().getString("Couldn't get client dependency check results!"), true);
+               this.getDialog().addLine(Main.getLocal().getString("Couldn't get client dependency check results!"));
                this.shouldStop();
                return true;
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
             {
                e,
                true
             });
             this.getDialog().addLine(
-               "Installation cannot be performed due to communication problems");
+               Main.getLocal().getString("Installation cannot be performed due to communication problems"));
             this.getDialog().setFinished();
             this.shouldStop();
             return true;
@@ -344,14 +342,14 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
                if (failed.isEmpty())
                {
                   this.getDialog().
-                     addLine("Successfully installed " + packageDesc + " on all hosts", false);
+                  	addLine(Main.getLocal().getString("Successfully installed ") + packageDesc + Main.getLocal().getString("on all hosts"), false);
                   return false;
                }
                else
                {
                   for (String node : failed)
                   {
-                     this.getDialog().addLine("Failed to install " + packageDesc + " on host " +
+                    this.getDialog().addLine(Main.getLocal().getString("Failed to install ") + packageDesc + Main.getLocal().getString("on host ") +
                         node, true);
                   }
                   return true;
@@ -360,23 +358,23 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
             else
             {
                this.getDialog().addLine(
-                  "Installation cannot be performed due to failed authentication");
+                  Main.getLocal().getString("Installation cannot be performed due to failed authentication"));
                this.getDialog().setFinished();
                this.shouldStop();
                LOGGER.log(Level.SEVERE,
-                  "Authentication failed. You are not allowed to perform an installation!", true);
+                  Main.getLocal().getString("Authentication failed. You are not allowed to perform an installation!"), true);
                return true;
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
             {
                e,
                true
             });
             this.getDialog().addLine(
-               "Installation cannot be performed due to communication problems");
+               Main.getLocal().getString("Installation cannot be performed due to communication problems"));
             this.getDialog().setFinished();
             this.shouldStop();
             return true;
@@ -436,10 +434,10 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
 
          if (!failedNodes.isEmpty())
          {
-            StringBuilder msg = new StringBuilder("Some hosts are not reachable through SSH." +
-               System.lineSeparator() + "Please make sure that all hosts exist and user root is " +
-               "able to do passwordless SSH login." + System.lineSeparator() +
-               System.lineSeparator() + "Failed Hosts :" + System.lineSeparator() +
+        	 StringBuilder msg = new StringBuilder(Main.getLocal().getString("Some hosts are not reachable through SSH.") +
+        		System.lineSeparator() + Main.getLocal().getString("Please make sure that all hosts exist and user root is ") +
+               Main.getLocal().getString("able to do passwordless SSH login.") + System.lineSeparator() +
+               System.lineSeparator() + Main.getLocal().getString("Failed Hosts :") + System.lineSeparator() +
                System.lineSeparator());
             HashSet<String> tmpSet = new HashSet<>(failedNodes.size());
             for (String n : failedNodes)
@@ -451,7 +449,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
                   tmpSet.add(n);
                }
             }
-            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
             retVal = false;
          }
 
@@ -459,11 +457,11 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
       }
       catch (IOException e)
       {
-         LOGGER.log(Level.SEVERE, "IO error", e);
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO error"), e);
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -480,7 +478,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
          }
          catch (IOException e)
          {
-            LOGGER.log(Level.SEVERE, "IO error", e);
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO error"), e);
          }
       }
       return retVal;
@@ -581,7 +579,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -735,7 +733,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
       jTextAreaDescription.setColumns(20);
       jTextAreaDescription.setLineWrap(true);
       jTextAreaDescription.setRows(5);
-      jTextAreaDescription.setText("Install BeeGFS\n\nBased on the information provided in the previous steps, an automatic installation of BeeGFS is performed now. Please check the data gathered about your nodes before you continue.");
+      jTextAreaDescription.setText(Main.getLocal().getString("Install BeeGFS\n\nBased on the information provided in the previous steps, an automatic installation of BeeGFS is performed now. Please check the data gathered about your nodes before you continue."));
       jTextAreaDescription.setWrapStyleWord(true);
       jTextAreaDescription.setBorder(null);
       jPanelFrame.add(jTextAreaDescription, java.awt.BorderLayout.NORTH);
@@ -752,7 +750,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
       jPanelButtons.setMinimumSize(new java.awt.Dimension(789, 40));
       jPanelButtons.setPreferredSize(new java.awt.Dimension(789, 40));
 
-      jButtonReload.setText("Reload");
+      jButtonReload.setText(Main.getLocal().getString("Reload"));
       jButtonReload.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonReload.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonReload.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -766,7 +764,7 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
       jPanelButtons.add(jButtonReload);
       jPanelButtons.add(filler1);
 
-      jButtonInstall.setText("Install");
+      jButtonInstall.setText(Main.getLocal().getString("Install"));
       jButtonInstall.setMaximumSize(new java.awt.Dimension(80, 30));
       jButtonInstall.setMinimumSize(new java.awt.Dimension(80, 30));
       jButtonInstall.setPreferredSize(new java.awt.Dimension(80, 30));
@@ -817,8 +815,8 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
       }
       else
       {
-         JOptionPane.showMessageDialog(this, "You must define the server roles before installing"
-            + " BeeGFS", "Server roles undefined", JOptionPane.ERROR_MESSAGE);
+    	  JOptionPane.showMessageDialog(this, Main.getLocal().getString("You must define the server roles before installing")
+        		 + " BeeGFS", Main.getLocal().getString("Server roles undefined"), JOptionPane.ERROR_MESSAGE);
       }
     }//GEN-LAST:event_jButtonInstallActionPerformed
 

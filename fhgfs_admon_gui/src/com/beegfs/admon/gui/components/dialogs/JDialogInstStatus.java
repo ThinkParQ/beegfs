@@ -28,7 +28,7 @@ public class JDialogInstStatus extends javax.swing.JDialog
       readyToClose = false;
       initComponents();
       this.jProgressBar.setVisible(false);
-      this.setTitle("Install status");
+      this.setTitle(Main.getLocal().getString("Install status"));
    }
 
    public JProgressBar getProgressBar()
@@ -54,15 +54,15 @@ public class JDialogInstStatus extends javax.swing.JDialog
    public void setFinished()
    {
       Dimension size = jButtonAbort.getSize();
-      jButtonAbort.setText("Close");
+      jButtonAbort.setText(Main.getLocal().getString("Close"));
       jButtonAbort.setHorizontalAlignment(JButton.CENTER);
       jButtonAbort.setSize(size);
       readyToClose = true;
 
       addLine("  ");
-      addLine("If you need any support please attach the BeeGFS installation");
-      addLine("log file, which can be accessed from the main menu");
-      addLine("(Installation -> Installation Log File) to your request");
+      addLine(Main.getLocal().getString("If you need any support please attach the BeeGFS installation"));
+      addLine(Main.getLocal().getString("log file, which can be accessed from the main menu"));
+      addLine(Main.getLocal().getString("(Installation -> Installation Log File) to your request"));
    }
 
    public void setManagementThread(GuiThread thread)
@@ -102,11 +102,11 @@ public class JDialogInstStatus extends javax.swing.JDialog
 
       jPanelDialog.add(jScrollPaneStatus, java.awt.BorderLayout.CENTER);
 
-      jProgressBar.setString("Installation in progess ... Please be patient ...");
+      jProgressBar.setString(Main.getLocal().getString("Installation in progess ... Please be patient ..."));
       jProgressBar.setStringPainted(true);
       jPanelDialog.add(jProgressBar, java.awt.BorderLayout.PAGE_START);
 
-      jButtonAbort.setText("Abort");
+      jButtonAbort.setText(Main.getLocal().getString("Abort"));
       jButtonAbort.addComponentListener(new java.awt.event.ComponentAdapter()
       {
          public void componentShown(java.awt.event.ComponentEvent evt)

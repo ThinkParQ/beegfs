@@ -15,6 +15,7 @@ import com.beegfs.admon.gui.common.tools.HttpTk;
 import com.beegfs.admon.gui.components.frames.JFrameStatsFilter;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.awt.Color;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -102,18 +103,18 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
 
       if ( (type == STATS_CLIENT_METADATA) || (type == STATS_CLIENT_STORAGE) )
       {
-         jLabelLineCount.setText("Number of clients:");
-         jPanelUseNames.setBorder(javax.swing.BorderFactory.createTitledBorder("Use Hostname"));
+    	  jLabelLineCount.setText(Main.getLocal().getString("Number of clients:"));
+    	  jPanelUseNames.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Use Hostname")));
          jPanelStatistics.setBorder(javax.swing.BorderFactory.createTitledBorder(
-            "Client Statistics"));
+        		 Main.getLocal().getString("Client Statistics")));
       }
       else
       { // translation into user name only possible on the server
-         jLabelLineCount.setText("Number of users:");
-         jPanelUseNames.setBorder(javax.swing.BorderFactory.createTitledBorder("Use Usernames"));
+    	  jLabelLineCount.setText(Main.getLocal().getString("Number of users:"));
+         jPanelUseNames.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Use Usernames")));
          jPanelUseNames.setVisible(false);
          jPanelStatistics.setBorder(javax.swing.BorderFactory.createTitledBorder(
-            "User Statistics"));
+        		 Main.getLocal().getString("User Statistics")));
       }
 
       // init and start of update thread is done by formInternalFrameOpened
@@ -388,7 +389,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
                   if (recievedDataSequenceID < FIRST_DATA_SEQUENCE_ID)
                   {
                      Object[][] data = new Object[1][getColumnCountForTableByType()];
-                     data[0][0] = "waiting for data ...";
+                     data[0][0] = Main.getLocal().getString("waiting for data ...");
 
                      lockTableData.lock();
                      try
@@ -430,7 +431,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
             }
             catch (CommunicationException ex)
             {
-               LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
                {
                   ex,
                   true
@@ -684,7 +685,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
       jPanelSettings.setPreferredSize(new java.awt.Dimension(300, 70));
       jPanelSettings.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 5));
 
-      jPanelConfig.setBorder(javax.swing.BorderFactory.createTitledBorder("Settings"));
+      jPanelConfig.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Settings")));
       jPanelConfig.setPreferredSize(new java.awt.Dimension(595, 60));
 
       jPanelLineCount.setPreferredSize(new java.awt.Dimension(231, 32));
@@ -703,7 +704,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
          }
       });
 
-      jLabelLineCount.setText("Number of clients:");
+      jLabelLineCount.setText(Main.getLocal().getString("Number of clients:"));
 
       javax.swing.GroupLayout jPanelLineCountLayout = new javax.swing.GroupLayout(jPanelLineCount);
       jPanelLineCount.setLayout(jPanelLineCountLayout);
@@ -741,7 +742,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
          }
       });
 
-      jLabelInterval.setText("Interval in sec:");
+      jLabelInterval.setText(Main.getLocal().getString("Interval in sec:"));
 
       javax.swing.GroupLayout jPanelIntervalLayout = new javax.swing.GroupLayout(jPanelInterval);
       jPanelInterval.setLayout(jPanelIntervalLayout);
@@ -762,7 +763,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
 
       jPanelSetConfig.setPreferredSize(new java.awt.Dimension(141, 32));
 
-      jButtonSetConfig.setText("Apply config");
+      jButtonSetConfig.setText(Main.getLocal().getString("Apply config"));
       jButtonSetConfig.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -812,10 +813,10 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
 
       jPanelSettings.add(jPanelConfig);
 
-      jPanelFilter.setBorder(javax.swing.BorderFactory.createTitledBorder("Filter"));
+      jPanelFilter.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Filter")));
       jPanelFilter.setPreferredSize(new java.awt.Dimension(137, 60));
 
-      jButtonSetFilter.setText("Set Filter ...");
+      jButtonSetFilter.setText(Main.getLocal().getString("Set Filter ..."));
       jButtonSetFilter.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -842,10 +843,10 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
 
       jPanelSettings.add(jPanelFilter);
 
-      jPanelUseNames.setBorder(javax.swing.BorderFactory.createTitledBorder("Use Hostname"));
+      jPanelUseNames.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Use Hostname")));
       jPanelUseNames.setPreferredSize(new java.awt.Dimension(120, 60));
 
-      jCheckBoxUseNames.setToolTipText("Use DNS resolution from the GUI host.");
+      jCheckBoxUseNames.setToolTipText(Main.getLocal().getString("Use DNS resolution from the GUI host."));
       jCheckBoxUseNames.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
       jCheckBoxUseNames.addItemListener(new java.awt.event.ItemListener()
       {
@@ -872,7 +873,7 @@ public class JInternalFrameStats extends javax.swing.JInternalFrame implements
 
       jPanelWindow.add(jPanelSettings, java.awt.BorderLayout.NORTH);
 
-      jPanelStatistics.setBorder(javax.swing.BorderFactory.createTitledBorder("Client Statistics"));
+      jPanelStatistics.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Client Statistics")));
       jPanelStatistics.setPreferredSize(new java.awt.Dimension(900, 400));
       jPanelStatistics.setLayout(new java.awt.BorderLayout());
 

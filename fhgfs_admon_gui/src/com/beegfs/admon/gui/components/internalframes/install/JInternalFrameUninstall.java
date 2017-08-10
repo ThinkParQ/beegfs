@@ -45,7 +45,7 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
    @Override
    public final String getFrameTitle()
    {
-      return "Uninstall BeeGFS";
+	   return Main.getLocal().getString("Uninstall BeeGFS");
    }
 
 
@@ -57,10 +57,10 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
       {
          super();
          DefaultTableModel defModel = new DefaultTableModelImpl();
-         defModel.addColumn("Type");
-         defModel.addColumn("Host");
-         defModel.addColumn("Architecture");
-         defModel.addColumn("Distribution");
+         defModel.addColumn(Main.getLocal().getString("Type"));
+         defModel.addColumn(Main.getLocal().getString("Host"));
+         defModel.addColumn(Main.getLocal().getString("Architecture"));
+         defModel.addColumn(Main.getLocal().getString("Distribution"));
          setModel(defModel);
          InstallTableCellRenderer renderer = new InstallTableCellRenderer();
          getColumnModel().getColumn(0).setCellRenderer(renderer);
@@ -113,40 +113,40 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
       {
          boolean errorOccured = false;
          ProgressBarThread pBarThread = new ProgressBarThread(this.dialog.getProgressBar(),
-            THREAD_NAME + "ProgressBar");
+            THREAD_NAME + Main.getLocal().getString("ProgressBar"));
          pBarThread.start();
          createNewSetupLogfile();
          printUninstallSummary();
 
-         getDialog().addLine("Check ssh connection to hosts...", false);
+         getDialog().addLine(Main.getLocal().getString("Check ssh connection to hosts..."), false);
 
          if (checkSSH())
          {
-            getDialog().addLine("Connection to all hosts available.", false);
+        	 getDialog().addLine(Main.getLocal().getString("Connection to all hosts available."), false);
             if (!stop)
             {
-               errorOccured = errorOccured || doUninstall("client", "BeeGFS client");
+            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("client"), Main.getLocal().getString("BeeGFS client"));
             }
             if (!stop)
             {
-               errorOccured = errorOccured || doUninstall("meta", "BeeGFS meta server");
+            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("meta"), Main.getLocal().getString("BeeGFS meta server"));
             }
             if (!stop)
             {
-               errorOccured = errorOccured || doUninstall("storage", "BeeGFS storage server");
+            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("storage"), Main.getLocal().getString("BeeGFS storage server"));
             }
             if (!stop)
             {
-               errorOccured = errorOccured || doUninstall("mgmtd", "BeeGFS management daemon");
+            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("mgmtd"), Main.getLocal().getString("BeeGFS management daemon"));
             }
             if (!stop)
             {
-               errorOccured = errorOccured || doUninstall("opentk", "BeeGFS open TK library");
+            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("opentk"), Main.getLocal().getString("BeeGFS open TK library"));
             }
          }
          else
          {
-            getDialog().addLine("Connection to hosts failed.", true);
+        	 getDialog().addLine(Main.getLocal().getString("Connection to hosts failed."), true);
          }
 
          pBarThread.shouldStop();
@@ -174,13 +174,13 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
             {
                e,
                true
             });
-            this.getDialog().addLine("Uninstallation cannot be performed due to communication " +
-                "problems");
+            this.getDialog().addLine(Main.getLocal().getString("Uninstallation cannot be performed due to communication ") +
+                Main.getLocal().getString("problems"));
             this.getDialog().setFinished();
             this.shouldStop();
          }
@@ -242,23 +242,23 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
          }
 
          this.getDialog().addLine("--------------------------------------------");
-         this.getDialog().addLine("starting uninstallation...");
+         this.getDialog().addLine(Main.getLocal().getString("starting uninstallation..."));
          this.getDialog().addLine("--------------------------------------------");
-         this.getDialog().addLine("Managment server: " + mgmtdString);
-         this.getDialog().addLine("Metadata server: " + metaString);
-         this.getDialog().addLine("Storage server: " + storageString);
-         this.getDialog().addLine("Clients: " + clientsString);
+         this.getDialog().addLine(Main.getLocal().getString("Managment server: ") + mgmtdString);
+         this.getDialog().addLine(Main.getLocal().getString("Metadata server: ") + metaString);
+         this.getDialog().addLine(Main.getLocal().getString("Storage server: ") + storageString);
+         this.getDialog().addLine(Main.getLocal().getString("Clients: ") + clientsString);
          this.getDialog().addLine("--------------------------------------------");
          this.getDialog().addLine("--------------------------------------------");
          this.getDialog().addLine(" ");
 
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
-         LOGGER.log(Level.INFO, "starting uninstallation...", true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("starting uninstallation..."), true);
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
-         LOGGER.log(Level.INFO, "Managment server: " + mgmtdString, true);
-         LOGGER.log(Level.INFO, "Metadata server: " + metaString, true);
-         LOGGER.log(Level.INFO, "Storage server: " + storageString, true);
-         LOGGER.log(Level.INFO, "Clients: " + clientsString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Managment server: ") + mgmtdString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Metadata server: ") + metaString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Storage server: ") + storageString, true);
+         LOGGER.log(Level.INFO, Main.getLocal().getString("Clients: ") + clientsString, true);
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
          LOGGER.log(Level.INFO, "--------------------------------------------", true);
          LOGGER.log(Level.INFO, " ", true);
@@ -285,40 +285,40 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
                ArrayList<String> failed = parser.getVector("failedHosts");
                if (failed.isEmpty())
                {
-                  this.getDialog().addLine("Successfully removed " + packageDesc +
-                     " from all hosts", false);
+                  this.getDialog().addLine(Main.getLocal().getString("Successfully removed ") + packageDesc +
+                     Main.getLocal().getString("from all hosts"), false);
                   return false;
                }
                else
                {
                   for (String node : failed)
                   {
-                     this.getDialog().addLine("Failed to remove " + packageDesc +
-                        " from host " + node, true);
+                     this.getDialog().addLine(Main.getLocal().getString("Failed to remove ") + packageDesc +
+                        Main.getLocal().getString("from host ") + node, true);
                   }
                   return true;
                }
             }
             else
             {
-               this.getDialog().addLine("Removal cannot be performed due to failed" +
-                  " authentication");
+               this.getDialog().addLine(Main.getLocal().getString("Removal cannot be performed due to failed ") +
+                  Main.getLocal().getString("authentication"));
                this.getDialog().setFinished();
                this.shouldStop();
-               LOGGER.log(Level.SEVERE, "Authentication failed. You are not allowed to perform" +
-                  " this operation!", true);
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Authentication failed. You are not allowed to perform ") +
+                  Main.getLocal().getString("this operation!"), true);
                return true;
             }
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
             {
                e,
                true
             });
-            this.getDialog().addLine("Removal cannot be performed due to communication " +
-               "problems");
+            this.getDialog().addLine(Main.getLocal().getString("Removal cannot be performed due to communication ") +
+               Main.getLocal().getString("problems"));
             this.getDialog().setFinished();
             this.shouldStop();
             return true;
@@ -378,10 +378,10 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
          failedNodes.remove("");
          if (!failedNodes.isEmpty())
          {
-            StringBuilder msg = new StringBuilder("Some hosts are not reachable through SSH." +
-               System.lineSeparator() + "Please make sure that all hosts exist and user root is " +
-               "able to do " + "passwordless SSH login." + System.lineSeparator() +
-               System.lineSeparator() + "Failed Hosts : " + System.lineSeparator() +
+            StringBuilder msg = new StringBuilder(Main.getLocal().getString("Some hosts are not reachable through SSH.") +
+               System.lineSeparator() + Main.getLocal().getString("Please make sure that all hosts exist and user root is ") +
+               Main.getLocal().getString("able to do ") + Main.getLocal().getString("passwordless SSH login.") + System.lineSeparator() +
+               System.lineSeparator() + Main.getLocal().getString("Failed Hosts : ") + System.lineSeparator() +
                System.lineSeparator());
             java.util.HashSet<String> tmpSet = new java.util.HashSet<>(failedNodes.size());
             for (String n : failedNodes)
@@ -393,17 +393,17 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
                   tmpSet.add(n);
                }
             }
-            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
             retVal = false;
          }
       }
       catch (IOException e)
       {
-         LOGGER.log(Level.SEVERE, "IO error", e);
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO error"), e);
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -522,7 +522,7 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
          {
             e,
             true
@@ -672,7 +672,7 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
       jTextAreaDescription.setColumns(20);
       jTextAreaDescription.setLineWrap(true);
       jTextAreaDescription.setRows(5);
-      jTextAreaDescription.setText("Uninstall BeeGFS\n\nThe following BeeGFS packages will be removed from their corresponding hosts. Please confirm the removal of BeeGFS by pressing the \"Uninstall\" button.");
+      jTextAreaDescription.setText(Main.getLocal().getString("Uninstall BeeGFS"));
       jTextAreaDescription.setWrapStyleWord(true);
       jTextAreaDescription.setBorder(null);
       jPanelFrame.add(jTextAreaDescription, java.awt.BorderLayout.NORTH);
@@ -683,7 +683,7 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
 
       jPanelFrame.add(jScrollPaneUninstall, java.awt.BorderLayout.CENTER);
 
-      jButtonReload.setText("Reload");
+      jButtonReload.setText(Main.getLocal().getString("Reload"));
       jButtonReload.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -694,7 +694,7 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
       jPanelButtons.add(jButtonReload);
       jPanelButtons.add(filler1);
 
-      jButtonInstall.setText("Uninstall");
+      jButtonInstall.setText(Main.getLocal().getString("Uninstall"));
       jButtonInstall.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -734,8 +734,8 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
       }
       else
       {
-         JOptionPane.showMessageDialog(this, "Setup cannot determine services!", "Server roles " +
-            "undefined", JOptionPane.ERROR_MESSAGE);
+    	  JOptionPane.showMessageDialog(this, Main.getLocal().getString("Setup cannot determine services!"), Main.getLocal().getString("Server roles ") +
+			Main.getLocal().getString("undefined"), JOptionPane.ERROR_MESSAGE);
       }
     }//GEN-LAST:event_jButtonInstallActionPerformed
 

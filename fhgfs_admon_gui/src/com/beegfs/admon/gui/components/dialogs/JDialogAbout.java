@@ -63,7 +63,7 @@ public class JDialogAbout extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(10, 10, 0, 10);
       getContentPane().add(jLabelLogo, gridBagConstraints);
 
-      jLabelSupport.setText("If you need support please contact support@beegfs.com.");
+      jLabelSupport.setText(Main.getLocal().getString("If you need support please contact support@beegfs.com."));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 5;
@@ -72,7 +72,7 @@ public class JDialogAbout extends javax.swing.JDialog
       getContentPane().add(jLabelSupport, gridBagConstraints);
 
       jLabelITWM.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-      jLabelITWM.setText("BeeGFS is a project of the Fraunhofer ITWM,");
+      jLabelITWM.setText(Main.getLocal().getString("BeeGFS is a project of the Fraunhofer ITWM,"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 3;
@@ -80,7 +80,7 @@ public class JDialogAbout extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(24, 10, 0, 10);
       getContentPane().add(jLabelITWM, gridBagConstraints);
 
-      jLabelDepartment.setText("Competence Center for High Performance Computing. ");
+      jLabelDepartment.setText(Main.getLocal().getString("Competence Center for High Performance Computing. "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 4;
@@ -88,7 +88,7 @@ public class JDialogAbout extends javax.swing.JDialog
       gridBagConstraints.insets = new java.awt.Insets(6, 10, 0, 10);
       getContentPane().add(jLabelDepartment, gridBagConstraints);
 
-      jButtonClose.setText("Close");
+      jButtonClose.setText(Main.getLocal().getString("Close"));
       jButtonClose.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -105,7 +105,7 @@ public class JDialogAbout extends javax.swing.JDialog
       getContentPane().add(jButtonClose, gridBagConstraints);
 
       jLabelURL.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-      jLabelURL.setText("http://www.beegfs.com");
+      jLabelURL.setText(Main.getLocal().getString("http://www.beegfs.com"));
       jLabelURL.addMouseListener(new java.awt.event.MouseAdapter()
       {
          public void mouseClicked(java.awt.event.MouseEvent evt)
@@ -122,7 +122,7 @@ public class JDialogAbout extends javax.swing.JDialog
       getContentPane().add(jLabelURL, gridBagConstraints);
 
       jLabelProduct.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-      jLabelProduct.setText("BeeGFS Admon GUI");
+      jLabelProduct.setText(Main.getLocal().getString("BeeGFS Admon GUI"));
       jLabelProduct.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;

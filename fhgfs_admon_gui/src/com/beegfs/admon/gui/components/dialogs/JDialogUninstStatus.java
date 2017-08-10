@@ -28,7 +28,7 @@ public class JDialogUninstStatus extends javax.swing.JDialog
       readyToClose = false;
       initComponents();
       this.jProgressBar.setVisible(false);
-      this.setTitle("Uninstall status");
+      this.setTitle(Main.getLocal().getString("Uninstall status"));
    }
 
    public JProgressBar getProgressBar()
@@ -55,15 +55,15 @@ public class JDialogUninstStatus extends javax.swing.JDialog
    public void setFinished()
    {
       Dimension size = jButtonAbort.getSize();
-      jButtonAbort.setText("Close");
+      jButtonAbort.setText(Main.getLocal().getString("Close"));
       jButtonAbort.setHorizontalAlignment(JButton.CENTER);
       jButtonAbort.setSize(size);
       readyToClose = true;
 
       addLine("  ");
-      addLine("If you need any support please attach the BeeGFS setup log file,");
-      addLine("which can be accessed from the main menu (Management -> Log file)");
-      addLine("to your request");
+      addLine(Main.getLocal().getString("If you need any support please attach the BeeGFS setup log file,"));
+      addLine(Main.getLocal().getString("which can be accessed from the main menu (Management -> Log file)"));
+      addLine(Main.getLocal().getString("to your request"));
    }
 
    public void setManagementThread(GuiThread thread)
@@ -98,11 +98,11 @@ public class JDialogUninstStatus extends javax.swing.JDialog
 
       jPanelDialog.add(jScrollPaneStatus, java.awt.BorderLayout.CENTER);
 
-      jProgressBar.setString("Removal in progess ... Please be patient ...");
+      jProgressBar.setString(Main.getLocal().getString("Removal in progess ... Please be patient ..."));
       jProgressBar.setStringPainted(true);
       jPanelDialog.add(jProgressBar, java.awt.BorderLayout.NORTH);
 
-      jButtonAbort.setText("Abort");
+      jButtonAbort.setText(Main.getLocal().getString("Abort"));
       jButtonAbort.addComponentListener(new java.awt.event.ComponentAdapter()
       {
          public void componentShown(java.awt.event.ComponentEvent evt)

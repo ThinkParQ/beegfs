@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # beegfs-ondemand-stoplocal
-# This file contains helper functions to stop beegfs-ondemand services locally on one node.
-# This is meant to be sourced from another script (i.e. beegfs-ondemand)
+# This file contains helper functions to stop BeeOND services locally on one node.
+# This is meant to be sourced from another script (i.e. beeond)
 
 
 # Checks the return code of the last command that has been executed. If the code is !=0, indicating
@@ -260,7 +260,7 @@ stoplocal()
 #   -L          => Delete log files after successful shutdown
 #   -q          => Suppress \"INFO\" messages, only print \"ERROR\"s
 #   -c          => "Cleanup": Remove remaining processes and directories of a
-#                  potentially unsuccessful shutdown of an earlier beegfs-ondemand
+#                  potentially unsuccessful shutdown of an earlier beeond
 #                  instance. This switch silences the error message when a status
 #                  information file is not found or an unmount command fails;
 #                  instead, a message is printed (if \"INFO\" messages are not
@@ -275,7 +275,7 @@ stoplocal()
 do_stoplocal()
 {
    # TODO get rid of variables already defined in the main script
-   local DEFAULT_STATUSFILE="/tmp/beegfs_ondemand_v2.tmp"
+   local DEFAULT_STATUSFILE=/tmp/beeond.tmp
    local CLIENTSERVICE=beegfs-client
    local DELETE_DATA="false"
    local DELETE_LOGS="false"
@@ -351,9 +351,9 @@ do_stoplocal()
       then
          echo "ERROR: Status file ${STATUSFILE} not found." >&2
 
-         # If the user has specified a statufile, just give a brief error message and exit.
-         # If the user has not specified a statuf file, give the full usage info - maybe the user
-         # didn't know how to specify a statusfile.
+         # If the user has specified a status file, just give a brief error message and exit.
+         # If the user has not specified a status file, give the full usage info - maybe the user
+         # didn't know how to specify a status file.
          if [ "${STATUSFILE}" = "${DEFAULT_STATUSFILE}" ]
          then
             if declare -f -F "print_usage_and_exit" >/dev/null

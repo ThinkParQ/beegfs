@@ -3,6 +3,7 @@ package com.beegfs.admon.gui.components.frames;
 import com.beegfs.admon.gui.common.enums.UpdateDataTypeEnum;
 import static com.beegfs.admon.gui.common.tools.DefinesTk.DEFAULT_ENCODING_UTF8;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameUpdateableInterface;
+import com.beegfs.admon.gui.program.Main;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -69,7 +70,7 @@ public class JFrameFileChooser extends javax.swing.JFrame
       jPanelButtons.setPreferredSize(new java.awt.Dimension(504, 30));
       jPanelButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 100, 0));
 
-      jButtonCancel.setText("Cancel");
+      jButtonCancel.setText(Main.getLocal().getString("Cancel"));
       jButtonCancel.setPreferredSize(new java.awt.Dimension(80, 30));
       jButtonCancel.addActionListener(new java.awt.event.ActionListener()
       {
@@ -80,7 +81,7 @@ public class JFrameFileChooser extends javax.swing.JFrame
       });
       jPanelButtons.add(jButtonCancel);
 
-      jButtonLoad.setText("Load");
+      jButtonLoad.setText(Main.getLocal().getString("Load"));
       jButtonLoad.setPreferredSize(new java.awt.Dimension(80, 30));
       jButtonLoad.addActionListener(new java.awt.event.ActionListener()
       {
@@ -113,7 +114,7 @@ public class JFrameFileChooser extends javax.swing.JFrame
       jTextAreaDescription.setFont(new java.awt.Font("Dialog", 1, 14)); // NOI18N
       jTextAreaDescription.setLineWrap(true);
       jTextAreaDescription.setRows(3);
-      jTextAreaDescription.setText("Please choose the file to import.\n\nThe file must contain one host per line.");
+      jTextAreaDescription.setText(Main.getLocal().getString("Please choose the file to import.\n\nThe file must contain one host per line."));
       jTextAreaDescription.setWrapStyleWord(true);
       jTextAreaDescription.setBorder(null);
       jScrollPaneDescription.setViewportView(jTextAreaDescription);
@@ -159,15 +160,15 @@ public class JFrameFileChooser extends javax.swing.JFrame
          }
          catch (FileNotFoundException e)
          {
-            LOGGER.log(Level.WARNING, "File not found", e);
-            JOptionPane.showMessageDialog(null, "The selected file does not exist or is not " +
-               "readable!", "Error", JOptionPane.ERROR_MESSAGE);
+            LOGGER.log(Level.WARNING, Main.getLocal().getString("File not found"), e);
+            JOptionPane.showMessageDialog(null, Main.getLocal().getString("The selected file does not exist or is not ") +
+            Main.getLocal().getString("readable!"), Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
          }
          catch (IOException e)
          {
-            LOGGER.log(Level.WARNING, "IO error", e);
-            JOptionPane.showMessageDialog(null, "The selected file does not exist or is not " +
-               "readable!", "Error", JOptionPane.ERROR_MESSAGE);
+            LOGGER.log(Level.WARNING, Main.getLocal().getString("IO error"), e);
+            JOptionPane.showMessageDialog(null, Main.getLocal().getString("The selected file does not exist or is not ") +
+            Main.getLocal().getString("readable!"), Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
          }
          finally
          {
@@ -180,14 +181,14 @@ public class JFrameFileChooser extends javax.swing.JFrame
             }
             catch (IOException e)
             {
-               LOGGER.log(Level.FINEST, "Could not close file.", e);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Could not close file."), e);
             }
          }
       }
       else
       {
-         JOptionPane.showMessageDialog(null, "The selected file does not exist or is not " +
-            "readable!", "Error", JOptionPane.ERROR_MESSAGE);
+    	  JOptionPane.showMessageDialog(null, Main.getLocal().getString("The selected file does not exist or is not ") +
+    		Main.getLocal().getString("readable!"), Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
       }
 
       parent.updateData(list, type);

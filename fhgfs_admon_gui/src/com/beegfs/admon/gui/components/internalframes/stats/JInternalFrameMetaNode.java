@@ -15,6 +15,7 @@ import com.beegfs.admon.gui.components.charts.LineChart;
 import com.beegfs.admon.gui.components.charts.LineTrace;
 import com.beegfs.admon.gui.components.internalframes.JInternalFrameInterface;
 import com.beegfs.admon.gui.components.managers.FrameManager;
+import com.beegfs.admon.gui.program.Main;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -173,17 +174,17 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
                ValueUnit<TimeUnitEnum> vu = UnitTk.strToValueUnitOfTime(timeSpanStr);
                long timeSpan = UnitTk.timeSpanToMinutes(vu);
 
-               GuiTk.addTracePointsToChart(workRequests, workRequestsChart, "Work Requests",
+               GuiTk.addTracePointsToChart(workRequests, workRequestsChart, Main.getLocal().getString("Work Requests"),
                         timeSpan, false, ColorLineTraceEnum.COLOR_META_OPS.color(),
                         new ArrayList<Integer>(0));
                GuiTk.addTracePointsToChart(queuedWorkRequests, queuedWorkRequestsChart,
-                        "Queued Work Requests", timeSpan, false,
+            		   Main.getLocal().getString("Queued Work Requests"), timeSpan, false,
                         ColorLineTraceEnum.COLOR_META_OPS.color(), new ArrayList<Integer>(0));
 
             }
             catch (CommunicationException | java.lang.NullPointerException e)
             {
-               LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]
+               LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]
                {
                   e,
                   true
@@ -270,7 +271,7 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
       jPanelFrame.setPreferredSize(new java.awt.Dimension(768, 677));
       jPanelFrame.setLayout(new java.awt.BorderLayout(5, 5));
 
-      jPanelWorkRequests.setBorder(javax.swing.BorderFactory.createTitledBorder("Work Requests"));
+      jPanelWorkRequests.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Work Requests")));
       jPanelWorkRequests.setLayout(new java.awt.BorderLayout());
 
       jSplitPane1.setDividerLocation(300);
@@ -281,13 +282,13 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
 
       ArrayList<ChartPoint> workRequests = new ArrayList<>(0);
 
-      LineTrace workRequestsTrace = new LineTrace("Work Requests",
+      LineTrace workRequestsTrace = new LineTrace(Main.getLocal().getString("Work Requests"),
          ColorLineTraceEnum.COLOR_META_OPS.color(), workRequests);
 
       LineTrace[] workRequestTraces = new LineTrace[DEFAULT_TRACE_COUNT];
       workRequestTraces[0] = workRequestsTrace;
 
-      workRequestsChart = new LineChart("Work Requests", "", "", 600, workRequestTraces, false,
+      workRequestsChart = new LineChart(Main.getLocal().getString("Work Requests"), "", "", 600, workRequestTraces, false,
          false);
 
       jPanelWorkRequestsGraph.add(workRequestsChart);
@@ -297,13 +298,13 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
       jPanelQueuedWorkRequestsGraph.setPreferredSize(new java.awt.Dimension(300, 300));
       jPanelQueuedWorkRequestsGraph.setLayout(new java.awt.GridLayout(1, 0));
 
-      LineTrace queuedWorkRequestsTrace = new LineTrace("Queued Work Requests",
+      LineTrace queuedWorkRequestsTrace = new LineTrace(Main.getLocal().getString("Queued Work Requests"),
          ColorLineTraceEnum.COLOR_META_OPS.color(), workRequests);
 
       LineTrace[] queuedWorkRequestTraces = new LineTrace[DEFAULT_TRACE_COUNT];
       queuedWorkRequestTraces[0] =  queuedWorkRequestsTrace;
 
-      queuedWorkRequestsChart = new LineChart("Queued Work Requests", "", "", 600,
+      queuedWorkRequestsChart = new LineChart(Main.getLocal().getString("Queued Work Requests"), "", "", 600,
          queuedWorkRequestTraces, false, false);
 
       jPanelQueuedWorkRequestsGraph.add(queuedWorkRequestsChart);
@@ -314,7 +315,7 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
 
       jPanelButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
 
-      jLabelTimeSpan.setText("Show the last ");
+      jLabelTimeSpan.setText(Main.getLocal().getString("Show the last "));
       jPanelButtons.add(jLabelTimeSpan);
 
       jComboBoxTimeSpan.setModel(new DefaultComboBoxModel<>(com.beegfs.admon.gui.common.tools.DefinesTk.CHART_TIME_INTERVAL.toArray(new String[1])));
@@ -338,11 +339,11 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
 
       jPanelFrame.add(jPanelWorkRequests, java.awt.BorderLayout.CENTER);
 
-      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder("General Information"));
+      jPanelGeneral.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("General Information")));
       jPanelGeneral.setLayout(new java.awt.GridBagLayout());
 
       jLabelNodeIDText.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-      jLabelNodeIDText.setText("Node ID : ");
+      jLabelNodeIDText.setText(Main.getLocal().getString("Node ID : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -359,7 +360,7 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
       jPanelGeneral.add(jLabelNodeID, gridBagConstraints);
 
       jLabelStatusText.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-      jLabelStatusText.setText("Status : ");
+      jLabelStatusText.setText(Main.getLocal().getString("Status : "));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 2;
       gridBagConstraints.gridy = 0;
@@ -454,6 +455,6 @@ public class JInternalFrameMetaNode extends javax.swing.JInternalFrame implement
    @Override
    public final String getFrameTitle()
    {
-      return "Metadata Node: " + node.getTypedNodeID();
+	   return Main.getLocal().getString("Metadata Node: ") + node.getTypedNodeID();
    }
 }

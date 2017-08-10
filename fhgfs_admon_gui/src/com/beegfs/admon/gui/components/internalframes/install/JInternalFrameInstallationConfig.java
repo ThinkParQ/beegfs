@@ -61,7 +61,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
    @Override
    public final String getFrameTitle()
    {
-      return "Installation -> Configuration";
+	   return Main.getLocal().getString("Installation -> Configuration");
    }
 
    @Override
@@ -175,9 +175,9 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       {
          super();
          this.node = node;
-         this.setText("Use for all");
-         this.setToolTipText("Use this configuration for all nodes. Note : You still need to "
-                 + "enable IB for the nodes.");
+         this.setText(Main.getLocal().getString("Use for all"));
+         this.setToolTipText(Main.getLocal().getString("Use this configuration for all nodes. Note : You still need to ")
+        		 + Main.getLocal().getString("enable IB for the nodes."));
          this.addActionListener(new java.awt.event.ActionListener()
          {
             @Override
@@ -290,8 +290,8 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
    private boolean confirmNotSaved()
    {
-      int ret = JOptionPane.showConfirmDialog(this, "You did not save your changes! Would you "
-              + "like to save now?", "Save changes?", JOptionPane.YES_NO_OPTION);
+	   int ret = JOptionPane.showConfirmDialog(this, Main.getLocal().getString("You did not save your changes! Would you ")
+			   + Main.getLocal().getString("like to save now?"), Main.getLocal().getString("Save changes?"), JOptionPane.YES_NO_OPTION);
       return ret == JOptionPane.YES_OPTION;
    }
 
@@ -300,33 +300,33 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       String notSavedTabs = null;
       if (!isSavedRoles)
       {
-         notSavedTabs = "Define roles";
+    	  notSavedTabs = Main.getLocal().getString("Define roles");
       }
       if (!isSavedConfig)
       {
          if (notSavedTabs == null)
          {
-            notSavedTabs = "Create basic configuration";
+        	 notSavedTabs = Main.getLocal().getString("Create basic configuration");
          }
          else
          {
-            notSavedTabs += ", Create basic configuration";
+        	 notSavedTabs += Main.getLocal().getString(", Create basic configuration");
          }
       }
       if (!isSavedIB)
       {
          if (notSavedTabs == null)
          {
-            notSavedTabs = "Configure Infiniband";
+        	 notSavedTabs = Main.getLocal().getString("Configure Infiniband");
          }
          else
          {
-            notSavedTabs += ", Configure Infiniband";
+        	 notSavedTabs += Main.getLocal().getString(", Configure Infiniband");
          }
       }
 
-      int ret = JOptionPane.showConfirmDialog(this, "You did not save your changes in the tabs " +
-              notSavedTabs + "! Would you like to save now?", "Save changes?",
+      int ret = JOptionPane.showConfirmDialog(this, Main.getLocal().getString("You did not save your changes in the tabs ") +
+    		  notSavedTabs + Main.getLocal().getString("! Would you like to save now?"), Main.getLocal().getString("Save changes?"),
               JOptionPane.YES_NO_OPTION);
       return ret == JOptionPane.YES_OPTION;
    }
@@ -376,7 +376,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
    }
 
@@ -390,7 +390,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          TreeMap<String, String> config = parser.getTreeMap();
          if (config.get("storeMetaDirectory") != null)
          {
-            jTextFieldMetaDir.setText(config.get("storeMetaDirectory"));
+        	 jTextFieldMetaDir.setText(config.get(Main.getLocal().getString("storeMetaDirectory")));
          }
          else
          {
@@ -398,7 +398,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connMetaPortTCP") != null)
          {
-            jTextFieldMetaPort.setText(config.get("connMetaPortTCP"));
+        	 jTextFieldMetaPort.setText(config.get(Main.getLocal().getString("connMetaPortTCP")));
          }
          else
          {
@@ -406,7 +406,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("storeStorageDirectory") != null)
          {
-            jTextFieldStorageDir.setText(config.get("storeStorageDirectory"));
+        	 jTextFieldStorageDir.setText(config.get(Main.getLocal().getString("storeStorageDirectory")));
          }
          else
          {
@@ -414,7 +414,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connStoragePortTCP") != null)
          {
-            jTextFieldStoragePort.setText(config.get("connStoragePortTCP"));
+        	 jTextFieldStoragePort.setText(config.get(Main.getLocal().getString("connStoragePortTCP")));
          }
          else
          {
@@ -422,7 +422,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connClientPortTCP") != null)
          {
-            jTextFieldClientPort.setText(config.get("connClientPortTCP"));
+        	 jTextFieldClientPort.setText(config.get(Main.getLocal().getString("connClientPortTCP")));
          }
          else
          {
@@ -430,7 +430,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("clientMount") != null)
          {
-            jTextFieldClientMount.setText(config.get("clientMount"));
+        	 jTextFieldClientMount.setText(config.get(Main.getLocal().getString("clientMount")));
          }
          else
          {
@@ -438,7 +438,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connHelperdPortTCP") != null)
          {
-            jTextFieldHelperdPort.setText(config.get("connHelperdPortTCP"));
+        	 jTextFieldHelperdPort.setText(config.get(Main.getLocal().getString("connHelperdPortTCP")));
          }
          else
          {
@@ -446,7 +446,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("storeMgmtdDirectory") != null)
          {
-            jTextFieldMgmtdDir.setText(config.get("storeMgmtdDirectory"));
+        	 jTextFieldMgmtdDir.setText(config.get(Main.getLocal().getString("storeMgmtdDirectory")));
          }
          else
          {
@@ -455,7 +455,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
          if (config.get("connMgmtdPortTCP") != null)
          {
-            jTextFieldMgmtdPort.setText(config.get("connMgmtdPortTCP"));
+        	 jTextFieldMgmtdPort.setText(config.get(Main.getLocal().getString("connMgmtdPortTCP")));
          }
          else
          {
@@ -501,7 +501,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
    }
 
@@ -547,7 +547,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       JCheckBox cb = new JCheckBox();
       cb.setText("");
-      cb.setToolTipText("Toggle all hosts to support (or not support) infiniband");
+      cb.setToolTipText(Main.getLocal().getString("Toggle all hosts to support (or not support) infiniband"));
 
       cb.addItemListener(new java.awt.event.ItemListener()
       {
@@ -575,7 +575,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       pGroup1.addComponent(cb);
       pGroupVertical.addComponent(cb);
 
-      JLabel labelHeading = new JLabel("<html><b><u><center>Node ID</center></u></b></html>");
+      JLabel labelHeading = new JLabel(Main.getLocal().getString("<html><b><u><center>Node ID</center></u></b></html>"));
       labelHeading.setHorizontalAlignment(JLabel.CENTER);
       labelHeading.setHorizontalTextPosition(JLabel.LEADING);
       labelHeading.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.
@@ -583,7 +583,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       pGroup2.addComponent(labelHeading);
       pGroupVertical.addComponent(labelHeading);
 
-      labelHeading = new JLabel("<html><b><u><center>IB kernel include path</center></u></b>"
+      labelHeading = new JLabel(Main.getLocal().getString("<html><b><u><center>IB kernel include path</center></u></b>")
          + "</html>");
       labelHeading.setHorizontalTextPosition(JLabel.LEADING);
       labelHeading.setHorizontalAlignment(JLabel.CENTER);
@@ -611,13 +611,13 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
             }
             catch (java.lang.NullPointerException e)
             {
-               LOGGER.log(Level.FINEST, "Internal error.", e);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), e);
             }
 
             IBCheckBox checkbox = new IBCheckBox(node);
             checkbox.setPreferredSize(new Dimension(20,20));
-            checkbox.setToolTipText("Toggle on if BeeGFS should try to support infiniband on this "
-                    + "host, toggle off if not");
+            checkbox.setToolTipText(Main.getLocal().getString("Toggle on if BeeGFS should try to support infiniband on this ")
+                    + Main.getLocal().getString("host, toggle off if not"));
             checkbox.setSelected(true);
 
             if (attributes.isEmpty())
@@ -672,7 +672,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
             }
             catch (java.lang.NullPointerException e)
             {
-               LOGGER.log(Level.FINEST, "Internal error.", e);
+               LOGGER.log(Level.FINEST, Main.getLocal().getString("Internal error."), e);
             }
             pGroup5.addComponent(kIncTF);
             pGroupVertical.addComponent(kIncTF);
@@ -686,7 +686,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          catch (CommunicationException e)
          {
-            LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
          }
       }
       hGroup.addGroup(pGroup1);
@@ -751,8 +751,8 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          {
             if (!saveDefaultIBConfig)
             {
-               JOptionPane.showMessageDialog(null, "IB configuration successfully written",
-                  "Success", JOptionPane.INFORMATION_MESSAGE);
+            	JOptionPane.showMessageDialog(null, Main.getLocal().getString("IB configuration successfully written"),
+            	Main.getLocal().getString("Success"), JOptionPane.INFORMATION_MESSAGE);
             }
 
             return true;
@@ -765,14 +765,14 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
                errorStr.append(error);
                errorStr.append(System.lineSeparator());
             }
-            JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+            JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                     JOptionPane.ERROR_MESSAGE);
             return false;
          }
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
       finally
       {
@@ -785,7 +785,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          catch (IOException e)
          {
-            LOGGER.log(Level.SEVERE, "IO Error occured", e);
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO Error occured"), e);
          }
       }
       return false;
@@ -855,18 +855,18 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
                errorStr.append(error);
                errorStr.append(System.lineSeparator());
             }
-            JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+            JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                     JOptionPane.ERROR_MESSAGE);
             return false;
          }
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
       catch (HeadlessException e)
       {
-         LOGGER.log(Level.SEVERE, "Internal error.", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Internal error."), new Object[]{e, true});
       }
       finally
       {
@@ -879,7 +879,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          catch (IOException e)
          {
-            LOGGER.log(Level.SEVERE, "IO error", e);
+            LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO error"), e);
          }
       }
       return false;
@@ -926,8 +926,8 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          ArrayList<String> errors = parser.getVector("errors");
          if (errors.isEmpty())
          {
-            JOptionPane.showMessageDialog(null, "Basic configuration successfully written",
-                    "Success", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(null, Main.getLocal().getString("Basic configuration successfully written"),
+                    Main.getLocal().getString("Success"), JOptionPane.INFORMATION_MESSAGE);
             return true;
          }
          else
@@ -938,14 +938,14 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
                errorStr.append(error);
                errorStr.append(System.lineSeparator());
             }
-            JOptionPane.showMessageDialog(null, errorStr, "Errors occured",
+            JOptionPane.showMessageDialog(null, errorStr, Main.getLocal().getString("Errors occured"),
                     JOptionPane.ERROR_MESSAGE);
             return false;
          }
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
       finally
       {
@@ -979,7 +979,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       }
       catch (InterruptedException | CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Couldn't parse XML-data from the admon!", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Couldn't parse XML-data from the admon!"), new Object[]{e, true});
       }
       return finished;
    }
@@ -1080,7 +1080,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jPopupMenuMeta.setInvoker(jListRoleMeta);
 
-      jMenuItemAddMeta.setText("Add host");
+      jMenuItemAddMeta.setText(Main.getLocal().getString("Add host"));
       jMenuItemAddMeta.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1090,7 +1090,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPopupMenuMeta.add(jMenuItemAddMeta);
 
-      jMenuItemImportHostListMeta.setText("Import hosts from file");
+      jMenuItemImportHostListMeta.setText(Main.getLocal().getString("Import hosts from file"));
       jMenuItemImportHostListMeta.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1100,7 +1100,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPopupMenuMeta.add(jMenuItemImportHostListMeta);
 
-      jMenuItemDeleteSelectedMeta.setText("Delete selected");
+      jMenuItemDeleteSelectedMeta.setText(Main.getLocal().getString("Delete selected"));
       jMenuItemDeleteSelectedMeta.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1112,7 +1112,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jPopupMenuStorage.setInvoker(jListRoleMeta);
 
-      jMenuItemAddStorage.setText("Add host");
+      jMenuItemAddStorage.setText(Main.getLocal().getString("Add host"));
       jMenuItemAddStorage.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1122,7 +1122,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPopupMenuStorage.add(jMenuItemAddStorage);
 
-      jMenuItemImportHostListStorage.setText("Import hosts from file");
+      jMenuItemImportHostListStorage.setText(Main.getLocal().getString("Import hosts from file"));
       jMenuItemImportHostListStorage.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1132,7 +1132,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPopupMenuStorage.add(jMenuItemImportHostListStorage);
 
-      jMenuItemDeleteSelectedStorage.setText("Delete selected");
+      jMenuItemDeleteSelectedStorage.setText(Main.getLocal().getString("Delete selected"));
       jMenuItemDeleteSelectedStorage.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1144,7 +1144,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jPopupMenuClient.setInvoker(jListRoleMeta);
 
-      jMenuItemAddClient.setText("Add host");
+      jMenuItemAddClient.setText(Main.getLocal().getString("Add host"));
       jMenuItemAddClient.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1154,7 +1154,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPopupMenuClient.add(jMenuItemAddClient);
 
-      jMenuItemImportHostListClient.setText("Import hosts from file");
+      jMenuItemImportHostListClient.setText(Main.getLocal().getString("Import hosts from file"));
       jMenuItemImportHostListClient.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1164,7 +1164,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPopupMenuClient.add(jMenuItemImportHostListClient);
 
-      jMenuItemDeleteSelectedClient.setText("Delete selected");
+      jMenuItemDeleteSelectedClient.setText(Main.getLocal().getString("Delete selected"));
       jMenuItemDeleteSelectedClient.addActionListener(new java.awt.event.ActionListener()
       {
          public void actionPerformed(java.awt.event.ActionEvent evt)
@@ -1232,7 +1232,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jTextAreaRolesDescription.setColumns(20);
       jTextAreaRolesDescription.setLineWrap(true);
       jTextAreaRolesDescription.setRows(5);
-      jTextAreaRolesDescription.setText("Step 1 : Define roles,\n\nPlease define the management host and the names of the hosts that shall act as metadata servers, storage servers and clients. For each category provide one hostname per line. The default value for the management daemon is the same host, which runs the admon daemon.");
+      jTextAreaRolesDescription.setText(Main.getLocal().getString("Step 1 : Define roles,\n\nPlease define the management host and the names of the hosts that shall act as metadata servers, storage servers and clients. For each category provide one hostname per line. The default value for the management daemon is the same host, which runs the admon daemon."));
       jTextAreaRolesDescription.setWrapStyleWord(true);
       jTextAreaRolesDescription.setBorder(null);
       jTextAreaRolesDescription.setMargin(new java.awt.Insets(10, 10, 10, 10));
@@ -1244,7 +1244,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jTextRoleAreaHintRightClick.setFont(new java.awt.Font("Dialog", 1, 12)); // NOI18N
       jTextRoleAreaHintRightClick.setLineWrap(true);
       jTextRoleAreaHintRightClick.setRows(1);
-      jTextRoleAreaHintRightClick.setText("Right-Click into the boxes to modify the lists.");
+      jTextRoleAreaHintRightClick.setText(Main.getLocal().getString("Right-Click into the boxes to modify the lists."));
       jTextRoleAreaHintRightClick.setWrapStyleWord(true);
       jTextRoleAreaHintRightClick.setBorder(null);
       jPanelRolesHeader.add(jTextRoleAreaHintRightClick, java.awt.BorderLayout.CENTER);
@@ -1267,7 +1267,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPanelRoleMgmtd.add(jTextRoleFieldMgmtd, java.awt.BorderLayout.CENTER);
 
-      jLabelRoleMgmtd.setText("Management daemon :");
+      jLabelRoleMgmtd.setText(Main.getLocal().getString("Management daemon :"));
       jPanelRoleMgmtd.add(jLabelRoleMgmtd, java.awt.BorderLayout.LINE_START);
 
       jPanelRolesHeader.add(jPanelRoleMgmtd, java.awt.BorderLayout.SOUTH);
@@ -1278,7 +1278,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jScrollPaneRoleMeta.setBorder(null);
 
-      jListRoleMeta.setBorder(javax.swing.BorderFactory.createTitledBorder("Metadata servers"));
+      jListRoleMeta.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Metadata servers")));
       jListRoleMeta.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_INTERVAL_SELECTION);
       jListRoleMeta.addMouseListener(new java.awt.event.MouseAdapter()
       {
@@ -1303,7 +1303,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jScrollPaneRoleStorage.setBorder(null);
 
-      jListRoleStorage.setBorder(javax.swing.BorderFactory.createTitledBorder("Storage servers"));
+      jListRoleStorage.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Storage servers")));
       jListRoleStorage.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_INTERVAL_SELECTION);
       jListRoleStorage.addMouseListener(new java.awt.event.MouseAdapter()
       {
@@ -1328,7 +1328,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jScrollPaneRoleClient.setBorder(null);
 
-      jListRoleClient.setBorder(javax.swing.BorderFactory.createTitledBorder("Clients"));
+      jListRoleClient.setBorder(javax.swing.BorderFactory.createTitledBorder(Main.getLocal().getString("Clients")));
       jListRoleClient.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_INTERVAL_SELECTION);
       jListRoleClient.addMouseListener(new java.awt.event.MouseAdapter()
       {
@@ -1352,7 +1352,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jPanelRolesConf.add(jPanelRoleLists, java.awt.BorderLayout.CENTER);
 
-      jTabbedPaneTabs.addTab("Define roles", jPanelRolesConf);
+      jTabbedPaneTabs.addTab(Main.getLocal().getString("Define roles"), jPanelRolesConf);
 
       jPanelBasicConf.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
       jPanelBasicConf.setPreferredSize(new java.awt.Dimension(813, 585));
@@ -1363,7 +1363,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jTextAreaBasicConfDescription.setColumns(20);
       jTextAreaBasicConfDescription.setLineWrap(true);
       jTextAreaBasicConfDescription.setRows(4);
-      jTextAreaBasicConfDescription.setText("Step 2 : Create basic configuration\n\nThis page will create a master configuration for all of your nodes, according to the data you provide here. The default values are recommendations.");
+      jTextAreaBasicConfDescription.setText(Main.getLocal().getString("Step 2 : Create basic configuration\n\nThis page will create a master configuration for all of your nodes, according to the data you provide here. The default values are recommendations."));
       jTextAreaBasicConfDescription.setWrapStyleWord(true);
       jTextAreaBasicConfDescription.setBorder(null);
       jTextAreaBasicConfDescription.setMinimumSize(new java.awt.Dimension(100, 20));
@@ -1376,7 +1376,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.setPreferredSize(new java.awt.Dimension(220, 200));
       jPanelBasicConfInner.setLayout(new java.awt.GridBagLayout());
 
-      jLabelMetaDir.setText("Metadata directory :");
+      jLabelMetaDir.setText(Main.getLocal().getString("Metadata directory :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 1;
@@ -1403,7 +1403,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jTextFieldMetaDir, gridBagConstraints);
 
       jLabelInfoMetaDir.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoMetaDir.setToolTipText("The directory in which the metadata servers store the data on their local devices");
+      jLabelInfoMetaDir.setToolTipText(Main.getLocal().getString("The directory in which the metadata servers store the data on their local devices"));
       jLabelInfoMetaDir.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMetaDir.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMetaDir.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1414,7 +1414,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelInfoMetaDir, gridBagConstraints);
 
-      jLabelMetaPort.setText("Metadata server port :");
+      jLabelMetaPort.setText(Main.getLocal().getString("Metadata server port :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 9;
@@ -1441,7 +1441,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jTextFieldMetaPort, gridBagConstraints);
 
       jLabelInfoMetaPort.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoMetaPort.setToolTipText("The port number (TCP and UDP) on which the meta servers will listen for connections");
+      jLabelInfoMetaPort.setToolTipText(Main.getLocal().getString("The port number (TCP and UDP) on which the meta servers will listen for connections"));
       jLabelInfoMetaPort.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMetaPort.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMetaPort.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1453,7 +1453,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jLabelInfoMetaPort, gridBagConstraints);
 
       jLabelInfoStoragePort.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoStoragePort.setToolTipText("The port number (TCP and UDP) on which the storage servers will listen for connections");
+      jLabelInfoStoragePort.setToolTipText(Main.getLocal().getString("The port number (TCP and UDP) on which the storage servers will listen for connections"));
       jLabelInfoStoragePort.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoStoragePort.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoStoragePort.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1482,7 +1482,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jTextFieldStoragePort, gridBagConstraints);
 
-      jLabelStoragePort.setText("Storage server port :");
+      jLabelStoragePort.setText(Main.getLocal().getString("Storage server port :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 10;
@@ -1490,7 +1490,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelStoragePort, gridBagConstraints);
 
-      jLabelStorageDir.setText("Storage directory :");
+      jLabelStorageDir.setText(Main.getLocal().getString("Storage directory :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 2;
@@ -1517,7 +1517,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jTextFieldStorageDir, gridBagConstraints);
 
       jLabelInfoStorageDir.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoStorageDir.setToolTipText("The directory in which the storage servers store the data on their local devices");
+      jLabelInfoStorageDir.setToolTipText(Main.getLocal().getString("The directory in which the storage servers store the data on their local devices"));
       jLabelInfoStorageDir.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoStorageDir.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoStorageDir.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1529,7 +1529,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jLabelInfoStorageDir, gridBagConstraints);
 
       jLabelInfoClientMount.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoClientMount.setToolTipText("The directory where BeeGFS will be mounted on the clients");
+      jLabelInfoClientMount.setToolTipText(Main.getLocal().getString("The directory where BeeGFS will be mounted on the clients"));
       jLabelInfoClientMount.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoClientMount.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoClientMount.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1558,7 +1558,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jTextFieldClientMount, gridBagConstraints);
 
-      jLabelClientMount.setText("Client mount point :");
+      jLabelClientMount.setText(Main.getLocal().getString("Client mount point :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 3;
@@ -1566,7 +1566,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelClientMount, gridBagConstraints);
 
-      jLabelClientPort.setText("Client port :");
+      jLabelClientPort.setText(Main.getLocal().getString("Client port :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 11;
@@ -1593,7 +1593,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jTextFieldClientPort, gridBagConstraints);
 
       jLabelInfoClientPort.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoClientPort.setToolTipText("The port number (TCP and UDP) on which the clients will listen for connections");
+      jLabelInfoClientPort.setToolTipText(Main.getLocal().getString("The port number (TCP and UDP) on which the clients will listen for connections"));
       jLabelInfoClientPort.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoClientPort.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoClientPort.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1605,7 +1605,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jLabelInfoClientPort, gridBagConstraints);
 
       jLabelInfoMgmtdPort.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoMgmtdPort.setToolTipText("The port number (TCP and UDP) on which the management daemon will listen for connections");
+      jLabelInfoMgmtdPort.setToolTipText(Main.getLocal().getString("The port number (TCP and UDP) on which the management daemon will listen for connections"));
       jLabelInfoMgmtdPort.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMgmtdPort.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMgmtdPort.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1634,7 +1634,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jTextFieldMgmtdPort, gridBagConstraints);
 
-      jLabelMgmtdPort.setText("Management daemon port :");
+      jLabelMgmtdPort.setText(Main.getLocal().getString("Management daemon port :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 8;
@@ -1642,7 +1642,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelMgmtdPort, gridBagConstraints);
 
-      jLabelMgmtdDir.setText("Management daemon directory :");
+      jLabelMgmtdDir.setText(Main.getLocal().getString("Management daemon directory :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 0;
@@ -1650,7 +1650,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelMgmtdDir, gridBagConstraints);
 
-      jLabelHelperdPort.setText("Helper daemon port :");
+      jLabelHelperdPort.setText(Main.getLocal().getString("Helper daemon port :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 12;
@@ -1695,7 +1695,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jTextFieldMgmtdDir, gridBagConstraints);
 
       jLabelInfoHelperdPort.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoHelperdPort.setToolTipText("The port number on which the helper daemon will listen for connections");
+      jLabelInfoHelperdPort.setToolTipText(Main.getLocal().getString("The port number on which the helper daemon will listen for connections"));
       jLabelInfoHelperdPort.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoHelperdPort.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoHelperdPort.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1707,7 +1707,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jLabelInfoHelperdPort, gridBagConstraints);
 
       jLabelInfoMgmtdDir.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoMgmtdDir.setToolTipText("The directory in which the management daemon stores its data on the local device");
+      jLabelInfoMgmtdDir.setToolTipText(Main.getLocal().getString("The directory in which the management daemon stores its data on the local device"));
       jLabelInfoMgmtdDir.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMgmtdDir.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoMgmtdDir.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1717,9 +1717,9 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.anchor = java.awt.GridBagConstraints.EAST;
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelInfoMgmtdDir, gridBagConstraints);
-      jLabelInfoMgmtdDir.getAccessibleContext().setAccessibleDescription("The directory in which the management daemon stores its data on the local device. Note : The BeeGFS management daemon will automatically be installed on the setup node.");
+      jLabelInfoMgmtdDir.getAccessibleContext().setAccessibleDescription(Main.getLocal().getString("The directory in which the management daemon stores its data on the local device. Note : The BeeGFS management daemon will automatically be installed on the setup node."));
 
-      jLabelUseRDMA.setText("Use RDMA when possible :");
+      jLabelUseRDMA.setText(Main.getLocal().getString("Use RDMA when possible :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 4;
@@ -1728,7 +1728,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelBasicConfInner.add(jLabelUseRDMA, gridBagConstraints);
 
       jLabelInfoUseRDMA.setIcon(new javax.swing.ImageIcon(JInternalFrameInstallationConfig.class.getResource(IMAGE_INFO.getPath())));
-      jLabelInfoUseRDMA.setToolTipText("If activated, hosts supporting it will use native Infiniband support with RDMA (Remote Direct Memory Access)");
+      jLabelInfoUseRDMA.setToolTipText(Main.getLocal().getString("If activated, hosts supporting it will use native Infiniband support with RDMA (Remote Direct Memory Access)"));
       jLabelInfoUseRDMA.setMaximumSize(new java.awt.Dimension(25, 25));
       jLabelInfoUseRDMA.setMinimumSize(new java.awt.Dimension(25, 25));
       jLabelInfoUseRDMA.setPreferredSize(new java.awt.Dimension(25, 25));
@@ -1765,7 +1765,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jCheckBoxUseRDMA, gridBagConstraints);
 
-      jLabelLogLevel.setText("Log Level :");
+      jLabelLogLevel.setText(Main.getLocal().getString("Log Level :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 7;
@@ -1785,7 +1785,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jLabelInfoLogLevel, gridBagConstraints);
 
-      jLabelClientCache.setText("Client cache type :");
+      jLabelClientCache.setText(Main.getLocal().getString("Client cache type :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 6;
@@ -1857,7 +1857,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       gridBagConstraints.insets = new java.awt.Insets(5, 5, 5, 5);
       jPanelBasicConfInner.add(jComboBoxLogLevel, gridBagConstraints);
 
-      jLabelXAttr.setText("Use extended attributes for metadata :");
+      jLabelXAttr.setText(Main.getLocal().getString("Use extended attributes for metadata :"));
       gridBagConstraints = new java.awt.GridBagConstraints();
       gridBagConstraints.gridx = 0;
       gridBagConstraints.gridy = 5;
@@ -1907,7 +1907,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jPanelBasicConf.add(jScrollPaneBasicConf, java.awt.BorderLayout.CENTER);
 
-      jTabbedPaneTabs.addTab("Create basic configuration", jPanelBasicConf);
+      jTabbedPaneTabs.addTab(Main.getLocal().getString("Create basic configuration"), jPanelBasicConf);
 
       jPanelIBConf.setLayout(new java.awt.BorderLayout(10, 10));
 
@@ -1916,7 +1916,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jTextAreaIBConfDescription.setColumns(20);
       jTextAreaIBConfDescription.setLineWrap(true);
       jTextAreaIBConfDescription.setRows(4);
-      jTextAreaIBConfDescription.setText("Step 3 : Configure Infiniband\n\nIn order to use Infiniband, BeeGFS needs to know which nodes have an Infiniband interface. Furthermore some information about the location of certain files is needed. If you do not want to use Infiniband you can skip this step.\nIf your include and library files are installed in default paths (/usr/include, etc.) you can leave the corresponding fields blank. ");
+      jTextAreaIBConfDescription.setText(Main.getLocal().getString("Step 3 : Configure Infiniband\n\nIn order to use Infiniband, BeeGFS needs to know which nodes have an Infiniband interface. Furthermore some information about the location of certain files is needed. If you do not want to use Infiniband you can skip this step.\nIf your include and library files are installed in default paths (/usr/include, etc.) you can leave the corresponding fields blank. "));
       jTextAreaIBConfDescription.setWrapStyleWord(true);
       jTextAreaIBConfDescription.setBorder(null);
       jPanelIBConf.add(jTextAreaIBConfDescription, java.awt.BorderLayout.NORTH);
@@ -1928,13 +1928,13 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       jPanelIBConf.add(jScrollPaneIBConfig, java.awt.BorderLayout.CENTER);
 
-      jTabbedPaneTabs.addTab("Configure Infiniband", jPanelIBConf);
+      jTabbedPaneTabs.addTab(Main.getLocal().getString("Configure Infiniband"), jPanelIBConf);
 
       jPanelFrame.add(jTabbedPaneTabs, java.awt.BorderLayout.CENTER);
 
       jPanelButtons.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 20, 10));
 
-      jButtonSave.setText("Save");
+      jButtonSave.setText(Main.getLocal().getString("Save"));
       jButtonSave.setMaximumSize(new java.awt.Dimension(150, 30));
       jButtonSave.setMinimumSize(new java.awt.Dimension(150, 30));
       jButtonSave.setName("roles"); // NOI18N
@@ -1948,7 +1948,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       });
       jPanelButtons.add(jButtonSave);
 
-      jButtonReload.setText("Reload from server");
+      jButtonReload.setText(Main.getLocal().getString("Reload from server"));
       jButtonReload.setMaximumSize(new java.awt.Dimension(150, 30));
       jButtonReload.setMinimumSize(new java.awt.Dimension(150, 30));
       jButtonReload.setPreferredSize(new java.awt.Dimension(150, 30));
@@ -1962,7 +1962,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       jPanelButtons.add(jButtonReload);
       jPanelButtons.add(fillerButtons);
 
-      jButtonNext.setText("Next ->");
+      jButtonNext.setText(Main.getLocal().getString("Next ->"));
       jButtonNext.setMaximumSize(new java.awt.Dimension(150, 30));
       jButtonNext.setMinimumSize(new java.awt.Dimension(150, 30));
       jButtonNext.setPreferredSize(new java.awt.Dimension(150, 30));
@@ -2203,14 +2203,14 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
       if (finished)
       {
-         JOptionPane.showMessageDialog(null, "All hosts are successfully saved", "Saved roles",
-                 JOptionPane.INFORMATION_MESSAGE);
-         return true;
+         JOptionPane.showMessageDialog(null, Main.getLocal().getString("All hosts are successfully saved"), Main.getLocal().getString("Saved roles"),
+               JOptionPane.INFORMATION_MESSAGE);
+          return true;
       }
       else
       {
-         JOptionPane.showMessageDialog(null, "Couldn't save hosts data!", "Saved roles",
-                 JOptionPane.ERROR_MESSAGE);
+         JOptionPane.showMessageDialog(null, Main.getLocal().getString("Couldn't save hosts data!"), Main.getLocal().getString("Saved roles"),
+               JOptionPane.ERROR_MESSAGE);
          return false;
       }
    }
@@ -2262,11 +2262,11 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          
          if (!failedNodes.isEmpty())
          {
-            StringBuilder msg = new StringBuilder("Some hosts are not reachable through SSH." +
-               System.lineSeparator() + "Please make sure that all hosts exist and user root is " +
-               "able to do passwordless SSH login." + System.lineSeparator() +
-               "This configuration is not saved!" + System.lineSeparator() +
-               System.lineSeparator() +"Failed Hosts : " + System.lineSeparator() +
+            StringBuilder msg = new StringBuilder(Main.getLocal().getString("Some hosts are not reachable through SSH.") +
+               System.lineSeparator() + Main.getLocal().getString("Please make sure that all hosts exist and user root is ") +
+               Main.getLocal().getString("able to do passwordless SSH login.") + System.lineSeparator() +
+               Main.getLocal().getString("This configuration is not saved!") + System.lineSeparator() +
+               System.lineSeparator() +Main.getLocal().getString("Failed Hosts : ") + System.lineSeparator() +
                System.lineSeparator());
             java.util.HashSet<String> tmpSet = new java.util.HashSet<>(failedNodes.size());
             for (String n : failedNodes)
@@ -2278,7 +2278,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
                   tmpSet.add(n);
                }
             }
-            JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, msg, Main.getLocal().getString("Error"), JOptionPane.ERROR_MESSAGE);
             retVal = false;
          }
          
@@ -2286,11 +2286,11 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
       }
       catch (IOException e)
       {
-         LOGGER.log(Level.SEVERE, "IO error", e);
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("IO error"), e);
       }
       catch (CommunicationException e)
       {
-         LOGGER.log(Level.SEVERE, "Communication Error occured", new Object[]{e, true});
+         LOGGER.log(Level.SEVERE, Main.getLocal().getString("Communication Error occured"), new Object[]{e, true});
       }
       finally
       {
