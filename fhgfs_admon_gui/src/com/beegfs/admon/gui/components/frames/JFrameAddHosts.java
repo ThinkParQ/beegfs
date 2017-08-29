@@ -117,7 +117,7 @@ public class JFrameAddHosts extends javax.swing.JFrame
       jTextArea1.setColumns(20);
       jTextArea1.setLineWrap(true);
       jTextArea1.setRows(5);
-      jTextArea1.setText(Main.getLocal().getString("Please insert the names of the hosts to add.\n\nCou can leave remaining fields blank."));
+      jTextArea1.setText(Main.getLocal().getString("Please insert the names of the hosts to add.\n\nYou can leave remaining fields blank."));
       jTextArea1.setWrapStyleWord(true);
       jTextArea1.setBorder(null);
       jScrollPaneDescription.setViewportView(jTextArea1);

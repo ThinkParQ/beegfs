@@ -77,7 +77,7 @@ void ModeCreateFile::printHelp()
    std::cout << "   --numtargets=<number>  Number of stripe nodes (per file)." << std::endl;
    std::cout << "  Optional:" << std::endl;
    std::cout << "   --targets=<targetlist> Comma-separated list of targetIDs to use for the new" << std::endl;
-   std::cout << "                          file. (The list by be longer than the given" << std::endl;
+   std::cout << "                          file. (The list may be longer than the given" << std::endl;
    std::cout << "                          numtargets value.)" << std::endl;
    std::cout << "   --access=<mode>        The octal access permissions value for user, group" << std::endl;
    std::cout << "                          and others. (Default: 0644)" << std::endl;

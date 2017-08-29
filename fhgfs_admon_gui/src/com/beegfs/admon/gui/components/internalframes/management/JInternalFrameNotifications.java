@@ -85,7 +85,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
          jComboBoxSendType.setSelectedIndex(Integer.parseInt(data.get("sendType")));
 
          lastSendmailPath = data.get("sendmailPath");
-         lastSmtpServer = data.get(Main.getLocal().getString("smtpServer"));
+         lastSmtpServer = data.get("smtpServer");
          if(jComboBoxSendType.getSelectedIndex() == SMTP_SEND_TYPE_SOCKET.ordinal())
          {
             jTextFieldSmtp.setText(lastSmtpServer);
@@ -102,10 +102,10 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
 
          setMailSettings(jCheckBoxEnable.isSelected(), true);
          setLabelAfterComboboxChanged();
-         jTextFieldSender.setText(data.get(Main.getLocal().getString("sender")));
-         jTextFieldRecipient.setText(data.get(Main.getLocal().getString("recipient")));
-         jTextFieldDelay.setText(data.get(Main.getLocal().getString("delay")));
-         jTextFieldResend.setText(data.get(Main.getLocal().getString("resendTime")));
+         jTextFieldSender.setText(data.get("sender"));
+         jTextFieldRecipient.setText(data.get("recipient"));
+         jTextFieldDelay.setText(data.get("delay"));
+         jTextFieldResend.setText(data.get("resendTime"));
 
          boolean overrideActive = Boolean.parseBoolean(data.get("overrideActive"));
          setMailSettings(!overrideActive, false);
@@ -225,7 +225,7 @@ public class JInternalFrameNotifications extends javax.swing.JInternalFrame
       try
       {
          TreeMap<String, String> data = parser.getTreeMap();
-         jTextFieldScript.setText(data.get(Main.getLocal().getString("scriptPath")));
+         jTextFieldScript.setText(data.get("scriptPath"));
       }
       catch (CommunicationException e)
       {

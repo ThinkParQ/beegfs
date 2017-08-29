@@ -93,8 +93,6 @@ void RWPagesWork_uninit(RWPagesWork* this)
    FhgfsChunkPageVec_destroy(this->pageVec);
 
    FhgfsInode_releaseHandle(fhgfsInode, this->handleType);
-
-   iput(this->inode);
 }
 
 void RWPagesWork_destruct(RWPagesWork* this)

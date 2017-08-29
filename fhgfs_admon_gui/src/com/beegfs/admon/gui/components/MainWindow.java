@@ -497,7 +497,7 @@ public class MainWindow extends javax.swing.JFrame
     private void jPasswordFieldQuickAdminActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jPasswordFieldQuickAdminActionPerformed
       try
       {
-         String username = Main.getLocal().getString("Administrator");
+         String username = "Administrator";
          String pw = CryptTk.getMD5(jPasswordFieldQuickAdmin.getPassword());
          if (!loginDialog.doLogin(username, pw))
          {

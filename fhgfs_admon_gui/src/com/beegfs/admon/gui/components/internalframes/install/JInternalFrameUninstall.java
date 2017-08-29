@@ -125,23 +125,23 @@ public class JInternalFrameUninstall extends javax.swing.JInternalFrame implemen
         	 getDialog().addLine(Main.getLocal().getString("Connection to all hosts available."), false);
             if (!stop)
             {
-            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("client"), Main.getLocal().getString("BeeGFS client"));
+            	errorOccured = errorOccured || doUninstall("client", Main.getLocal().getString("BeeGFS client"));
             }
             if (!stop)
             {
-            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("meta"), Main.getLocal().getString("BeeGFS meta server"));
+            	errorOccured = errorOccured || doUninstall("meta", Main.getLocal().getString("BeeGFS meta server"));
             }
             if (!stop)
             {
-            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("storage"), Main.getLocal().getString("BeeGFS storage server"));
+            	errorOccured = errorOccured || doUninstall("storage", Main.getLocal().getString("BeeGFS storage server"));
             }
             if (!stop)
             {
-            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("mgmtd"), Main.getLocal().getString("BeeGFS management daemon"));
+            	errorOccured = errorOccured || doUninstall("mgmtd", Main.getLocal().getString("BeeGFS management daemon"));
             }
             if (!stop)
             {
-            	errorOccured = errorOccured || doUninstall(Main.getLocal().getString("opentk"), Main.getLocal().getString("BeeGFS open TK library"));
+            	errorOccured = errorOccured || doUninstall("opentk", Main.getLocal().getString("BeeGFS open TK library"));
             }
          }
          else

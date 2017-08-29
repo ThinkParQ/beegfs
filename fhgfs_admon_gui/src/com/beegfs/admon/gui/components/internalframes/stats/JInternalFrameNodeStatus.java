@@ -16,6 +16,7 @@ import java.util.TreeMap;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.SwingConstants;
+import java.text.MessageFormat;
 
 import com.beegfs.admon.gui.program.Main;
 
@@ -415,7 +416,7 @@ public class JInternalFrameNodeStatus extends javax.swing.JInternalFrame impleme
       }
       else
       {
-         newTitle = this.nodeType.type() + Main.getLocal().getString("nodes status (Group : " + this.group + ")");
+         newTitle = this.nodeType.type() + MessageFormat.format(Main.getLocal().getString("nodes status (Group : {0})"), this.group);
       }
       return newTitle;
    }

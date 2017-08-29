@@ -36,9 +36,9 @@ public class Main
    private static final double JAVA_MIN_VERSION = 1.7;
    private static final String BEEGFS_VERSION = "@VERSION@";
 
-   private  static Locale locale; 
+   private  static Locale locale;
 
-   private  static  ResourceBundle zh; 
+   private  static  ResourceBundle zh;
 
    /**
     * @param args the command line arguments
@@ -84,26 +84,16 @@ public class Main
          System.exit(1);
       }
 
+      Main.locale = new Locale("en", "US");
+      Main.zh = ResourceBundle.getBundle("Message", locale);
+
       if(initConfigFromFile())
       {
-          
-          System.out.println("##"+config.getAdmonLocal()+"##");
           if(config.getAdmonLocal().equals( "Chinese"))
           {
-
-
-
        	     Main.locale = new Locale("zh", "CN");
-
        	     Main.zh = ResourceBundle.getBundle("Message", locale);
           }
-          else
-          {
-         	 Main.locale = new Locale("en", "US");
-       	
-         	 Main.zh = ResourceBundle.getBundle("Message", locale);
-          }
-          
 
          //create session
          session = new Session();
@@ -136,13 +126,13 @@ public class Main
       return Main.config;
    }
 
-   
+
    public  static ResourceBundle getLocal()
    {
 
 	   return Main.zh;
    }
-   
+
 
    public static Session getSession()
    {

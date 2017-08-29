@@ -33,7 +33,7 @@ public class Config
 
    // set default values
    private String admonHost = null;
-   private String admonLocal = null; 
+   private String admonLocal = null;
    private String logFile = null;
    private String cfgFile = null;
    private int admonHttpPort = 0;
@@ -97,7 +97,6 @@ public class Config
             if(key.equalsIgnoreCase(PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getArgsKey()))
             {
                this.admonLocal = value;
-               System.out.println("##"+value+"##");
             }
             else
             if(key.equalsIgnoreCase(PropertyEnum.PROPERTY_ADMON_GUI_LOG_FILE.getArgsKey()))
@@ -628,7 +627,7 @@ public class Config
 
       builder.append(String.format("%-50s%s%n",
               PropertyEnum.PROPERTY_ADMON_GUI_LOCAL.getArgsKey() +
-              "=English|Chinese", "The local is used to set the language environment"));
+              "=English|Chinese", "The locale is used to set the language environment"));
 
       builder.append(String.format("%-50s%s%n",
          PropertyEnum.PROPERTY_ADMON_GUI_RESOLUTION.getArgsKey() +

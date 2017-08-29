@@ -556,8 +556,6 @@ int _FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_co
    #endif // LOG_DEBUG_MESSAGES
 
 
-   ihold(inode); // make sure the inode is not released
-
    if (!page)
    {  // writepages
       #ifdef KERNEL_HAS_WRITE_CACHE_PAGES
@@ -620,8 +618,6 @@ int _FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_co
       FhgfsInode_releaseHandle(fhgfsInode, pageData.handleType);
 
 outReferenceErr:
-   iput(inode);
-
    #ifdef LOG_DEBUG_MESSAGES
    {
       App* app = FhgfsOps_getApp(inode->i_sb);

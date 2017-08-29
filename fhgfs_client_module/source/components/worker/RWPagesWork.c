@@ -58,8 +58,6 @@ bool RWPagesWork_init(RWPagesWork* this, App* app, struct inode* inode,
    if (unlikely(referenceRes != FhgfsOpsErr_SUCCESS) )
       return false;
 
-   ihold(inode); // make sure the inode does not get evicted while we are reading/writing the file
-
    #ifdef KERNEL_HAS_2_PARAM_INIT_WORK
       INIT_WORK(&this->kernelWork, RWPagesWork_process);
    #else
@@ -176,23 +174,9 @@ void RWPagesWork_processQueue(RWPagesWork* this)
    App* app = this->app;
    Logger* log = App_getLogger(app);
 
-   FhgfsInode* fhgfsInode = BEEGFS_INODE(this->inode);
-
    ssize_t rwRes;
 
-   if (this->rwType == BEEGFS_RWTYPE_WRITE)
-      FhgfsInode_incWriteBackCounter(fhgfsInode);
-
    rwRes = FhgfsOpsRemoting_rwChunkPageVec(this->pageVec, &this->ioInfo,  this->rwType);
-
-   if (this->rwType == BEEGFS_RWTYPE_WRITE)
-   {
-      spin_lock(&this->inode->i_lock);
-      FhgfsInode_setLastWriteBackOrIsizeWriteTime(fhgfsInode);
-      FhgfsInode_decWriteBackCounter(fhgfsInode);
-      FhgfsInode_unsetNoIsizeDecrease(fhgfsInode);
-      spin_unlock(&this->inode->i_lock);
-   }
 
    if (unlikely(rwRes < 0) )
       LOG_DEBUG_FORMATTED(log, 1, __func__, "error: %s", FhgfsOpsErr_toErrString(-rwRes) );

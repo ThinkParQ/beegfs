@@ -342,14 +342,14 @@ public class JInternalFrameInstall extends javax.swing.JInternalFrame implements
                if (failed.isEmpty())
                {
                   this.getDialog().
-                  	addLine(Main.getLocal().getString("Successfully installed ") + packageDesc + Main.getLocal().getString("on all hosts"), false);
+                     addLine(Main.getLocal().getString("Successfully installed ") + " " + packageDesc + " " + Main.getLocal().getString("on all hosts"), false);
                   return false;
                }
                else
                {
                   for (String node : failed)
                   {
-                    this.getDialog().addLine(Main.getLocal().getString("Failed to install ") + packageDesc + Main.getLocal().getString("on host ") +
+                    this.getDialog().addLine(Main.getLocal().getString("Failed to install ") + " " + packageDesc + " " + Main.getLocal().getString("on host ") +
                         node, true);
                   }
                   return true;

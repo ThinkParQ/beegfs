@@ -390,7 +390,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          TreeMap<String, String> config = parser.getTreeMap();
          if (config.get("storeMetaDirectory") != null)
          {
-        	 jTextFieldMetaDir.setText(config.get(Main.getLocal().getString("storeMetaDirectory")));
+        	 jTextFieldMetaDir.setText(config.get("storeMetaDirectory"));
          }
          else
          {
@@ -398,7 +398,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connMetaPortTCP") != null)
          {
-        	 jTextFieldMetaPort.setText(config.get(Main.getLocal().getString("connMetaPortTCP")));
+        	 jTextFieldMetaPort.setText(config.get("connMetaPortTCP"));
          }
          else
          {
@@ -406,7 +406,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("storeStorageDirectory") != null)
          {
-        	 jTextFieldStorageDir.setText(config.get(Main.getLocal().getString("storeStorageDirectory")));
+        	 jTextFieldStorageDir.setText(config.get("storeStorageDirectory"));
          }
          else
          {
@@ -414,7 +414,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connStoragePortTCP") != null)
          {
-        	 jTextFieldStoragePort.setText(config.get(Main.getLocal().getString("connStoragePortTCP")));
+        	 jTextFieldStoragePort.setText(config.get("connStoragePortTCP"));
          }
          else
          {
@@ -422,7 +422,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connClientPortTCP") != null)
          {
-        	 jTextFieldClientPort.setText(config.get(Main.getLocal().getString("connClientPortTCP")));
+        	 jTextFieldClientPort.setText(config.get("connClientPortTCP"));
          }
          else
          {
@@ -430,7 +430,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("clientMount") != null)
          {
-        	 jTextFieldClientMount.setText(config.get(Main.getLocal().getString("clientMount")));
+        	 jTextFieldClientMount.setText(config.get("clientMount"));
          }
          else
          {
@@ -438,7 +438,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("connHelperdPortTCP") != null)
          {
-        	 jTextFieldHelperdPort.setText(config.get(Main.getLocal().getString("connHelperdPortTCP")));
+        	 jTextFieldHelperdPort.setText(config.get("connHelperdPortTCP"));
          }
          else
          {
@@ -446,7 +446,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
          }
          if (config.get("storeMgmtdDirectory") != null)
          {
-        	 jTextFieldMgmtdDir.setText(config.get(Main.getLocal().getString("storeMgmtdDirectory")));
+        	 jTextFieldMgmtdDir.setText(config.get("storeMgmtdDirectory"));
          }
          else
          {
@@ -455,7 +455,7 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
 
          if (config.get("connMgmtdPortTCP") != null)
          {
-        	 jTextFieldMgmtdPort.setText(config.get(Main.getLocal().getString("connMgmtdPortTCP")));
+        	 jTextFieldMgmtdPort.setText(config.get("connMgmtdPortTCP"));
          }
          else
          {

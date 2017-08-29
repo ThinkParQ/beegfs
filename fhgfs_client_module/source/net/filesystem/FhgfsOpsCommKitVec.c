@@ -1000,7 +1000,7 @@ void __FhgfsOpsCommKitVec_writefileStageHandlePages(CommKitVecHelper* commHelper
    }
 
    if (unlikely(remainingServerWriteRes < 0) )
-      Logger_logTopFormattedWithEntryID(inode, LogTopic_COMMKIT, Log_ERR, __func__,
+      Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_ERR, __func__,
          "Write error detected (check server logs for details)!");
 }
 
@@ -1030,6 +1030,10 @@ static int64_t __FhgfsOpsCommKitVec_readfileCommunicate(CommKitVecHelper* commHe
 static int64_t __FhgfsOpsCommKitVec_writefileCommunicate(CommKitVecHelper* commHelper,
    FhgfsCommKitVec* comm)
 {
+   FhgfsInode* inode = BEEGFS_INODE(comm->pageVec->inode);
+
+   FhgfsInode_incWriteBackCounter(inode);
+
    comm->doHeader = false;
 
    __FhgfsOpsCommKitVec_writefileStagePREPARE(commHelper, comm);
@@ -1040,6 +1044,12 @@ static int64_t __FhgfsOpsCommKitVec_writefileCommunicate(CommKitVecHelper* commH
       // set doHeader to true if required
       __FhgfsOpsCommKitVec_writefileStageSENDHEADER(commHelper, comm);
    }
+
+   spin_lock(&inode->vfs_inode.i_lock);
+   FhgfsInode_setLastWriteBackOrIsizeWriteTime(inode);
+   FhgfsInode_decWriteBackCounter(inode);
+   FhgfsInode_unsetNoIsizeDecrease(inode);
+   spin_unlock(&inode->vfs_inode.i_lock);
 
    return comm->nodeResult;
 }

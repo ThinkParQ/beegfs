@@ -26,6 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.ImageIcon;
+import java.text.MessageFormat;
 
 /**
  *
@@ -62,7 +63,7 @@ public class JInternalFrameMetaNodesOverview extends javax.swing.JInternalFrame
    {
       this.group = group;
       initComponents();
-      setTitle(Main.getLocal().getString("Metadata nodes overview (Group : " + group + ")"));
+      setTitle(MessageFormat.format(Main.getLocal().getString("Metadata nodes overview (Group : {0})"), group));
       setFrameIcon(GuiTk.getFrameIcon());
    }
 

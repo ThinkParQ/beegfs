@@ -688,7 +688,7 @@ public class JInternalFrameStriping extends javax.swing.JInternalFrame
          gridX++;
          gbcIDs.gridx = gridX;
          gbcIDs.gridy = gridY;
-         jLabelMetaID = new JLabel(parser.getValue(Main.getLocal().getString("meta")));
+         jLabelMetaID = new JLabel(parser.getValue("meta"));
          jPanelLocation.add(jLabelMetaID, gbcIDs);
 
 
