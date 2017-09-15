@@ -220,7 +220,7 @@ void Logger::logErrGranted(const char* threadName, const char* context, const ch
    getTimeStr(nowTime.getTimeS(), timeStr, LOGGER_TIMESTR_SIZE);
       
 #ifdef BEEGFS_DEBUG_PROFILING
-   uint64_t timeMicroS = nowTime.getTimeMicroSecPart(); // additional ms info for timestamp
+   uint64_t timeMicroS = nowTime.getTimeMicroSecPart();// additional microsecond info for timestamp
 
    fprintf(errFile, "(E) %s.%06ld %s [%s] >> %s\n", timeStr, (long) timeMicroS,
       threadName, context, msg);

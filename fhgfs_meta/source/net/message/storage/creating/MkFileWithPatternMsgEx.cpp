@@ -5,6 +5,8 @@
 #include <common/net/message/storage/creating/MkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
+#include <common/storage/striping/StripePattern.h>
+#include <common/toolkit/MathTk.h>
 #include <common/toolkit/MessagingTk.h>
 #include <net/msghelpers/MsgHelperMkFile.h>
 #include <session/EntryLock.h>
@@ -136,6 +138,22 @@ FhgfsOpsErr MkFileWithPatternMsgEx::mkMetaFile(DirInode& dir, MkFileDetails& mkD
 
    // swap given preferred targets of stripe pattern with chosen targets
    stripePattern->getStripeTargetIDsModifyable()->swap(stripeTargets);
+
+   // check if chunk size satisfies constraints
+   const unsigned chunkSize = stripePattern->getChunkSize();
+   if (!MathTk::isPowerOfTwo(chunkSize))
+   {
+      LOG_TOP(GENERAL, DEBUG, "Invalid chunk size: Must be a power of two.", chunkSize);
+      return FhgfsOpsErr_INTERNAL;
+   }
+   if (chunkSize < STRIPEPATTERN_MIN_CHUNKSIZE)
+   {
+      LOG_TOP(GENERAL, DEBUG, "Invalid chunk size: Below minimum size.",
+               chunkSize,
+               as("minChunkSize", STRIPEPATTERN_MIN_CHUNKSIZE));
+      return FhgfsOpsErr_INTERNAL;
+   }
+
 
    FhgfsOpsErr makeRes = metaStore->mkNewMetaFile(dir, &mkDetails, std::move(stripePattern),
       outEntryInfo, &inodeDiskData); // (note: internally deletes stripePattern)

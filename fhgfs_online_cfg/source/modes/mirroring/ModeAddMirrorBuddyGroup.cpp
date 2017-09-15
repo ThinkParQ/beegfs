@@ -368,6 +368,10 @@ FhgfsOpsErr ModeAddMirrorBuddyGroup::doAutomaticMode()
          "Please check the messages printed above."
          << std::endl;
 
+   // if used with --force, return success if retVal signals invalid values
+   if(retVal == FhgfsOpsErr_INVAL && cfgForce)
+      return FhgfsOpsErr_SUCCESS;
+
    return retVal;
 }
 

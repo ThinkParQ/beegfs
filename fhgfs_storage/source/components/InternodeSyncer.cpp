@@ -254,6 +254,26 @@ void InternodeSyncer::updateTargetStatesAndBuddyGroups()
       // Store old states for ChangeTargetConsistencyStatesMsg.
       UInt8List oldConsistencyStates = targetConsistencyStates;
 
+      // before anything else is done, update the targetWasOffline flags in the resyncers. updating
+      // them later opens a window of opportunity where the target state store says "offline", but
+      // the resyncer has not noticed - which would erroneously not fail the resync.
+      {
+         UInt16ListConstIter targetID = targetIDs.begin();
+         UInt8ListConstIter targetState = targetReachabilityStates.begin();
+         while (targetID != targetIDs.end())
+         {
+            if (*targetState == TargetReachabilityState_OFFLINE)
+            {
+               BuddyResyncJob* const job = app->getBuddyResyncer()->getResyncJob(*targetID);
+               if (job)
+                  job->setTargetOffline();
+            }
+
+            targetID++;
+            targetState++;
+         }
+      }
+
       // Sync buddy groups here, because decideResync depends on it.
       // This is not a problem because if pushing target states fails all targets will be
       // (p)offline anyway.

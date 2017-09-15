@@ -533,7 +533,7 @@ uint64_t FhgfsInode_generateInodeID(struct super_block* sb, const char* entryID,
          if(unlikely(hashRes <= BEEGFS_INODE_MAXRESERVED_INO) )
             hashRes = HashTk_hash(HASHTK_HALFMD4, hashBits, entryID, entryIDLen+1);
 
-            return hashRes;
+         return hashRes;
       } break;
 
       case INODEIDSTYLE_Hash32MD4:

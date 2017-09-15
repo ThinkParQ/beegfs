@@ -180,7 +180,9 @@ int __FhgfsOps_constructFsInfo(struct super_block* sb, void* rawMountOptions)
     */
    bdi->ra_pages = BEEGFS_DEFAULT_READAHEAD_PAGES;
 
-   #ifdef KERNEL_HAS_BDI_CAP_MAP_COPY
+   #if defined(KERNEL_HAS_SUPER_SETUP_BDI_NAME) && !defined(KERNEL_HAS_BDI_SETUP_AND_REGISTER)
+      res = super_setup_bdi_name(sb, BEEGFS_MODULE_NAME_STR);
+   #elif defined(KERNEL_HAS_BDI_CAP_MAP_COPY) 
       res = bdi_setup_and_register(bdi, BEEGFS_MODULE_NAME_STR, BDI_CAP_MAP_COPY);
    #else
       res = bdi_setup_and_register(bdi, BEEGFS_MODULE_NAME_STR);
@@ -222,10 +224,15 @@ void __FhgfsOps_destructFsInfo(struct super_block* sb)
    {
       App* app = FhgfsOps_getApp(sb);
 
+//call destroy iff not initialised/registered by super_setup_bdi_name
 #if defined(KERNEL_HAS_SB_BDI)
+
+#if !defined(KERNEL_HAS_SUPER_SETUP_BDI_NAME) || defined(KERNEL_HAS_BDI_SETUP_AND_REGISTER)
       struct backing_dev_info* bdi = FhgfsOps_getBdi(sb);
 
       bdi_destroy(bdi);
+#endif
+
 #endif
 
       __FhgfsOps_uninitApp(app);

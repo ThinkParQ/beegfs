@@ -750,8 +750,12 @@ void StorageTk::checkOrCreateOrigNodeIDFile(const std::string pathStr, std::stri
          throw InvalidConfigException(outStream.str() );
       }
 
-      std::string currentNodeIDFileStr = currentNodeID + "\n";
+      std::string currentNodeIDFileStr = currentNodeID + "\n"
+            "# This file was auto-generated and must not be modified. If your hostname has "
+            "changed, create a\n# copy of this file under the name \"nodeID\", keep the content "
+            "unchanged and restart this service.";
       ssize_t writeRes = write(fd, currentNodeIDFileStr.c_str(), currentNodeIDFileStr.length() );
+      
       IGNORE_UNUSED_VARIABLE(writeRes);
 
       fsync(fd);

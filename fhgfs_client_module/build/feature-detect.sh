@@ -114,6 +114,16 @@ check_function \
    KERNEL_HAS_FILE_DENTRY \
    linux/fs.h
 
+check_function \
+   super_setup_bdi_name "int (struct super_block *sb, char *fmt, ...)" \
+   KERNEL_HAS_SUPER_SETUP_BDI_NAME \
+   linux/fs.h
+
+check_function \
+   have_submounts "int (struct dentry *parent)" \
+   KERNEL_HAS_HAVE_SUBMOUNTS \
+   linux/dcache.h
+
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to
 # detect and remove again.

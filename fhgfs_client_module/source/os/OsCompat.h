@@ -46,6 +46,10 @@ static inline int os_generic_permission(struct inode *inode, int mask);
    extern int bdi_setup_and_register(struct backing_dev_info *bdi, char *name, unsigned int cap);
 #endif
 
+#ifndef KERNEL_HAS_HAVE_SUBMOUNTS
+extern int have_submounts(struct dentry *parent);
+#endif
+
 /**
  * generic_permission() compatibility function
  *

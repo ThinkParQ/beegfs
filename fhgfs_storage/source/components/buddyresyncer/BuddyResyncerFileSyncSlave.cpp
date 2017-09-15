@@ -138,8 +138,8 @@ FhgfsOpsErr BuddyResyncerFileSyncSlave::doResync(std::string& chunkPathStr, uint
          int errCode = errno;
 
          if(errCode == ENOENT)
-         { // chunk was deleted => no error
-            // delete the mirror chunk before resync starts
+         {  // chunk was deleted => no error
+            // delete the mirror chunk and return
             bool rmRes = removeBuddyChunkUnlocked(*node, buddyTargetID, chunkPathStr);
 
             if (!rmRes) // rm failed; stop resync
@@ -152,7 +152,7 @@ FhgfsOpsErr BuddyResyncerFileSyncSlave::doResync(std::string& chunkPathStr, uint
                retVal = FhgfsOpsErr_INTERNAL;
             }
          }
-         else
+         else // error => log and return
          {
             LogContext(__func__).logErr(
                "Open of chunk failed. chunkPath: " + chunkPathStr + "; targetID: "

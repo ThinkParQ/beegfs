@@ -41,6 +41,7 @@ class BuddyResyncJob : public PThread
       AtomicUInt64 numDirsMatched;
 
       AtomicInt16 shallAbort; // quasi-boolean
+      AtomicInt16 targetWasOffline;
 
       bool checkTopLevelDir(std::string& path, int64_t lastBuddyCommTimeSecs);
       bool walkDirs(std::string chunksPath, std::string relPath, int level,
@@ -67,6 +68,11 @@ class BuddyResyncJob : public PThread
       {
          std::lock_guard<Mutex> mutexLock(statusMutex);
          return status == BuddyResyncJobState_RUNNING;
+      }
+
+      void setTargetOffline()
+      {
+         targetWasOffline.set(1);
       }
 
    private:

@@ -44,6 +44,9 @@ print_usage()
 	echo "  -x     Build with BEEGFS_DEBUG."
         echo "  -l F   log to specific file"
         echo "  -K     keep previously built files (no clean)"
+        echo "  -o     Use openssl library shipped with beegfs"
+        echo "  -s     Use sqlite3 library shipped with beegfs"
+        echo "  -u     Use cppunit library shipped with beegfs"
 	echo
 	echo "EXAMPLE:"
 	echo "  $ `basename $0` -j 4 -p /tmp/my_beegfs_packages"
@@ -69,9 +72,12 @@ run_cmd()
 DRY_RUN=0
 CLEAN_ONLY=0
 CLIENT_ONLY=0
+BUILD_OPENSSL=0
+BUILD_CPPUNIT=0
+BUILD_SQLITE=0
 LOGFILE=
 
-while getopts "hcdm:v:DCxj:p:l:K" opt; do
+while getopts "hcdm:v:DCxj:p:l:Kosu" opt; do
 	case $opt in
 	h)
 		print_usage
@@ -115,6 +121,15 @@ while getopts "hcdm:v:DCxj:p:l:K" opt; do
 		;;
         K)
                 DO_CLEAN=false
+                ;;
+        o)      
+                BUILD_OPENSSL=1
+                ;;
+        s)      
+                BUILD_SQLITE=1
+                ;;
+        u)      
+                BUILD_CPPUNIT=1
                 ;;
         :)
                 echo "Option -$OPTARG requires an argument." >&2
@@ -197,9 +212,21 @@ fi
 
 # build common, opentk and thirdparty, as others depend on them
 if [ $CLIENT_ONLY -eq 0 ]; then
-	make_dep_lib $thirdparty "" "all cppunit sqlite openssl"
-	make_dep_lib $common
-	make_dep_lib $opentk 
+        make_dep_lib $thirdparty "" all # mongoose and ticpp
+        if [ ${BUILD_OPENSSL} -eq 1 ]; then
+           make_dep_lib $thirdparty "" openssl
+        fi
+        
+        if [ ${BUILD_CPPUNIT} -eq 1 ]; then
+           make_dep_lib $thirdparty "" cppunit
+        fi
+        
+        if [ ${BUILD_SQLITE} -eq 1 ]; then
+           make_dep_lib $thirdparty "" sqlite
+        fi
+
+        make_dep_lib $opentk
+        make_dep_lib $common
 fi
 
 

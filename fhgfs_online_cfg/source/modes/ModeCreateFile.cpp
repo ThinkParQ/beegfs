@@ -4,6 +4,8 @@
 #include <common/net/message/storage/creating/MkFileMsg.h>
 #include <common/net/message/storage/creating/MkFileRespMsg.h>
 #include <common/storage/striping/Raid0Pattern.h>
+#include <common/storage/striping/StripePattern.h>
+#include <common/toolkit/MathTk.h>
 #include <common/toolkit/MetadataTk.h>
 #include <common/toolkit/NodesTk.h>
 #include <common/toolkit/UnitTk.h>
@@ -117,6 +119,18 @@ bool ModeCreateFile::initFileSettings(FileSettings* settings)
    else
    {
       chunkSize = UnitTk::strHumanToInt64(iter->second);
+      if(!MathTk::isPowerOfTwo(chunkSize))
+      {
+         std::cerr << "Invalid value for " << MODECREATEFILE_ARG_CHUNKSIZE;
+         std::cerr << ": Must be a power of two." << std::endl;
+         return false;
+      }
+      if(chunkSize < STRIPEPATTERN_MIN_CHUNKSIZE)
+      {
+         std::cerr << "Invalid value for " << MODECREATEFILE_ARG_CHUNKSIZE;
+         std::cerr << ": Minimum chunk size is " << STRIPEPATTERN_MIN_CHUNKSIZE << "." << std::endl;
+         return false;
+      }
       cfg->erase(iter);
    }
 

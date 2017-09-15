@@ -157,6 +157,19 @@
    #define currentFsGroupID      current_fsgid()
 #endif
 
+// in 4.13 wait_queue_t got renamed to wait_queue_entry_t
+#if defined(KERNEL_HAS_WAIT_QUEUE_ENTRY_T)
+ typedef wait_queue_entry_t wait_queue_t;
+#endif
+
+#if !defined(KERNEL_HAS_CURRENT_FS_TIME)
+static inline struct timespec current_fs_time(struct super_block *sb)
+{
+   struct timespec now = current_kernel_time();
+   return timespec_trunc(now, sb->s_time_gran);
+}
+#endif
+
 /* Defined by <linux/include/linux/uidgid.h> and already included by one of the headers, so
  * no KernelFeatureDetection.mk detection required.
  * Note: Not in OsCompat.h, as OsCompat depends on Common.h. */

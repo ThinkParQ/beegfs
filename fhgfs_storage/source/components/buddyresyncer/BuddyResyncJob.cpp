@@ -91,6 +91,7 @@ void BuddyResyncJob::run()
    bool walkRes;
 
    shallAbort.setZero();
+   targetWasOffline = false;
 
    // delete sync candidates and gather queue; just in case there was something from a previous run
    syncCandidates.clear();
@@ -312,9 +313,17 @@ cleanup:
          setStatus(BuddyResyncJobState_INTERRUPTED);
          informBuddy();
       }
-      else
-      if (syncErrors) // any file sync errors or success?
+      else if (syncErrors || targetWasOffline.read()) // any sync errors or success?
       {
+         // we must set the buddy BAD if it has been offline during any period of time during which
+         // the resync was also running. we implicitly do this during resync proper, since resync
+         // slaves abort with errors if the target is offline. if the target goes offline *after*
+         // the last proper resync messages has been sent and comes *back* before we try to inform
+         // it we will never detect that it has been offline at all. concurrently executing
+         // messages (eg TruncFile) may run between our opportunities to detect the offline state
+         // and may fail to forward their actions *even though they should forward*. this would
+         // lead to an inconsistent secondary. since the target has gone offline, the only
+         // reasonable course of action is to fail to resync entirely.
          setStatus(BuddyResyncJobState_ERRORS);
          informBuddy();
       }
@@ -323,8 +332,19 @@ cleanup:
          setStatus(BuddyResyncJobState_SUCCESS);
          // delete timestamp override file if it exists
          storageTargets->rmLastBuddyCommOverride(targetID);
-         storageTargets->setBuddyNeedsResync(targetID, false);
+         // so the target went offline between the previous check "syncErrors || targetWasOffline".
+         // any message that has tried to forward itself in the intervening time will have seen the
+         // offline state, but will have been unable to set the buddy to needs-resync because it
+         // still *is* needs-resync. the resync itself has been perfectly successful, but we have
+         // to start another one anyway once the target comes back to ensure that no information
+         // was lost.
+         storageTargets->setBuddyNeedsResync(targetID, targetWasOffline.read());
          informBuddy();
+
+         if (targetWasOffline.read())
+            LOG(WARNING,
+                  "Resync successful, but target went offline during finalization. "
+                  "Setting target to needs-resync again.", targetID);
       }
    }
 
