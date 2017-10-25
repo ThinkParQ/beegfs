@@ -190,6 +190,13 @@ bool ModeCreateFile::initFileSettings(FileSettings* settings)
          std::string currentTrimmedTarget = StringTk::trim(*targetsIter);
          uint16_t currentTargetID = StringTk::strToUInt(currentTrimmedTarget);
 
+         if (std::find(settings->preferredTargets->begin(), settings->preferredTargets->end(),
+               currentTargetID) != settings->preferredTargets->end())
+         {
+            std::cerr << "Each storage target may be used only once in a stripe pattern."
+                  << std::endl;
+            return false;
+         }
          settings->preferredTargets->push_back(currentTargetID);
       }
    }

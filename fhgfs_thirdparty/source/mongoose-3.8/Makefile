@@ -7,7 +7,6 @@
 
 LIB = mongoose
 
-CC = gcc
 CFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
 	-pthread -rdynamic -Wall -fmessage-length=0 -fno-strict-aliasing \
 	-Wunused-variable -Wextra -Wno-unused-parameter -ggdb3

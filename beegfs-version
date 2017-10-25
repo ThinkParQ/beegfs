@@ -181,7 +181,7 @@ assemble_numeric_version_code()
 # build/packaging scripts
 define_debian_version()
 {
-   DEBIAN_VERSION=`lsb_release -r -s | sed -e 's/\..*$//'`
+   DEBIAN_VERSION=`lsb_release -r -s 2>/dev/null | sed -e 's/\..*$//'`
 }
 
 #

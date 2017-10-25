@@ -271,16 +271,18 @@ void NodeCapacityPools::chooseStorageTargets(unsigned numTargets, unsigned minNu
       // in a pool. our strategy here is to automatically allow non-preferred targets before
       // touching the emergency pool.
 
+      std::set<uint16_t> chosenTargets;
+
       // try normal and low pool with preferred targets...
 
-      chooseStorageNodesWithPref(pools[CapacityPool_NORMAL],
-         numTargets, preferredTargets, false, outTargets);
+      chooseStorageNodesWithPref(pools[CapacityPool_NORMAL], numTargets, preferredTargets, false,
+                                 outTargets, chosenTargets);
 
       if(outTargets->size() >= minNumRequiredTargets)
          goto unlock_and_exit;
 
-      chooseStorageNodesWithPref(pools[CapacityPool_LOW],
-         numTargets - outTargets->size(), preferredTargets, false, outTargets);
+      chooseStorageNodesWithPref(pools[CapacityPool_LOW], numTargets - outTargets->size(),
+                                 preferredTargets, false, outTargets, chosenTargets);
 
       if(!outTargets->empty() )
          goto unlock_and_exit;
@@ -291,14 +293,14 @@ void NodeCapacityPools::chooseStorageTargets(unsigned numTargets, unsigned minNu
 
       // no targets yet - allow non-preferred targets before using emergency pool...
 
-      chooseStorageNodesWithPref(pools[CapacityPool_NORMAL],
-         numTargets, preferredTargets, true, outTargets);
+      chooseStorageNodesWithPref(pools[CapacityPool_NORMAL], numTargets, preferredTargets, true,
+                                 outTargets, chosenTargets);
 
       if(outTargets->size() >= minNumRequiredTargets)
          goto unlock_and_exit;
 
-      chooseStorageNodesWithPref(pools[CapacityPool_LOW],
-         numTargets - outTargets->size(), preferredTargets, true, outTargets);
+      chooseStorageNodesWithPref(pools[CapacityPool_LOW], numTargets - outTargets->size(),
+                                 preferredTargets, true, outTargets, chosenTargets);
 
       if(!outTargets->empty() )
          goto unlock_and_exit;
@@ -306,13 +308,13 @@ void NodeCapacityPools::chooseStorageTargets(unsigned numTargets, unsigned minNu
       /* still no targets available => we have to try the emergency pool (first with preference,
          then without preference) */
 
-      chooseStorageNodesWithPref(pools[CapacityPool_EMERGENCY],
-         numTargets, preferredTargets, false, outTargets);
+      chooseStorageNodesWithPref(pools[CapacityPool_EMERGENCY], numTargets, preferredTargets, false,
+         outTargets, chosenTargets);
       if(!outTargets->empty() )
          goto unlock_and_exit;
 
-      chooseStorageNodesWithPref(pools[CapacityPool_EMERGENCY],
-         numTargets, preferredTargets, true, outTargets);
+      chooseStorageNodesWithPref(pools[CapacityPool_EMERGENCY], numTargets, preferredTargets, true,
+         outTargets, chosenTargets);
    }
 
 
@@ -457,7 +459,7 @@ void NodeCapacityPools::chooseStorageNodesNoPrefRoundRobin(UInt16Set& activeTarg
  */
 void NodeCapacityPools::chooseStorageNodesWithPref(UInt16Set& activeTargets,
    unsigned numTargets, const UInt16List* preferredTargets, bool allowNonPreferredTargets,
-   UInt16Vector* outTargets)
+   UInt16Vector* outTargets, std::set<uint16_t>& chosenTargets)
 {
    // note: we use the name "activeTargets" for the pool here to keep the code very similar to the
       // nodes chooser in the NodeStore class
@@ -476,7 +478,6 @@ void NodeCapacityPools::chooseStorageNodesWithPref(UInt16Set& activeTargets,
    // note: we use a separate set for the outTargets here to quickly find out (in stage 2) whether
    // we already added a certain node from the preferred targets (in stage 1)
 
-   UInt16Set outTargetsSet; // (see note above)
    UInt16ListConstIter preferredIter;
    UInt16SetIter activeTargetsIter; // (will be re-used in stage 2)
 
@@ -492,11 +493,9 @@ void NodeCapacityPools::chooseStorageNodesWithPref(UInt16Set& activeTargets,
    {
       activeTargetsIter = activeTargets.find(*preferredIter);
 
-      if(activeTargetsIter != activeTargets.end() )
-      { // this preferred node is active => add to outTargets and to outTargetsSet
+      if(activeTargetsIter != activeTargets.end() && chosenTargets.insert(*preferredIter).second)
+      { // this preferred node is active => add to outTargets
          outTargets->push_back(*preferredIter);
-         outTargetsSet.insert(*preferredIter);
-
          numTargets--;
       }
 
@@ -520,12 +519,9 @@ void NodeCapacityPools::chooseStorageNodesWithPref(UInt16Set& activeTargets,
       // while we haven't found the number of requested targets
       while(numTargets)
       {
-         outTargetsSetIter = outTargetsSet.find(*activeTargetsIter);
-         if(outTargetsSetIter == outTargetsSet.end() )
+         if(chosenTargets.insert(*activeTargetsIter).second)
          {
             outTargets->push_back(*activeTargetsIter);
-            outTargetsSet.insert(*activeTargetsIter);
-
             numTargets--;
          }
 

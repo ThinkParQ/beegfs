@@ -57,6 +57,16 @@ void want_fn(void) {
 EOF
 }
 
+_check_symbol() {
+   local name=$1
+   shift
+
+   _generate_includes "$@"
+   cat <<EOF
+   __typeof__($name) predicate = $name;
+EOF
+}
+
 check_function() {
    local name=$1
    local signature=$2
@@ -72,6 +82,14 @@ check_header() {
    shift 2
 
    _generate_includes "$header" | _marker_if_compiles "$marker"
+}
+
+check_symbol() {
+   local name=$1
+   local marker=$2
+   shift 2
+
+   _check_symbol "$name" "$@" | _marker_if_compiles "$marker"
 }
 
 check_struct_field \
@@ -123,6 +141,14 @@ check_function \
    have_submounts "int (struct dentry *parent)" \
    KERNEL_HAS_HAVE_SUBMOUNTS \
    linux/dcache.h
+
+# kernel 4.9 and newer have the iov_iter flavor ITER_PIPE which we currently cannot handle in our
+# buffered read_iter/write_iter functions. until we can handle it those kernels must have their
+# buffered read_iter/write_iter disabled, otherwise the kernel may crash.
+check_symbol \
+   ITER_PIPE \
+   KERNEL_HAS_ITER_PIPE \
+   linux/uio.h
 
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to

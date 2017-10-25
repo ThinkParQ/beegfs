@@ -164,6 +164,12 @@ int ModeAddMirrorBuddyGroup::execute()
          return APPCODE_INVALID_CONFIG;
       }
 
+      if (cfgPrimaryTargetID == cfgSecondaryTargetID)
+      {
+         std::cerr << "Primary and secondary target must be different." << std::endl;
+         return APPCODE_INVALID_CONFIG;
+      }
+
       if (cfg->count(MODEADDMIRRORBUDDYGROUP_ARG_GROUPID) > 0 &&
             cfg->count(MODEADDMIRRORBUDDYGROUP_ARG_MGROUPID) > 0)
       {

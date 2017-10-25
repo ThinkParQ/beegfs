@@ -359,15 +359,16 @@ FhgfsOpsErr __MessagingTk_requestResponseNodeRetry(App* app, RequestResponseNode
 
       // check target state
 
-      if (rrNode->peer.isMirrorGroup && rrNode->targetStates)
+      if (rrNode->targetStates)
       {
          CombinedTargetState state;
          bool getStateRes = TargetStateStore_getState(rrNode->targetStates, nodeID.value,
             &state);
 
-         if(unlikely( !getStateRes ||
-            (state.reachabilityState != TargetReachabilityState_ONLINE) ||
-            (state.consistencyState != TargetConsistencyState_GOOD) ) )
+         if (!getStateRes ||
+               state.reachabilityState != TargetReachabilityState_ONLINE ||
+               (rrNode->peer.isMirrorGroup &&
+                  state.consistencyState != TargetConsistencyState_GOOD))
          {
             if(state.reachabilityState == TargetReachabilityState_OFFLINE)
             { // no need to wait for offline servers

@@ -58,8 +58,8 @@ class NodeCapacityPools
       void chooseStorageNodesNoPrefRoundRobin(UInt16Set& activeTargets, unsigned numTargets,
          UInt16Vector* outTargets);
       void chooseStorageNodesWithPref(UInt16Set& activeTargets, unsigned numTargets,
-         const UInt16List* preferredTargets, bool allowNonPreferredTargets, UInt16Vector* outTargets);
-
+         const UInt16List* preferredTargets, bool allowNonPreferredTargets,
+         UInt16Vector* outTargets, std::set<uint16_t>& chosenTargets);
 
    public:
       // getters & setters

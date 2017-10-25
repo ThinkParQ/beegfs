@@ -45,6 +45,12 @@ FhgfsOpsErr MirrorBuddyGroupMapper::mapMirrorBuddyGroup(uint16_t buddyGroupID,
       return FhgfsOpsErr_EXISTS;
    }
 
+   // dont allow the same ID for primary and secondary
+   if (primaryTargetID == secondaryTargetID)
+   {
+      return FhgfsOpsErr_INVAL;
+   }
+
    if (targetMapper)
    {
       if (! this->targetMapper->targetExists(primaryTargetID) )

@@ -16,20 +16,20 @@ class NodeStoreClients : public AbstractNodeStore
    public:
       NodeStoreClients(bool channelsDirectDefault);
 
-      virtual bool addOrUpdateNode(NodeHandle node);
-      virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID);
+      virtual bool addOrUpdateNode(NodeHandle node) override;
+      virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) override;
       bool updateLastHeartbeatT(NumNodeID numNodeID);
       virtual bool deleteNode(NumNodeID numNodeID);
 
       NodeHandle referenceNode(NumNodeID numNodeID);
 
       bool isNodeActive(NumNodeID numNodeID);
-      virtual size_t getSize();
+      virtual size_t getSize() override;
 
-      virtual NodeHandle referenceFirstNode();
-      virtual NodeHandle referenceNextNode(const NodeHandle& oldNode);
+      virtual NodeHandle referenceFirstNode() override;
+      virtual NodeHandle referenceNextNode(const NodeHandle& oldNode) override;
 
-      virtual std::vector<NodeHandle> referenceAllNodes();
+      virtual std::vector<NodeHandle> referenceAllNodes() override;
 
       void syncNodes(const std::vector<NodeHandle>& masterList, NumNodeIDList* outAddedIDs,
          NumNodeIDList* outRemovedIDs, bool updateExisting, Node* appLocalNode=NULL);

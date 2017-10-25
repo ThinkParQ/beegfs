@@ -1148,7 +1148,11 @@ static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *
    FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
          __func__, "(offset: %lld; nr_segs: %lu)", (long long)iocb->ki_pos, to->nr_segs);
 
+#ifdef KERNEL_HAS_ITER_PIPE
+   if (!(to->type & (ITER_BVEC | ITER_PIPE)))
+#else
    if (!(to->type & ITER_BVEC))
+#endif
    {
       struct iovec iov;
       struct iov_iter iter = *to;
@@ -1191,7 +1195,7 @@ static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *
       if (!buffer)
          return -ENOMEM;
 
-      kaddr = kmap_atomic(buffer);
+      kaddr = kmap(buffer);
       {
          ssize_t readRes;
          size_t copyRes;
@@ -1208,14 +1212,22 @@ static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *
             if (readRes <= 0)
                break;
 
+#ifdef KERNEL_HAS_ITER_PIPE
+            // do not use copy_page_to_iter with pipe targets since that would not actually *copy*
+            // the page but *link* it instead. our subsequent uses of the page would clobber it
+            // badly, and us freeing it while the pipe still has a reference would also not be
+            // very good.
+            copyRes = copy_to_iter(kaddr, readRes, to);
+#else
             copyRes = copy_page_to_iter(buffer, 0, readRes, to);
+#endif
             if (copyRes < readRes)
                readRes = copyRes;
 
             totalReadRes += readRes;
          }
       }
-      kunmap_atomic(kaddr);
+      kunmap(buffer);
       __free_page(buffer);
    }
 
@@ -1545,7 +1557,7 @@ static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter 
       if (!buffer)
          return -ENOMEM;
 
-      kaddr = kmap_atomic(buffer);
+      kaddr = kmap(buffer);
       {
          ssize_t writeRes;
          size_t copyRes;
@@ -1569,7 +1581,7 @@ static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter 
                break;
          }
       }
-      kunmap_atomic(kaddr);
+      kunmap(buffer);
       __free_page(buffer);
    }
 
