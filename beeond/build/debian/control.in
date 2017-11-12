@@ -1,0 +1,13 @@
+Source: beeond
+Section: misc
+Priority: optional
+Maintainer: BeeGFS Maintainers <packages@beegfs.com>
+Build-Depends: debhelper (>= 7.0.0), lsb-release
+Standards-Version: 3.8.0
+
+Package: beeond
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beeond-thirdparty-gpl (= __BEEGFS_DEB_FULLVERSION__), beegfs-utils (= __BEEGFS_DEB_FULLVERSION__), beegfs-mgmtd (= __BEEGFS_DEB_FULLVERSION__), beegfs-meta (= __BEEGFS_DEB_FULLVERSION__), beegfs-storage (= __BEEGFS_DEB_FULLVERSION__), beegfs-client (= __BEEGFS_DEB_FULLVERSION__), beegfs-helperd (= __BEEGFS_DEB_FULLVERSION__)
+Description: BeeOND
+ This package contains BeeOND.
+

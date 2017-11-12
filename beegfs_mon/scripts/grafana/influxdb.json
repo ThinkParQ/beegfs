@@ -1,0 +1,7 @@
+{
+  "name":"%DATASOURCE_NAME%",
+  "type":"influxdb",
+  "url":"%DATASOURCE_URL%",
+  "access":"proxy",
+  "database":"%DATABASE_NAME%"
+}

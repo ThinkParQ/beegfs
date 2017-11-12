@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# License: BeeGFS EULA
+
+# constant definitions
+# (for configurables see below)
+
+DEFAULT_CFG_PATH="/etc/beegfs/beegfs-client.conf"
+MGMTD_CFG_KEY="sysMgmtdHost"
+LOGTYPE_CFG_KEY="logType"
+QUOTA_ENABLED_CFG_KEY="quotaEnabled"
+
+print_usage()
+{
+	echo
+	echo "DESCRIPTION: Initialize or update the beegfs-client config file."
+	echo
+	echo "USAGE: `basename $0` [options]"
+	echo
+	echo " Recommended Options:"
+	echo
+	echo "   -m <host> - Hostname (or IP address) of management server."
+	echo "               (Will be stored in client config file.)"
+	echo
+	echo " Other Options:"
+	echo
+	echo "   -C        - Do not update client config file."
+	echo
+	echo "   -c <path> - Path to client config file."
+	echo "               (Default: ${DEFAULT_CFG_PATH})"
+	echo
+	echo "   -f        - Force actions, ignore warnings."
+	echo
+	echo "   -h        - Print this help."
+	echo
+	echo "   -l        - Set logger type to syslog in config file."
+	echo "               (Default: Log via beegfs-helperd)"
+	echo
+	echo "   -q        - Enable quota support in config file."
+	echo "               (Default: Quota support disabled)"
+	echo
+	echo "EXAMPLES:"
+	echo " * Example 1) Set \"storage01\" as management daemon host in config file:"
+	echo "   $ `basename $0` -m storage01"
+	echo
+}
+
+# update config file (if enabled)
+update_config_file()
+{
+	# check if config file is defined
+
+	if [ -z "${CFG_PATH}" ]; then
+		return 0
+	fi
+
+	echo "Updating config file: ${CFG_PATH}"
+
+	if [ ! -f "${CFG_PATH}" ]; then
+		echo " * ERROR: Config file not found: ${CFG_PATH}"
+		exit 1
+	fi
+
+	if [ -n "${MGMTD_HOST}" ]; then
+		echo " * Setting management host: ${MGMTD_HOST}"
+		sed -i "s/\(^${MGMTD_CFG_KEY}.*=\).*/\1 ${MGMTD_HOST}/" ${CFG_PATH}
+	fi
+
+	if [ -n "${LOGTYPE}" ]; then
+		echo " * Setting log type: ${LOGTYPE}"
+		sed -i "s/\(^${LOGTYPE_CFG_KEY}.*=\).*/\1 ${LOGTYPE}/" ${CFG_PATH}
+	fi
+
+	if [ -n "${QUOTA_ENABLED}" ]; then
+		echo " * Setting quota enabled: ${QUOTA_ENABLED}"
+		sed -i "s/\(^${QUOTA_ENABLED_CFG_KEY}.*=\).*/\1 ${QUOTA_ENABLED}/" ${CFG_PATH}
+	fi
+}
+
+################## end of function definitions ##############
+
+
+# configurable values and their defaults
+# (for constants see above)
+
+CFG_PATH="$DEFAULT_CFG_PATH" # empty path means "don't update cfg file"
+FORCE_ACTIONS=""
+MGMTD_HOST=""
+LOGTYPE=""
+QUOTA_ENABLED=""
+
+# parse command line arguments
+# (see print_usage() for description of parameters)
+
+while getopts "Cc:fhlm:q" opt; do
+        case $opt in
+	C)
+		CFG_PATH=""
+		;;
+	c)
+		CFG_PATH="$OPTARG"
+		;;
+	f)
+		FORCE_ACTIONS="1"
+		;;
+	h)
+		print_usage
+		exit 0
+		;;
+	l)
+		LOGTYPE="syslog"
+		;;
+	m)
+		MGMTD_HOST="$OPTARG"
+		;;
+	q)
+		QUOTA_ENABLED="true"
+		;;
+        *)
+		echo "ERROR: Invalid argument" >&2
+		print_usage
+		exit 1
+		;;
+	esac
+done
+
+set -e
+
+# don't do anything if no arguments are provided
+
+if [ $# -eq 0 ]; then
+	print_usage
+	exit 1
+fi
+
+# update config file
+
+update_config_file
+
+
+echo "All done."

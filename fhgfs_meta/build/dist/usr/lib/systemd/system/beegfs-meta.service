@@ -1,0 +1,14 @@
+[Unit]
+Description=BeeGFS Metadata Server
+Documentation=http://www.beegfs.com/content/documentation/
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service
+After=network-online.target beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service zfs.target
+
+[Service]
+ExecStart=/opt/beegfs/sbin/beegfs-meta cfgFile=/etc/beegfs/beegfs-meta.conf runDaemonized=false
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,354 @@
+#!/bin/bash
+
+# Source helper script.
+ABSOLUTE_PATH=$(dirname "$(readlink -e "$0")") # using readlink, because somone might be calling
+                                               # this script using a symlink
+
+if [ -e "${ABSOLUTE_PATH}/../lib/beeond-lib" ]
+then
+   BEEOND_LIB="${ABSOLUTE_PATH}/../lib/beeond-lib"
+else
+   BEEOND_LIB="${ABSOLUTE_PATH}/../scripts/lib/beeond-lib"
+fi
+
+#shellcheck source=scripts/lib/beeond-lib
+source "${BEEOND_LIB}"
+PARALLEL="${ABSOLUTE_PATH}/../thirdparty/parallel/parallel"
+
+# Print usage.
+print_usage_and_exit()
+{
+   echo ""
+   echo "BeeOND copy (http://www.beegfs.com)"
+   echo ""
+   echo "DESCRIPTION:"
+   echo "   BeeGFS OnDemand copying/staging system."
+   echo ""
+   echo "USAGE: $(basename "$0") <mode> <options>"
+   echo ""
+   echo "ACTIONS:"
+   echo "   The first argument to $(basename "$0") is considered to be an action that the script"
+   echo "   should perform."
+   echo ""
+   echo "   The following actions are available:"
+   echo ""
+   echo "   stagein: (EXPERIMENTAL)"
+   echo "      Stage a complete directory from the global storage in to BeeOND."
+   echo ""
+   echo "      Mandatory arguments:"
+   echo "         -n FILENAME  => File containing the list of nodes where the parallel"
+   echo "                         copy should be performed. All nodes must have access to"
+   echo "                         the global and local directories."
+   echo "         -g PATH      => Directory on global storage. (*)"
+   echo "         -l PATH      => Directory on local (BeeOND) storage. (*)"
+   echo ""
+   echo "      Notes:"
+   echo "         (*) Global and local directories have to be specified in form of an"
+   echo "             absolute path."
+   echo ""
+   echo "   stageout: (EXPERIMENTAL)"
+   echo "      Stage a complete directory out from BeeOND to the global storage."
+   echo "      Only changes will be staged out of the local directory and committed to"
+   echo "      the global directory."
+   echo ""
+   echo "      Mandatory arguments:"
+   echo "         -l PATH      => Local directory."
+   echo ""
+   echo "      Notes:"
+   echo "         The contents will be completely synchronized, i.e. deleted files on "
+   echo "         BeeOND will get deleted on global storage, too."
+   echo ""
+   echo "   copy:"
+   echo "      Perform a parallel copy of a set of files or folders."
+   echo "      Files will be copied into the target directory, folders will be copied"
+   echo "      recursively. The copy process is parallelized across the set of nodes"
+   echo "      specified in the nodefile."
+   echo ""
+   echo "      Mandatory arguments:"
+   echo "         -n FILENAME  => File containing the list of nodes where the parallel"
+   echo "                         copy should be performed. All nodes must have access to"
+   echo "                         the sources and the target directory."
+   echo ""
+   echo "      Notes:"
+   echo "         Further command line arguments are consdiered source directory or file"
+   echo "         names. The last command line argument specifies the target directory"
+   echo ""
+   echo "EXAMPLES:"
+   echo "   Stage data from /mnt/beegfs-global/dataset in to BeeOND mounted at /mnt/beeond,"
+   echo "   using the nodes given in /tmp/nodefile:"
+   echo "      beeond-cp stagein -n /tmp/nodefile -g /mnt/beegfs-global/dataset -l /mnt/beeond"
+   echo ""
+   echo "   Stage out modified data from BeeOND mounted at /mnt/beeond to the global "
+   echo "   storage:"
+   echo "      beeond-cp stageout -n /tmp/nodefile -g /mnt/beegfs-global/dataset -l /mnt/beeond"
+   echo "" 
+   echo "   Recursively copy the directories dir_1 and dir_2 to /mnt/beegfs, using the nodes"
+   echo "   in /tmp/nodefile:"
+   echo "      beeond-cp copy -n /tmp/nodefile dir_1 dir_2 /mnt/beegfs"
+   echo ""
+   echo "NOTE:"
+   echo "   BeeOND copy uses GNU Parallel -"
+   echo "   When using programs that use GNU Parallel to process data for publication"
+   echo "   please cite:"
+   echo "     O. Tange (2011): GNU Parallel - The Command-Line Power Tool,"
+   echo "     ;login: The USENIX Magazine, February 2011:42-47."
+   echo ""
+   echo "   SSH is used to log into the nodes specified in the nodefile. Please make"
+   echo "   sure your SSH configuration allows for enough concurrent sessions and pending"
+   echo "   logins. You might have to (ask your admin to) raise the MaxSessions and"
+   echo "   MaxStartups settings in the sshd_config file."
+   echo ""
+   echo "   Also please make sure you have the access rights needed to write to the"
+   echo "   global store. Otherwise the stage-out might fail. Note that the access rights"
+   echo "   in the BeeOND local store do not necessarily reflect those in the global"
+   echo "   store."
+
+   exit 1
+}
+
+### main functions
+do_start()
+{
+   local NODEFILE="${1}"
+   local GLOBAL_PATH="${2}"
+   local LOCAL_PATH="${3}"
+
+   beeond_print_info "BeeOND startup..."
+
+   beeond_print_info "nodefile: ${NODEFILE}"
+   beeond_print_info "global path: ${GLOBAL_PATH}"
+   beeond_print_info "local path: ${LOCAL_PATH}"
+
+   MISSING_PARAM=0
+   if [ "${NODEFILE}" = "" ]
+   then
+      beeond_print_error "No nodefile specified."
+      MISSING_PARAM=1
+   fi
+   if [ "${GLOBAL_PATH}" = "" ]
+   then
+      beeond_print_error "Global path not specified."
+      MISSING_PARAM=1
+   fi
+   if [ "${LOCAL_PATH}" = "" ]
+   then
+      beeond_print_error "Local path not specified."
+      MISSING_PARAM=1
+   fi
+
+   # Expand relative path to nodefile.
+   if [ ! "${NODEFILE:0:1}" = "/" ]
+   then
+      NODEFILE="${PWD}/${NODEFILE}"
+   fi
+
+   if [ ! -e "${NODEFILE}" ]
+   then
+      beeond_print_error_and_exit "Node file does not exist."
+   fi
+
+   # The paths to the global and local directory have to be specified as absolute paths to prevent
+   # user errors (like copying a lot of files to ~/mnt/beeond).
+   if [ ! "${GLOBAL_PATH:0:1}" = "/" ] || [ ! "${LOCAL_PATH:0:1}" = "/" ]
+   then
+      beeond_print_error_and_exit "Global path and local path have to be absolute."
+   fi
+
+   [ "${MISSING_PARAM}" = "1" ] && exit 1
+
+   # Make sure target directory is empty before starting.
+   if [ -e "${LOCAL_PATH}" ]
+   then
+      [ -d "${LOCAL_PATH}" ] \
+         || beeond_print_error_and_exit "Target path is not a directory."
+
+      find "${LOCAL_PATH}" -maxdepth 0 -type d -empty | read -r _ \
+         || beeond_print_error_and_exit "Target directory is not empty."
+   else
+      mkdir -p "${LOCAL_PATH}" \
+         || beeond_print_error_and_exit "Cannot create target directory."
+   fi
+
+   local CONCURRENCY=$(( $(wc -l < "${NODEFILE}") ))
+   beeond_print_info "Concurrency: ${CONCURRENCY}"
+
+   beeond_print_info "Writing session information."
+   beeond_save_session_info "${NODEFILE}" "${GLOBAL_PATH}"
+
+   beeond_print_info "Starting stage-in..."
+   NODES=( $(grep -v '^$' "${NODEFILE}" | uniq) ) # Store as array and ignore empty lines.
+   NODELIST=$(IFS=,; echo "${NODES[*]}") # turn argument list into comma-separated string for PDSH
+
+   beeond_stage_in "${GLOBAL_PATH}" "${LOCAL_PATH}" "${NODELIST}" ${CONCURRENCY}
+
+   beeond_print_info "Done."
+}
+
+do_stop()
+{
+   local LOCAL_PATH="${1}"
+
+   if [ "${LOCAL_PATH}" = "" ]
+   then
+      beeond_print_error_and_exit "No path specified."
+   fi
+
+   # Expand relative local path.
+   # Note: Don't have to ensure that it's an absolute path here: We confirm it's a BeeOND instance
+   #       by looking for the session info file.
+   if [ ! "${LOCAL_PATH:0:1}" = "/" ]
+   then
+      LOCAL_PATH="${PWD}/${LOCAL_PATH}"
+   fi
+
+   # Read parameters from session info file.
+   NODEFILE=$(grep NodeFile "${LOCAL_PATH}/${BEEOND_SESSION_FILE}" | cut -d = -f 2-)
+   GLOBAL_PATH=$(grep GlobalPath "${LOCAL_PATH}/${BEEOND_SESSION_FILE}" | cut -d = -f 2-)
+
+   if [ "${NODEFILE}" = "" ]
+   then
+      beeond_print_error "Error reading node file name from session file."
+      MISSING_PARAM=1
+   fi
+   if [ "${GLOBAL_PATH}" = "" ]
+   then
+      beeond_print_error "Error reading global path from session file."
+      MISSING_PARAM=1
+   fi
+
+   [ "${MISSING_PARAM}" = "1" ] && exit 1
+
+   if [ ! -e "${NODEFILE}" ]
+   then
+      beeond_print_error_and_exit "Node file does not exist."
+   fi
+
+   beeond_print_info "BeeOND shutdown..."
+
+   beeond_print_info "nodefile: ${NODEFILE}"
+   beeond_print_info "global path: ${GLOBAL_PATH}"
+   beeond_print_info "local path: ${LOCAL_PATH}"
+
+   NODES=( $(grep -v '^$' "${NODEFILE}" | uniq) ) # Store as array and ignore empty lines.
+   NODELIST=$(IFS=,; echo "${NODES[*]}")
+
+   local CONCURRENCY=$(( $(wc -l < "${NODEFILE}") ))
+   beeond_print_info "Concurrency: ${CONCURRENCY}"
+
+   beeond_stage_out "${GLOBAL_PATH}" "${LOCAL_PATH}" "${NODELIST}" ${CONCURRENCY}
+
+   beeond_print_info "Done."
+}
+
+do_copy()
+{
+   local NODEFILE="${1}"
+   shift
+
+   beeond_print_info "BeeOND copy..."
+
+   if [ "${NODEFILE}" = "" ]
+   then
+      beeond_print_error "No nodefile specified."
+   fi
+
+   # Expand relative path to nodefile.
+   if [ ! "${NODEFILE:0:1}" = "/" ]
+   then
+      NODEFILE="${PWD}/${NODEFILE}"
+   fi
+
+   if [ ! -e "${NODEFILE}" ]
+   then
+      beeond_print_error_and_exit "Node file does not exist."
+   fi
+
+   NODES=( $(grep -v '^$' "${NODEFILE}" | uniq) ) # Store as array and ignore empty lines.
+   NODELIST=$(IFS=,; echo "${NODES[*]}")
+
+   local CONCURRENCY=$(( $(wc -l < "${NODEFILE}") ))
+   beeond_print_info "Concurrency: ${CONCURRENCY}"
+
+   beeond_copy "${NODELIST}" "${CONCURRENCY}" "$@"
+}
+
+# Print help if no arguments given.
+if [ $# -eq 0 ] ; then
+   print_usage_and_exit
+fi
+
+# Do it.
+ACTION="${1}"
+
+if [ "${ACTION}" = "stagein" ]
+then
+   shift
+   while getopts ":n:g:l:" opt; do
+      case $opt in
+         n)
+            NODEFILE="${OPTARG}"
+         ;;
+         g)
+            GLOBAL_PATH="${OPTARG}"
+         ;;
+         l)
+            LOCAL_PATH="${OPTARG}"
+         ;;
+         \?)
+            beeond_print_error_and_exit "Invalid option: -${OPTARG}."
+         ;;
+         :)
+            beeond_print_error_and_exit "Option -${OPTARG} requires an argument."
+         ;;
+      esac
+   done
+
+   do_start "${NODEFILE}" "${GLOBAL_PATH}" "${LOCAL_PATH}"
+elif [ "${ACTION}" = "stageout" ]
+then
+   shift
+   while getopts ":l:" opt; do
+      case $opt in
+         l)
+            LOCAL_PATH="${OPTARG}"
+         ;;
+         \?)
+            beeond_print_error_and_exit "Invalid option: -${OPTARG}."
+         ;;
+         :)
+            beeond_print_error_and_exit "Option -${OPTARG} requires an argument."
+         ;;
+      esac
+   done
+
+   do_stop "${LOCAL_PATH}"
+elif [ "${ACTION}" = "copy" ]
+then
+   shift
+
+   # Nodefile has to be given as the only command line argument.
+   if getopts ":n:" opt
+   then
+      if [ "$opt" = "n" ]
+      then
+         NODEFILE="${OPTARG}"
+      else
+         beeond_print_error_and_exit "Invalid option: -${opt}"
+      fi
+
+   else
+      beeond_print_error_and_exit "No nodefile specified."
+   fi
+
+   # All following command line arguments are file or directory names, specifying the sources and
+   # the target of the copy ancion
+   shift # shift out -n parameter
+   shift # shift out name of node file
+
+   do_copy "${NODEFILE}" "$@"
+elif [ "${ACTION}" = "info" ]
+then
+   do_print_info
+else
+   print_usage_and_exit
+fi

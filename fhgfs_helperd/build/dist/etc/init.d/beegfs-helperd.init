@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+### BEGIN INIT INFO
+# Provides:          beegfs-helperd
+# Required-Start:
+# Should-Start:      $network
+# Required-Stop:
+# Should-Stop:       $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# chkconfig:         35 98 6
+# Short-Description: BeeGFS Helperd
+# Description:       Start BeeGFS Helperd
+### END INIT INFO
+
+APP_NAME="BeeGFS Client Helper Daemon"
+SERVICE_NAME=beegfs-helperd
+
+# source function library
+. /etc/beegfs/lib/start-stop-functions
+. /etc/beegfs/lib/init-multi-mode

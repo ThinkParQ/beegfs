@@ -1,0 +1,396 @@
+#!/bin/bash
+
+# beegfs-ondemand-stoplocal
+# This file contains helper functions to stop BeeOND services locally on one node.
+# This is meant to be sourced from another script (i.e. beeond)
+
+
+# Checks the return code of the last command that has been executed. If the code is !=0, indicating
+# an error, it prints a message and sets an error flag.
+# Parameters:
+#     * The return code of the last command
+#     * A string containing a hint on what was being done that could have caused the error. It is
+#       used for the error message.
+# Modifies:
+#     ERROR: Is set to "true" when an error was encountered.
+sl_checkerror()
+{
+   if [ "${1}" != 0 ]
+   then
+      echo "ERROR: There was a problem ${2} on host $(hostname)"
+      ERROR="true"
+   fi
+}
+
+# Prints an info message if the QUIET variable is not set.
+# Parameter:
+#     A string (the message). It is prefixed with INFO when printed.
+# Checks:
+#     QUIET: If "true", nothing is printed.
+sl_print_info()
+{
+   local MESSAGE=${1}
+   if [ "${QUIET}" != "true" ]
+   then
+      echo "INFO: ${MESSAGE}"
+   fi
+}
+
+# unmounts tmpfs mounts listed in the status file
+sl_unmount_tmpfs()
+{
+   local SERVICE MOUNTPOINT _
+   IFS=,
+   while read -r _ SERVICE MOUNTPOINT _ _
+   do
+      if [ "${SERVICE}" != "tmpfs" ]
+      then
+         continue
+      fi
+
+      sl_print_info "Unmounting tmpfs at ${MOUNTPOINT}"
+
+      if [ "${CLEANUP}" != "true" ]
+      then
+         fuser -k "${MOUNTPOINT}"
+         umount -l "${MOUNTPOINT}"
+
+         sl_checkerror $? "unmounting tmpfs"
+      else
+         fuser -k "${MOUNTPOINT}" 2>/dev/null
+         umount -l "${MOUNTPOINT}" 2>/dev/null
+         true
+      fi
+   done < "${STATUSFILE}"
+   unset IFS
+}
+
+# Unmounts all local mounts listed in the status file
+sl_unmount_local_mounts()
+{
+   local SERVICE MOUNTPOINT _
+   IFS=,
+   while read -r _ SERVICE MOUNTPOINT _ _
+   do
+      if [ "${SERVICE}" != "${CLIENTSERVICE}" ]
+      then
+         continue
+      fi
+
+      sl_print_info "Unmounting ${MOUNTPOINT}"
+      if [ "${CLEANUP}" != "true" ]
+      then
+         fuser -k "${MOUNTPOINT}" # no "sl_checkerror" after this, becuase fuser also returns
+                                  # non-zero when there are no processes accessing the file system
+         umount -l "${MOUNTPOINT}"
+         sl_checkerror $? "unmounting the ondemand file system"
+      else
+         fuser -k "${MOUNTPOINT}" 2>/dev/null
+         umount -l "${MOUNTPOINT}" 2>/dev/null
+         true # reset error code before next invocation of sl_checkerror
+      fi
+   done < "${STATUSFILE}"
+   unset IFS
+}
+
+# sends a SIGTERM to a process, then waits until the process is stopped or appriximately 10 seconds
+# have passed.
+# Parameter:
+#     The PID of the proces
+# Returns:
+#     0 if process was stopped within 10 seconds, 1 if it wasn't, 255 if initial kill returned an
+#     error.
+sl_kill_check()
+{
+   local PID=$1
+
+   if ! kill "$PID"
+   then
+      return 255
+   fi
+
+   for ((i=0; i<100; i++))
+   do
+      if kill -0 "$PID" 2>/dev/null
+      then
+         sleep 0.1
+      else
+         return 0
+      fi
+   done
+
+   return 1
+}
+
+# stops all services listed in the status file except for clients
+sl_stop_services()
+{
+   local SERVICE DATAPATH PIDFILE _
+   IFS=,
+   while read -r _ SERVICE DATAPATH _ PIDFILE
+   do
+      if [ "${PIDFILE}" != "-" ] # pidfile is "-" for beegfs-client and tmpfs, because it is not
+                                 # a process
+      then
+         if [ -e "${PIDFILE}" ]
+         then
+            PID=$(cat "${PIDFILE}")
+            sl_kill_check "${PID}"
+            RES=$?
+            if [ $RES -eq 1 ]
+            then
+               echo "ERROR: ${SERVICE} did not stop within 10 seconds (PID ${PID})."
+               ERROR="true"
+            elif [ $RES -eq 255 ]
+            then
+               echo "ERROR: ${SERVICE} does not seem to be running any more (PID ${PID})."
+            fi
+         else
+            if [ "${CLEANUP}" != "true" ]
+            then
+               echo "ERROR: PID file ${PIDFILE} does not exist on host $(hostname)"
+               ERROR="true"
+            fi
+         fi
+
+         # delete data...
+         if [ "${DELETE_DATA}" = "true" ]
+         then
+            if [ "${DATAPATH}" != "-" ]
+            then
+               sl_print_info "Deleting stored data; Data path: ${DATAPATH}"
+               rm -rf "${DATAPATH}"
+               sl_checkerror $? "deleting ${DATAPATH}"
+            fi
+         fi
+
+      # delete preferredMds and preferredTarget files
+      rm -f "${PREFERRED_MDS_FILE}"
+      sl_checkerror $? "deleting ${PREFERRED_MDS_FILE}"
+      rm -f "${PREFERRED_TARGET_FILE}"
+      sl_checkerror $? "deleting ${PREFERRED_TARGET_FILE}"
+      fi
+   done < "${STATUSFILE}"
+   unset IFS
+
+   # unmount tempfs if it was used
+   sl_unmount_tmpfs
+}
+
+# deletes the logfiles listed in the status file if ERROR is set to false
+# If the log directory is empty afterwards, it is also deleted
+sl_delete_logfiles()
+{
+   local LOGFILE # declare it here, because the last LOGFILE path is needed to delete the directory
+                 # after the loop
+
+   # delete log files
+   if [ "${ERROR}" != "true" ] # if we haven't encountered an error yet.
+   then
+      # delete log files
+      local SERVICE LOGFILE _
+      IFS=,
+      while read -r _ SERVICE _ LOGFILE _
+      do
+         if [ "${ONLY_UNMOUNT}" = "true" ] && [ "${SERVICE}" != "${CLIENTSERVICE}" ]
+            then continue; fi
+         if [ "${ONLY_STOP_SERVER}" = "true" ] && [ "${SERVICE}" = "${CLIENTSERVICE}" ]
+            then continue; fi
+         if [ "${LOGFILE}" != "-" ]
+         then
+            sl_print_info "Deleting log file ${LOGFILE}"
+            rm -f "${LOGFILE}" 2>/dev/null  # beegfs-client does not (always) generate a logfile.
+                                          # in this case rm gives an error message, but we don't
+                                          # want to see it. - for the same reason no sl_checkerror
+                                          # here
+         fi
+      done < "${STATUSFILE}"
+      unset IFS
+
+      # delete log directory if empty
+      local LOG_DIR
+      LOG_DIR=$(dirname "${LOGFILE}")
+      if [ "${LOG_DIR}" != "." ] && [ ! "$(ls -A "${LOG_DIR}")" ]
+      then
+         echo "Deleting log directory ${LOG_DIR}"
+         rmdir "${LOG_DIR}"
+         sl_checkerror $? "deleting ${LOG_DIR}"
+      fi
+   else
+      sl_print_info "Not deleting log files because of a previous error."
+   fi
+}
+
+# The "main" stoplocal function. From here, the functions to unmount the file system and stop the
+# services are called. If there was no error, sl_delete_logfiles is called, and the status file is
+# also removed.
+# Checks the following variables:
+#     STATUSFILE        The location of the status file
+#     ONLY_STOP_SERVER  If "true", the umount_local_mounts step is skipped, and status file is not
+#                       removed.
+#     ONLY_UNMOUNT      If "true", the stop_services step is skipped, and status file is not
+#                       removed.
+# Modifies:
+#     ERROR             Is set to "true" (and an error message is printed to %2) if an error is
+#                       encountered in any step.
+stoplocal()
+{
+   sl_print_info "Using status file ${STATUSFILE}"
+
+   # do the actual shutdown process
+
+   # unmount the file system (skip this step if we only want to stop the server)
+   if [ "${ONLY_STOP_SERVER}" != "true" ]
+   then
+      sl_unmount_local_mounts
+   fi
+
+   # stop the services (skip this step if we only got asked to unmount the file system)
+   if [ "${ONLY_UNMOUNT}" != "true" ]
+   then
+      sl_stop_services
+   fi
+
+   # delete the logfiles
+   if [ "${ERROR}" != "true" ] && [ "${DELETE_LOGS}" = "true" ]
+   then
+      sl_delete_logfiles
+   fi
+
+
+   # delete the status file (only if a full shutdown was requested)
+   if [ "${ONLY_UNMOUNT}" != "true" ] && [ "${ONLY_STOP_SERVER}" != "true" ]
+   then
+      rm -f "${STATUSFILE}"
+      sl_checkerror $? "deleting the status file"
+   fi
+}
+
+# the user interface / main entry point to stoplocal
+# Options:
+#   -i FILENAME => Status information filename
+#                  (DEFAULT: ${DEFAULT_STATUSFILE})
+#   -d          => Delete BeeGFS data on disks
+#   -L          => Delete log files after successful shutdown
+#   -q          => Suppress \"INFO\" messages, only print \"ERROR\"s
+#   -c          => "Cleanup": Remove remaining processes and directories of a
+#                  potentially unsuccessful shutdown of an earlier beeond
+#                  instance. This switch silences the error message when a status
+#                  information file is not found or an unmount command fails;
+#                  instead, a message is printed (if \"INFO\" messages are not
+#                  suppressed) when a status file DOES exist, because this means
+#                  there actually was an instance before that is now being
+#                  cleaned up.
+#   -u          => ONLY unmount the file systems(*)
+#   -s          => ONLY stop non-client services(*)
+#
+#                  (*) Options -u and -s are mutually exclusive
+#                      If -u or -s are given, the status file is not deleted.
+do_stoplocal()
+{
+   local DEFAULT_STATUSFILE=/tmp/beeond.tmp
+   local CLIENTSERVICE=beegfs-client
+   local DELETE_DATA="false"
+   local DELETE_LOGS="false"
+   local ONLY_UNMOUNT="false"
+   local ONLY_STOP_SERVER="false"
+   local PREFERRED_MDS_FILE=/tmp/preferredMds.fod
+   local PREFERRED_TARGET_FILE=/tmp/preferredTarget.fod
+   local QUIET="false"
+
+   local ERROR="false"
+   local STATUSFILE="${DEFAULT_STATUSFILE}"
+
+   local OPTIND=1
+   local OPTARG=""
+   while getopts ":i:dLusqc" opt "$@"
+   do
+      case $opt in
+         i)
+            STATUSFILE=${OPTARG}
+         ;;
+         d)
+            DELETE_DATA="true"
+         ;;
+         L)
+            DELETE_LOGS="true"
+         ;;
+         u)
+            if [ "${ONLY_STOP_SERVER}" = "true" ]
+            then
+               echo "ERROR: Options -s and -${OPTARG} are mutually exclusive" >&2
+               if declare -f -F print_usage_and_exit >/dev/null
+                  then print_usage_and_exit; fi
+               return 1
+            fi
+            ONLY_UNMOUNT="true"
+         ;;
+         s)
+            if [ "${ONLY_UNMOUNT}" = "true" ]
+            then
+               echo "ERROR: Options -u and -${OPTARG} are mutually exclusive" >&2
+               if declare -f -F print_usage_and_exit >/dev/null
+                  then print_usage_and_exit; fi
+               return 1
+            fi
+            ONLY_STOP_SERVER="true"
+         ;;
+         q)
+            QUIET="true"
+         ;;
+         c)
+            CLEANUP="true"
+         ;;
+         \?)
+            echo "ERROR: invalid option -${OPTARG}" >&2
+            if declare -f -F print_usage_and_exit >/dev/null
+               then print_usage_and_exit; fi
+            return 1
+         ;;
+         :)
+            echo "ERROR: Option -${OPTARG} requires an argument" >&2
+            if declare -f -F print_usage_and_exit >/dev/null
+               then print_usage_and_exit; fi
+            return 1
+         ;;
+      esac
+   done
+
+   # if statusfile can't be found, print a message and exit.
+   if [ ! -f ${STATUSFILE} ]
+   then
+      # only print message when we're not doing a cleanup run.
+      if [ "${CLEANUP}" != "true" ]
+      then
+         echo "ERROR: Status file ${STATUSFILE} not found." >&2
+
+         # If the user has specified a status file, just give a brief error message and exit.
+         # If the user has not specified a status file, give the full usage info - maybe the user
+         # didn't know how to specify a status file.
+         if [ "${STATUSFILE}" = "${DEFAULT_STATUSFILE}" ]
+         then
+            if declare -f -F "print_usage_and_exit" >/dev/null
+               then print_usage_and_exit; fi
+         fi
+
+         return 1
+      else
+         return 0 # return 0 if we're doing a cleanup so that pdsh doesn't complain
+      fi
+   fi
+
+   # if we're doing a cleanup run, inform the user that a status file was found.
+   if [ "${CLEANUP}" = "true" ]
+   then
+      sl_print_info "Status file found."
+   fi
+
+   stoplocal
+
+   if [ "${ERROR}" = "true" ]
+   then
+      return 1
+   else
+      return 0
+   fi
+}

@@ -1,0 +1,12 @@
+PACK_SUMMARY="BeeGFS Client"
+PACK_NAME="beegfs_client"
+ONLINECFG="beegfs_online_cfg"
+FSCK="beegfs_fsck"
+
+CMAKE_PATH=/tmp/cmake-2.8.1
+CPACK=${CMAKE_PATH}/bin/cpack
+CMAKE=${CMAKE_PATH}/bin/cmake
+
+PACK_DIR=$(pwd)/packages
+
+KDIR=/home/beegfs/linux-2.6.16.1

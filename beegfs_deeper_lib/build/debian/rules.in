@@ -1,0 +1,135 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+DEB_BUILD_ROOT = debian/__NAME__
+BEEGFS_COMMON_PATH = __BEEGFS_COMMON_PATH__
+BEEGFS_COMMON_PACKAGE_PATH = __BEEGFS_COMMON_PACKAGE_PATH__
+BEEGFS_OPENTK_PATH = __BEEGFS_OPENTK_PATH__
+BEEGFS_THIRDPARTY_PATH = __BEEGFS_THIRDPARTY_PATH__
+BEEGFS_DEEPER_CACHED_PATH = __BEEGFS_DEEPER_CACHED_PATH__
+BEEGFS_DEEPER_COMMON_PATH = __BEEGFS_DEEPER_COMMON_PATH__
+
+GENERIC_INITSCRIPT = __BEEGFS_COMMON_PACKAGE_PATH__/build/dist/etc/init.d/beegfs-service.init
+COMMON_SCRIPT_PATH = __BEEGFS_COMMON_PACKAGE_PATH__/scripts/etc/beegfs/lib
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	# nothing to do for us
+	touch configure-stamp
+	
+build: build-stamp
+
+build-stamp: $(QUILT_STAMPFN) configure-stamp 
+	dh_testdir
+
+	make root-dir='__ROOT_DIR__' \
+		BEEGFS_VERSION='__BEEGFS_VERSION__' \
+		BEEGFS_COMMON_PATH='__BEEGFS_COMMON_PATH__' \
+		BEEGFS_OPENTK_PATH='__BEEGFS_OPENTK_PATH__' \
+		BEEGFS_THIRDPARTY_PATH='__BEEGFS_THIRDPARTY_PATH__' \
+		BEEGFS_DEEPER_COMMON_PATH='__BEEGFS_DEEPER_COMMON_PATH__' \
+		BEEGFS_DEEPER_CACHED_PATH='__BEEGFS_DEEPER_CACHED_PATH__' \
+		USER_CXXFLAGS='__USER_CXXFLAGS__' \
+		USER_LDFLAGS='__USER_LDFLAGS__' \
+		-j __MAKE_CONCURRENCY__ \
+		package_lib
+
+	touch build-stamp
+
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp 
+
+	make clean
+
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	# manual installation
+	# add init script and add the genric part of the init script from the common package
+	mkdir -p $(DEB_BUILD_ROOT)/etc/init.d/
+	install -D __BEEGFS_DEEPER_CACHED_PATH__/build/dist/etc/init.d/__NAME_DAEMON__.init \
+		debian/__NAME__.__NAME_DAEMON__.init
+	cat $(GENERIC_INITSCRIPT) >> debian/__NAME__.__NAME_DAEMON__.init
+	
+	#install systemd unit description, debian installs the service file in /lib/systemd/system/
+	install -D -m644 __BEEGFS_DEEPER_CACHED_PATH__/build/dist/usr/lib/systemd/system/__NAME_DAEMON__.service \
+		debian/__NAME__.__NAME_DAEMON__.service
+	
+	#add helper scripts for deeper-cached
+	install -D -m644 $(COMMON_SCRIPT_PATH)/start-stop-functions \
+		$(DEB_BUILD_ROOT)/etc/beegfs/lib/start-stop-functions.__NAME_DAEMON__
+	install -D -m644 $(COMMON_SCRIPT_PATH)/init-multi-mode \
+		$(DEB_BUILD_ROOT)/etc/beegfs/lib/init-multi-mode.__NAME_DAEMON__
+
+	#add shared lib and daemon binary
+	install -D libbeegfs-deeper.so \
+		$(DEB_BUILD_ROOT)/opt/beegfs/lib/libbeegfs-deeper.so
+	install -D __BEEGFS_DEEPER_CACHED_PATH__/build/__NAME_DAEMON__ \
+		$(DEB_BUILD_ROOT)/opt/beegfs/sbin/__NAME_DAEMON__
+
+	#add configuration files for lib and daemon
+	install -D dist/etc/beegfs/__NAME__.conf \
+		$(DEB_BUILD_ROOT)/etc/beegfs/__NAME__.conf
+	install -D __BEEGFS_DEEPER_CACHED_PATH__/build/dist/etc/default/__NAME_DAEMON__ \
+		$(DEB_BUILD_ROOT)/etc/default/__NAME_DAEMON__
+	install -D dist/etc/ld.so.conf.d/beegfs-deeper.conf.in \
+		$(DEB_BUILD_ROOT)/etc/ld.so.conf.d/beegfs-deeper.conf		
+
+	#add include file and code example
+	install -D ../include/deeper/deeper_cache.h \
+		$(DEB_BUILD_ROOT)/usr/include/deeper/deeper_cache.h
+	install -D dist/usr/share/doc/__NAME__/examples/beegfs-deeper-lib-example.cpp \
+		$(DEB_BUILD_ROOT)/usr/share/doc/__NAME__/examples/beegfs-deeper-lib-example.cpp
+
+	#create symlinks for lib to default lib location and and symlink for daemon configuration file
+	mkdir -p $(DEB_BUILD_ROOT)/usr/lib/
+	ln -s /opt/beegfs/lib/libbeegfs-deeper.so $(DEB_BUILD_ROOT)/usr/lib/libbeegfs-deeper.so
+	ln -s /etc/beegfs/__NAME__.conf $(DEB_BUILD_ROOT)/etc/beegfs/__NAME_DAEMON__.conf
+
+
+# Build architecture-independent files here.
+binary-indep:
+# We have nothing to do by default.
+
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs 
+	dh_installdocs
+	dh_installexamples
+
+	dh_systemd_enable --name=__NAME_DAEMON__
+	dh_installinit --name=__NAME_DAEMON__ --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
+	dh_installman
+	dh_link
+	dh_strip --dbg-package=__NAME__-dbg
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_lintian
+
+
+override_dh_strip:
+	dh_strip --dbg-package=__NAME__-dbg
+
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure override_dh_strip

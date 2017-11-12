@@ -1,0 +1,46 @@
+#!/bin/bash 
+
+NAME=beegfs-client-devel
+SPEC_FILE=${NAME}.spec
+
+source ../../beegfs-version
+
+uname -m | grep x86_64 > /dev/null 2>&1
+if [ $? -eq 0 ]
+then
+   BUILDARCH="x86_64"
+else
+   BUILDARCH="i686"
+fi
+
+set -e
+
+pushd ../ 
+TOOLS_ROOT=`pwd`
+popd 
+BUILD="${TOOLS_ROOT}/build"
+mkdir -p $BUILD/buildroot/{BUILD,RPMS,S{RPMS,PECS,OURCES}}
+
+rm -f $BUILD/buildroot/SOURCES/*.tgz
+
+BEEGFS_OPENTK_PATH=${BEEGFS_OPENTK_PATH:-`readlink -f ../../beegfs_opentk_lib`}
+BEEGFS_COMMON_PATH=${BEEGFS_COMMON_PATH:-`readlink -f ../../beegfs_common`}
+
+
+pushd $TOOLS_ROOT
+tar czf $BUILD/buildroot/SOURCES/${NAME}-${BEEGFS_VERSION}.tgz   --exclude=buildroot/* *
+cd $BUILD
+sed 	-e "s#%BEEGFS_OPENTK_PATH%#$BEEGFS_OPENTK_PATH#" \
+	-e "s#%BEEGFS_COMMON_PATH%#$BEEGFS_COMMON_PATH#" \
+	-e "s/%NAME%/$NAME/g" \
+	-e "s/%BEEGFS_VERSION%/$BEEGFS_VERSION/"   \
+	-e "s/%BUILDARCH%/$BUILDARCH/"   \
+	${SPEC_FILE}.in > ${SPEC_FILE}
+
+rpmbuild --clean -bb ${SPEC_FILE} --define "_topdir $BUILD/buildroot/" --define "__os_install_post %{nil}" --define "__debug_install_post %{nil}"
+
+popd
+
+rm -fr /var/tmp/${NAME}-root/
+rm -f /var/tmp/rpm-tmp.*
+

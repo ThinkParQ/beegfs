@@ -1,0 +1,14 @@
+[Unit]
+Description=BeeGFS Mon Server (multimode)
+Documentation=http://www.beegfs.com/content/documentation/
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service
+After=network-online.target beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service zfs.target
+
+[Service]
+ExecStart=/opt/beegfs/sbin/beegfs-mon cfgFile=/etc/beegfs/%I.d/beegfs-mon.conf runDaemonized=false
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

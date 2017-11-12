@@ -1,0 +1,12 @@
+[Unit]
+Description=Start BeeGFS DEEP-ER cache daemon
+After=beegfs-client
+
+[Service]
+ExecStart=/etc/init.d/beegfs-deeper-cached start
+ExecStop=/etc/init.d/beegfs-deeper-cached stop
+Type=forking
+PIDFile=/var/run/beegfs-deeper-cached.pid
+
+[Install]
+WantedBy=multi-user.target

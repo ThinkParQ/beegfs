@@ -1,0 +1,292 @@
+#include "App.h"
+
+#include <app/SignalHandler.h>
+#include <common/components/ComponentInitException.h>
+#include <common/components/worker/DummyWork.h>
+
+
+App::App(int argc, char** argv) :
+   argc(argc), argv(argv)
+{}
+
+void App::run()
+{
+   try
+   {
+      cfg = boost::make_unique<Config>(argc,argv);
+      runNormal();
+      appResult = AppCode::NO_ERROR;
+   }
+   catch (const InvalidConfigException& e)
+   {
+      std::ostringstream err;
+      err << "Config error: " << e.what() << std::endl
+            << "[BeeGFS Mon Version: " << BEEGFS_VERSION << std::endl
+            << "Refer to the default config file (/etc/beegfs/beegfs-mon.conf)" << std::endl
+            << "or visit http://www.beegfs.com to find out about configuration options.]";
+      printOrLogError(err.str());
+      appResult = AppCode::INVALID_CONFIG;
+   }
+   catch (const ComponentInitException& e)
+   {
+      printOrLogError("Component initialization error: " + std::string(e.what()));
+      appResult = AppCode::INITIALIZATION_ERROR;
+   }
+   catch (const std::runtime_error& e)
+   {
+      printOrLogError("Runtime error: " + std::string(e.what()));
+      appResult = AppCode::RUNTIME_ERROR;
+   }
+   catch (const std::exception& e)
+   {
+      printOrLogError("Generic error: " + std::string(e.what()));
+      appResult = AppCode::RUNTIME_ERROR;
+   }
+}
+
+void App::printOrLogError(const std::string& text) const
+{
+   if (Logger::isInitialized())
+      LOG(GENERAL, ERR, text);
+   else
+      std::cerr << std::endl << text << std::endl << std::endl;
+}
+
+void App::runNormal()
+{
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(),
+         cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
+         cfg->getLogNumRotatedFiles());
+
+   pidFileLockFD = createAndLockPIDFile(cfg->getPIDFile());
+   initDataObjects();
+   SignalHandler::registerSignalHandler(this);
+   initLocalNodeInfo();
+   initWorkers();
+   initComponents();
+
+   RDMASocket::rdmaForkInitOnce();
+
+
+   if (cfg->getRunDaemonized())
+      daemonize();
+
+   logInfos();
+
+   // make sure components don't receive SIGINT/SIGTERM (blocked signals are inherited)
+   PThread::blockInterruptSignals();
+   startWorkers();
+   startComponents();
+   PThread::unblockInterruptSignals();
+
+   joinComponents();
+   joinWorkers();
+}
+
+void App::initLocalNodeInfo()
+{
+   bool useSDP = cfg->getConnUseSDP();
+   bool useRDMA = cfg->getConnUseRDMA();
+   unsigned portUDP = cfg->getConnAdmonPortUDP();
+
+   StringList allowedInterfaces;
+   std::string interfacesFilename = cfg->getConnInterfacesFile();
+   if (interfacesFilename.length() )
+      cfg->loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
+
+   NetworkInterfaceCard::findAll(&allowedInterfaces, useSDP, useRDMA, &localNicList);
+
+   if (localNicList.empty() )
+      throw InvalidConfigException("Couldn't find any usable NIC");
+
+   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
+
+   std::string nodeID = System::getHostname();
+
+   localNode = std::make_shared<LocalNode>(nodeID, NumNodeID(1), portUDP, 0, localNicList);
+}
+
+void App::initDataObjects()
+{
+   netFilter = boost::make_unique<NetFilter>(cfg->getConnNetFilterFile());
+   tcpOnlyFilter = boost::make_unique<NetFilter>(cfg->getConnTcpOnlyFilterFile());
+   netMessageFactory = boost::make_unique<NetMessageFactory>();
+   tsdb = boost::make_unique<TSDatabase>(cfg.get());
+   workQueue = boost::make_unique<MultiWorkQueue>();
+
+   targetMapper = boost::make_unique<TargetMapper>();
+
+   metaNodes = boost::make_unique<NodeStoreMetaEx>();
+   storageNodes = boost::make_unique<NodeStoreStorageEx>();
+   mgmtNodes = boost::make_unique<NodeStoreMgmtEx>();
+
+   metaBuddyGroupMapper = boost::make_unique<MirrorBuddyGroupMapper>();
+   storageBuddyGroupMapper = boost::make_unique<MirrorBuddyGroupMapper>();
+}
+
+void App::initComponents()
+{
+   nodeListRequestor = boost::make_unique<NodeListRequestor>(this);
+   statsCollector = boost::make_unique<StatsCollector>(this);
+   cleanUp = boost::make_unique<CleanUp>(this);
+}
+
+void App::startComponents()
+{
+   LOG(GENERAL, DEBUG, "Starting components...");
+   nodeListRequestor->start();
+   statsCollector->start();
+   cleanUp->start();
+   LOG(GENERAL, DEBUG, "Components running.");
+}
+
+void App::stopComponents()
+{
+   if (nodeListRequestor)
+      nodeListRequestor->selfTerminate();
+   if (statsCollector)
+      statsCollector->selfTerminate();
+   if (cleanUp)
+      cleanUp->selfTerminate();
+
+   stopWorkers();
+   selfTerminate();
+}
+
+void App::joinComponents()
+{
+   LOG(GENERAL, DEBUG, "Joining Component threads...");
+   nodeListRequestor->join();
+   statsCollector->join();
+   cleanUp->join();
+   LOG(GENERAL, CRITICAL, "All components stopped. Exiting now.");
+}
+
+void App::initWorkers()
+{
+   const unsigned numDirectWorkers = 1;
+   const unsigned workersBufSize = 1024*1024;
+
+   unsigned numWorkers = cfg->getTuneNumWorkers();
+
+   for (unsigned i=0; i < numWorkers; i++)
+   {
+      auto worker = boost::make_unique<Worker>("Worker" + StringTk::intToStr(i+1),
+            workQueue.get(), QueueWorkType_INDIRECT);
+
+      worker->setBufLens(workersBufSize, workersBufSize);
+      workerList.push_back(std::move(worker));
+   }
+
+   for (unsigned i=0; i < numDirectWorkers; i++)
+   {
+      auto worker = boost::make_unique<Worker>("DirectWorker" + StringTk::intToStr(i+1),
+            workQueue.get(), QueueWorkType_DIRECT);
+
+      worker->setBufLens(workersBufSize, workersBufSize);
+      workerList.push_back(std::move(worker));
+   }
+}
+
+void App::startWorkers()
+{
+   for (auto worker = workerList.begin(); worker != workerList.end(); worker++)
+   {
+      (*worker)->start();
+   }
+}
+
+void App::stopWorkers()
+{
+   // need two loops because we don't know if the worker that handles the work will be the same that
+   // received the self-terminate-request
+   for (auto worker = workerList.begin(); worker != workerList.end(); worker++)
+   {
+      (*worker)->selfTerminate();
+
+      // add dummy work to wake up the worker immediately for faster self termination
+      PersonalWorkQueue* personalQ = (*worker)->getPersonalWorkQueue();
+      workQueue->addPersonalWork(new DummyWork(), personalQ);
+   }
+}
+
+void App::joinWorkers()
+{
+
+   for (auto worker = workerList.begin(); worker != workerList.end(); worker++)
+   {
+      waitForComponentTermination((*worker).get());
+   }
+}
+
+void App::logInfos()
+{
+   LOG(GENERAL, CRITICAL, std::string("Version: ") + BEEGFS_VERSION);
+#ifdef BEEGFS_DEBUG
+   LOG(GENERAL, DEBUG, "--DEBUG VERSION--");
+#endif
+
+   std::string nicListStr;
+   std::string extendedNicListStr;
+   for (auto nicIter = localNicList.begin(); nicIter != localNicList.end(); nicIter++)
+   {
+      std::string nicTypeStr;
+
+      if (nicIter->nicType == NICADDRTYPE_RDMA)
+         nicTypeStr = "RDMA";
+      else
+      if (nicIter->nicType == NICADDRTYPE_SDP)
+         nicTypeStr = "SDP";
+      else
+      if (nicIter->nicType == NICADDRTYPE_STANDARD)
+         nicTypeStr = "TCP";
+      else
+         nicTypeStr = "Unknown";
+
+      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
+
+      extendedNicListStr += "\n+ ";
+      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&*nicIter) + " ";
+   }
+
+   LOG(GENERAL, WARNING, std::string("Usable NICs: ") + nicListStr);
+   LOG(GENERAL, DEBUG, std::string("Extended List of usable NICs: ") + extendedNicListStr);
+
+   // print net filters
+   if (netFilter->getNumFilterEntries() )
+   {
+      LOG(GENERAL, WARNING, std::string("Net filters: ")
+            + StringTk::uintToStr(netFilter->getNumFilterEntries() ) );
+   }
+
+   if (tcpOnlyFilter->getNumFilterEntries() )
+   {
+      LOG(GENERAL, WARNING, std::string("TCP-only filters: ")
+            + StringTk::uintToStr(tcpOnlyFilter->getNumFilterEntries() ) );
+   }
+}
+
+void App::daemonize()
+{
+   int nochdir = 1; // 1 to keep working directory
+   int noclose = 0; // 1 to keep stdin/-out/-err open
+
+   LOG(GENERAL, CRITICAL, "Detaching process...");
+
+   int detachRes = daemon(nochdir, noclose);
+   if (detachRes == -1)
+      throw std::runtime_error(std::string("Unable to detach process: ")
+            + System::getErrString());
+
+   updateLockedPIDFile(pidFileLockFD); // ignored if pidFileFD is -1
+}
+
+void App::handleComponentException(std::exception& e)
+{
+   LOG(GENERAL, CRITICAL, "This component encountered an unrecoverable error.", sysErr(),
+         as("Exception", e.what()));
+
+   LOG(GENERAL, WARNING, "Shutting down...");
+   stopComponents();
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Start BeeGFS DEEP-ER cache daemon
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=openibd.service openib.service rdma.service opensmd.service opensm.service
+After=network-online.target openibd.service openib.service rdma.service opensmd.service opensm.service zfs.target
+
+[Service]
+ExecStart=/etc/init.d/beegfs-deeper-cached start
+ExecStop=/etc/init.d/beegfs-deeper-cached stop
+Type=forking
+# We disable PIDFile= because it doesn't work with multi-mode configurations
+#PIDFile=/var/run/beegfs-mgmtd.pid
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+Source: beegfs-storage
+Section: misc
+Priority: optional
+Maintainer: BeeGFS Maintainers <packages@beegfs.com>
+Build-Depends: debhelper (>= 7.0.0), lsb-release
+Standards-Version: 3.8.0
+
+Package: beegfs-storage
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-opentk-lib (= __BEEGFS_DEB_FULLVERSION__), beegfs-common (= __BEEGFS_DEB_FULLVERSION__)
+Description: BeeGFS storage server daemon
+ This package contains the BeeGFS storage server binaries.
+
+Package: beegfs-storage-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-storage (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-storage
+ The package contains the debugging symbols for beegfs-storage
+

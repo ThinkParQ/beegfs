@@ -1,0 +1,58 @@
+#!/bin/bash 
+
+NAME=beegfs-mirror-md
+SPEC_FILE=${NAME}.spec
+
+source ../../../beegfs-version
+
+arch=`uname -m`
+if [[ "$arch" == "x86_64" ]]; then
+	BUILDARCH="$arch"
+elif [[ "$arch" =~ 86 ]]; then
+	BUILDARCH="i686"
+else
+	BUILDARCH=$arch
+fi
+
+CONCURRENCY=${MAKE_CONCURRENCY:-4}
+
+export BEEGFS_VERSION_PATH=`pwd`/../../../beegfs-version
+
+
+set -e
+
+pushd ../ 
+TOOLS_ROOT=`pwd`
+popd 
+BUILD="${TOOLS_ROOT}/build"
+mkdir -p $BUILD/buildroot/{BUILD,RPMS,S{RPMS,PECS,OURCES}}
+
+rm -f $BUILD/buildroot/SOURCES/*.tgz
+
+ROOT_DIR=${ROOT_DIR:-`(cd ../../..; pwd)`}
+
+set +e
+# test if redhat-rpm-config is installed. If so, we must not specify
+# %debug_package in the spec file, if not installed we need to define it
+# in order to strip binaries and to build a debug package
+rpm -qa redhat-rpm-config | grep redhat-rpm-config
+NEED_DEBUG_DEFINE=$?
+
+set -e
+
+pushd $TOOLS_ROOT
+tar czf $BUILD/buildroot/SOURCES/${NAME}-${BEEGFS_VERSION}.tgz   --exclude=buildroot/* *
+cd $BUILD
+sed -e "s/%NAME%/$NAME/g" 				\
+	-e "s/%BEEGFS_VERSION%/$BEEGFS_VERSION/g"   	\
+	-e "s/%BUILDARCH%/$BUILDARCH/g"			\
+	-e "s/%MAKE_CONCURRENCY%/$CONCURRENCY/g"	\
+	${SPEC_FILE}.in > ${SPEC_FILE}
+
+rpmbuild --clean -bb ${SPEC_FILE} --define "_topdir $BUILD/buildroot/" -D "ROOT_DIR $ROOT_DIR"
+
+popd
+
+rm -fr /var/tmp/${NAME}-root/
+rm -f /var/tmp/rpm-tmp.*
+

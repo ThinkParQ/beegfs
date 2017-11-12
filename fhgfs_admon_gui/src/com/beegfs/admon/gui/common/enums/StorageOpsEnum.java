@@ -1,0 +1,52 @@
+package com.beegfs.admon.gui.common.enums;
+
+
+import com.beegfs.admon.gui.common.tools.DefinesTk;
+
+
+
+
+public enum StorageOpsEnum
+{
+   STORAGE_OPS_IP("client IP", DefinesTk.CLIENT_STATS_COLUMN_WIDTH_IP),
+   STORAGE_OPS_OPSUM("sum", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_ACK("ack", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_SETCHANNELDIRECT("sChDrct", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_GETLOCALFILESIZE("getFSize", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_SETLOCALATTR("sAttr", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_STATSTORAGEPATH("statfs", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_TRUNCLOCALFILE("trunc", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_CLOSELOCAL("close", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_FSYNCLOCAL("fsync", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_OPENLOCAL("open", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_READOPS("ops-rd", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_READBYTES("B-rd", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_WRITEOPS("ops-wr", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_WRITEBYTES("B-wr", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_GENERICDEBUG("gendbg", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_HEARTBEAT("hrtbeat", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_REMOVENODE("remNode", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_GETNODEINFO("nodeInf", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_REQUESTSTORAGEDATA("storInf", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH),
+   STORAGE_OPS_UNLINK("unlnk", DefinesTk.CLIENT_STATS_DEFAULT_COLUMN_WIDTH);
+
+   private final String label;
+   private final int columnWidth;
+
+   StorageOpsEnum(String label, int columnWidth)
+   {
+      this.label = label;
+      this.columnWidth = columnWidth;
+   }
+
+   public String getLabel()
+   {
+      return label;
+   }
+
+   public int getColumnWidth()
+   {
+      return columnWidth;
+   }
+
+}

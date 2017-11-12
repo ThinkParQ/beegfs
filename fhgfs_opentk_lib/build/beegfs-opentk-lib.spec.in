@@ -1,0 +1,111 @@
+%define buildarch %BUILDARCH%
+%define PREFIX /opt/beegfs
+%define BEEGFS_COMMON_PATH %BEEGFS_COMMON_PATH%
+%define BEEGFS_VERSION %BEEGFS_VERSION%
+%define VER %(echo '%{BEEGFS_VERSION}' | cut -d - -f 1)
+%define BEEGFS_RELEASE_STR %(echo '%{BEEGFS_VERSION}-' | cut -d - -f 2)
+%define EPOCH %(echo '%{VER}' | cut -d . -f 1)
+
+#filtering
+Source91:  filter-requires.sh
+%define    _use_internal_dependency_generator 0
+%define    __find_requires %{SOURCE91}
+
+
+%define is_fedora %(test -e /etc/fedora-release && echo 1 || echo 0)
+%define is_redhat %(test -e /etc/redhat-release && echo 1 || echo 0)
+%define is_suse %(test -e /etc/SuSE-release && echo 1 || echo 0)
+%define is_mandrake %(test -e /etc/mandrake-release && echo 1 || echo 0)
+
+%if %is_mandrake
+%define disttag mdk
+%endif
+
+%if %is_suse
+%define disttag suse
+%define distver %(relpackage="`rpm -qf /etc/SuSE-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %is_fedora
+%define disttag fc
+%endif
+
+%if %is_redhat
+%define disttag el
+%define distver %(relpackage="`rpm -qf /etc/redhat-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %{defined disttag}
+%define RELEASE %{BEEGFS_RELEASE_STR}%{disttag}%{distver}
+%else
+%define RELEASE %{BEEGFS_RELEASE_STR}generic
+%endif
+
+Summary: BeeGFS opentk library
+Name: %NAME%
+Version: %{VER}
+Release: %{RELEASE}
+License: BeeGFS EULA
+Group: Software/Other
+Source: %NAME%-%{BEEGFS_VERSION}.tgz
+URL: http://www.beegfs.com
+Vendor: Fraunhofer ITWM
+BuildRoot: %{_tmppath}/%NAME%-root
+BuildArch: %{buildarch}
+Buildrequires: librdmacm-devel, libibverbs-devel
+Epoch: %{EPOCH}
+
+%description
+This package contains the BeeGFS shared opentk library, which provides the
+userspace RDMA abstraction layer.
+
+%clean
+rm -rf %{buildroot}
+
+%post
+beegfs-setup-rdma
+ldconfig
+
+%postun
+ldconfig
+
+%prep
+%setup -c
+
+%build
+cd build
+
+# build without IB support
+make \
+	root-dir=%{ROOT_DIR} \
+	BEEGFS_VERSION=%{BEEGFS_VERSION}            \
+	-j4                                    \
+	package_lib
+
+
+%define debug_package %{nil}
+%debug_package %{nil}
+
+%install
+cd build
+mkdir -p ${RPM_BUILD_ROOT}
+make root-dir=%{ROOT_DIR} DESTDIR=${RPM_BUILD_ROOT} PREFIX=%{PREFIX} package_install
+# Tools have an rpm depency on libbeegfs-opentk.so, so we need this file
+# and use the disabled-IB.so as default
+
+# for rpm stupidness only!
+pushd ${RPM_BUILD_ROOT}/%{PREFIX}/lib
+ln -f  libbeegfs-opentk-disabledIB.so libbeegfs-opentk.so
+chmod +x *.so
+popd
+
+%files
+%defattr(-,root,root)
+/etc/ld.so.conf.d/beegfs.conf
+%config(noreplace) /etc/beegfs/beegfs-libopentk.conf
+%{PREFIX}/lib/libbeegfs-opentk-disabledIB.so
+%{PREFIX}/lib/libbeegfs-opentk-enabledIB.so
+%{PREFIX}/lib/libbeegfs-opentk.so
+%{PREFIX}/src/*
+/usr/sbin/beegfs-setup-rdma
+

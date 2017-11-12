@@ -1,0 +1,62 @@
+#!/bin/bash
+
+
+function addDashboard()
+{
+   echo -e "{\"dashboard\": $(cat $1) }" | \
+   sed -e "s,\${DS_BEEGFS_MON_INFLUXDB},$DATASOURCE_NAME,g" | \
+   curl -s -X POST "$HOST/api/dashboards/db"  \
+      --header "Content-type: application/json" \
+      --data @-
+}
+
+function addDatasource()
+{
+   sed -e "s,%DATABASE_NAME%,$DATABASE_NAME,g" \
+      -e "s,%DATASOURCE_URL%,$DATASOURCE_URL,g" \
+      -e "s,%DATASOURCE_NAME%,$DATASOURCE_NAME,g" \
+      "$1" | \
+   curl -s -X POST "$HOST/api/datasources" \
+      --header "Content-type: application/json" \
+      --data @-
+}
+
+DATASOURCE_NAME="beegfs_mon_influxdb"
+HOST="http://admin:admin@localhost:3000"
+DATABASE_NAME="beegfs_mon"
+DATASOURCE_URL="http://localhost:8086"
+
+
+if [[ $1 != "default" ]] && [[ ! $# -eq 3 ]]; then
+   echo "This script imports the default beegfs-mon Dashboards into Grafana using its HTTP API."
+   echo "Curl is required."
+   echo ""
+   echo "Usage: "
+   echo "Default installation to localhost: $(basename "$0") default"
+   echo "Custom installation: $(basename "$0") <grafana url> <datasource url> <database name>"
+   echo ""
+   echo "Default:"
+   echo "$(basename "$0") $HOST $DATASOURCE_URL $DATABASE_NAME"
+   exit 0
+fi
+
+command -v curl > /dev/null 2>&1 || \
+{
+   echo "This script requires curl, but it doesn't seem to be installed. Aborting."
+   exit 1
+}
+
+if [[ $1 != "default" ]]; then
+   HOST="$1"
+   DATABASE_NAME="$3"
+   DATASOURCE_URL="$2"
+fi
+
+GRAFANA_DIR=$(dirname "$0")
+
+addDatasource "$GRAFANA_DIR/influxdb.json"
+
+addDashboard "$GRAFANA_DIR/meta.json"
+addDashboard "$GRAFANA_DIR/storage.json"
+addDashboard "$GRAFANA_DIR/storage_targets.json"
+addDashboard "$GRAFANA_DIR/client_ops.json"

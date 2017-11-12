@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# License: BeeGFS EULA
+
+print_usage()
+{
+   echo
+   echo "DESCRIPTION: Check if all BeeGFS servers are reachable from this host."
+   echo "             (This is a wrapper for beegfs-ctl.)"
+   echo
+   echo "USAGE: $(basename "$0") [options]"
+   echo
+   echo "   (default) - If no command line argument is given, check servers based on"
+   echo "               default client config file."
+   echo
+   echo "   -h        - Print this help."
+   echo
+   echo "   -p <path> - Check servers for the given BeeGFS mount point."
+   echo
+   echo "   -c <path> - Check servers for the given BeeGFS client config file."
+   echo
+   echo "   -e        - Exit code reports an error if a node is not reachable."
+   echo
+}
+
+# @param $line is the server name.
+# @stdin one line from stdin to find out whether server is reachable or not,
+#        next line to get route info.
+print_server()
+{
+   read -r reach
+   read -r route
+
+   stripped_route=${route//Route: /}
+
+   if echo "$reach" | grep -q "\<yes\>"; then
+      echo "$line: reachable at $stripped_route"
+   else
+      echo "$line: UNREACHABLE"
+   fi
+}
+
+# @param1: complete output of "beegfs-ctl mode=listnodes check_reachability"
+parse_output()
+{
+   # we strip the output here because librdma can taint the output with
+   # warning messages
+   strippedout=$(echo "$1" | grep -B1 -A1 "Reachable:")
+
+   echo "$strippedout" | \
+   while read -r line; do
+      if echo "$line" | grep -q "^\w"; then
+         print_server
+      fi
+   done
+}
+
+
+################## end of function definitions ##############
+
+
+# parse command line arguments
+
+while getopts "hp:c:e" opt; do
+   case $opt in
+   h)
+      print_usage
+      exit 0
+      ;;
+   p)
+      BEEGFS_PATH_ARG="--mount=$OPTARG"
+      ;;
+   c)
+      BEEGFS_PATH_ARG="--cfgFile=$OPTARG"
+      ;;
+   e)
+      OPTIONAL_ARGS="--errorcodes"
+      ;;
+   *)
+      echo "Invalid option: -$OPTARG" >&2
+      print_usage
+      exit 1
+      ;;
+   esac
+done
+
+# call beegfs-ctl reachability check for each server type
+
+for type in Management Metadata Storage; do
+   echo $type
+   echo ==========
+   if [ "${BEEGFS_PATH_ARG}" == "" ]; then
+      out=$(beegfs-ctl --listnodes --reachable --route $OPTIONAL_ARGS --nodetype=$type)
+   else
+      out=$(beegfs-ctl --listnodes --reachable --route $OPTIONAL_ARGS --nodetype=$type \
+      "$BEEGFS_PATH_ARG")
+   fi
+
+   if [ $? -eq 0 ]; then
+      parse_output "$out"
+   else
+      echo "$out" >&2
+      exit 1
+   fi
+   echo
+done
+

@@ -1,0 +1,12 @@
+PACK_SUMMARY="BeeGFS Management daemon"
+PACK_NAME="beegfs_mgmtd"
+BINARY_NAME="beegfs_mgmtd"
+VERSION_YEAR=2009
+VERSION_MONTH=8
+VERSION_PATCH=r2
+
+CMAKE_PATH=/tmp/cmake-2.8.1
+CPACK=${CMAKE_PATH}/bin/cpack
+CMAKE=${CMAKE_PATH}/bin/cmake
+
+PACK_DIR=$(pwd)/packages
