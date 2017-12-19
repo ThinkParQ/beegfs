@@ -118,7 +118,7 @@
               ],
               "orderByTime": "ASC",
               "policy": "default",
-              "query": "SELECT sum(*)   FROM \"metaClientOps\" WHERE time > now() - $aggregationPeriod GROUP BY node fill(null) ORDER BY time DESC LIMIT 1",
+              "query": "SELECT sum(*)   FROM \"metaClientOpsByNode\" WHERE time > now() - $aggregationPeriod GROUP BY node ",
               "rawQuery": true,
               "refId": "A",
               "resultFormat": "table",
@@ -127,43 +127,6 @@
                   {
                     "params": [
                       "value"
-                    ],
-                    "type": "field"
-                  },
-                  {
-                    "params": [],
-                    "type": "mean"
-                  }
-                ]
-              ],
-              "tags": []
-            },
-            {
-              "dsType": "influxdb",
-              "groupBy": [
-                {
-                  "params": [
-                    "$__interval"
-                  ],
-                  "type": "time"
-                },
-                {
-                  "params": [
-                    "null"
-                  ],
-                  "type": "fill"
-                }
-              ],
-              "measurement": "clientOps",
-              "orderByTime": "ASC",
-              "policy": "default",
-              "refId": "B",
-              "resultFormat": "time_series",
-              "select": [
-                [
-                  {
-                    "params": [
-                      "ack"
                     ],
                     "type": "field"
                   },
@@ -222,7 +185,7 @@
                 "rgba(50, 172, 45, 0.97)"
               ],
               "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
+              "decimals": 0,
               "pattern": "/^sum_(.*)$/",
               "thresholds": [],
               "type": "number",
@@ -236,7 +199,7 @@
                 "rgba(237, 129, 40, 0.89)",
                 "rgba(50, 172, 45, 0.97)"
               ],
-              "decimals": 2,
+              "decimals": 0,
               "pattern": "/.*/",
               "thresholds": [],
               "type": "number",
@@ -262,7 +225,7 @@
               ],
               "orderByTime": "ASC",
               "policy": "default",
-              "query": "SELECT sum(*)   FROM \"storageClientOps\" WHERE time > now() - $aggregationPeriod GROUP BY node fill(null) ORDER BY time DESC LIMIT 1",
+              "query": "SELECT sum(*)   FROM \"storageClientOpsByNode\" WHERE time > now() - $aggregationPeriod GROUP BY node",
               "rawQuery": true,
               "refId": "A",
               "resultFormat": "table",
@@ -425,6 +388,6 @@
     ]
   },
   "timezone": "",
-  "title": "BeeGFS Client Operations",
+  "title": "BeeGFS Client Operations (by node)",
   "version": 3
 }

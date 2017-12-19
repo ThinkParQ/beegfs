@@ -18,13 +18,17 @@ class RequestStorageDataWork : public Work
          StorageNodeDataContent data;
          HighResStatsList highResStatsList;
          StorageTargetInfoList storageTargetList;
-         ClientOpsRequestor::IdOpsUnorderedMap idOpsUnorderedMap;
+         ClientOpsRequestor::IdOpsUnorderedMap ipOpsUnorderedMap;
+         ClientOpsRequestor::IdOpsUnorderedMap userOpsUnorderedMap;
       };
 
       RequestStorageDataWork(std::shared_ptr<StorageNodeEx> node,
-            StatsCollector* statsCollector) :
-         node(std::move(node)),
-         statsCollector(statsCollector)
+            StatsCollector* statsCollector, bool collectClientOpsByNode,
+            bool collectClientOpsByUser) :
+            node(std::move(node)),
+            statsCollector(statsCollector),
+            collectClientOpsByNode(collectClientOpsByNode),
+            collectClientOpsByUser(collectClientOpsByUser)
       {}
 
       void process(char* bufIn, unsigned bufInLen, char* bufOut,
@@ -33,6 +37,8 @@ class RequestStorageDataWork : public Work
    private:
       std::shared_ptr<StorageNodeEx> node;
       StatsCollector* statsCollector;
+      bool collectClientOpsByNode;
+      bool collectClientOpsByUser;
 };
 
 #endif /*REQUESTSTORAGEDATAWORK_H_*/

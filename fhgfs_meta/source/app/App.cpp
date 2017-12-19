@@ -917,7 +917,8 @@ void App::stopComponents()
 
    // resyncer wants to control the workers, so any running resync must be finished or aborted
    // before the workers are stopped.
-   buddyResyncer->shutdown();
+   if(buddyResyncer)
+      buddyResyncer->shutdown();
 
    workersStop();
 

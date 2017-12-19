@@ -284,8 +284,13 @@ case "$1" in
             mkdir -p ${mnt}
          fi
 
+	      exec_mount_hook pre-mount "${mnt}"
+
          mount -t ${fstype} beegfs_nodev ${mnt} \
             -ocfgFile=${cfg},_netdev,${SELINUX_OPT},${extra_mount_opts}
+
+	      exec_mount_hook post-mount "${mnt}"
+
       done
 
       RETVAL=$?
@@ -311,6 +316,8 @@ case "$1" in
             continue
          fi
 
+	      exec_mount_hook pre-unmount "${mnt}"
+
          set +e
          res=`umount ${mnt} 2>&1`
          if [ $? -ne 0 ]; then
@@ -323,6 +330,8 @@ case "$1" in
             fi
          fi
          set -e
+
+	      exec_mount_hook post-unmount "${mnt}"
 
       done
       IFS="$OLDIFS"

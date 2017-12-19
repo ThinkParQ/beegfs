@@ -24,8 +24,8 @@ class TSDatabase
             const HighResolutionStats& data);
       void insertStorageTargetsData(std::shared_ptr<Node> node, const StorageTargetInfo& data);
 
-      void insertClientNodeData(const std::string& node, const NodeType nodeType,
-            const std::map<std::string, uint64_t>& opMap);
+      void insertClientNodeData(const std::string& id, const NodeType nodeType,
+            const std::map<std::string, uint64_t>& opMap, bool perUser);
 
       void writePoints();
 

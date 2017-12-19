@@ -153,18 +153,30 @@ void TSDatabase::insertStorageTargetsData(std::shared_ptr<Node> node,
    appendPoint(point.str());
 }
 
-void TSDatabase::insertClientNodeData(const std::string& node, const NodeType nodeType,
-      const std::map<std::string, uint64_t>& opMap)
+void TSDatabase::insertClientNodeData(const std::string& id, const NodeType nodeType,
+      const std::map<std::string, uint64_t>& opMap, bool perUser)
 {
    std::ostringstream point;
-   if (nodeType == NODETYPE_Meta)
-      point << "metaClientOps";
-   else if (nodeType == NODETYPE_Storage)
-      point << "storageClientOps";
+   if (perUser)
+   {
+      if (nodeType == NODETYPE_Meta)
+         point << "metaClientOpsByUser";
+      else if (nodeType == NODETYPE_Storage)
+         point << "storageClientOpsByUser";
+      else
+         throw DatabaseException("Invalid Nodetype given.");
+   }
    else
-      throw DatabaseException("Invalid Nodetype given.");
+   {
+      if (nodeType == NODETYPE_Meta)
+         point << "metaClientOpsByNode";
+      else if (nodeType == NODETYPE_Storage)
+         point << "storageClientOpsByNode";
+      else
+         throw DatabaseException("Invalid Nodetype given.");
+   }
 
-   point << ",node=" << node;
+   point << (perUser ? ",user=" : ",node=") << id;
 
    bool first = true;
 

@@ -70,7 +70,11 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
             node->setLastStatRequestTime(lastStatsRequestTime);
          }
 
-         result.idOpsUnorderedMap = ClientOpsRequestor::request(*node, false);
+         if (collectClientOpsByNode)
+            result.ipOpsUnorderedMap = ClientOpsRequestor::request(*node, false);
+
+         if (collectClientOpsByUser)
+            result.userOpsUnorderedMap = ClientOpsRequestor::request(*node, true);
       }
    }
 

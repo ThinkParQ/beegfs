@@ -314,7 +314,8 @@ void App::stopComponents()
    //    lead to a deadlock (when calling from signal handler)
    workersStop();
 
-   this->internodeSyncer->selfTerminate();
+   if(this->internodeSyncer)
+      this->internodeSyncer->selfTerminate();
 
    if ( dgramListener )
    {

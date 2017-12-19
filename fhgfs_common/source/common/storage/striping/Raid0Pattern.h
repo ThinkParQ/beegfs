@@ -35,7 +35,7 @@ class Raid0Pattern : public StripePattern
        * Note: for deserialization only
        */
       Raid0Pattern(unsigned chunkSize,
-         StoragePoolId storagePoolId = StoragePoolStore::DEFAULT_POOL_ID) :
+         boost::optional<StoragePoolId> storagePoolId = StoragePoolStore::DEFAULT_POOL_ID) :
          StripePattern(StripePatternType_Raid0, chunkSize, storagePoolId) { }
 
       // (de)serialization

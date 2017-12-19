@@ -34,8 +34,12 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("dbMaxPointsPerRequest",      "5000");
    configMapRedefine("dbSetRetentionPolicy",       "true");
    configMapRedefine("dbRetentionDuration",        "1d");
+
+   configMapRedefine("collectClientOpsByNode",     "true");
+   configMapRedefine("collectClientOpsByUser",     "true");
+
    configMapRedefine("httpTimeoutMSecs",           "1000");
-   configMapRedefine("statsRequestIntervalSecs",    "5");
+   configMapRedefine("statsRequestIntervalSecs",   "5");
    configMapRedefine("nodelistRequestIntervalSecs","30");
 
 }
@@ -93,6 +97,12 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       else
       if (iter->first == std::string("dbRetentionDuration"))
          dbRetentionDuration = iter->second;
+      else
+      if (iter->first == std::string("collectClientOpsByNode"))
+         collectClientOpsByNode = StringTk::strToBool(iter->second);
+      else
+      if (iter->first == std::string("collectClientOpsByUser"))
+         collectClientOpsByUser = StringTk::strToBool(iter->second);
       else
       if (iter->first == std::string("httpTimeoutMSecs"))
          httpTimeout = std::chrono::milliseconds(StringTk::strToUInt(iter->second));

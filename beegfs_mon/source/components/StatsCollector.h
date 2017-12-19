@@ -21,8 +21,10 @@ class StatsCollector : public PThread
 
    private:
       App* const app;
-      ClientOps metaClientOps;
-      ClientOps storageClientOps;
+      ClientOps ipMetaClientOps;
+      ClientOps ipStorageClientOps;
+      ClientOps userMetaClientOps;
+      ClientOps userStorageClientOps;
 
       mutable std::mutex mutex;
       int workItemCounter;
@@ -32,7 +34,7 @@ class StatsCollector : public PThread
 
       virtual void run() override;
       void requestLoop();
-      void processClientOps(ClientOps& clientOps, NodeType nodeType);
+      void processClientOps(ClientOps& clientOps, NodeType nodeType, bool perUser);
 
       void insertMetaData(RequestMetaDataWork::Result result)
       {

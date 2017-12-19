@@ -107,8 +107,6 @@ void StoragePool::setDescription(const std::string& description)
 
 StoragePoolId StoragePool::getId() const
 {
-   std::lock_guard<Mutex> lock(mutex);
-
    return id;
 }
 

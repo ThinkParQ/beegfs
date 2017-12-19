@@ -1,5 +1,15 @@
 #!/bin/sh
 
+function exec_mount_hook()
+{
+   if [ -n "$MOUNT_HOOK" ]
+   then
+      set +e
+      /bin/sh -c "${MOUNT_HOOK} ${1} \"${2}\""
+      set -e
+   fi
+}
+
 function init_multi_mode()
 {
    ACTION=$1
@@ -193,6 +203,9 @@ function init_multi_mode_single_configuration()
                fi
             fi
 
+
+            exec_mount_hook pre-mount "${mnt}"
+
             mount -t beegfs beegfs_${CONFIG} ${mnt} \
                -ocfgFile=${cfg},_netdev,${SELINUX_OPT},${extra_mount_opts}
             if [ $? -ne 0 ]
@@ -201,6 +214,9 @@ function init_multi_mode_single_configuration()
                RETVAL=1
                continue
             fi
+
+            exec_mount_hook post-mount "${mnt}"
+               
          done
 
          IFS="$OLDIFS"
@@ -237,6 +253,8 @@ function init_multi_mode_single_configuration()
                continue
             fi
 
+            exec_mount_hook pre-unmount "${mnt}"
+
             res=`umount ${mnt} 2>&1`
             if [ $? -ne 0 ]
             then
@@ -249,6 +267,9 @@ function init_multi_mode_single_configuration()
                   continue
                fi
             fi
+
+            exec_mount_hook post-unmount "${mnt}"
+
          done
 
          IFS="$OLDIFS"

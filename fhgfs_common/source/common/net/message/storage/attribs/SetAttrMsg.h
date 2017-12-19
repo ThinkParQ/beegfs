@@ -26,7 +26,8 @@ class SetAttrMsg : public MirroredMessageBase<SetAttrMsg>
       SetAttrMsg(EntryInfo *entryInfo, int validAttribs, SettableFileAttribs* attribs)
        : BaseType(NETMSGTYPE_SetAttr),
          validAttribs(validAttribs),
-         attribs(*attribs)
+         attribs(*attribs),
+         entryInfoPtr(entryInfo)
       { }
 
       /**

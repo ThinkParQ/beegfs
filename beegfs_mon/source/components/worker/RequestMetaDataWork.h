@@ -16,13 +16,17 @@ class RequestMetaDataWork : public Work
          std::shared_ptr<MetaNodeEx> node;
          MetaNodeDataContent data;
          HighResStatsList highResStatsList;
-         ClientOpsRequestor::IdOpsUnorderedMap idOpsUnorderedMap;
+         ClientOpsRequestor::IdOpsUnorderedMap ipOpsUnorderedMap;
+         ClientOpsRequestor::IdOpsUnorderedMap userOpsUnorderedMap;
       };
 
       RequestMetaDataWork(std::shared_ptr<MetaNodeEx> node,
-            StatsCollector* statsCollector) :
-         node(std::move(node)),
-         statsCollector(statsCollector)
+            StatsCollector* statsCollector,
+            bool collectClientOpsByNode, bool collectClientOpsByUser) :
+            node(std::move(node)),
+            statsCollector(statsCollector),
+            collectClientOpsByNode(collectClientOpsByNode),
+            collectClientOpsByUser(collectClientOpsByUser)
       {}
 
       virtual void process(char* bufIn, unsigned bufInLen,
@@ -31,6 +35,8 @@ class RequestMetaDataWork : public Work
    private:
       std::shared_ptr<MetaNodeEx> node;
       StatsCollector* statsCollector;
+      bool collectClientOpsByNode;
+      bool collectClientOpsByUser;
 };
 
 #endif /*REQUESTMETADATAWORK_H_*/

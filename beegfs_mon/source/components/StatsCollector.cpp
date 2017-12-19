@@ -27,6 +27,9 @@ void StatsCollector::run()
 
 void StatsCollector::requestLoop()
 {
+   bool collectClientOpsByNode = app->getConfig()->getCollectClientOpsByNode();
+   bool collectClientOpsByUser = app->getConfig()->getCollectClientOpsByUser();
+
    // intially wait one query interval before requesting stats to give NodeListRequestor the time
    // to retrieve the node lists
    while (!waitForSelfTerminateOrder(std::chrono::milliseconds(
@@ -49,7 +52,8 @@ void StatsCollector::requestLoop()
          {
             workItemCounter++;
             app->getWorkQueue()->addIndirectWork(
-                  new RequestMetaDataWork(std::static_pointer_cast<MetaNodeEx>(*node), this));
+                  new RequestMetaDataWork(std::static_pointer_cast<MetaNodeEx>(*node),
+                  this, collectClientOpsByNode, collectClientOpsByUser));
          }
 
          const auto& storageNodes = app->getStorageNodes()->referenceAllNodes();
@@ -58,7 +62,8 @@ void StatsCollector::requestLoop()
          {
             workItemCounter++;
             app->getWorkQueue()->addIndirectWork(
-                  new RequestStorageDataWork(std::static_pointer_cast<StorageNodeEx>(*node), this));
+                  new RequestStorageDataWork(std::static_pointer_cast<StorageNodeEx>(*node),
+                  this, collectClientOpsByNode, collectClientOpsByUser));
          }
 
          while (workItemCounter > 0)
@@ -76,10 +81,22 @@ void StatsCollector::requestLoop()
                app->getTSDB()->insertHighResMetaNodeData(iter->node, *listIter);
             }
 
-            for (auto mapIter = iter->idOpsUnorderedMap.begin();
-                  mapIter != iter->idOpsUnorderedMap.end(); mapIter++)
+            if (collectClientOpsByNode)
             {
-               metaClientOps.addOpsList(mapIter->first, mapIter->second);
+               for (auto mapIter = iter->ipOpsUnorderedMap.begin();
+                     mapIter != iter->ipOpsUnorderedMap.end(); mapIter++)
+               {
+                  ipMetaClientOps.addOpsList(mapIter->first, mapIter->second);
+               }
+            }
+
+            if (collectClientOpsByUser)
+            {
+               for (auto mapIter = iter->userOpsUnorderedMap.begin();
+                     mapIter != iter->userOpsUnorderedMap.end(); mapIter++)
+               {
+                  userMetaClientOps.addOpsList(mapIter->first, mapIter->second);
+               }
             }
          }
 
@@ -100,22 +117,43 @@ void StatsCollector::requestLoop()
                app->getTSDB()->insertStorageTargetsData(iter->node, *listIter);
             }
 
-            for (auto mapIter = iter->idOpsUnorderedMap.begin();
-                  mapIter != iter->idOpsUnorderedMap.end(); mapIter++)
+            if (collectClientOpsByNode)
             {
-               storageClientOps.addOpsList(mapIter->first, mapIter->second);
+               for (auto mapIter = iter->ipOpsUnorderedMap.begin();
+                     mapIter != iter->ipOpsUnorderedMap.end(); mapIter++)
+               {
+                  ipStorageClientOps.addOpsList(mapIter->first, mapIter->second);
+               }
+            }
+
+            if (collectClientOpsByUser)
+            {
+               for (auto mapIter = iter->userOpsUnorderedMap.begin();
+                     mapIter != iter->userOpsUnorderedMap.end(); mapIter++)
+               {
+                  userStorageClientOps.addOpsList(mapIter->first, mapIter->second);
+               }
             }
          }
 
-         processClientOps(metaClientOps, NODETYPE_Meta);
-         processClientOps(storageClientOps, NODETYPE_Storage);
+         if (collectClientOpsByNode)
+         {
+            processClientOps(ipMetaClientOps, NODETYPE_Meta, false);
+            processClientOps(ipStorageClientOps, NODETYPE_Storage, false);
+         }
+
+         if (collectClientOpsByUser)
+         {
+            processClientOps(userMetaClientOps, NODETYPE_Meta, true);
+            processClientOps(userStorageClientOps, NODETYPE_Storage, true);
+         }
 
          app->getTSDB()->writePoints();
       }
    }
 }
 
-void StatsCollector::processClientOps(ClientOps& clientOps, NodeType nodeType)
+void StatsCollector::processClientOps(ClientOps& clientOps, NodeType nodeType, bool perUser)
 {
    ClientOps::IdOpsMap diffOpsMap;
    ClientOps::OpsList sumOpsList;
@@ -129,8 +167,20 @@ void StatsCollector::processClientOps(ClientOps& clientOps, NodeType nodeType)
             opsMapIter != diffOpsMap.end();
             opsMapIter++)
       {
-         struct in_addr inAddr = { (in_addr_t)opsMapIter->first };
-         std::string id = Socket::ipaddrToStr(&inAddr);
+         std::string id;
+
+         if (perUser)
+         {
+            if (opsMapIter->first == ~0U)
+               id = "undefined";
+            else
+               id = StringTk::uintToStr(opsMapIter->first);
+         }
+         else
+         {
+            struct in_addr inAddr = { (in_addr_t)opsMapIter->first };
+            id = Socket::ipaddrToStr(&inAddr);
+         }
 
          std::map<std::string, uint64_t> stringOpMap;
          unsigned opCounter = 0;
@@ -148,7 +198,7 @@ void StatsCollector::processClientOps(ClientOps& clientOps, NodeType nodeType)
             opCounter++;
          }
 
-         app->getTSDB()->insertClientNodeData(id, nodeType, stringOpMap);
+         app->getTSDB()->insertClientNodeData(id, nodeType, stringOpMap, perUser);
       }
    }
 

@@ -1,6 +1,7 @@
 #ifndef STRIPEPATTERN_H_
 #define STRIPEPATTERN_H_
 
+#include <boost/optional.hpp>
 #include <common/Common.h>
 #include <common/nodes/StoragePoolStore.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -26,8 +27,10 @@ struct StripePatternHeader
          storagePoolId = StoragePoolStore::DEFAULT_POOL_ID;
    }
 
-   StripePatternHeader(StripePatternType type, uint32_t chunkSize, StoragePoolId storagePoolId) :
-        length(0), type(type), chunkSize(chunkSize), storagePoolId(storagePoolId), hasPoolId(true)
+   StripePatternHeader(StripePatternType type, uint32_t chunkSize, boost::optional<StoragePoolId> storagePoolId) :
+        length(0), type(type), chunkSize(chunkSize),
+        storagePoolId(storagePoolId.value_or(StoragePoolStore::DEFAULT_POOL_ID)),
+        hasPoolId(!!storagePoolId)
         {}
 
    uint32_t length;
@@ -84,7 +87,8 @@ class StripePattern
       /**
        * @param chunkSize 0 for app-level default
        */
-      StripePattern(StripePatternType type, unsigned chunkSize, StoragePoolId storagePoolId)
+      StripePattern(StripePatternType type, unsigned chunkSize,
+            boost::optional<StoragePoolId> storagePoolId)
          : header(type, chunkSize ? chunkSize : STRIPEPATTERN_DEFAULT_CHUNKSIZE, storagePoolId) { }
 
       // (de)serialization

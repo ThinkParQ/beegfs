@@ -1222,9 +1222,15 @@ static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *
             copyRes = copy_page_to_iter(buffer, 0, readRes, to);
 #endif
             if (copyRes < readRes)
+            {
+               iocb->ki_pos -= (readRes - copyRes);
                readRes = copyRes;
+            }
 
             totalReadRes += readRes;
+
+            if (copyRes == 0)
+               break;
          }
       }
       kunmap(buffer);

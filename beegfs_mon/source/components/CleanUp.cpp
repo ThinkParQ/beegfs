@@ -49,7 +49,8 @@ unsigned CleanUp::dropIdleConnsByStore(NodeStoreServers* nodes)
 {
    unsigned numDroppedConns = 0;
 
-   for (auto node = nodes->referenceAllNodes().begin(); node != nodes->referenceAllNodes().end();
+   const auto referencedNodes = nodes->referenceAllNodes();
+   for (auto node = referencedNodes.begin(); node != referencedNodes.end();
          node++)
    {
       // don't do any idle disconnect stuff with local node

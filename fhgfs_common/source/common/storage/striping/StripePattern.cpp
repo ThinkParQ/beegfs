@@ -19,19 +19,20 @@ StripePattern* StripePattern::deserialize(Deserializer& des, bool hasPoolId)
    }
 
    StripePattern* pattern = NULL;
+   boost::optional<StoragePoolId> poolId(hasPoolId, header.storagePoolId);
 
    switch(header.type)
    {
       case StripePatternType_Raid0:
-         pattern = new Raid0Pattern(header.chunkSize, header.storagePoolId);
+         pattern = new Raid0Pattern(header.chunkSize, poolId);
          break;
 
       case StripePatternType_Raid10:
-         pattern = new Raid10Pattern(header.chunkSize, header.storagePoolId);
+         pattern = new Raid10Pattern(header.chunkSize, poolId);
          break;
 
       case StripePatternType_BuddyMirror:
-         pattern = new BuddyMirrorPattern(header.chunkSize, header.storagePoolId);
+         pattern = new BuddyMirrorPattern(header.chunkSize, poolId);
          break;
 
       case StripePatternType_Invalid:

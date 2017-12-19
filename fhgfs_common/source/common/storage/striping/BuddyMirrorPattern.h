@@ -35,7 +35,7 @@ class BuddyMirrorPattern : public StripePattern
        * Note: for deserialization only
        */
       BuddyMirrorPattern(unsigned chunkSize,
-         StoragePoolId storagePoolId = StoragePoolStore::DEFAULT_POOL_ID):
+         boost::optional<StoragePoolId> storagePoolId = StoragePoolStore::DEFAULT_POOL_ID):
          StripePattern(StripePatternType_BuddyMirror, chunkSize, storagePoolId) { }
 
       // (de)serialization

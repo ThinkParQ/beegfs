@@ -1,0 +1,37 @@
+#!/bin/bash -e
+# BeeGFS client mount hook script
+
+action="${1}"
+mountpoint="${2}"
+
+# THIS IS AN EXAMPLE SCRIPT.
+# Copy and modify it, and remove the following line:
+exit 1
+
+if [ ! -d "${mountpoint}" ]
+then
+   echo "${0}: Mount point does not exist: ${mountpoint}"
+   exit 1
+fi
+
+case "${action}" in
+
+   pre-mount)
+      ;;
+
+   post-mount)
+      mount -o bind "${mountpoint}/foo" "${mountpoint}/bar"
+      ;;
+
+   pre-unmount)
+      umount "${mountpoint}/bar"
+      ;;
+
+   post-unmount)
+      ;;
+
+   *)
+      echo "${0}: Unrecognized option supplied to client mount hook: ${action}"
+      exit 1
+      ;;
+esac

@@ -99,7 +99,7 @@ parse_release_suffix()
    
    # test for rc build release string ("rc...")
    local is_rc_rel_str=`echo $release_suffix | grep -E '^rc[0-9]+$'`
-   if [ ! -z "$is_git_rel_str" ]; then
+   if [ ! -z "$is_rc_rel_str" ]; then
       release_type=`echo $release_suffix | sed -r s/[0-9]+//`
       release_num=`echo $release_suffix | sed -r s/rc//`
    fi

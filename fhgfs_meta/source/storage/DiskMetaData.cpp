@@ -131,6 +131,7 @@ void DiskMetaData::serializeInDentryFormat(Serializer& ser, DiskMetaDataType met
 
       case DIRENTRY_STORAGE_FORMAT_VER5: // gets automatically upgraded to v6
          dentryFormatVersion = DIRENTRY_STORAGE_FORMAT_VER6; // inlined inodes + chunk-path-V3
+         inodeData->getStripePattern()->setStoragePoolId(StoragePoolStore::DEFAULT_POOL_ID);
          // fall through
 
       case DIRENTRY_STORAGE_FORMAT_VER6:
@@ -408,9 +409,7 @@ void DiskMetaData::deserializeDentryV4(Deserializer& des)
    }
 
    {
-      StripePattern* pattern = NULL;
-
-      des % pattern;
+      StripePattern* pattern = StripePattern::deserialize(des, false);
       this->inodeData->setPattern(pattern);
    }
 

@@ -78,6 +78,8 @@ install: build
 	install -D dist/sbin/beegfs-setup-client \
 		${DEB_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-client
 
+	install -D dist/etc/beegfs-client-mount-hook.example \
+   	${DEB_BUILD_ROOT}/etc/beegfs/beegfs-client-mount-hook.example
 
 # Build architecture-independent files here.
 binary-indep:

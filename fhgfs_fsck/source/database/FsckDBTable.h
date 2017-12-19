@@ -265,6 +265,11 @@ class FsckDBDentryTable
          else
             return getPathOf(item.second);
       }
+
+      void commitChanges()
+      {
+         table.commitChanges();
+      }
 };
 
 class FsckDBFileInodesTable
@@ -362,6 +367,12 @@ class FsckDBFileInodesTable
       {
          insert(fileInodes, &handle);
       }
+
+      void commitChanges()
+      {
+         inodes.commitChanges();
+         targets.commitChanges();
+      }
 };
 
 class FsckDBDirInodesTable
@@ -405,6 +416,11 @@ class FsckDBDirInodesTable
       {
          insert(fileInodes, &handle);
       }
+
+      void commitChanges()
+      {
+         table.commitChanges();
+      }
 };
 
 class FsckDBChunksTable
@@ -447,6 +463,11 @@ class FsckDBChunksTable
       {
          insert(chunks, &handle);
       }
+
+      void commitChanges()
+      {
+         table.commitChanges();
+      }
 };
 
 class FsckDBContDirsTable
@@ -486,6 +507,11 @@ class FsckDBContDirsTable
       void insert(FsckContDirList& contDirs, const BulkHandle& handle)
       {
          insert(contDirs, &handle);
+      }
+
+      void commitChanges()
+      {
+         table.commitChanges();
       }
 };
 
@@ -527,6 +553,11 @@ class FsckDBFsIDsTable
       void insert(FsckFsIDList& fsIDs, const BulkHandle& handle)
       {
          insert(fsIDs, &handle);
+      }
+
+      void commitChanges()
+      {
+         table.commitChanges();
       }
 };
 

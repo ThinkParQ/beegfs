@@ -406,6 +406,18 @@ void ModeCheckFS::printHeaderInformation()
       "Started BeeGFS fsck in forward check mode [" + timeStr.substr(0, timeStr.length() - 1)
          + "]\nLog will be written to " + cfg->getLogStdFile() + "\nDatabase will be saved in "
          + cfg->getDatabasePath(), OutputOptions_LINEBREAK | OutputOptions_HEADLINE);
+
+   if (Program::getApp()->getMetaMirrorBuddyGroupMapper()->getSize() > 0)
+   {
+      FsckTkEx::fsckOutput(
+            "IMPORTANT NOTICE: The initiation of a repair action on a metadata mirror group "
+            "will temporarily set the consistency state of the secondary node to bad to prevent "
+            "interaction during the repair. After fsck finishes, it will set the states "
+            "of all affected nodes to needs-resync, so the repaired data will be synced from their "
+            "primary. \n\nIf beegfs-fsck is aborted prematurely, a resync needs to be initiated "
+            "manually so all targets are consistent (good) again." ,
+            OutputOptions_DOUBLELINEBREAK | OutputOptions_HEADLINE);
+   }
 }
 
 void ModeCheckFS::disposeUnusedFiles()
@@ -458,11 +470,22 @@ int64_t ModeCheckFS::checkAndRepairGeneric(Cursor<Obj> cursor,
       errorCount++;
    }
 
+
    if(errorCount)
+   {
+      database->getDentryTable()->commitChanges();
+      database->getFileInodesTable()->commitChanges();
+      database->getDirInodesTable()->commitChanges();
+      database->getChunksTable()->commitChanges();
+      database->getContDirsTable()->commitChanges();
+      database->getFsIDsTable()->commitChanges();
+
       FsckTkEx::fsckOutput(">>> Found " + StringTk::int64ToStr(errorCount)
          + " errors. Detailed information can also be found in "
          + Program::getApp()->getConfig()->getLogOutFile() + ".",
       OutputOptions_DOUBLELINEBREAK);
+
+   }
 
    return errorCount;
 }

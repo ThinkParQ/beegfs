@@ -23,6 +23,8 @@ class Config : public AbstractConfig
       unsigned dbMaxPointsPerRequest;
       bool dbSetRetentionPolicy;
       std::string dbRetentionDuration;
+      bool collectClientOpsByNode;
+      bool collectClientOpsByUser;
       std::chrono::milliseconds httpTimeout;
       std::chrono::seconds statsRequestInterval;
       std::chrono::seconds nodelistRequestInterval;
@@ -83,6 +85,16 @@ class Config : public AbstractConfig
       const std::string& getDbRetentionDuration() const
       {
          return dbRetentionDuration;
+      }
+
+      bool getCollectClientOpsByNode() const
+      {
+         return collectClientOpsByNode;
+      }
+
+      bool getCollectClientOpsByUser() const
+      {
+         return collectClientOpsByUser;
       }
 
       const std::chrono::milliseconds& getHttpTimeout() const

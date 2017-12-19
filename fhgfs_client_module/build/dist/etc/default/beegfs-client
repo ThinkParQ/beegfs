@@ -16,3 +16,11 @@ START_SERVICE="YES"
 # Example: /etc/beegfs/scratch.d/beegfs-client.conf
 # $ /etc/init.d/beegfs-client start scratch
 MULTI_MODE="NO"
+
+# Mount hook will be executed before any mount or unmount operation,
+# and additionally after the operation succeeded.
+# The first argument passed is either 'pre-mount', 'post-mount', 'pre-unmount',
+# or 'post-unmount'.
+# The second argument is the mount point. This can be useful to set up bind
+# mounts on top of a BeeGFS, for example.
+#MOUNT_HOOK=/etc/beegfs/beegfs-client-mount-hook.example

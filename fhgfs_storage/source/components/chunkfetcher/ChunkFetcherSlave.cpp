@@ -76,7 +76,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
    DIR* dir = ::opendir(path.c_str() );
    if(!dir)
    {
-      log.log(Log_WARNING, "Could not open directory " + path);
+      LOG(GENERAL, WARNING, "Could not open directory.", path, targetID, sysErr());
       Program::getApp()->getChunkFetcher()->setBad();
       return false;
    }
@@ -104,7 +104,8 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
 #endif
       if(readRes != 0)
       {
-         log.log(Log_WARNING, "readdir failed: " + System::getErrString() );
+         LOG(GENERAL, WARNING, "readdir failed.", path, targetID,
+               as("sysErr", System::getErrString(readRes)));
          result = false;
          break;
       }
@@ -123,7 +124,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
       int statRes = ::stat(pathBuf.c_str(), &statBuf);
       if(statRes)
       {
-         log.log(Log_WARNING, "Could not open directory " + path);
+         LOG(GENERAL, WARNING, "Could not stat directory.", path, targetID, sysErr());
          result = false;
          break;
       }

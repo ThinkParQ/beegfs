@@ -120,6 +120,9 @@ install -D ../scripts/etc/beegfs/lib/init-multi-mode.beegfs-client \
 install -D dist/sbin/beegfs-setup-client \
 	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-client
 
+install -D dist/etc/beegfs-client-mount-hook.example \
+   ${RPM_BUILD_ROOT}/etc/beegfs/beegfs-client-mount-hook.example
+
 %post
 if [ "$1" = 1 ]
 then
