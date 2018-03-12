@@ -1,5 +1,7 @@
 #include "DatagramListener.h"
 
+#include <common/net/message/NetMessageTypes.h>
+
 DatagramListener::DatagramListener(NetFilter* netFilter, NicAddressList& localNicList,
    AcknowledgmentStore* ackStore, unsigned short udpPort)
    throw(ComponentInitException) :
@@ -16,6 +18,9 @@ void DatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessag
    HighResolutionStats stats; // currently ignored
    NetMessage::ResponseContext rctx(fromAddr, udpSock, sendBuf, DGRAMMGR_SENDBUF_SIZE, &stats);
 
+   NetMsgStrMapping strMapping;
+   const auto messageType = strMapping.defineToStr(msg->getMsgType());
+
    switch(msg->getMsgType() )
    {
       // valid messages within this context
@@ -30,7 +35,9 @@ void DatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessag
       case NETMSGTYPE_SetMirrorBuddyGroup:
       {
          if(!msg->processIncoming(rctx) )
-            log.log(Log_WARNING, "Problem encountered during handling of incoming message");
+         {
+            LOG(WARNING, "Problem encountered during handling of incoming message.", messageType);
+         }
       } break;
 
       default:
@@ -38,7 +45,7 @@ void DatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessag
          log.logErr(
             "Received a message that is invalid within the current context "
             "from: " + Socket::ipaddrToStr(&fromAddr->sin_addr) + "; "
-            "type: " + StringTk::intToStr(msg->getMsgType() ) );
+            "type: " + messageType );
       } break;
    };
 }

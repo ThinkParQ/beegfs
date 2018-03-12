@@ -41,7 +41,7 @@ FhgfsOpsErr MirrorBuddyGroupCreator::addGroup(uint16_t primaryTargetID, uint16_t
          errStr = "Mirror buddy group with ID " + StringTk::uintToStr(forcedGroupID)
             + " already exists.";
       else
-         errStr = "Internal error.";
+         errStr = "Internal error (Please check metadata server log).";
 
       std::string logMessage("Failed to add mirror buddy group: primaryTargetID " +
          StringTk::uintToStr(primaryTargetID) + "; secondaryTargetID " +

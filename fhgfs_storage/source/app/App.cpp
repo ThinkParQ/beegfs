@@ -778,9 +778,12 @@ void App::handleComponentException(std::exception& e)
    const char* logContext = "App (component exception handler)";
    LogContext log(logContext);
 
-   log.logErr(std::string("This component encountered an unrecoverable error. ") +
-      std::string("[SysErr: ") + System::getErrString() + "] " +
-      std::string("Exception message: ") + e.what() );
+   const auto componentName = PThread::getCurrentThreadName();
+
+   log.logErr(
+         "The component [" + componentName + "] encountered an unrecoverable error. " +
+         std::string("[SysErr: ") + System::getErrString() + "] " +
+         std::string("Exception message: ") + e.what() );
 
    log.log(Log_WARNING, "Shutting down...");
 
@@ -1600,7 +1603,9 @@ bool App::openLibZfs()
 
       if(!dlOpenHandleLibZfs)
       {
-         log->log(Log_ERR, "Error during open of libzfs.so. Error: " + std::string(dlerror() ) );
+         LOG(ERR, "Error loading " + std::string(APP_LIB_ZFS_NAME) + ". "
+              "Please make sure the libzfs2 development packages are installed.",
+              as("System error", dlerror()));
          libZfsErrorReported = true;
 
          return false;
@@ -1616,7 +1621,8 @@ bool App::closeLibZfs()
    {
       if(dlclose(dlOpenHandleLibZfs) )
       {
-         log->log(Log_ERR, "Error during close of libzfs.so. Error: " + std::string(dlerror() ) );
+         LOG(ERR, "Error closing " + std::string(APP_LIB_ZFS_NAME) + ".",
+               as("System error", dlerror()));
          libZfsErrorReported = true;
          return false;
       }

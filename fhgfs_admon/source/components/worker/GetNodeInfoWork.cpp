@@ -13,7 +13,7 @@ void GetNodeInfoWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
    NodeStoreServers* nodes = app->getServerStoreFromType(nodeType);
    if(!nodes)
    {
-      log.logErr("Invalid node type: " + Node::nodeTypeToStr(nodeType) );
+      LOG(ERR, "Invalid node type.", as("Node Type", Node::nodeTypeToStr(nodeType)));
       return;
    }
 

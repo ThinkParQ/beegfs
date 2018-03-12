@@ -77,6 +77,10 @@ sl_unmount_local_mounts()
          true # reset error code before next invocation of sl_checkerror
       fi
    done
+
+   # try to remove the client module - this is allowed to fail, because we might have a "normal"
+   # beegfs mount somewhere in the system.
+   rmmod beegfs 2>/dev/null || true
 }
 
 # sends a SIGTERM to a process, then waits until the process is stopped or appriximately 10 seconds

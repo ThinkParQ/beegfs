@@ -127,16 +127,16 @@ void BuddyResyncJob::run()
    NetMessage* respMsg = NULL;
 
    uint16_t buddyTargetID = buddyGroupMapper->getBuddyTargetID(targetID);
-   NumNodeID nodeID = targetMapper->getNodeID(buddyTargetID);
-   auto buddyNode = storageNodes->referenceNode(nodeID);
+   NumNodeID buddyNodeID = targetMapper->getNodeID(buddyTargetID);
+   auto buddyNode = storageNodes->referenceNode(buddyNodeID);
    StorageResyncStartedMsg storageResyncStartedMsg(buddyTargetID);
    commRes = MessagingTk::requestResponse(*buddyNode, &storageResyncStartedMsg,
          NETMSGTYPE_StorageResyncStartedResp, &respBuf, &respMsg);
 
    if(!commRes)
    {
-      LogContext(__func__).logErr("Unable to notify buddy about resync attempt. Resync will not "
-         "start. targetID: " + StringTk::uintToStr(targetID));
+      LOG(ERR, "Unable to notify buddy about resync attempt. Resync will not start.",
+            targetID, buddyTargetID);
       setStatus(BuddyResyncJobState_FAILURE);
       goto cleanup;
    }
@@ -338,7 +338,7 @@ cleanup:
          // still *is* needs-resync. the resync itself has been perfectly successful, but we have
          // to start another one anyway once the target comes back to ensure that no information
          // was lost.
-         storageTargets->setBuddyNeedsResync(targetID, targetWasOffline.read());
+         storageTargets->setBuddyNeedsResync(targetID, targetWasOffline.read(), buddyTargetID);
          informBuddy();
 
          if (targetWasOffline.read())
@@ -537,7 +537,7 @@ void BuddyResyncJob::getJobStats(StorageBuddyResyncJobStatistics& outStats)
    }
 
    outStats = StorageBuddyResyncJobStatistics(status, startTime, endTime, discoveredFiles,
-         matchedFiles, discoveredDirs, matchedDirs, syncedFiles, syncedDirs, errorFiles, errorDirs);
+         discoveredDirs, matchedFiles, matchedDirs, syncedFiles, syncedDirs, errorFiles, errorDirs);
 }
 
 void BuddyResyncJob::informBuddy()
@@ -564,15 +564,15 @@ void BuddyResyncJob::informBuddy()
    }
 
    uint16_t buddyTargetID = buddyGroupMapper->getBuddyTargetID(targetID);
-   NumNodeID nodeID = targetMapper->getNodeID(buddyTargetID);
-   auto storageNode = storageNodes->referenceNode(nodeID);
+   NumNodeID buddyNodeID = targetMapper->getNodeID(buddyTargetID);
+   auto storageNode = storageNodes->referenceNode(buddyNodeID);
 
    if (!storageNode)
    {
       LogContext(__func__).logErr(
          "Unable to inform buddy about finished resync. TargetID: " + StringTk::uintToStr(targetID)
             + "; buddyTargetID: " + StringTk::uintToStr(buddyTargetID) + "; buddyNodeID: "
-            + nodeID.str() + "; error: unknown storage node");
+            + buddyNodeID.str() + "; error: unknown storage node");
       return;
    }
 
@@ -598,7 +598,7 @@ void BuddyResyncJob::informBuddy()
          "Unable to inform buddy about finished resync. "
          "targetID: " + StringTk::uintToStr(targetID) + "; "
          "buddyTargetID: " + StringTk::uintToStr(buddyTargetID) + "; "
-         "buddyNodeID: " + nodeID.str() + "; "
+         "buddyNodeID: " + buddyNodeID.str() + "; "
          "error: Communication error");
       goto err_cleanup;
    }
@@ -612,7 +612,7 @@ void BuddyResyncJob::informBuddy()
          "Error while informing buddy about finished resync. "
          "targetID: " + StringTk::uintToStr(targetID) + "; "
          "buddyTargetID: " + StringTk::uintToStr(buddyTargetID) + "; "
-         "buddyNodeID: " + nodeID.str() + "; "
+         "buddyNodeID: " + buddyNodeID.str() + "; "
          "error: " + FhgfsOpsErrTk::toErrString(result) );
    }
 

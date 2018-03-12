@@ -704,7 +704,7 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
          propertiesKey = STORAGETK_FORMAT_STATES_STORAGE;
          break;
       default:
-         throw ComponentInitException("Invalid node type: "
+         throw ComponentInitException("Invalid node type for state store initialization: "
                + Node::nodeTypeToStr(stateStore->getNodeType()));
    }
 
@@ -833,9 +833,12 @@ void App::handleComponentException(std::exception& e)
    const char* logContext = "App (component exception handler)";
    LogContext log(logContext);
 
-   log.logErr(std::string("This component encountered an unrecoverable error. ") +
-      std::string("[SysErr: ") + System::getErrString() + "] " +
-      std::string("Exception message: ") + e.what() );
+   const auto componentName = PThread::getCurrentThreadName();
+
+   log.logErr(
+         "The component [" + componentName + "] encountered an unrecoverable error. " +
+         std::string("[SysErr: ") + System::getErrString() + "] " +
+         std::string("Exception message: ") + e.what() );
 
    log.log(2, "Shutting down...");
 

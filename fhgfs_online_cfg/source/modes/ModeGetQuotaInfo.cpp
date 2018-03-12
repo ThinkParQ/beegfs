@@ -660,7 +660,9 @@ int ModeGetQuotaInfo::getUsedQuotaStrings(QuotaDataMap* usedQuota, unsigned id,
    else if(this->cfg.cfgPrintUnused)
    {
       usedSizeOut = "0";
-      usedSizeOut.append(" Byte");
+
+      if (!cfg.cfgCsv)
+         usedSizeOut.append(" Byte");
 
       if(quotaInodeSupport == QuotaInodeSupport_NO_BLOCKDEVICES)
       {
@@ -753,7 +755,6 @@ void ModeGetQuotaInfo::getDefaultQuotaStrings(QuotaDefaultLimits& quotaLimits, Q
       if(this->cfg.cfgCsv)
       {
          defaultLimitSizeOut = StringTk::uint64ToStr(limitSizeValueByte);
-         defaultLimitSizeOut.append(" Byte");
       }
       else
       {

@@ -142,6 +142,11 @@ check_function \
    KERNEL_HAS_HAVE_SUBMOUNTS \
    linux/dcache.h
 
+check_function \
+   kernel_read "ssize_t (struct file *, void *, size_t, loff_t *)" \
+   KERNEL_HAS_KERNEL_READ \
+   linux/fs.h
+
 # kernel 4.9 and newer have the iov_iter flavor ITER_PIPE which we currently cannot handle in our
 # buffered read_iter/write_iter functions. until we can handle it those kernels must have their
 # buffered read_iter/write_iter disabled, otherwise the kernel may crash.

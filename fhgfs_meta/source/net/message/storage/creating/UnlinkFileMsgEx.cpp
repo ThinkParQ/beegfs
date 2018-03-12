@@ -134,10 +134,7 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
     /* note: if the file is still opened or if there are/were hardlinks then unlinkedInode will be
        NULL even on FhgfsOpsErr_SUCCESS */
     if( (unlinkRes == FhgfsOpsErr_SUCCESS) && unlinkedInode)
-    {
-       unlinkRes = MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(),
-             getMsgHeaderUserID());
-    }
+       MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(), getMsgHeaderUserID());
 
     app->getMetaStore()->releaseDir(dir->getID());
 

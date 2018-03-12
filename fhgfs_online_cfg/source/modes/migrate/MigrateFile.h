@@ -8,6 +8,7 @@
 #include <common/toolkit/MetadataTk.h>
 #include <common/storage/EntryInfo.h>
 #include <common/toolkit/Random.h>
+#include <toolkit/XAttrTk.h>
 
 #include <dirent.h> // DT_LNK and DT_REG
 
@@ -132,6 +133,11 @@ class MigrateFile
       bool copyOwnerAndMode(int tmpFD, struct stat* fromStatData);
       bool fileWasModified(struct stat* fromStatData);
       bool copyOwnerAndModeLink(struct stat* fromStatData);
+
+      inline bool getXAttrs(XAttrMap& outXAttrs);
+      bool copyXAttrs(const XAttrMap& fromXAttrs);
+
+      inline void printError(const XAttrException& message);
 };
 
 #endif /* MIGRATEFILE_H_ */

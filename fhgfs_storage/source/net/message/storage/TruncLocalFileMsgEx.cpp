@@ -380,7 +380,11 @@ FhgfsOpsErr TruncLocalFileMsgEx::forwardToSecondary(ResponseContext& ctx, uint16
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
       // buddy is marked offline, so local msg processing will be done and buddy needs resync
-      storageTargets->setBuddyNeedsResync(actualTargetID, true);
+      // at this point:
+      // actualTargetID = our own target and (as message assumes) primary
+      // getTargetID() = mirrorGroupID
+      auto secTargetID = app->getMirrorBuddyGroupMapper()->getSecondaryTargetID(getTargetID());
+      storageTargets->setBuddyNeedsResync(actualTargetID, true, secTargetID);
 
       return FhgfsOpsErr_SUCCESS; // go ahead with local msg processing
    }
@@ -420,7 +424,8 @@ FhgfsOpsErr TruncLocalFileMsgEx::forwardToSecondary(ResponseContext& ctx, uint16
             "Secondary reports unknown target error and will need resync. "
             "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
-         storageTargets->setBuddyNeedsResync(actualTargetID, true);
+         auto secTargetID = app->getMirrorBuddyGroupMapper()->getSecondaryTargetID(getTargetID());
+         storageTargets->setBuddyNeedsResync(actualTargetID, true, secTargetID);
 
          return FhgfsOpsErr_SUCCESS;
       }

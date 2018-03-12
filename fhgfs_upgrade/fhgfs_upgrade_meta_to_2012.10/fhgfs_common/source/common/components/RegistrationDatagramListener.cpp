@@ -1,5 +1,7 @@
 #include "RegistrationDatagramListener.h"
 
+#include <common/net/message/NetMessageTypes.h>
+
 RegistrationDatagramListener::RegistrationDatagramListener(NetFilter* netFilter,
    NicAddressList& localNicList, AcknowledgmentStore* ackStore, unsigned short udpPort)
    throw(ComponentInitException) :
@@ -10,6 +12,10 @@ RegistrationDatagramListener::RegistrationDatagramListener(NetFilter* netFilter,
 void RegistrationDatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessage* msg)
 {
    HighResolutionStats stats; // currently ignored
+
+   NetMsgStrMapping strMapping;
+   const auto messageType = strMapping.defineToStr(msg->getMsgType());
+
    switch(msg->getMsgType() )
    {
       // valid messages within this context
@@ -18,7 +24,9 @@ void RegistrationDatagramListener::handleIncomingMsg(struct sockaddr_in* fromAdd
       case NETMSGTYPE_Dummy:
       {
          if(!msg->processIncoming(fromAddr, udpSock, sendBuf, DGRAMMGR_SENDBUF_SIZE, &stats) )
-            log.log(Log_WARNING, "Problem encountered during handling of incoming message");
+         {
+            LOG(WARNING, "Problem encountered during handling of incoming message.", messageType);
+         }
       } break;
 
       case NETMSGTYPE_Invalid:
@@ -31,7 +39,7 @@ void RegistrationDatagramListener::handleIncomingMsg(struct sockaddr_in* fromAdd
          log.log(Log_SPAM,
             "Received a message that is invalid within the current context "
             "from: " + Socket::ipaddrToStr(&fromAddr->sin_addr) + "; "
-            "type: " + StringTk::intToStr(msg->getMsgType() ) );
+            "type: " + messageType );
       } break;
    };
 }

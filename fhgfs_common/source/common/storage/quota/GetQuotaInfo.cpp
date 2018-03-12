@@ -227,28 +227,26 @@ bool GetQuotaInfo::requestQuotaDataAndCollectResponses(const NodeHandle& mgmtNod
 }
 
 /*
- * calculate the number of massages which are required to download all quota data
+ * calculate the number of messages which are required to download all quota data
  */
 int GetQuotaInfo::getMaxMessageCount()
 {
-   int retVal = 1;
+
+   unsigned numIds = 1;
 
    if(this->cfg.cfgUseList || this->cfg.cfgUseAll)
    {
-      retVal = this->cfg.cfgIDList.size() / GETQUOTAINFORESPMSG_MAX_ID_COUNT;
-
-      if( (this->cfg.cfgIDList.size() % GETQUOTAINFORESPMSG_MAX_ID_COUNT) != 0)
-         retVal++;
+      numIds = cfg.cfgIDList.size();
    }
-   else
-   if(this->cfg.cfgUseRange)
+   else if (cfg.cfgUseRange)
    {
-      int value = this->cfg.cfgIDRangeEnd - this->cfg.cfgIDRangeStart;
-      retVal = value / GETQUOTAINFORESPMSG_MAX_ID_COUNT;
-
-      if( (value % GETQUOTAINFORESPMSG_MAX_ID_COUNT) != 0)
-         retVal++;
+      numIds = this->cfg.cfgIDRangeEnd - this->cfg.cfgIDRangeStart + 1; //inclusive range
    }
+
+   int retVal = numIds / GETQUOTAINFORESPMSG_MAX_ID_COUNT;
+
+  if (numIds % GETQUOTAINFORESPMSG_MAX_ID_COUNT != 0)
+         ++retVal;
 
    return retVal;
 }

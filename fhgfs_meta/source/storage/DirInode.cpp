@@ -874,7 +874,11 @@ FhgfsOpsErr DirInode::storeInitialMetaDataInode()
    DiskMetaData::serializeDirInode(ser, *this);
    if (!ser.good())
    {
-      LogContext(logContext).logErr("Buffer too small for inode " + metaFilename + ".");
+      LOG(ERR, "Serialized metadata is larger than serialization buffer size.", id, parentDirID,
+            metaFilename,
+            as("Data size", ser.size()),
+            as("Buffer size", META_SERBUF_SIZE));
+
       retVal = FhgfsOpsErr_INTERNAL;
       goto error_closefile;
    }
@@ -1214,7 +1218,9 @@ bool DirInode::storeUpdatedMetaDataUnlocked()
    DiskMetaData::serializeDirInode(ser, *this);
    if (!ser.good())
    {
-      LogContext(logContext).logErr("Inode too large");
+      LOG(ERR, "Serialized metadata is larger than serialization buffer size.", id, parentDirID,
+            as("Data size", ser.size()),
+            as("Buffer size", META_SERBUF_SIZE));
       LogContext(logContext).logBacktrace();
       return false;
    }

@@ -356,8 +356,11 @@ static inline void i_mmap_unlock_read(struct address_space* mapping)
 
 static inline bool beegfs_hasMappings(struct inode* inode)
 {
-#ifdef KERNEL_HAS_I_MMAP_RBTREE
+#if defined(KERNEL_HAS_I_MMAP_RBTREE)
    if (!RB_EMPTY_ROOT(&inode->i_mapping->i_mmap))
+      return true;
+#elif defined(KERNEL_HAS_I_MMAP_CACHED_RBTREE)
+   if (!RB_EMPTY_ROOT(&inode->i_mapping->i_mmap.rb_root))
       return true;
 #else
    if (!prio_tree_empty(&inode->i_mapping->i_mmap))

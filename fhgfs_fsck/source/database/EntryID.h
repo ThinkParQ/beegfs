@@ -56,6 +56,11 @@ struct EntryID {
       return *this == disposal() || *this == mdisposal();
    }
 
+   bool isRootDir() const
+   {
+      return *this == root();
+   }
+
    std::string str() const
    {
       if(isSpecial() )

@@ -56,32 +56,23 @@ bool QuotaStoreLimits::getQuotaLimit(QuotaData& quotaDataInOut)
  * @param outQuotaDataList retrieved quota data is appended to this list.
  * @returns true if a limit was found for every ID in the range.
  */
-bool QuotaStoreLimits::getQuotaLimitForRange(unsigned rangeStart, unsigned rangeEnd,
+bool QuotaStoreLimits::getQuotaLimitForRange(const unsigned rangeStart, const unsigned rangeEnd,
    QuotaDataList* outQuotaDataList)
 {
-   bool retVal = true;
-   unsigned id = rangeStart;
 
    SafeRWLock rwLock(&this->limitsRWLock, SafeRWLock_READ); // L O C K
 
-   QuotaDataMapIter iter = this->limits.find(rangeStart);
-
-   if (iter == this->limits.end() )
-      retVal = false;
-
-   while ( iter != this->limits.end()
-     && iter->second.getID() <= rangeEnd)
+   for (QuotaDataMapIter iter  = limits.lower_bound(rangeStart),
+                          end  = limits.upper_bound(rangeEnd);
+                         iter != end;
+                       ++iter)
    {
-      if (iter->second.getID() != id++)
-         retVal = false; // IDs in list are not consecutive -> set retVal to false, but keep going.
-
       outQuotaDataList->push_back(iter->second);
-      iter++;
    }
 
    rwLock.unlock(); // U N L O C K
 
-   return retVal;
+   return outQuotaDataList->size() == rangeEnd - rangeStart + 1;
 }
 
 /**

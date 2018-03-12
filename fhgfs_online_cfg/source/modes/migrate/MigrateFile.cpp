@@ -7,6 +7,7 @@
 #include "MigrateFile.h"
 #include "ModeMigrateException.h"
 
+#include <utility>
 #include <string.h>   // memset
 #include <features.h> // _POSIX_C_SOURCE
 
@@ -52,16 +53,26 @@ bool MigrateFile::migrateRegularFile(void)
    // FD and stat data of the file we want to copy
    int fromFD;
    struct stat fromStatData;
+
    bool fromMeta = getFromFileMeta(&fromFD, &fromStatData);
    if (fromMeta == false)
    {
-      std::cerr << "Failed to get orig meta data" << std::endl;
+      std::cerr << "Failed to get origin meta data" << std::endl;
       return false;
    }
 
    if (fromStatData.st_nlink > 1)
    {
       std::cerr << "Cannot migrate file with hard link (yet): " << this->filePath << std::endl;
+      return false;
+   }
+
+   XAttrMap fromXAttrs;
+
+   bool xattrRes = getXAttrs(fromXAttrs);
+   if (!xattrRes)
+   {
+      std::cerr << "Failed to get origin extended attributes" << this->filePath << std::endl;
       return false;
    }
 
@@ -119,6 +130,14 @@ bool MigrateFile::migrateRegularFile(void)
       goto out;
    }
 
+   //copy extended attributes
+   metaRes = copyXAttrs(fromXAttrs);
+   if (metaRes == false)
+   {
+      removeTmpOnErr();
+      goto out;
+   }
+
    retVal = true;
 
 out:
@@ -129,7 +148,7 @@ out:
 }
 
 /**
- * Migrate symbolik links
+ * Migrate symbolic links
  */
 bool MigrateFile::migrateSymLink(void)
 {
@@ -145,6 +164,15 @@ bool MigrateFile::migrateSymLink(void)
    {
       std::cerr << "Failed to stat (" << this->filePath << "): " << System::getErrString() <<
          std::endl;
+      return false;
+   }
+
+   XAttrMap fromXAttributes;
+
+   bool xattrRes = getXAttrs(fromXAttributes);
+   if (!xattrRes)
+   {
+      std::cerr << "Failed to get origin extended attributes" << this->filePath << std::endl;
       return false;
    }
 
@@ -217,6 +245,13 @@ bool MigrateFile::migrateSymLink(void)
       goto out;
    }
 
+   //copy extended attributes
+   metaRes = copyXAttrs(fromXAttributes);
+   if (metaRes == false)
+   {
+      removeTmpOnErr();
+      goto out;
+   }
 
    retVal = true;
 
@@ -293,7 +328,7 @@ void MigrateFile::removeTmpOnErr(void)
          std::string tmpPath = this->dirPath + "/" + this->tmpName;
          std::cerr << "Unlinking of the tmp file (" << tmpPath << ") failed. Aborting. " <<
             "(" << System::getErrString() << ")" << std::endl;
-         throw ModeMigrateException("Unexpected migration errror!");
+         throw ModeMigrateException("Unexpected migration error!");
       }
    }
 }
@@ -322,7 +357,6 @@ bool MigrateFile::getFromFileMeta(int *outFD, struct stat* outStatData)
       close(*outFD);
       return false;
    }
-
    return true;
 }
 
@@ -803,4 +837,62 @@ bool MigrateFile::copyOwnerAndModeLink(struct stat* fromStatData)
 #endif // fchmodat(...,..., mode, AT_SYMLINK_NOFOLLOW) not (yet) supported in linux
 
    return true;
+}
+
+/**
+ * Get all extended attributes names and their respective values.
+ *
+ * @param outXAttrs The output map of extended attributes of the file to be copied.
+ *                  The map contains the attribute names and their respective values.
+ *                  Each value is a tuple containing the attribute value array and its length.
+ * @return true if the map could be retrieved; false otherwise.
+ */
+bool MigrateFile::getXAttrs(XAttrMap& outXAttrs)
+{
+   try
+   {
+      XAttrTk::getXAttrs(this->filePath, outXAttrs);
+   }
+   catch (const XAttrException& exception)
+   {
+      printError(exception);
+      return false;
+   }
+   return true;
+}
+
+/**
+ * Sets extended attributes of migrated file.
+ *
+ * @param fromXAttrs A map of extended attributes names and their respective values.
+ *                   Each map object is a tuple containing the attribute value array
+ *                   and its length.
+ * @return true if the copy was successful; false otherwise.
+ */
+bool MigrateFile::copyXAttrs(const XAttrMap& fromXAttrs)
+{
+   try
+   {
+      XAttrTk::setXAttrs(this->filePath, fromXAttrs);
+   }
+   catch (const XAttrException& exception)
+   {
+      printError(exception);
+      return false;
+   }
+   return true;
+}
+
+/**
+ * Format and print an extended attribute error message.
+ *
+ * @param exception The extended attribute exception to be printed.
+ */
+void MigrateFile::printError(const XAttrException& exception)
+{
+   std::cerr << exception.what() << std::endl <<
+
+      "Make sure the file system is not in use during migration. " <<
+      "Also, check the consistency of the " <<
+      "file system with beegfs-fsck and check the log files for error messages." << std::endl;
 }

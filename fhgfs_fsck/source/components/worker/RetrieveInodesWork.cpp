@@ -53,6 +53,11 @@ void RetrieveInodesWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
 
 void RetrieveInodesWork::doWork(bool isBuddyMirrored)
 {
+   const NumNodeID& metaRootID = Program::getApp()->getMetaNodes()->getRootNodeNumID();
+   const NumNodeID& nodeID = node.getNumID();
+   const NumNodeID nodeBuddyGroupID = NumNodeID(Program::getApp()->getMetaMirrorBuddyGroupMapper()
+         ->getBuddyGroupID(node.getNumID().val()));
+
    for ( unsigned firstLevelhashDirNum = hashDirStart; firstLevelhashDirNum <= hashDirEnd;
       firstLevelhashDirNum++ )
    {
@@ -135,22 +140,32 @@ void RetrieveInodesWork::doWork(bool isBuddyMirrored)
                // check inode entry IDs
                for (auto it = dirInodes.begin(); it != dirInodes.end(); )
                {
-                  if (db::EntryID::tryFromStr(it->getID()).first
-                        && db::EntryID::tryFromStr(it->getParentDirID()).first)
+                  auto entryIDPair = db::EntryID::tryFromStr(it->getID());
+                  if (!entryIDPair.first ||
+                        !db::EntryID::tryFromStr(it->getParentDirID()).first)
                   {
+                     LOG(ERR, "Found inode with invalid entry IDs.",
+                           as("node", it->getSaveNodeID()),
+                           as("isBuddyMirrored", it->getIsBuddyMirrored()),
+                           as("entryID", it->getID()),
+                           as("parentEntryID", it->getParentDirID()));
+
                      ++it;
+                     errors->increase();
+                     dirInodes.erase(std::prev(it));
                      continue;
                   }
 
-                  LOG(ERR, "Found inode with invalid entry IDs.",
-                        as("node", it->getSaveNodeID()),
-                        as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                        as("entryID", it->getID()),
-                        as("parentEntryID", it->getParentDirID()));
-
+                  // remove root inodes from non root metas
+                  if (entryIDPair.second.isRootDir() &&
+                        ((it->getIsBuddyMirrored() && nodeBuddyGroupID != metaRootID)
+                        || (!it->getIsBuddyMirrored() && nodeID != metaRootID)))
+                  {
+                     ++it;
+                     dirInodes.erase(std::prev(it));
+                     continue;
+                  }
                   ++it;
-                  errors->increase();
-                  dirInodes.erase(std::prev(it));
                }
 
                fileInodeCount = fileInodes.size();

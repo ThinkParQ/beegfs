@@ -537,7 +537,7 @@ FhgfsOpsErr WriteLocalFileMsgEx::prepareMirroring(char* buf, size_t bufLen,
 
          // buddy is marked offline, so local msg processing will be done and buddy needs resync
 
-         app->getStorageTargets()->setBuddyNeedsResync(primaryTargetID, true);
+         app->getStorageTargets()->setBuddyNeedsResync(primaryTargetID, true, secondaryTargetID);
 
          return FhgfsOpsErr_SUCCESS;
       }
@@ -839,12 +839,14 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
 
          uint16_t primaryTargetID = app->getMirrorBuddyGroupMapper()->getPrimaryTargetID(
             getTargetID() );
+         uint16_t secondaryTargetID = app->getMirrorBuddyGroupMapper()->getSecondaryTargetID(
+            getTargetID() );
 
          LogContext(logContext).log(Log_DEBUG,
             "Secondary reports unknown target error and will need resync. "
             "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
-         app->getStorageTargets()->setBuddyNeedsResync(primaryTargetID, true);
+         app->getStorageTargets()->setBuddyNeedsResync(primaryTargetID, true, secondaryTargetID);
 
          return FhgfsOpsErr_SUCCESS;
       }

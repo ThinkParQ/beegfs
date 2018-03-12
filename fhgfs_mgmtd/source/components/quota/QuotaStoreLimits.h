@@ -27,7 +27,7 @@ class QuotaStoreLimits
       void addOrUpdateLimits(const QuotaDataList& quotaData);
 
       bool getQuotaLimit(QuotaData& quotaDataInOut);
-      bool getQuotaLimitForRange(unsigned rangeStart, unsigned rangeEnd,
+      bool getQuotaLimitForRange(const unsigned rangeStart, const unsigned rangeEnd,
          QuotaDataList* outQuotaDataList);
 
       QuotaDataMap getAllQuotaLimits();

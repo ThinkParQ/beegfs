@@ -68,11 +68,17 @@ namespace BuddyCommTk
             FhgfsOpsErr resyncRes = buddyResyncer->startResync();
 
             if (resyncRes == FhgfsOpsErr_SUCCESS)
-               LogContext(__func__).log(Log_WARNING, "Starting buddy resync job.");
+            {
+               LOG(WARNING, "Starting buddy resync job.", as("Buddy node ID", buddyID.val()));
+            }
             else if (resyncRes == FhgfsOpsErr_INUSE)
-               LogContext(__func__).log(Log_DEBUG, "Resync job currently running.");
+            {
+               LOG(WARNING, "Resync job currently running.", as("Buddy node ID", buddyID.val()));
+            }
             else
-               LogContext(__func__).log(Log_WARNING, "Starting buddy resync job failed.");
+            {
+               LOG(WARNING, "Starting buddy resync job failed.", as("Buddy node ID", buddyID.val()));
+            }
          }
       }
    }
@@ -80,12 +86,12 @@ namespace BuddyCommTk
    /**
     * Creates the buddyneedsresync file, and tells the buddy about the state.
     */
-   void setBuddyNeedsResync(const std::string& path, bool needsResync)
+   void setBuddyNeedsResync(const std::string& path, bool needsResync, NumNodeID buddyNodeID)
    {
       if (needsResync)
       {
          bool fileCreated;
-         createBuddyNeedsResyncFile(path, fileCreated);
+         createBuddyNeedsResyncFile(path, fileCreated, buddyNodeID);
          if (fileCreated)
             setBuddyNeedsResyncState(needsResync);
       }
@@ -153,7 +159,8 @@ namespace BuddyCommTk
    /**
     * @param outFileCreated set to true if file didn't exist before and was actually created.
     */
-   void createBuddyNeedsResyncFile(const std::string& path, bool& outFileCreated)
+   void createBuddyNeedsResyncFile(const std::string& path, bool& outFileCreated,
+         NumNodeID buddyNodeID)
    {
       std::string fileName = path + "/" + BUDDY_NEEDS_RESYNC_FILENAME;
 
@@ -170,8 +177,7 @@ namespace BuddyCommTk
       if (outFileCreated)
       {
          // File wasn't there before - inform user about newly needed resync.
-         LogContext(__func__).log(Log_CRITICAL,
-            "Marked secondary buddy for needed resync.");
+         LOG(CRITICAL, "Secondary mirror buddy needs to be resynced.", buddyNodeID);
       }
    }
 

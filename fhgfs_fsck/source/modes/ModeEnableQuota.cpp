@@ -42,15 +42,6 @@ int ModeEnableQuota::execute()
    App* app = Program::getApp();
    Config *cfg = app->getConfig();
 
-   // check root privileges
-   if ( geteuid() && getegid() )
-   { // no root privileges
-      FsckTkEx::printVersionHeader(true, true);
-      FsckTkEx::fsckOutput("Error: beegfs-fsck requires root privileges.",
-         OutputOptions_NOLOG | OutputOptions_STDERR | OutputOptions_DOUBLELINEBREAK);
-      return APPCODE_INITIALIZATION_ERROR;
-   }
-
    if(this->checkInvalidArgs(cfg->getUnknownConfigArgs()))
       return APPCODE_INVALID_CONFIG;
 

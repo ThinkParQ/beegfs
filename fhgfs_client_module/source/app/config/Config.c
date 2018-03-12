@@ -35,6 +35,24 @@ static bool __Config_readLineFromFile(struct file* cfgFile,
 
 
 
+static size_t Config_fs_read(struct file *file, char *buf, size_t size, loff_t *pos)
+{
+   size_t readRes;
+
+#if defined(KERNEL_HAS_KERNEL_READ)
+   readRes = kernel_read(file, buf, size, pos);
+#else
+   mm_segment_t oldfs;
+   ACQUIRE_PROCESS_CONTEXT(oldfs);
+
+   readRes = vfs_read(file, buf, size, pos);
+
+   RELEASE_PROCESS_CONTEXT(oldfs);
+#endif
+
+   return readRes;
+}
+
 /**
  * @param mountConfig will be copied (not owned by this object)
  */
@@ -833,7 +851,6 @@ const char* __Config_createDefaultCfgFilename(void)
 bool __Config_readLineFromFile(struct file* cfgFile,
    char* buf, size_t bufLen, bool* outEndOfFile)
 {
-   mm_segment_t oldfs;
    size_t numRead;
    bool endOfLine;
    bool erroroccurred;
@@ -842,13 +859,12 @@ bool __Config_readLineFromFile(struct file* cfgFile,
    endOfLine = false;
    erroroccurred = false;
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
    for(numRead = 0; numRead < (bufLen-1); numRead++)
    {
       char charBuf;
 
-      ssize_t readRes = vfs_read(cfgFile, &charBuf, 1, &cfgFile->f_pos);
+      ssize_t readRes = Config_fs_read(cfgFile, &charBuf, 1, &cfgFile->f_pos);
 
       if( (readRes > 0) && (charBuf == '\n') )
       { // end of line
@@ -884,7 +900,7 @@ bool __Config_readLineFromFile(struct file* cfgFile,
    {
       char charBuf;
 
-      ssize_t readRes = vfs_read(cfgFile, &charBuf, 1, &cfgFile->f_pos);
+      ssize_t readRes = Config_fs_read(cfgFile, &charBuf, 1, &cfgFile->f_pos);
       if( (readRes > 0) && (charBuf == '\n') )
          endOfLine = true;
       if(readRes == 0)
@@ -895,7 +911,6 @@ bool __Config_readLineFromFile(struct file* cfgFile,
    }
 
 
-   RELEASE_PROCESS_CONTEXT(oldfs);
 
    return !erroroccurred;
 
@@ -1112,15 +1127,11 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
       return false;
    }
 
+   readRes = Config_fs_read(fileHandle, buf, CONFIG_AUTHFILE_READSIZE, &fileHandle->f_pos);
 
    ACQUIRE_PROCESS_CONTEXT(oldfs);
-
-   readRes = vfs_read(fileHandle, buf, CONFIG_AUTHFILE_READSIZE, &fileHandle->f_pos);
-
    filp_close(fileHandle, NULL);
-
    RELEASE_PROCESS_CONTEXT(oldfs);
-
 
    if(readRes < 0)
    {

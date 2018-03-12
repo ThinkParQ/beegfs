@@ -707,13 +707,13 @@ class StorageTargets
       /**
        * @param needsResync true to set marker, false to remove it
        */
-      void setBuddyNeedsResync(uint16_t targetID, bool needsResync)
+      void setBuddyNeedsResync(uint16_t targetID, bool needsResync, uint16_t buddyTargetID)
       {
          if(needsResync)
          {
             bool fileCreated;
 
-            createBuddyNeedsResyncFile(targetID, &fileCreated);
+            createBuddyNeedsResyncFile(targetID, &fileCreated, buddyTargetID);
 
             if(fileCreated) // only notify mgmtd once
                setBuddyNeedsResyncState(targetID, true, false);
@@ -777,7 +777,7 @@ class StorageTargets
        * @param fileCreated true if file didn't exist before and was actually created (may be NULL
        *    if caller is not interested).
        */
-      void createBuddyNeedsResyncFile(uint16_t targetID, bool* fileCreated)
+      void createBuddyNeedsResyncFile(uint16_t targetID, bool* fileCreated, uint16_t buddyTargetID)
       {
          const char* logContext = "StorageTargets (mark buddy resync)";
 
@@ -809,11 +809,11 @@ class StorageTargets
             return;
          }
 
-         if(*fileCreated)
-         { // mark wasn't set before, inform user about new mark
-            LogContext(logContext).log(Log_CRITICAL,
-               "Marked secondary buddy for needed resync. "
-               "primary targetID: " + StringTk::uintToStr(targetID) );
+         if (*fileCreated)
+         {
+            // mark wasn't set before, inform user about new mark
+            LOG(CRITICAL, "Secondary mirror buddy needs to be resynced.",
+                  as("primaryTargetID", targetID), buddyTargetID);
          }
       }
 

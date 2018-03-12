@@ -124,6 +124,17 @@ void App::runNormal()
       return;
    }
 
+   // check if running as root
+   if(geteuid())
+   {
+      std::cerr << std::endl
+            << "Running beegfs-fsck requires root privileges."
+            << std::endl << std::endl << std::endl;
+      ModeHelp().execute();
+      appResult = APPCODE_INITIALIZATION_ERROR;
+      return;
+   }
+
    initDataObjects(argc, argv);
 
    // wait for mgmtd
@@ -346,7 +357,8 @@ void App::stopComponents()
    //    lead to a deadlock (when calling from signal handler)
    workersStop();
 
-   this->internodeSyncer->selfTerminate();
+   if(this->internodeSyncer)
+      this->internodeSyncer->selfTerminate();
 
    if ( dgramListener )
    {
@@ -527,9 +539,12 @@ void App::handleComponentException(std::exception& e)
    const char* logContext = "App (component exception handler)";
    LogContext log(logContext);
 
-   log.logErr(std::string("This component encountered an unrecoverable error. ") +
-      std::string("[SysErr: ") + System::getErrString() + "] " +
-      std::string("Exception message: ") + e.what() );
+   const auto componentName = PThread::getCurrentThreadName();
+
+   log.logErr(
+         "The component [" + componentName + "] encountered an unrecoverable error. " +
+         std::string("[SysErr: ") + System::getErrString() + "] " +
+         std::string("Exception message: ") + e.what() );
 
    log.log(2, "Shutting down...");
 

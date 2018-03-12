@@ -288,8 +288,12 @@ void Config::initImplicitVals() throw (InvalidConfigException)
    if (!tuneDentryCacheSize)
       tuneDentryCacheSize = tuneDbFragmentSize / 384;
 
-   // connAuthHash
-   AbstractConfig::initConnAuthHash(connAuthFile, &connAuthHash);
+   // read in connAuthFile only if we are running as root.
+   // if not root, the program will abort anyway
+   if(!geteuid())
+   {
+      AbstractConfig::initConnAuthHash(connAuthFile, &connAuthHash);
+   }
 }
 
 std::string Config::createDefaultCfgFilename()

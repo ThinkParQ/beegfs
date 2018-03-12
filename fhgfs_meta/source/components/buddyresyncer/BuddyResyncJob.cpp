@@ -220,7 +220,7 @@ cleanup:
          setState(BuddyResyncJobState_SUCCESS);
 
       // delete timestamp override file if it exists.
-      BuddyCommTk::setBuddyNeedsResync(metaPath, false);
+      BuddyCommTk::setBuddyNeedsResync(metaPath, false, buddyNodeID);
 
       const TargetConsistencyState buddyState = newBuddyState();
       informBuddy(buddyState);

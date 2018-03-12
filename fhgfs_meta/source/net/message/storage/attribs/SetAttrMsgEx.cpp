@@ -141,7 +141,7 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
          earlyComplete(ctx, ResponseState(setAttrRes));
 
       if (setAttrRes == FhgfsOpsErr_SUCCESS)
-         setAttrRes = setChunkFileAttribs(*inode, false);
+         setChunkFileAttribs(*inode, false);
 
       if (cfg->getQuotaEarlyChownResponse())
       {

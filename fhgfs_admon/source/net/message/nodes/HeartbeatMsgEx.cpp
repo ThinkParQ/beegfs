@@ -52,7 +52,13 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       default:
       {
-         log.logErr(std::string("Invalid node type: ") + StringTk::intToStr(getNodeType() ) );
+         LOG(ERR, "Invalid node type.",
+               as("Node Type", Node::nodeTypeToStr(getNodeType())),
+               as("Sender", ctx.peerName()),
+               as("NodeID", getNodeNumID()),
+               as("Port (UDP)", getPortUDP()),
+               as("Port (TCP)", getPortTCP())
+            );
 
          goto ack_resp;
       } break;

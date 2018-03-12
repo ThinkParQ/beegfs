@@ -48,7 +48,9 @@ static inline void FhgfsOps_setIsRootInited(struct super_block* sb, bool isInite
 struct FhgfsSuperBlockInfo
 {
    App app;
+#if !defined(KERNEL_HAS_SUPER_SETUP_BDI_NAME)
    struct backing_dev_info bdi;
+#endif
    bool haveRootEntryInfo; // false until the root EntryInfo is set in root-FhgfsInode
 
    bool isRootInited; /* false until root inode attrs have been fetched/initialized in
@@ -78,9 +80,13 @@ App* FhgfsOps_getApp(struct super_block* sb)
  */
 struct backing_dev_info* FhgfsOps_getBdi(struct super_block* sb)
 {
+#if defined(KERNEL_HAS_SUPER_SETUP_BDI_NAME)
+   return sb->s_bdi;
+#else
    FhgfsSuperBlockInfo* sbInfo = sb->s_fs_info;
 
    return &(sbInfo->bdi);
+#endif
 }
 
 /**

@@ -32,7 +32,10 @@ bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
          stateStore = app->getMetaStateStore();
          break;
       default:
-         LogContext(logContext).logErr("Invalid node type: " + StringTk::intToStr(nodeType) );
+         LOG(ERR, "Invalid node type.",
+               as("Node Type", Node::nodeTypeToStr(nodeType)),
+               as("Sender", ctx.peerName())
+            );
          return false;
    }
 

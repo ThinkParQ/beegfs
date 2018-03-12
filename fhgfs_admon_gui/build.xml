@@ -131,18 +131,6 @@
       <replace file="manifest.mf" value="@VERSION@" token="${VERSION}"/>
    </target>
 
-   <taskdef name="findbugs" classname="edu.umd.cs.findbugs.anttask.FindBugsTask" />
-      <target name="findbugs" depends="jar">
-         <findbugs home="${basedir}/../beegfs_thirdparty/source/findbugs" output="xml"
-                   outputFile="findbugs.xml">
-            <sourcePath path="${src.dir}" />
-            <class location="${build.dir}/classes" />
-            <auxClasspath path="${basedir}/lib/jchart2d-3.2.2.jar" />
-            <auxClasspath path="${basedir}/lib/jdom.jar" />
-            <auxClasspath path="${basedir}/lib/nimrodlf-1.2.jar" />
-         </findbugs>
-   </target>
-
    <target name="-post-clean">
       <condition property="VERSION" value="${BEEGFS_VERSION}" else="DEBUG">
          <isset property="BEEGFS_VERSION"/>

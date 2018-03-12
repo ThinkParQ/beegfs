@@ -418,7 +418,10 @@ class MirroredMessage : public BaseT
 
       void setBuddyNeedsResync()
       {
-         BuddyCommTk::setBuddyNeedsResync(Program::getApp()->getMetaPath(), true);
+         auto* app = Program::getApp();
+         auto* buddyGroups = app->getMetaBuddyGroupMapper();
+         NumNodeID buddyNodeID(buddyGroups->getBuddyTargetID(app->getLocalNodeNumID().val()));
+         BuddyCommTk::setBuddyNeedsResync(Program::getApp()->getMetaPath(), true, buddyNodeID);
       }
 };
 

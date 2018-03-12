@@ -20,7 +20,10 @@ bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
    if(!nodes)
 
    {
-      log.logErr(std::string("Invalid node type: ") + StringTk::intToStr(nodeType) );
+      LOG(ERR, "Invalid node type.",
+            as("Node Type", Node::nodeTypeToStr(nodeType)),
+            as("Sender", ctx.peerName())
+         );
       return false;
    }
 

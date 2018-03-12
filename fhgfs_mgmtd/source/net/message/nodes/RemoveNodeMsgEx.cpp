@@ -37,7 +37,11 @@ bool RemoveNodeMsgEx::processIncoming(ResponseContext& ctx)
       NodeStoreServers* nodes = app->getServerStoreFromType(getNodeType() );
       if(!nodes)
       { // invalid node type
-         LOG(ERR, "Invalid node type ", getNodeType(), getNodeNumID());
+         LOG(ERR, "Invalid node type.",
+               as("Node Type", Node::nodeTypeToStr(getNodeType())),
+               as("Sender", ctx.peerName()),
+               as("NodeID", getNodeNumID())
+            );
       }
       else
       { // found the corresponding server store => delete by ID

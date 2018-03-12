@@ -13,11 +13,12 @@
 namespace BuddyCommTk
 {
    void checkBuddyNeedsResync();
-   void setBuddyNeedsResync(const std::string& path, bool needsResync);
+   void setBuddyNeedsResync(const std::string& path, bool needsResync, NumNodeID buddyNodeID);
    void setBuddyNeedsResyncState(bool needsResync);
    bool getBuddyNeedsResync();
 
-   void createBuddyNeedsResyncFile(const std::string& path, bool& outFileCreated);
+   void createBuddyNeedsResyncFile(const std::string& path, bool& outFileCreated,
+         NumNodeID buddyNodeID);
    void removeBuddyNeedsResyncFile(const std::string& path);
 };
 

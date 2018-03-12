@@ -94,7 +94,12 @@ bool MoveChunkFileMsgEx::processIncoming(ResponseContext& ctx)
       result = 1;
    }
    else if (getIsMirrored())
-      app->getStorageTargets()->setBuddyNeedsResync(targetID, true);
+   {
+      auto* buddyGroups = app->getMirrorBuddyGroupMapper();
+      auto buddyGroupID = buddyGroups->getBuddyGroupID(targetID);
+      auto secondaryTargetID = buddyGroups->getSecondaryTargetID(buddyGroupID);
+      app->getStorageTargets()->setBuddyNeedsResync(targetID, true, secondaryTargetID);
+   }
 
 sendResp:
    ctx.sendResponse(MoveChunkFileRespMsg(result) );

@@ -1036,7 +1036,8 @@ void App::stopComponents()
 
    // resyncer wants to control the workers, so any running resync must be finished or aborted
    // before the workers are stopped.
-   buddyResyncer->shutdown();
+   if(buddyResyncer)
+      buddyResyncer->shutdown();
 
    workersStop();
 
@@ -1070,9 +1071,12 @@ void App::handleComponentException(std::exception& e)
    const char* logContext = "App (component exception handler)";
    LogContext log(logContext);
 
-   log.logErr(std::string("This component encountered an unrecoverable error. ") +
-      std::string("[SysErr: ") + System::getErrString() + "] " +
-      std::string("Exception message: ") + e.what() );
+   const auto componentName = PThread::getCurrentThreadName();
+
+   log.logErr(
+         "The component [" + componentName + "] encountered an unrecoverable error. " +
+         std::string("[SysErr: ") + System::getErrString() + "] " +
+         std::string("Exception message: ") + e.what() );
 
    log.log(Log_WARNING, "Shutting down...");
 

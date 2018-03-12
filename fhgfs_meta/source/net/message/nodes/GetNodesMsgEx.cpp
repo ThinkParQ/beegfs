@@ -17,8 +17,10 @@ bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
    NodeStore* nodes = app->getServerStoreFromType(nodeType);
    if(unlikely(!nodes) )
    {
-      log.logErr("Invalid node type: " + StringTk::intToStr(nodeType) +
-         "(" + Node::nodeTypeToStr(nodeType) + ")");
+      LOG(ERR, "Invalid node type.",
+            as("Node Type", Node::nodeTypeToStr(getNodeType())),
+            as("Sender", ctx.peerName())
+         );
 
       return true;
    }

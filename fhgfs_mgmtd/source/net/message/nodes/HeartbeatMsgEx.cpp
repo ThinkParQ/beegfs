@@ -77,7 +77,13 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       NodeStoreServers* servers = app->getServerStoreFromType(nodeType);
       if(unlikely(!servers) )
       {
-         log.logErr(std::string("Invalid node type: ") + StringTk::intToStr(nodeType) );
+         LOG(ERR, "Invalid node type.",
+               as("Node Type", Node::nodeTypeToStr(getNodeType())),
+               as("Sender", ctx.peerName()),
+               as("NodeID", getNodeNumID()),
+               as("Port (UDP)", getPortUDP()),
+               as("Port (TCP)", getPortTCP())
+            );
 
          return false;
       }

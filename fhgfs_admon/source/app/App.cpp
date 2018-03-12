@@ -360,9 +360,12 @@ void App::handleComponentException(std::exception& e)
    const char* logContext = "App::handleComponentException";
    LogContext log(logContext);
 
-   log.logErr(std::string("This component encountered an unrecoverable error. ") +
-      std::string("[SysErrnoMessage: ") + System::getErrString() + "] " +
-      std::string("Exception message: ") + e.what() );
+   const auto componentName = PThread::getCurrentThreadName();
+
+   log.logErr(
+         "The component [" + componentName + "] encountered an unrecoverable error. " +
+         std::string("[SysErr: ") + System::getErrString() + "] " +
+         std::string("Exception message: ") + e.what() );
 
    log.log(Log_WARNING, "Shutting down...");
 

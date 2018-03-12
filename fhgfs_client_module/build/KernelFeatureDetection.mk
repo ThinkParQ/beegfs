@@ -244,6 +244,7 @@ $(call define_if_matches, KERNEL_HAS_I_MMAP_LOCK, -F "i_mmap_lock_read", fs.h)
 $(call define_if_matches, KERNEL_HAS_I_MMAP_RWSEM, -F "i_mmap_rwsem", fs.h)
 $(call define_if_matches, KERNEL_HAS_I_MMAP_MUTEX, -F "i_mmap_mutex", fs.h)
 $(call define_if_matches, KERNEL_HAS_I_MMAP_RBTREE, -P "struct rb_root\s+i_mmap", fs.h)
+$(call define_if_matches, KERNEL_HAS_I_MMAP_CACHED_RBTREE, -P "struct rb_root_cached\s+i_mmap", fs.h)
 $(call define_if_matches, KERNEL_HAS_I_MMAP_NONLINEAR, -F "i_mmap_nonlinear", fs.h)
 
 $(call define_if_matches, KERNEL_HAS_LONG_IOV_DIO, \
