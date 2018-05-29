@@ -1,4 +1,5 @@
 #!/bin/bash
+source $(dirname $(readlink -f $0))/../../build/make-deb-common
 
 set -e
 
@@ -49,11 +50,7 @@ sed \
 
 chmod +x debian/rules
 
-# build the package and supress lintian warnings. Lintian in Lenny cannot
-# do that itself yet
-# NOTE: package not signed yet! (-us -uc)
-yes | debuild -us -uc 2>&1 | egrep -v "dir-or-file-in-opt | file-in-unusual-dir"
-[ "${DEBIAN_VERSION}" = "9" ] && yes | debuild -- clean || debuild clean
+runDebuild
 
 if [ -z "$DEBIAN_ARCHIVE_DIR" ]; then
 	DEBIAN_ARCHIVE_DIR=`mktemp -d /tmp/debian_archive.XXXXXXXXX`

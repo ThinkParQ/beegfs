@@ -28,10 +28,10 @@ mkdir -p $BUILD/buildroot/{BUILD,RPMS,S{RPMS,PECS,OURCES}}
 
 rm -f $BUILD/buildroot/SOURCES/*.tgz
 
-BEEGFS_BEEOND_THIRDPARTY_PATH=${BEEGFS_BEEOND_THIRDPARTY_PATH:-`readlink -f ../../beegfs_beeond_thirdparty`}
-BEEGFS_COMMON_PATH=${BEEGFS_COMMON_PATH:-`readlink -f ../../beegfs_common`}
-BEEGFS_ONLINE_CFG_PATH=${BEEGFS_ONLINE_CFG_PATH:-`readlink -f ../../beegfs_online_cfg`}
-BEEGFS_FSCK_PATH=${BEEGFS_FSCK_PATH:-`readlink -f ../../beegfs_fsck`}
+BEEGFS_BEEOND_THIRDPARTY_PATH=${BEEGFS_BEEOND_THIRDPARTY_PATH:-`readlink -f ../../beeond_thirdparty`}
+BEEGFS_COMMON_PATH=${BEEGFS_COMMON_PATH:-`readlink -f ../../common`}
+BEEGFS_ONLINE_CFG_PATH=${BEEGFS_ONLINE_CFG_PATH:-`readlink -f ../../ctl`}
+BEEGFS_FSCK_PATH=${BEEGFS_FSCK_PATH:-`readlink -f ../../fsck`}
 
 
 pushd $TOOLS_ROOT

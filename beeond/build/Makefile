@@ -1,5 +1,3 @@
-# This is the beeond makefile.
-
 all:
 
 clean:

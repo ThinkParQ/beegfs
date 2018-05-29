@@ -1,0 +1,12 @@
+Source: beegfs-utils-dev
+Section: misc
+Priority: optional
+Maintainer: BeeGFS Maintainers <packages@beegfs.com>
+Build-Depends: debhelper (>= 7.0.0), lsb-release
+Standards-Version: 3.8.0
+
+Package: beegfs-utils-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: BeeGFS utils devel files
+ This package contains BeeGFS development development files and examples.

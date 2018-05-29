@@ -1,0 +1,76 @@
+#!/bin/bash 
+source $(dirname $(readlink -f $0))/../../build/make-deb-common
+
+set -e
+
+NAME="beegfs-deeper-lib"
+NAME_DAEMON="beegfs-deeper-cached"
+
+source ../../beegfs-version
+
+CONCURRENCY=${MAKE_CONCURRENCY:-4}
+
+ROOT_DIR=${ROOT_DIR:-`(cd ../..; pwd)`}
+BEEGFS_COMMON_PATH=${BEEGFS_COMMON_PATH:-`readlink -f ../../common`}
+BEEGFS_COMMON_PACKAGE_PATH=${BEEGFS_COMMON_PACKAGE_PATH:-`readlink -f ../../common_package`}
+BEEGFS_OPENTK_PATH=${BEEGFS_OPENTK_PATH:-`readlink -f ../../opentk_lib/`}
+BEEGFS_THIRDPARTY_PATH=${BEEGFS_THIRDPARTY_PATH:-`readlink -f ../../thirdparty/`}
+BEEGFS_DEEPER_COMMON_PATH=${BEEGFS_DEEPER_COMMON_PATH:-`readlink -f ../../deeper_common/`}
+BEEGFS_DEEPER_CACHED_PATH=${BEEGFS_DEEPER_CACHED_PATH:-`readlink -f ../../deeper_cached/`}
+
+CHANGELOG="debian/changelog"
+RULES="debian/rules"
+
+# set date to US locale, because the German locale disturbs the debbuild process
+CURRENT_TIME=`LC_ALL=en_US.UTF-8 date "+%a, %d %b %Y %H:%M:%S %z"`
+
+# parse BeeGFS version for debian versioning
+BEEGFS_DEB_MAJOR=`echo ${BEEGFS_VERSION} | cut -d . -f 1`
+BEEGFS_DEB_MINOR=`echo ${BEEGFS_VERSION} | cut -d - -f 1 | cut -d . -f 2`
+BEEGFS_DEB_REL_SUFFIX=`echo ${BEEGFS_VERSION}- | cut -d - -f 2`
+
+if [ ! -z ${BEEGFS_DEB_REL_SUFFIX} ]; then
+   # prepend "~" to the suffix, so final version will look like this:
+   # "beegfs-XXX-6.0-debian8~beta1"
+   BEEGFS_DEB_REL_SUFFIX="~${BEEGFS_DEB_REL_SUFFIX}"
+fi
+
+BEEGFS_DEB_FULLVERSION=${EPOCH}:${BEEGFS_DEB_MAJOR}.${BEEGFS_DEB_MINOR}${BEEGFS_DEB_REL_SUFFIX}-debian${DEBIAN_VERSION}
+
+sed \
+	-e "s/__NAME__/$NAME/g" 			              \
+	-e "s/__BEEGFS_DEB_FULLVERSION__/${BEEGFS_DEB_FULLVERSION}/g" \
+	-e "s/__CURRENT_TIME__/${CURRENT_TIME}/g"                     \
+	${CHANGELOG}.in > ${CHANGELOG}
+
+sed \
+	-e "s#__ROOT_DIR__#$ROOT_DIR#g" \
+	-e "s#__BEEGFS_COMMON_PATH__#$BEEGFS_COMMON_PATH#g" 	\
+	-e "s#__BEEGFS_COMMON_PACKAGE_PATH__#$BEEGFS_COMMON_PACKAGE_PATH#g" 	\
+	-e "s#__BEEGFS_OPENTK_PATH__#$BEEGFS_OPENTK_PATH#g"		\
+	-e "s#__BEEGFS_THIRDPARTY_PATH__#$BEEGFS_THIRDPARTY_PATH#g"   \
+	-e "s#__BEEGFS_DEEPER_CACHED_PATH__#$BEEGFS_DEEPER_CACHED_PATH#g" \
+	-e "s#__BEEGFS_DEEPER_COMMON_PATH__#$BEEGFS_DEEPER_COMMON_PATH#g" \
+	-e "s/__BEEGFS_VERSION__/$BEEGFS_VERSION/g"   		\
+	-e "s/__NAME__/$NAME/g" 				\
+	-e "s/__NAME_DAEMON__/$NAME_DAEMON/g" 				\
+	-e "s/__USER_CXXFLAGS__/$USER_CXXFLAGS/g"		\
+	-e "s/__USER_LDFLAGS__/$USER_LDFLAGS/g"			\
+	-e "s/__BEEGFS_DEBUG__/$BEEGFS_DEBUG/g"              \
+	-e "s/__MAKE_CONCURRENCY__/$CONCURRENCY/g"            \
+	${RULES}.in > ${RULES}
+
+chmod +x debian/rules
+
+
+builddir=$(pwd)
+cd $builddir
+
+runDebuild
+
+if [ -z "$DEBIAN_ARCHIVE_DIR" ]; then
+	DEBIAN_ARCHIVE_DIR=`mktemp -d /tmp/debian_archive.XXXXXXXXX`
+fi
+
+mv ../*.build ../*.changes ../*.deb ../*.dsc ../*.tar.gz $DEBIAN_ARCHIVE_DIR/
+echo "Wrote package files to $DEBIAN_ARCHIVE_DIR"

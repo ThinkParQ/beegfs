@@ -1,6 +1,3 @@
-# This is the beeond_thirdparty makefile.
-# It provides the thirdparty tools needed by BeeOND.
-
 # At the moment there's not much more to do than moving the GNU Parallel script to the correct
 # directory.
 

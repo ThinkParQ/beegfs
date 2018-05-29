@@ -1,0 +1,28 @@
+export TOP_PID=$$
+
+function die() {
+   echo "${*}" >&2
+   kill $TOP_PID
+}
+
+function getVersion() {
+   dpkg-query -f '${Version}' -W "${1}" 2>/dev/null || die "Package ${1} is not installed."
+}
+
+function isNewerVersion() {
+   local v=$(getVersion "${1}")
+   dpkg --compare-versions "${v}" \>= "${2}"
+}
+
+function runDebuild() {
+# build the package and supress lintian warnings. Lintian in Lenny cannot
+# do that itself yet
+# NOTE: package not signed yet! (-us -uc)`
+yes | debuild -us -uc 2>&1 | egrep -v "dir-or-file-in-opt | file-in-unusual-dir"
+
+if $(isNewerVersion devscripts 2.16.10); then
+   yes | debuild -- clean
+else
+   yes | debuild clean
+fi
+}

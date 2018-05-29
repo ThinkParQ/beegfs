@@ -1,0 +1,233 @@
+#!/bin/bash
+
+# License: BeeGFS EULA
+
+# constant definitions
+# (for configurables see below)
+
+DEFAULT_CFG_PATH="/etc/beegfs/beegfs-mgmtd.conf"
+STORAGE_PATH_CFG_KEY="storeMgmtdDirectory"
+ALLOW_INIT_CFG_KEY="storeAllowFirstRunInit"
+ALLOW_NEW_SERVERS_CFG_KEY="sysAllowNewServers"
+SERVER_STRID_FILE="nodeID"
+FORMAT_FILENAME="format.conf"
+FORMAT_FILE_VERSION="4"
+
+# show help text
+print_usage()
+{
+	echo
+	echo "DESCRIPTION: Initialize management storage directory for beegfs-mgmtd server"
+	echo "daemon and update the beegfs-mgmtd config file."
+	echo
+	echo "USAGE: `basename $0` -p <management_path> [options]"
+	echo
+	echo " Mandatory Options:"
+	echo 
+	echo "   -p <path> - Path to management storage directory that is to be initialized."
+	echo "               (Path will also be added to config file.)"
+	echo "               Note: Not mandatory if \"-n\" or \"-N\" is given."
+	echo
+	echo " Recommended Options:"
+	echo
+	echo "   -n & -N   - Allow (\"-n\") or deny (\"-N\") registration of new servers."
+	echo "               Set deny after initial setup is complete and all servers were"
+	echo "               started and registered. beegfs-mgmtd service restart is required"
+	echo "               to make new setting effective."
+	echo
+	echo " Other Options:"
+	echo
+	echo "   -C        - Do not update server config file."
+	echo
+	echo "   -c <path> - Path to server config file."
+	echo "               (Default: ${DEFAULT_CFG_PATH})"
+	echo
+	echo "   -f        - Force actions, ignore warnings."
+	echo
+	echo "   -h        - Print this help."
+	echo
+	echo "   -S <str>  - Assign the given string ID to the server of this storage"
+	echo "               directory. This ID will be used in server-related log messages."
+	echo "               (Default: Use hostname as ID.)"
+	echo
+	echo "   -u        - Do not disable usage of uninitialized storage directory in config"
+	echo "               file."
+	echo
+	echo "NOTES:"
+	echo " * All given IDs must be unique in their service class for the whole file system"
+	echo "   instance, i.e. there can only be one beegfs-meta service with ID 2, but there"
+	echo "   can also be a beegfs-storage service with ID 2 in the file system."
+	echo
+	echo " * BeeGFS servers can also run without pre-initializing storage directories, if"
+	echo "   storeAllowFirstRunInit=true is set in the server config files (which is"
+	echo "   usually not recommended)."
+	echo
+	echo "EXAMPLES:"
+	echo " * Example 1) Initialize management storage directory:"
+	echo "   $ `basename $0` -p /mnt/myraid1/beegfs-mgmtd"
+	echo
+	echo " * Example 2) Deny registration of new servers when all servers are started (to"
+	echo "   avoid accidental adding of new servers to your production system later):"
+	echo "   $ `basename $0` -N"
+	echo
+}
+
+# initialize storage directory (if enabled)
+init_storage_dir()
+{
+	# check if storage path is defined
+
+	if [ -z "${STORAGE_PATH}" ]; then
+		return 0
+	fi
+
+	# create storage path
+
+	echo "Preparing storage directory: ${STORAGE_PATH}"
+	mkdir -p "${STORAGE_PATH}"
+
+	# make sure storage dir is empty
+
+	if [ -z "${FORCE_ACTIONS}" ] && [ "$(ls -AI lost+found ${STORAGE_PATH} )" ]; then
+		echo " * ERROR: Storage directory is not empty. Initialization of non-empty" \
+			"directories can lead to data loss or orphaned data. ('-f' disables this check.)"
+		exit 1
+	fi
+
+	# create format file
+
+	echo " * Creating ${FORMAT_FILENAME} file..."
+
+	FORMAT_FILE_PATH="${STORAGE_PATH}/${FORMAT_FILENAME}"
+	echo "# This file was auto-generated. Do not modify it!" >> ${FORMAT_FILE_PATH}
+	echo "version=${FORMAT_FILE_VERSION}" >> ${FORMAT_FILE_PATH}
+
+	# create ID files
+
+	if [ -n "${SERVER_STRID}" ]; then
+		echo " * Creating server string ID file: ${STORAGE_PATH}/${SERVER_STRID_FILE}"
+		echo "${SERVER_STRID}" > "${STORAGE_PATH}/${SERVER_STRID_FILE}"
+	fi
+}
+
+# update config file (if enabled)
+update_config_file()
+{
+	# check if config file is defined
+
+	if [ -z "${CFG_PATH}" ]; then
+		return 0
+	fi
+
+	echo "Updating config file: ${CFG_PATH}"
+
+	if [ ! -f "${CFG_PATH}" ]; then
+		echo " * ERROR: Config file not found: ${CFG_PATH}"
+		exit 1
+	fi
+
+	if [ -n "${MGMTD_HOST}" ]; then
+		echo " * Setting management host: ${MGMTD_HOST}"
+		sed -i "s/\(^${MGMTD_CFG_KEY}.*=\).*/\1 ${MGMTD_HOST}/" ${CFG_PATH}
+	fi
+
+	if [ -n "${STORAGE_PATH}" ]; then
+		echo " * Setting storage directory in config file..."
+		sed -i "s|\(^${STORAGE_PATH_CFG_KEY}.*=\).*$|\1 ${STORAGE_PATH}|" ${CFG_PATH}
+	fi
+
+	if [ -n "${ALLOW_NEW_SERVERS}" ]; then
+		echo " * Setting allow registration of new servers: ${ALLOW_NEW_SERVERS}"
+		sed -i "s/\(^${ALLOW_NEW_SERVERS_CFG_KEY}.*=\).*/\1 ${ALLOW_NEW_SERVERS}/" ${CFG_PATH}
+	fi
+
+	if [ -n "${DISABLE_UNINITED_TARGETS}" ] && [ -n "${STORAGE_PATH}" ]; then
+		echo " * Disabling usage of uninitialized storage directory in config file..."
+		sed -i "s/\(^${ALLOW_INIT_CFG_KEY}.*=\).*/\1 false/" ${CFG_PATH}
+	fi
+}
+
+################## end of function definitions ##############
+
+
+# configurable values and their defaults
+# (for constants see above)
+
+CFG_PATH="$DEFAULT_CFG_PATH" # empty path means "don't update cfg file"
+FORCE_ACTIONS=""
+MGMTD_HOST=""
+SERVER_STRID=""
+STORAGE_PATH=""
+ALLOW_NEW_SERVERS=""
+DISABLE_UNINITED_TARGETS="1"
+
+# parse command line arguments
+# (see print_usage() for description of parameters)
+
+while getopts "Cc:fhNnp:S:u" opt; do
+        case $opt in
+	C)
+		CFG_PATH=""
+		;;
+	c)
+		CFG_PATH="$OPTARG"
+		;;
+	f)
+		FORCE_ACTIONS="1"
+		;;
+	h)
+		print_usage
+		exit 0
+		;;
+	N)
+		ALLOW_NEW_SERVERS="false"
+		;;
+	n)
+		ALLOW_NEW_SERVERS="true"
+		;;
+	p)
+		STORAGE_PATH="$OPTARG"
+		;;
+	S)
+		SERVER_STRID="$OPTARG"
+		;;
+	u)
+		DISABLE_UNINITED_TARGETS=""
+		;;
+        *)
+		echo "ERROR: Invalid argument" >&2
+		print_usage
+		exit 1
+		;;
+	esac
+done
+
+set -e
+
+# don't do anything if no arguments are provided
+
+if [ $# -eq 0 ]; then
+	print_usage
+	exit 1
+fi
+
+# make sure either storage dir or one of the registration options is given
+
+if [ -z "${STORAGE_PATH}" ] && [ -z "${ALLOW_NEW_SERVERS}" ]; then
+	echo "ERROR: Either storage directory (\"-p <path>\" or registration allow/deny option " \
+		"(\"-n\" / \"-N\") must be given." >&2
+	echo
+	print_usage
+	exit 1
+fi
+
+# initialize storage directory
+
+init_storage_dir
+
+# update config file
+
+update_config_file
+
+
+echo "All done."

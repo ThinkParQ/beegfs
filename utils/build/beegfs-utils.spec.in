@@ -1,0 +1,111 @@
+%define buildarch %BUILDARCH%
+%define BEEGFS_VERSION %VER%-%RELEASE_STR%
+%define MAKE_CONCURRENCY %MAKE_CONCURRENCY%
+%define NEED_DEBUG_DEFINE %NEED_DEBUG_DEFINE%
+%define BEEGFS_VERSION %BEEGFS_VERSION%
+%define VER %(echo '%{BEEGFS_VERSION}' | cut -d - -f 1)
+%define BEEGFS_RELEASE_STR %(echo '%{BEEGFS_VERSION}-' | cut -d - -f 2)
+%define EPOCH %(echo '%{VER}' | cut -d . -f 1)
+
+%define is_fedora %(test -e /etc/fedora-release && echo 1 || echo 0)
+%define is_redhat %(test -e /etc/redhat-release && echo 1 || echo 0)
+%define is_suse %(test -e /etc/SuSE-release && echo 1 || echo 0)
+%define is_mandrake %(test -e /etc/mandrake-release && echo 1 || echo 0)
+
+%if %is_mandrake
+%define disttag mdk
+%endif
+
+%if %is_suse
+%define disttag suse
+%define distver %(relpackage="`rpm -qf /etc/SuSE-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %is_fedora
+%define disttag fc
+%endif
+
+%if %is_redhat
+%define disttag el
+%define distver %(relpackage="`rpm -qf /etc/redhat-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %{defined disttag}
+%define RELEASE %{BEEGFS_RELEASE_STR}%{disttag}%{distver}
+%else
+%define RELEASE %{BEEGFS_RELEASE_STR}generic
+%endif
+
+%define FULL_VERSION %{EPOCH}:%{VER}-%{RELEASE}
+
+#
+# beegfs utils creator
+#
+Summary: BeeGFS utilities
+Name: %NAME%
+Version: %{VER}
+Release: %{RELEASE}
+License: BeeGFS EULA
+Group: Software/Other
+Source: %NAME%-%{BEEGFS_VERSION}.tgz
+URL: http://www.beegfs.com
+Vendor: Fraunhofer ITWM
+BuildRoot: %{_tmppath}/%NAME%-root
+BuildArch: %{buildarch}
+requires: beegfs-opentk-lib = %{FULL_VERSION}
+Epoch: %{EPOCH}
+
+%description
+This package contains BeeGFS utilities.
+
+
+%if %{NEED_DEBUG_DEFINE}
+%debug_package
+%endif
+
+%clean
+rm -rf %{buildroot}
+
+
+%prep
+%setup -c
+
+%build
+make \
+	root-dir=%{ROOT_DIR} \
+	BEEGFS_VERSION=%{BEEGFS_VERSION}			\
+	-C build/ -j %{MAKE_CONCURRENCY}
+	
+
+%install
+cd build
+echo "mkdir RPM_BUILD_ROOT (${RPM_BUILD_ROOT})"
+mkdir -p ${RPM_BUILD_ROOT}
+install -D --mode=u+rwxs,g+rx,o+rx beegfs-ctl ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-ctl
+install -D --mode=u+rwx,g+rx,o+rx beegfs-fsck ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-fsck
+mkdir -p ${RPM_BUILD_ROOT}/sbin
+cp -a ../scripts/fsck.beegfs ${RPM_BUILD_ROOT}/sbin/
+mkdir -p ${RPM_BUILD_ROOT}/usr/bin/
+ln -s /opt/beegfs/sbin/beegfs-ctl ${RPM_BUILD_ROOT}/usr/bin/beegfs-ctl
+ln -s /opt/beegfs/sbin/beegfs-fsck ${RPM_BUILD_ROOT}/usr/bin/beegfs-fsck
+cp -a ../scripts/beegfs-* ${RPM_BUILD_ROOT}/usr/bin/
+mkdir -p ${RPM_BUILD_ROOT}/opt/beegfs/lib
+cp libjbeegfs.so jbeegfs.jar ${RPM_BUILD_ROOT}/opt/beegfs/lib/
+mkdir -p ${RPM_BUILD_ROOT}/etc/bash_completion.d
+cp -a ../scripts/etc/bash_completion.d/beegfs-ctl ${RPM_BUILD_ROOT}/etc/bash_completion.d/
+install -D --mode=u+rwx,g+rx,o+rx beegfs-event-listener ${RPM_BUILD_ROOT}/opt/beegfs/sbin/
+
+%post
+
+%preun
+
+%files
+%defattr(-,root,root)
+%attr(0755, root, root) /opt/beegfs/sbin/beegfs-fsck
+%attr(4755, root, root) /opt/beegfs/sbin/beegfs-ctl
+/opt/beegfs/lib/jbeegfs.jar
+/opt/beegfs/lib/libjbeegfs.so
+/usr/bin/*
+/etc/bash_completion.d/*
+/sbin/fsck.beegfs
+/opt/beegfs/sbin/beegfs-event-listener

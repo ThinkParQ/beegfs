@@ -1,4 +1,0 @@
-This a copy of fhgfs_common as of 2012-10-29. We could also link to fhgfs_common. However,
-fhgfs_common is under rapid development, while this upgrade tool is unlikely to be
-much updated in the future. So we use a copy of fhgfs_common in order to 
-keep maintainance overhead as low as possible.

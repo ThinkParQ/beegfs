@@ -1,0 +1,62 @@
+FileEvent Documentation
+-----------------------
+
+meta server write log messages about file operations
+to a socket. currently UNIX only, will be extended.
+
+An example program is located in the git repository in the
+event_listener folder.
+It can be build by calling make inside the `build` folder.
+
+The binary is also included in the beegfs_utils package.
+
+Messages
+--------
+
+EntryID -> See [[EntryID]]
+
+The following message types exist.
+
+
+Flush
+Truncate
+SetAttr
+Close
+Create
+MKdir
+MKnod
+RMdir
+   Path           Full path relative to the mountpoint of the file/directory
+   EntryId        The EntryID (similar to an inode number of other systems) of the file/directory
+   ParentEntryId  The EntryID of the parent directory, containing the file/directory being worked on
+
+
+Symlink
+   Same as standard messages, containig properties of the newly created link, plus
+   TargetPath     Path the link shall point to. Node: since this is a symlink, this may contain relative and/or non-existing paths.
+
+Unlink
+   Same as standard messages, containig properties of the unlinked path, plus
+   chunksFreed    indicating, if this was the last reference to the data and the storage chunks have been freed.
+
+   Note: Multiple paths can refernece the same EntryID (File Content). Disk space is only freed if the last link
+   has been removed.
+
+Hardlink
+   
+   Path           Full path relative to the mountpoint of the new link
+   EntryId        The EntryID of the referenced file
+   ParentEntryId  The EntryID of the parent directory, containing the new link. Since hardlinks are only supported within the same directory,
+                  this is identical to the parent directory of the source.
+
+Rename
+   Path           Thing being moved
+   EntryID        Its entryID
+   ParentEntryID  Its parentEntryID
+   TargetPath     The path/name moved to
+
+   Example
+   mv source dest
+   will result in
+   { "Version": 1, "PacketSize": 76, "Dropped": 0, "Missed": 0, "Type": "Rename", "Path": "source", "EntryId": "1-5A562525-1", "ParentEntryId": "root", "TargetPath": "dest" }
+

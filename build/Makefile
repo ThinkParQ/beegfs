@@ -74,10 +74,10 @@ define HELP_ARGS_GENERIC
 	@echo  '  CXX=<compiler>             Specifies a c++ compiler'
 	@echo  '  DISTCC=distcc              Enables the usage of distcc'
 	@echo  '  V=1                        Print command lines of tool invocations'
-	@echo  '  BEEGFS_COMMON_PATH=<path>  Path to the beegfs_common directory'
-	@echo  '  BEEGFS_OPENTK_PATH=<path>  Path to the beegfs_opentk_lib directory'
+	@echo  '  BEEGFS_COMMON_PATH=<path>  Path to the common directory'
+	@echo  '  BEEGFS_OPENTK_PATH=<path>  Path to the opentk_lib directory'
 	@echo  '  BEEGFS_THIRDPARTY_PATH=<path>'
-	@echo  '                             Path to the beegfs_thirdparty directory'
+	@echo  '                             Path to the thirdparty directory'
 endef
 define HELP_TARGETS_GENERIC
 	@echo '  all (default)     build only'
@@ -112,24 +112,26 @@ root_dir := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 build_dir := $(realpath $(dir $(firstword $(MAKEFILE_LIST))))
 
 BEEGFS_VERSION_PATH            ?= $(root_dir)/beegfs-version
-BEEGFS_COMMON_PATH             ?= $(root_dir)/fhgfs_common
-BEEGFS_OPENTK_PATH             ?= $(root_dir)/fhgfs_opentk_lib
-BEEGFS_THIRDPARTY_PATH         ?= $(root_dir)/fhgfs_thirdparty
-ADMON_GUI_PATH                 ?= $(root_dir)/fhgfs_admon_gui
-BEEGFS_ONLINE_CFG_PATH         ?= $(root_dir)/fhgfs_online_cfg
-BEEGFS_FSCK_PATH               ?= $(root_dir)/fhgfs_fsck
-BEEGFS_DEVEL_INCLUDE_PATH      ?= $(root_dir)/beegfs_client_devel/include
-BEEGFS_JAVA_LIB_PATH           ?= $(root_dir)/fhgfs_java_lib
-BEEGFS_DEEPER_COMMON_PATH      ?= $(root_dir)/beegfs_deeper_common
-BEEGFS_DEEPER_LIB_INCLUDE_PATH ?= $(root_dir)/beegfs_deeper_lib/include
+BEEGFS_COMMON_PATH             ?= $(root_dir)/common
+BEEGFS_OPENTK_PATH             ?= $(root_dir)/opentk_lib
+BEEGFS_THIRDPARTY_PATH         ?= $(root_dir)/thirdparty
+ADMON_GUI_PATH                 ?= $(root_dir)/admon_gui
+BEEGFS_ONLINE_CFG_PATH         ?= $(root_dir)/ctl
+BEEGFS_FSCK_PATH               ?= $(root_dir)/fsck
+BEEGFS_EVENT_LISTENER_PATH     ?= $(root_dir)/event_listener
+BEEGFS_DEVEL_INCLUDE_PATH      ?= $(root_dir)/client_devel/include
+BEEGFS_JAVA_LIB_PATH           ?= $(root_dir)/java_lib
+BEEGFS_DEEPER_COMMON_PATH      ?= $(root_dir)/deeper_common
+BEEGFS_DEEPER_LIB_INCLUDE_PATH ?= $(root_dir)/deeper_lib/include
 
 SQLITE_INC_PATH   ?= $(BEEGFS_THIRDPARTY_PATH)/source/sqlite
 OPENSSL_INC_PATH  ?= $(BEEGFS_THIRDPARTY_PATH)/source/openssl/include
-CPPUNIT_INC_PATH  ?= $(BEEGFS_THIRDPARTY_PATH)/source/cppunit_install/usr/local/include
-CPPUNIT_LIB_PATH  ?= $(BEEGFS_THIRDPARTY_PATH)/build
 TICPP_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/ticpp
 MONGOOSE_INC_PATH ?= $(BEEGFS_THIRDPARTY_PATH)/source/mongoose
 BOOST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/boost
+
+GTEST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/gtest/googletest/include
+GTEST_LIB_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/build
 
 ifneq ($(target_arch),)
    STRIP := $(target_arch)-strip
@@ -207,7 +209,6 @@ CXXFLAGS += \
 #  * openssl (from thirdparty, or from system if not built in thirdparty)
 #  * ticpp (from thirdparty)
 #  * mongoose (from thirdparty)
-#  * cppunit (from thirdparty, or from system if not built in thirdparty)
 #
 # to define new libraries, add appriopriate calls to define-dep-lib in this section.
 # the signature of define-dep-lib is:
@@ -287,10 +288,6 @@ else
       -I $(BEEGFS_COMMON_PATH)/source,\
       $(BEEGFS_COMMON_PATH)/build/libbeegfs-common.a)
 
-   $(call define-dep-lib, tests,\
-      -I $(BEEGFS_COMMON_PATH)/tests/include,\
-      $(BEEGFS_COMMON_PATH)/build/libbeegfs-tests.a)
-
    $(call define-dep-lib, client-devel,\
       -I $(BEEGFS_DEVEL_INCLUDE_PATH),)
 
@@ -308,18 +305,9 @@ else
       -isystem $(MONGOOSE_INC_PATH),\
       $(BEEGFS_THIRDPARTY_PATH)/build/libmongoose.a)
 
-   $(call define-dep-lib, cppunit-from-thirdparty,\
-      -isystem $(CPPUNIT_INC_PATH),\
-      $(CPPUNIT_LIB_PATH)/libcppunit.a)
-
-   ifneq ($(realpath $(CPPUNIT_LIB_PATH)/libcppunit.a),)
-      $(info [NOTE] Using packaged libcppunit)
-      $(call define-dep-lib, cppunit,\
-         -isystem $(CPPUNIT_INC_PATH),\
-         $(CPPUNIT_LIB_PATH)/libcppunit.a)
-   else
-      $(call define-dep-lib-system, cppunit, cppunit)
-   endif
+   $(call define-dep-lib, gtest,\
+      -isystem $(GTEST_INC_PATH)/include,\
+      $(GTEST_LIB_PATH)/libgtest.a)
 
    ifneq ($(realpath $(BEEGFS_THIRDPARTY_PATH)/build/libsqlite3.a),)
       $(info [NOTE] Using packaged sqlite3)
@@ -331,6 +319,7 @@ else
    endif
 
    $(call define-dep-lib-system, curl, libcurl)  
+   $(call define-dep-lib-system, z, zlib)
 
    ifneq ($(realpath $(BEEGFS_THIRDPARTY_PATH)/build/libssl.a),)
       $(info [NOTE] Using packaged OpenSSL)
@@ -385,6 +374,20 @@ $1: $(addsuffix .o,$2) $(foreach lib,$3,$(call resolve-dep-deps,$(lib)))
 	$$V$$(CXX) -o $$@ $(addsuffix .o,$2) $$(LDFLAGS)
 
 -include $(addsuffix .d,$2)
+endef
+
+# build-test
+#
+# build a test runner from specified test files. acts much like build-executable, except that it
+# includes gtest in the build as a non-library .a
+#  #1: name if the test executable
+#  #2: sources
+#  #3: required libraries (not including gtest)
+#  #4: included directories (not including gtest)
+define build-test
+$(call build-executable, $1, $2, $3, $4 -isystem $(GTEST_INC_PATH))
+
+$1: LDFLAGS += $(GTEST_LIB_PATH)/libgtest.a
 endef
 
 # build-static-library

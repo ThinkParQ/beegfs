@@ -1,0 +1,113 @@
+#!/usr/bin/make -f
+
+DEB_BUILD_ROOT = debian/__NAME__
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+CLIENT_DIR=/opt/beegfs/src/client/client_module___BEEGFS_DEB_MAJOR__
+CLIENT_COMPAT_DIR=/opt/beegfs/src/client/client_compat_module___BEEGFS_DEB_MAJOR__
+
+COMPAT_FSTYPE=$(shell echo beegfs-__BEEGFS_DEB_MAJOR__)
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	# nothing to do for us
+	touch configure-stamp
+	
+build: build-stamp
+
+build-stamp: $(QUILT_STAMPFN) configure-stamp
+	dh_testdir
+	
+	# nothing to do for us
+	touch build-stamp
+
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+
+	make 								\
+		RELEASE_PATH=$(DEB_BUILD_ROOT)/opt/beegfs/src/client	\
+		BEEGFS_VERSION=__BEEGFS_VERSION__			\
+		KDIR='__KDIR__'						\
+		USER_CXXFLAGS='__USER_CXXFLAGS__'			\
+		USER_LDFLAGS='__USER_LDFLAGS__'				\
+	        WITHOUT_OPENTK=1 V=1 clean
+	
+
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	make 								\
+		RELEASE_PATH=$(DEB_BUILD_ROOT)/opt/beegfs/src/client	\
+	        BEEGFS_VERSION=__BEEGFS_VERSION__				\
+		KDIR='__KDIR__'						\
+	        WITHOUT_OPENTK=1 V=1 -j __MAKE_CONCURRENCY__ prepare_release
+
+	# for compat package
+	mkdir -p $(DEB_BUILD_ROOT)-compat/opt/beegfs/src/client
+	cp -a $(DEB_BUILD_ROOT)/$(CLIENT_DIR) $(DEB_BUILD_ROOT)-compat/$(CLIENT_COMPAT_DIR)
+
+	# set the compat fstype
+	echo ${COMPAT_FSTYPE} > $(DEB_BUILD_ROOT)-compat/$(CLIENT_COMPAT_DIR)/build/beegfs.fstype
+
+	install -D dist/etc/init.d/__NAME__.init debian/__NAME__.init
+
+	#install systemd unit description, debian installs the service file in /lib/systemd/system/
+	install -D -m644 dist/usr/lib/systemd/system/__NAME__.service debian/__NAME__.service
+
+	install -D -m644 dist/etc/default/__NAME__ debian/__NAME__.default
+
+	install -D -m644 dist/etc/__NAME__.conf $(DEB_BUILD_ROOT)/etc/beegfs/__NAME__.conf
+	install -D -m644 dist/etc/__NAME__-autobuild.conf $(DEB_BUILD_ROOT)/etc/beegfs/__NAME__-autobuild.conf
+	install -D -m644 dist/etc/beegfs-mounts.conf $(DEB_BUILD_ROOT)/etc/beegfs/beegfs-mounts.conf
+
+	install -D -m644 ../scripts/etc/beegfs/lib/init-multi-mode.beegfs-client \
+		$(DEB_BUILD_ROOT)/etc/beegfs/lib/init-multi-mode.beegfs-client
+
+	install -D dist/sbin/beegfs-setup-client \
+		${DEB_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-client
+
+	install -D dist/etc/beegfs-client-mount-hook.example \
+   	${DEB_BUILD_ROOT}/etc/beegfs/beegfs-client-mount-hook.example
+
+# Build architecture-independent files here.
+binary-indep:
+# We have nothing to do by default.
+
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs
+	dh_installdocs
+	dh_installexamples
+
+	dh_systemd_enable
+	dh_installinit --no-restart-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
+	dh_installman
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+	dh_lintian
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure
+

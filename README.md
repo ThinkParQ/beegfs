@@ -11,19 +11,47 @@ Homepage: https://www.beegfs.io
 ## Prerequisites
 Before building BeeGFS, install the following dependency packages:
 
-### Red Hat
+### Red Hat / CentOS
 ```
 $ yum install libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config \
-  rpm-build xfsprogs-devel cppunit cppunit-devel zlib-devel openssl-devel sqlite \
-  sqlite-devel ant gcc-c++ gcc redhat-lsb-core java-devel unzip libcurl-devel
+  rpm-build xfsprogs-devel zlib-devel openssl-devel sqlite sqlite-devel ant gcc-c++ gcc \
+  redhat-lsb-core java-devel unzip libcurl-devel elfutils-libelf-devel kernel-devel
 ```
+
+The `elfutils-libelf-devel` and `kernel-devel` packages can be omitted if you don't intend to
+build the client module.
+
+The additional `devtoolset-7` package is also required,
+which provides a newer compiler version. The installation steps are outlined here.
+Please consult the documentation of your distribution for details.
+
+  1. Install a package with repository for your system:
+   - On CentOS, install package centos-release-scl available in CentOS repository:
+     ```
+     $ sudo yum install centos-release-scl
+     ```
+   - On RHEL, enable RHSCL repository for you system:
+     ```
+     $ sudo yum-config-manager --enable rhel-server-rhscl-7-rpms
+     ```
+  2. Install the collection:
+     ```
+     $ sudo yum install devtoolset-7
+     ```
+
+  3. Start using software collections:
+     ```
+     $ scl enable devtoolset-7 bash
+     ```
+  4. Follow the instructions below to build BeeGFS.
+
 ### Debian
 On Debian or Ubuntu based systems run this command to install the required packages:
 ```
 $ sudo apt install build-essential autoconf automake pkg-config devscripts debhelper \
   libtool libattr1-dev xfslibs-dev lsb-release kmod librdmacm-dev libibverbs-dev \
-  default-jdk ant dh-systemd libcppunit-dev zlib1g-dev libssl-dev sqlite3 \
-  libsqlite3-dev libcurl4-openssl-dev
+  default-jdk ant dh-systemd zlib1g-dev libssl-dev sqlite3 libsqlite3-dev \
+  libcurl4-openssl-dev
 ```
 Note: If you have an older Debian system you might have to install the
 `module-init-tools` package instead of `kmod`.
@@ -35,9 +63,9 @@ BeeGFS comes with a shell script that can build all BeeGFS packages for the
 system on which it is executed.
 The packages include all services, the client module and utilities.
 
-Go to the `beegfs_auto_package` subdirectory:
+Go to the `auto_package` subdirectory:
 ```
- $ cd beegfs_auto_package
+ $ cd auto_package
 ```
 
 To build RPM packages, run
@@ -64,7 +92,7 @@ to prepare common parts required by the services and tools.
 The packages can then be built by running the `make-deb` or `make-rpm` script
 in the corresponding sub-project folders. For example:
 ```
-$ cd beegfs_storage/build
+$ cd storage/build
 $ ./make-deb
 ```
 

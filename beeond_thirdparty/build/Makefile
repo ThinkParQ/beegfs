@@ -1,6 +1,3 @@
-# This is the beeond_thirdparty makefile.
-# It provides the thirdparty tools needed by BeeOND.
-
 SHELL := /bin/bash
 
 SOURCE_PATH = $(shell echo `pwd`/../source )

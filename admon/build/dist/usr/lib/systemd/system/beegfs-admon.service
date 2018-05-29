@@ -1,0 +1,14 @@
+[Unit]
+Description=Start BeeGFS Admon
+Documentation=http://www.beegfs.com/content/documentation/
+Requires=network-online.target
+# We disable the wants service, because it spams the log files
+#Wants=beegfs-mgmtd.service beegfs-storage.service openibd.service openib.service rdma.service opensmd.service opensm.service
+After=network-online.target zfs.target
+
+[Service]
+ExecStart=/opt/beegfs/sbin/beegfs-admon cfgFile=/etc/beegfs/beegfs-admon.conf runDaemonized=false
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

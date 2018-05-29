@@ -1,7 +1,0 @@
-PACK_SUMMARY="BeeGFS Admon"
-PACK_NAME="beegfs_admon"
-BINARY_NAME="beegfs_admon"
-CMAKE_PATH=/tmp/cmake-2.8.1
-CPACK=${CMAKE_PATH}/bin/cpack
-
-PACK_DIR=$(pwd)/packages
