@@ -312,4 +312,10 @@ extern void assertMsg(const char* file, unsigned line, const char* condition);
 #define USE_READDIR_R 1
 #endif
 
+#if __GNUC__ > 6
+# define BEEGFS_FALLTHROUGH [[fallthrough]]
+#else
+# define BEEGFS_FALLTHROUGH
+#endif
+
 #endif /*COMMON_H_*/

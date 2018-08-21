@@ -47,11 +47,19 @@ void __DatagramListener_listenLoop(DatagramListener* this)
          continue;
       }
       else
-      if(unlikely(recvRes <= 0) )
-      { // error
+      if(recvRes == 0)
+      {
+         char* fromIP = SocketTk_ipaddrToStr(&fromAddr.addr);
+         Logger_logFormatted(log, Log_NOTICE, logContext,
+            "Received an empty datagram. IP: %s; port: %d",
+            fromIP, fromAddr.port);
+         kfree(fromIP);
 
-         //if(errno == -EINTR) // ignore iterruption, because the debugger makes this happen
-         //   continue;
+         continue;
+      }
+      else
+      if(unlikely(recvRes < 0) )
+      { // error
 
          Logger_logErrFormatted(log, logContext,
             "Encountered an unrecoverable socket error. ErrCode: %d", recvRes);

@@ -80,7 +80,7 @@ class ModeCheckFS : public Mode
       int64_t checkAndRepairChunksInWrongPath();
 
       int64_t checkDuplicateInodeIDs();
-      void logDuplicateInodeID(std::pair<db::EntryID, std::set<uint32_t> >& dups, int&);
+      void logDuplicateInodeID(checks::DuplicatedInode& dups, int&);
 
       int64_t checkDuplicateChunks();
       void logDuplicateChunk(std::list<FsckChunk>& dups, int&);

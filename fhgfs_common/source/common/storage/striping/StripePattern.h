@@ -139,10 +139,7 @@ class StripePattern
        */
       size_t getStripeTargetIndex(int64_t pos) const
       {
-         const unsigned chunkSize = getChunkSize();
-         const unsigned stripeSetSize = getNumStripeTargetIDs() * chunkSize;
-
-         return (pos % stripeSetSize) / chunkSize;
+         return (pos / getChunkSize()) % getNumStripeTargetIDs();
       }
 
       /**

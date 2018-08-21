@@ -204,6 +204,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connRDMABufNum",                   "70");
    _Config_configMapRedefine(this, "connRDMATypeOfService",            "0");
    _Config_configMapRedefine(this, "connNetFilterFile",                "");
+   _Config_configMapRedefine(this, "connMaxConcurrentAttempts",        "0");
    _Config_configMapRedefine(this, "connAuthFile",                     "");
    _Config_configMapRedefine(this, "connRecvNonIntrTimeoutMS",         "5000");
    _Config_configMapRedefine(this, "connTcpOnlyFilterFile",            "");
@@ -364,6 +365,11 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       {
          SAFE_KFREE(this->connNetFilterFile);
          this->connNetFilterFile = StringTk_strDup(valueStr);
+      }
+      else
+      if (!strcmp(keyStr, "connMaxConcurrentAttempts"))
+      {
+         this->connMaxConcurrentAttempts = StringTk_strToUInt(valueStr);
       }
       else
       if(!strcmp(keyStr, "connAuthFile") )

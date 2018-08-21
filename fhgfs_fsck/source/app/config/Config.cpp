@@ -166,6 +166,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes) throw (Invalid
       if(testConfigMapKeyMatch(iter, "tuneDentryCacheSize", addDashes) )
          tuneDentryCacheSize = StringTk::strToUInt64(iter->second.c_str() );
       else
+      IGNORE_CONFIG_CLIENT_VALUE("connMaxConcurrentAttempts")
       IGNORE_CONFIG_CLIENT_VALUE("tuneFileCacheType")
       IGNORE_CONFIG_CLIENT_VALUE("tunePagedIOBufSize")
       IGNORE_CONFIG_CLIENT_VALUE("tunePagedIOBufNum")

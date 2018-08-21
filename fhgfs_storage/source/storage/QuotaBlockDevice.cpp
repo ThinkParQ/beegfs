@@ -7,6 +7,7 @@
 #include <mntent.h>
 #include <fstab.h>
 
+#include <sys/statfs.h>
 
 /**
  * checks one storage target path and creates a QuotaBlockDevice
@@ -21,7 +22,6 @@ QuotaBlockDevice QuotaBlockDevice::getBlockDeviceOfTarget(std::string& targetPat
 
    std::string resMountPath;
    std::string resBlockDevicePath;
-   QuotaBlockDeviceFsType resFsType = QuotaBlockDeviceFsType_UNKNOWN;
 
    struct mntent* mntData;
    FILE *mntFile = setmntent(mountInformationPath.c_str(), "r");
@@ -41,28 +41,18 @@ QuotaBlockDevice QuotaBlockDevice::getBlockDeviceOfTarget(std::string& targetPat
       {
          resMountPath = mntData->mnt_dir;
          resBlockDevicePath = mntData->mnt_fsname;
-         std::string type(mntData->mnt_type);
-
-         if ( type.compare("xfs") == 0 )
-            resFsType = QuotaBlockDeviceFsType_XFS;
-         else
-         if ( type.find("ext") == 0 )
-            resFsType = QuotaBlockDeviceFsType_EXTX;
-         else
-         if ( type.compare("zfs") == 0 )
-            resFsType = QuotaBlockDeviceFsType_ZFS;
-         else
-            resFsType = QuotaBlockDeviceFsType_UNKNOWN;
       }
    }
 
    endmntent(mntFile);
 
-   QuotaBlockDevice blockDevice(resMountPath, resBlockDevicePath, resFsType, targetPath);
+   QuotaBlockDevice blockDevice(resMountPath, resBlockDevicePath, getFsType(targetPath), targetPath);
 
    // check if the installed libzfs is compatible with implementation
    if(blockDevice.getFsType() == QuotaBlockDeviceFsType_ZFS)
    {
+      // note: if the installed zfslib doesn't support inode quota,
+      // QuotaBlockDeviceFsType_ZFSOLD will be set inside of checkRequiredLibZfsFunctions
       if(!Program::getApp()->isDlOpenHandleLibZfsValid() )
          QuotaTk::checkRequiredLibZfsFunctions(&blockDevice, targetNumID);
    }
@@ -133,10 +123,37 @@ QuotaInodeSupport QuotaBlockDevice::quotaInodeSupportFromBlockDevice()
          return QuotaInodeSupport_ALL_BLOCKDEVICES;
          break;
       case QuotaBlockDeviceFsType_ZFS:
+         return QuotaInodeSupport_ALL_BLOCKDEVICES;
+         break;
+      case QuotaBlockDeviceFsType_ZFSOLD:
          return QuotaInodeSupport_NO_BLOCKDEVICES;
          break;
       default:
          return QuotaInodeSupport_UNKNOWN;
          break;
    }
+}
+
+QuotaBlockDeviceFsType QuotaBlockDevice::getFsType(const std::string& path)
+{
+   struct statfs stats;
+   const auto result = statfs(path.c_str(), &stats);
+
+   if (result != 0)
+   {
+      const auto err = errno;
+      throw std::runtime_error("Error getting FS Type of " + path + ":" + strerror(err));
+   }
+
+   switch (stats.f_type)
+   {
+   case 0xef53:     // same magic for EXT2/3, from linux/magic.h (not available in older distros)
+      return QuotaBlockDeviceFsType_EXTX;
+   case 0x58465342: // from statfs man page
+      return QuotaBlockDeviceFsType_XFS;
+   case 0x2fc12fc1: // found by running statfs on a zfs
+      return QuotaBlockDeviceFsType_ZFS;
+   }
+
+   return QuotaBlockDeviceFsType_UNKNOWN;
 }

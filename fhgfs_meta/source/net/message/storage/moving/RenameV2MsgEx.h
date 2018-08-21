@@ -16,7 +16,8 @@ struct RenameV2Locks
    DirIDLock toDirLock;
    // source file must be locked because concurrent modifications of file attributes may
    // race with the moving operation between two servers.
-   FileIDLock fromFileLock;
+   FileIDLock fromFileLockF;
+   DirIDLock fromFileLockD;
    // if target exists, the target file must be unlocked to exclude concurrent operations on
    // target (eg close, setxattr, ...)
    FileIDLock unlinkedFileLock;
@@ -43,7 +44,8 @@ struct RenameV2Locks
       std::swap(toNameLock, other.toNameLock);
       std::swap(fromDirLock, other.fromDirLock);
       std::swap(toDirLock, other.toDirLock);
-      std::swap(fromFileLock, other.fromFileLock);
+      std::swap(fromFileLockF, other.fromFileLockF);
+      std::swap(fromFileLockD, other.fromFileLockD);
       std::swap(unlinkedFileLock, other.unlinkedFileLock);
    }
 };

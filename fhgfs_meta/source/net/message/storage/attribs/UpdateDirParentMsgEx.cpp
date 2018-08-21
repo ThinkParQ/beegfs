@@ -29,6 +29,8 @@ bool UpdateDirParentMsgEx::processIncoming(ResponseContext& ctx)
    (void) entryInfo;
    (void) parentNodeID;
 
+   rctx = &ctx;
+
    BaseType::processIncoming(ctx);
 
    // update operation counters
@@ -40,6 +42,9 @@ bool UpdateDirParentMsgEx::processIncoming(ResponseContext& ctx)
 
 DirIDLock UpdateDirParentMsgEx::lock(EntryLockStore& store)
 {
+   if (rctx->isLocallyGenerated())
+      return {};
+
    return {&store, getEntryInfo()->getEntryID(), true};
 }
 

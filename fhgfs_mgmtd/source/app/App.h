@@ -65,7 +65,7 @@ class App : public AbstractApp
 
       virtual void run();
 
-      void shutDown();
+      void shutDown(bool clean);
       void handleComponentException(std::exception& e);
 
    private:

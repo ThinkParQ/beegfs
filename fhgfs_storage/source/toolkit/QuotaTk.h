@@ -35,7 +35,7 @@ class QuotaTk
       static bool checkRequiredLibZfsFunctions(QuotaBlockDevice* blockDevice, uint16_t targetNumID);
 
       static bool requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t targetNumID,
-         std::string* zfsPropertyString, QuotaData* outData, ZfsSession* session);
+         QuotaData* outData, ZfsSession* session);
 
    private:
       QuotaTk();

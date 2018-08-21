@@ -229,7 +229,14 @@ int ModeAddMirrorBuddyGroup::execute()
    else
    {
       auto addRes = addGroup(cfgPrimaryTargetID, cfgSecondaryTargetID, cfgGroupID);
-      if (addRes != FhgfsOpsErr_SUCCESS)
+      if (addRes == FhgfsOpsErr_NOTOWNER && nodeType == NODETYPE_Meta)
+      {
+         std::cerr << "Could not add buddy group: new group would own the root inode, but the root\n"
+            "inode is owned by the secondary of the new group. Only the primary of a\n"
+            "new group may own the root inode; try switching primary and secondary.\n";
+         return APPCODE_RUNTIME_ERROR;
+      }
+      else if (addRes != FhgfsOpsErr_SUCCESS)
       {
          std::cerr << "Could not add buddy group: " << FhgfsOpsErrTk::toErrString(addRes) << "\n";
          retVal = APPCODE_RUNTIME_ERROR;

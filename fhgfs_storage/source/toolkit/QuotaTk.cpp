@@ -1,7 +1,9 @@
 #include <common/toolkit/UnitTk.h>
+#include <common/storage/quota/Quota.h>
 #include <program/Program.h>
 #include "QuotaTk.h"
 
+#include <boost/lexical_cast.hpp>
 #include <dlfcn.h>
 // xfs/xfs.h includes linux/fs.h, which (sometimes) defines MS_RDONLY.
 // sys/mount.h is the canonical source of MS_RDONLY, but declares it as an enum - which is then
@@ -14,7 +16,8 @@
 
 #define QUOTATK_ZFS_USER_QUOTA          "userused@"
 #define QUOTATK_ZFS_GROUP_QUOTA         "groupused@"
-
+#define QUOTATK_ZFS_USER_INODE_QUOTA    "userobjused@"
+#define QUOTATK_ZFS_GROUP_INODE_QUOTA   "groupobjused@"
 
 /**
  * Get quota data for a single ID and append it to the outQuotaDataList.
@@ -118,7 +121,6 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
    fs_disk_quota xfsQuotaData;                                       // required for XFS
    QuotaData tmpQuotaData(outData->getID(), outData->getType() );    // required for ZFS
 
-   std::string zfsPropertyString;
    QuotaDataType quotaType = outData->getType();
 
    for(QuotaBlockDeviceMapIter iter = blockDevices->begin(); iter != blockDevices->end(); iter++)
@@ -145,7 +147,7 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
          }
       }
       else
-      if(fstype == QuotaBlockDeviceFsType_ZFS)
+      if ( (fstype == QuotaBlockDeviceFsType_ZFS) || (fstype == QuotaBlockDeviceFsType_ZFSOLD) )
       {
          if(!session->isSessionValid() )
          {
@@ -153,8 +155,7 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
                return false;
          }
 
-         if(QuotaTk::requestQuotaFromZFS(&iter->second, iter->first, &zfsPropertyString,
-            &tmpQuotaData, session) )
+         if(QuotaTk::requestQuotaFromZFS(&iter->second, iter->first, &tmpQuotaData, session))
             errorCode = FhgfsOpsErr_SUCCESS;
          else
          {
@@ -197,7 +198,8 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
             LogContext(logContext).logErr("Error: Quota request - quotactl failed. Type: " +
                QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
                StringTk::uintToStr(outData->getID()) + "; SysErr: " +
-               System::getErrString(errorCode) );
+               System::getErrString(errorCode) +"; fstype = " +
+               boost::lexical_cast<std::string>(iter->second.getFsType()));
 
             return false;
          }
@@ -212,7 +214,7 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
          outData->forceMergeQuotaDataCounter(blocks, xfsQuotaData.d_icount);
       }
       else
-      if(fstype == QuotaBlockDeviceFsType_ZFS)
+      if ( (fstype == QuotaBlockDeviceFsType_ZFS) || (fstype == QuotaBlockDeviceFsType_ZFSOLD) )
       {
          if(tmpQuotaData.isValid() )
          {
@@ -349,10 +351,16 @@ bool QuotaTk::checkRequiredLibZfsFunctions(QuotaBlockDevice* blockDevice, uint16
    }
 
    // check if the signature of all function pointers are compatible
-   std::string propertyString;
    QuotaData quotaData(0, QuotaDataType_USER); // test request for user root
-   if(!requestQuotaFromZFS(blockDevice, targetNumID, &propertyString, &quotaData, &session) )
-      return false;
+   if (!requestQuotaFromZFS(blockDevice, targetNumID, &quotaData, &session))
+   {  // quota update failed; try to get quota without inode quota (only supported on zfs >= 0.7.4)
+      // i.e. set the fsType to QuotaBlockDeviceFsType_ZFSOLD and try again
+      // if it still doesn't work, libzfs is not compatible at all, if it works now we fall back to
+      // quota without inode quota
+      blockDevice->setFsType(QuotaBlockDeviceFsType_ZFSOLD);
+      if (!requestQuotaFromZFS(blockDevice, targetNumID, &quotaData, &session))
+         return false;
+   }
 
    // check function pointers which are required in case of errors happens
    std::string errorDec( (*session.libzfs_error_description)(session.getlibZfsHandle() ) );
@@ -366,16 +374,13 @@ bool QuotaTk::checkRequiredLibZfsFunctions(QuotaBlockDevice* blockDevice, uint16
  *
  * @param blockDevice the QuotaBlockDevice to check
  * @param targetNumID the targetNumID of the storage target
- * @param zfsPropertyString could be an empty string, is initialized during the first execution of
- *                          this function and should be reused during the next call for the next
- *                          QuotaBlockDevice (example: "userused@5111")
  * @param outData needs to be initialized with type and ID
  * @param session a session for all required lib handles if zfs is used, it can be an uninitialized
  *        session, the initialization can be done by this function
  * @return false on error (in which case outData is not initialized)
  */
 bool QuotaTk::requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t targetNumID,
-   std::string* zfsPropertyString, QuotaData* outData, ZfsSession* session)
+   QuotaData* outData, ZfsSession* session)
 {
    std::string logContext("requestQuotaFromZFS");
 
@@ -393,21 +398,23 @@ bool QuotaTk::requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t target
       return false;
 
    uint64_t usedSizeValue = 0;
+   uint64_t usedInodesValue = 0;
 
-   if(zfsPropertyString->empty() )
+   std::string sizeProp;
+   std::string inodeProp;
+
+   if(outData->getType() == QuotaDataType_USER)
    {
-      if(outData->getType() == QuotaDataType_USER)
-         zfsPropertyString->assign(QUOTATK_ZFS_USER_QUOTA +
-            StringTk::uintToStr(outData->getID() ) );
-      else
-         zfsPropertyString->assign(QUOTATK_ZFS_GROUP_QUOTA +
-            StringTk::uintToStr(outData->getID() ) );
+      sizeProp = QUOTATK_ZFS_USER_QUOTA + StringTk::uintToStr(outData->getID());
+      inodeProp = QUOTATK_ZFS_USER_INODE_QUOTA + StringTk::uintToStr(outData->getID());
+   }
+   else
+   {
+      sizeProp = QUOTATK_ZFS_GROUP_QUOTA + StringTk::uintToStr(outData->getID());
+      inodeProp = QUOTATK_ZFS_GROUP_INODE_QUOTA + StringTk::uintToStr(outData->getID());
    }
 
-   int error = (*session->zfs_prop_get_userquota_int)(zfsHandle, zfsPropertyString->c_str(),
-      &usedSizeValue);
-
-   if(error)
+   if ((*session->zfs_prop_get_userquota_int)(zfsHandle, sizeProp.c_str(), &usedSizeValue))
    {
       std::string errorDec( (*session->libzfs_error_description)(session->getlibZfsHandle() ) );
       std::string errorAct( (*session->libzfs_error_action)(session->getlibZfsHandle() ) );
@@ -415,8 +422,22 @@ bool QuotaTk::requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t target
       return false;
    }
 
-   // inode value is every time 0, because zfs doesn't support inode quota
-   outData->setQuotaData(usedSizeValue, 0);
+    if (blockDevice->getFsType() != QuotaBlockDeviceFsType_ZFSOLD) // no inode support on zfs<=0.7.4
+    {
+       if ((*session->zfs_prop_get_userquota_int)(zfsHandle, inodeProp.c_str(), &usedInodesValue))
+       {
+           // could not read inode quota (which is only supported since zfs 0.7.4)
+           // log the error and set 0 as inode quota
+           log->logErr(logContext,
+                   "Inode quota could not be requested. Please note that inode quota on"
+                         " ZFS is not supported for zfs versions prior to 0.7.4. ZFS Error: "
+                         + std::string((*session->libzfs_error_description)
+                         (session->getlibZfsHandle())));
+           return false;
+       }
+    }
+
+   outData->setQuotaData(usedSizeValue, usedInodesValue);
 
    return true;
 }

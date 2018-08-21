@@ -81,6 +81,7 @@ class FsckTkEx
       static bool stopModificationLogging(NodeStore* metaNodes);
 
       static bool testVersions(NodeStore* metaNodes, NodeStore* storageNodes);
+      static bool checkConsistencyStates();
 
    private:
       FsckTkEx() {}

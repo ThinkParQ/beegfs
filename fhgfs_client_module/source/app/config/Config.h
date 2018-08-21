@@ -84,6 +84,7 @@ static inline unsigned Config_getConnRDMABufNum(Config* this);
 static inline int Config_getConnRDMATypeOfService(Config* this);
 static inline char* Config_getConnNetFilterFile(Config* this);
 static inline char* Config_getConnAuthFile(Config* this);
+static inline unsigned Config_getConnMaxConcurrentAttempts(Config* this);
 static inline uint64_t Config_getConnAuthHash(Config* this);
 static inline unsigned Config_getConnRecvNonIntrTimeoutMS(Config* this);
 static inline char* Config_getConnTcpOnlyFilterFile(Config* this);
@@ -185,6 +186,7 @@ struct Config
    unsigned       connRDMABufNum;
    int            connRDMATypeOfService;
    char*          connNetFilterFile; // allowed IP addresses (all IPs allowed, if empty)
+   unsigned       connMaxConcurrentAttempts;
    char*          connAuthFile;
    uint64_t       connAuthHash; // implicitly set based on hash of connAuthFile contents
    unsigned       connRecvNonIntrTimeoutMS; // timeout before allowing interuptions, e.g. SIGINT
@@ -376,6 +378,11 @@ char* Config_getConnNetFilterFile(Config* this)
 char* Config_getConnAuthFile(Config* this)
 {
    return this->connAuthFile;
+}
+
+unsigned Config_getConnMaxConcurrentAttempts(Config* this)
+{
+   return this->connMaxConcurrentAttempts;
 }
 
 uint64_t Config_getConnAuthHash(Config* this)

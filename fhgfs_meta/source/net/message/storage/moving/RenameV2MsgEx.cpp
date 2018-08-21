@@ -25,99 +25,139 @@
 
 #include <boost/scoped_array.hpp>
 
+namespace {
+struct DirHandle {
+   MetaStore* metaStore;
+   const EntryInfo* ei;
+
+   DirHandle(MetaStore* metaStore, const EntryInfo* ei): metaStore(metaStore), ei(ei) {}
+
+   DirHandle(const DirHandle&) = delete;
+   DirHandle(DirHandle&&) = delete;
+
+   DirHandle& operator=(const DirHandle&) = delete;
+   DirHandle& operator=(DirHandle&&) = delete;
+
+   ~DirHandle() {
+      metaStore->releaseDir(ei->getEntryID());
+   }
+};
+}
+
 RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
 {
-   RenameV2Locks result;
-
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
-   // take care about lock ordering! see MirroredMessage::lock()
-   // since directories are locked for read, and by the same id as the (parent,name) tuples,the
-   // same ordering applies.
-   if (getFromDirInfo()->getEntryID() < getToDirInfo()->getEntryID())
-   {
-      result.fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
-      result.toDirLock = {&store, getToDirInfo()->getEntryID(), true};
-
-      result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-      result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
-   }
-   else if (getFromDirInfo()->getEntryID() == getToDirInfo()->getEntryID())
-   {
-      result.fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
-
-      if (getOldName() < getNewName())
-      {
-         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-         result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
-      }
-      else if (getOldName() == getNewName())
-      {
-         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-      }
-      else
-      {
-         result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
-         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-      }
-   }
-   else
-   {
-      result.toDirLock = {&store, getToDirInfo()->getEntryID(), true};
-      result.fromDirLock = {&store, getFromDirInfo()->getEntryID(), true};
-
-      result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
-      result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
-   }
-
-   EntryInfo fromFileInfo;
-   EntryInfo toFileInfo;
-
-   DirInode* fromDir = metaStore->referenceDir(getFromDirInfo()->getEntryID(),
-         getFromDirInfo()->getIsBuddyMirrored(), true);
    // if the directory could not be referenced it does not exist on the current node. this will
    // cause the operation to fail lateron during executeLocally() when we reference the same
    // directory again. since we cannot do anything without having access to the source directory,
    // and since no directory with the same id as the source directory can appear after the source
    // directory has been removed, we can safely unlock everything right here and continue without
    // blocking other workers on the (probably live) target directory.
+   DirInode* fromDir = metaStore->referenceDir(getFromDirInfo()->getEntryID(),
+         getFromDirInfo()->getIsBuddyMirrored(), true);
    if (!fromDir)
       return {};
-   else
-   {
+
+   const DirHandle _from(metaStore, getFromDirInfo());
+
+   DirInode* toDir = metaStore->referenceDir(getToDirInfo()->getEntryID(),
+         getToDirInfo()->getIsBuddyMirrored(), true);
+
+   if (!toDir)
+      return {};
+
+   const DirHandle _to(metaStore, getToDirInfo());
+
+   for (;;) {
+      RenameV2Locks result;
+
+      EntryInfo fromFileInfo;
+      EntryInfo toFileInfo;
+
       fromDir->getFileEntryInfo(getOldName(), fromFileInfo);
-      if (getFromDirInfo()->getEntryID() == getToDirInfo()->getEntryID())
-         fromDir->getFileEntryInfo(getNewName(), toFileInfo);
+      toDir->getFileEntryInfo(getNewName(), toFileInfo);
 
-      metaStore->releaseDir(getFromDirInfo()->getEntryID());
-   }
-
-   if (DirEntryType_ISFILE(fromFileInfo.getEntryType()) && fromFileInfo.getIsInlined())
-   {
-      if (DirEntryType_ISFILE(toFileInfo.getEntryType()) && toFileInfo.getIsInlined())
       {
-         if (fromFileInfo.getEntryID() < toFileInfo.getEntryID())
+         std::map<std::string, DirIDLock*> lockOrder;
+
+         lockOrder.insert(std::make_pair(getFromDirInfo()->getEntryID(), &result.fromDirLock));
+         lockOrder.insert(std::make_pair(getToDirInfo()->getEntryID(), &result.toDirLock));
+         if (DirEntryType_ISDIR(fromFileInfo.getEntryType()))
+            lockOrder.insert(std::make_pair(fromFileInfo.getEntryID(), &result.fromFileLockD));
+
+         for (auto it = lockOrder.begin(); it != lockOrder.end(); ++it)
+            *it->second = {&store, it->first, true};
+      }
+
+      // we might have locked fromFileLockD before fromDirLock due to ordering. resolve the source
+      // once more and check that we still refer to the same id, otherwise retry until we have the
+      // correct inode.
+      // if the name went away we don't have to retry (it can't be created while the dir is locked),
+      // but retrying is simpler to do.
+      EntryInfo fromFileInfoCheck;
+      fromDir->getFileEntryInfo(getOldName(), fromFileInfoCheck);
+      if (fromFileInfo.getEntryID() != fromFileInfoCheck.getEntryID())
+         continue;
+
+      // take care about lock ordering! see MirroredMessage::lock()
+      // since directories are locked for read, and by the same id as the (parent,name) tuples,the
+      // same ordering applies.
+      if (getFromDirInfo()->getEntryID() < getToDirInfo()->getEntryID())
+      {
+         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+         result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+      }
+      else if (getFromDirInfo()->getEntryID() == getToDirInfo()->getEntryID())
+      {
+         if (getOldName() < getNewName())
          {
-            result.fromFileLock = {&store, fromFileInfo.getEntryID()};
-            result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
+            result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
+            result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
          }
-         else if (fromFileInfo.getEntryID() == toFileInfo.getEntryID())
+         else if (getOldName() == getNewName())
          {
-            result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+            result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
          }
          else
          {
-            result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
-            result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+            result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+            result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
          }
       }
       else
       {
-         result.fromFileLock = {&store, fromFileInfo.getEntryID()};
+         result.toNameLock = {&store, getToDirInfo()->getEntryID(), getNewName()};
+         result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
       }
-   }
 
-   return result;
+      if (DirEntryType_ISFILE(fromFileInfo.getEntryType()) && fromFileInfo.getIsInlined())
+      {
+         if (DirEntryType_ISFILE(toFileInfo.getEntryType()) && toFileInfo.getIsInlined())
+         {
+            if (fromFileInfo.getEntryID() < toFileInfo.getEntryID())
+            {
+               result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+               result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
+            }
+            else if (fromFileInfo.getEntryID() == toFileInfo.getEntryID())
+            {
+               result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+            }
+            else
+            {
+               result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
+               result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+            }
+         }
+         else
+         {
+            result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+         }
+      }
+
+      return result;
+   }
 }
 
 bool RenameV2MsgEx::processIncoming(ResponseContext& ctx)

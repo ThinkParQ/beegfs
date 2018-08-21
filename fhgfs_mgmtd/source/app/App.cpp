@@ -239,15 +239,7 @@ void App::runNormal()
    while (shuttingDown.read() == App_RUNNING)
       ::sleep(SHUTDOWN_CHECK_TIMEOUT_SECS);
 
-   if (shuttingDown.read() == App_SHUTDOWN_CLEAN)
-   {
-      shutDown();
-   }
-   else // App_SHUTDOWN_IMMEDIATE
-   {
-      internodeSyncer->selfTerminate();
-      waitForComponentTermination(internodeSyncer);
-   }
+   shutDown(shuttingDown.read() == App_SHUTDOWN_CLEAN);
 
    // wait for termination
 
@@ -610,8 +602,20 @@ void App::initStorage(const bool firstRun) throw(InvalidConfigException, Compone
          StringTk::intToStr(targetNumIDMapper->getSize() ) );
 
 
-   // load target mappings
+   // Set path for legacy resync set file
+   Path targetsToResyncPath(CONFIG_STORAGETARGETSTORESYNC_FILENAME);
+   targetStateStore->setResyncSetStorePath(targetsToResyncPath.str() );
+   Path nodesToResyncPath(CONFIG_METANODESTORESYNC_FILENAME);
+   metaStateStore->setResyncSetStorePath(nodesToResyncPath.str() );
 
+   // Set path for state set file
+   targetStateStore->setTargetStateStorePath(CONFIG_STORAGETARGETSTATES_FILENAME);
+   metaStateStore->setTargetStateStorePath(CONFIG_METANODESTATES_FILENAME);
+
+   readTargetStates(firstRun, formatProperties, targetStateStore);
+   readTargetStates(firstRun, formatProperties, metaStateStore);
+
+   // load target mappings
    Path targetsPath(CONFIG_TARGETMAPPINGS_FILENAME);
    targetMapper->setStorePath(targetsPath.str() );
    if(targetMapper->loadFromFile() )
@@ -644,19 +648,6 @@ void App::initStorage(const bool firstRun) throw(InvalidConfigException, Compone
    if (metaBuddyGroupMapper->loadFromFile() )
       this->log->log(Log_NOTICE, "Loaded metadata node mirror buddy group mappings: " +
          StringTk::intToStr(metaBuddyGroupMapper->getSize() ) );
-
-   // Set path for legacy resync set file
-   Path targetsToResyncPath(CONFIG_STORAGETARGETSTORESYNC_FILENAME);
-   targetStateStore->setResyncSetStorePath(targetsToResyncPath.str() );
-   Path nodesToResyncPath(CONFIG_METANODESTORESYNC_FILENAME);
-   metaStateStore->setResyncSetStorePath(nodesToResyncPath.str() );
-
-   // Set path for state set file
-   targetStateStore->setTargetStateStorePath(CONFIG_STORAGETARGETSTATES_FILENAME);
-   metaStateStore->setTargetStateStorePath(CONFIG_METANODESTATES_FILENAME);
-
-   readTargetStates(firstRun, formatProperties, targetStateStore);
-   readTargetStates(firstRun, formatProperties, metaStateStore);
 
    // save config, just to be sure that the format is correct and up to date
    formatProperties.erase("longNodeIDs");
@@ -976,13 +967,14 @@ void App::logInfos()
    }
 }
 
-void App::shutDown()
+void App::shutDown (bool clean)
 {
    getInternodeSyncer()->selfTerminate();
    waitForComponentTermination(internodeSyncer);
 
-   if (storageBuddyGroupMapper->getSize() != 0
-         || metaBuddyGroupMapper->getSize() != 0)
+   if (clean &&
+         (storageBuddyGroupMapper->getSize() != 0
+         || metaBuddyGroupMapper->getSize() != 0))
    {
       setPrimariesPOffline();
 

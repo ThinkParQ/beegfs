@@ -171,7 +171,12 @@ int __FhgfsOps_constructFsInfo(struct super_block* sb, void* rawMountOptions)
 #if defined(KERNEL_HAS_SB_BDI)
 
    #if defined(KERNEL_HAS_SUPER_SETUP_BDI_NAME) && !defined(KERNEL_HAS_BDI_SETUP_AND_REGISTER)
-      res = super_setup_bdi_name(sb, BEEGFS_MODULE_NAME_STR);
+   {
+      static atomic_long_t bdi_seq = ATOMIC_LONG_INIT(0);
+
+      res = super_setup_bdi_name(sb, BEEGFS_MODULE_NAME_STR "-%ld",
+            atomic_long_inc_return(&bdi_seq));
+   }
    #else
       bdi = &sbInfo->bdi;
 

@@ -201,7 +201,8 @@ class Table {
          {
          case ms_bulk_insert:
             assertNoBulkInsert();
-            // fall-through
+            BEEGFS_FALLTHROUGH;
+
          case ms_none:
             modificationState = ms_ordered_only_insert;
             break;

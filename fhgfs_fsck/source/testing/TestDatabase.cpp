@@ -375,13 +375,13 @@ void TestDatabase::testFindDuplicateInodeIDs()
    this->db->getDirInodesTable()->insert(disposal);
    this->db->getFileInodesTable()->insert(files);
 
-   Cursor<std::pair<db::EntryID, std::set<uint32_t> > > c = this->db->findDuplicateInodeIDs();
+   Cursor<checks::DuplicatedInode> c = this->db->findDuplicateInodeIDs();
 
    CPPUNIT_ASSERT(c.step() );
    {
-      std::set<uint32_t> nodes;
-      nodes.insert(3000);
-      nodes.insert(2);
+      std::set<std::pair<uint32_t,bool>> nodes;
+      nodes.insert(std::make_pair(3000, false));
+      nodes.insert(std::make_pair(2, false));
 
       CPPUNIT_ASSERT(c.get()->first == db::EntryID(0, 1, 1) );
       CPPUNIT_ASSERT(c.get()->second.size() == 2);
@@ -390,9 +390,9 @@ void TestDatabase::testFindDuplicateInodeIDs()
 
    CPPUNIT_ASSERT(c.step() );
    {
-      std::set<uint32_t> nodes;
-      nodes.insert(3002);
-      nodes.insert(2);
+      std::set<std::pair<uint32_t,bool>> nodes;
+      nodes.insert(std::make_pair(3002, false));
+      nodes.insert(std::make_pair(2, false));
 
       CPPUNIT_ASSERT(c.get()->first == db::EntryID(2, 1, 1) );
       CPPUNIT_ASSERT(c.get()->second.size() == 2);
@@ -401,9 +401,9 @@ void TestDatabase::testFindDuplicateInodeIDs()
 
    CPPUNIT_ASSERT(c.step() );
    {
-      std::set<uint32_t> nodes;
-      nodes.insert(2006);
-      nodes.insert(3);
+      std::set<std::pair<uint32_t,bool>> nodes;
+      nodes.insert(std::make_pair(2006, false));
+      nodes.insert(std::make_pair(3, false));
 
       CPPUNIT_ASSERT(c.get()->first == db::EntryID(6, 1, 1) );
       CPPUNIT_ASSERT(c.get()->second.size() == 2);

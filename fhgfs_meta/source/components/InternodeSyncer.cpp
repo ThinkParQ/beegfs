@@ -589,6 +589,8 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
 
          EntryInfo* entryInfo = sessionFile->getEntryInfo();
 
+         FileIDLock lock(sessions->getEntryLockStore(), entryInfo->getEntryID());
+
          if(allowRemoteComm)
             MsgHelperClose::closeChunkFile(sessionID, fileHandleID.c_str(),
                maxUsedNodesIndex, *inode, entryInfo, NETMSG_DEFAULT_USERID);

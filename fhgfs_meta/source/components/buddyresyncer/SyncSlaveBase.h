@@ -28,6 +28,8 @@ class SyncSlaveBase : public PThread
       }
 
    protected:
+      BuddyResyncJob* parentJob;
+
       NumNodeID buddyNodeID;
 
       Mutex stateMutex;
@@ -39,8 +41,9 @@ class SyncSlaveBase : public PThread
 
       Path basePath;
 
-      SyncSlaveBase(const std::string& threadName, const NumNodeID buddyNodeID):
-         PThread(threadName), buddyNodeID(buddyNodeID), isRunning(false)
+      SyncSlaveBase(const std::string& threadName, BuddyResyncJob& parentJob,
+            const NumNodeID buddyNodeID):
+         PThread(threadName), parentJob(&parentJob), buddyNodeID(buddyNodeID), isRunning(false)
       {
       }
 

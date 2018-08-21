@@ -72,7 +72,7 @@ class LeftJoinEq
                else
                   this->hasRightMark = false;
 
-               // fall-through
+               BEEGFS_FALLTHROUGH;
 
             case s_first_right: {
                while(rightKey() < leftKey() )

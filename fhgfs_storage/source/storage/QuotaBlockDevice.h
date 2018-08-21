@@ -49,6 +49,8 @@ class QuotaBlockDevice
          QuotaBlockDeviceFsType fsTypeBlockDevice);
       QuotaInodeSupport quotaInodeSupportFromBlockDevice();
 
+      static QuotaBlockDeviceFsType getFsType(const std::string& path);
+
 
    private:
       std::string storageTargetPath;
@@ -87,20 +89,6 @@ class QuotaBlockDevice
       std::string getStorageTargetPath() const
       {
          return storageTargetPath;
-      }
-
-      std::string getFsTypeString() const
-      {
-         if(fsType == QuotaBlockDeviceFsType_EXTX)
-            return "QuotaBlockDeviceFsType_EXTX";
-         else
-         if(fsType == QuotaBlockDeviceFsType_XFS)
-            return "QuotaBlockDeviceFsType_XFS";
-         else
-         if(fsType == QuotaBlockDeviceFsType_ZFS)
-            return "QuotaBlockDeviceFsType_ZFS";
-         else
-            return "QuotaBlockDeviceFsType_UNKNOWN";
       }
 
       void setFsType(QuotaBlockDeviceFsType fsType)

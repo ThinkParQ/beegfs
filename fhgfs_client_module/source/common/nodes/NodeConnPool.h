@@ -117,7 +117,8 @@ struct NodeConnPool
    unsigned establishedConns; // not equal to connList.size!!
    unsigned maxConns;
    unsigned fallbackExpirationSecs; // expiration time for conns to fallback interfaces
-   
+   unsigned maxConcurrentAttempts;
+
    NodeConnPoolStats stats;
    NodeConnPoolErrorState errState;
 
@@ -125,6 +126,7 @@ struct NodeConnPool
 
    Mutex mutex;
    Condition changeCond;
+   struct semaphore connSemaphore;
 };
 
 

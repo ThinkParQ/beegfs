@@ -15,6 +15,7 @@
  * @throw SocketException
  */
 StandardSocket::StandardSocket(int domain, int type, int protocol)
+   : isDgramSocket(type == SOCK_DGRAM)
 {
    this->sockDomain = domain;
 
@@ -63,6 +64,7 @@ StandardSocket::StandardSocket(int domain, int type, int protocol)
  */
 StandardSocket::StandardSocket(int fd, unsigned short sockDomain, struct in_addr peerIP,
    std::string peername)
+   : isDgramSocket(false)
 {
    this->sock = fd;
    this->sockDomain = sockDomain;
@@ -426,10 +428,22 @@ ssize_t StandardSocket::recv(void *buf, size_t len, int flags)
    }
 
    if(recvRes == 0)
-      throw SocketDisconnectException(std::string("Soft disconnect from ") + peername);
+   {
+      if (isDgramSocket)
+      {
+         LOG_TOP(GENERAL, NOTICE, "Received empty UDP datagram.", peername);
+         return 0;
+      }
+      else
+      {
+         throw SocketDisconnectException(std::string("Soft disconnect from ") + peername);
+      }
+   }
    else
+   {
       throw SocketDisconnectException(std::string("Recv(): Hard disconnect from ") +
          peername + ". SysErr: " + System::getErrString() );
+   }
 }
 
 /**
@@ -496,11 +510,25 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
    }
 
    if(recvRes == 0)
-      throw SocketDisconnectException(std::string("Soft disconnect from ") + peername);
+   {
+      if (isDgramSocket)
+      {
+         struct sockaddr_in* sin = (struct sockaddr_in*)from;
+         LOG_TOP(GENERAL, NOTICE, "Received empty UDP datagram.", peername,
+               as("IP", Socket::ipaddrToStr(&sin->sin_addr)), as("port", ntohs(sin->sin_port)));
+         return 0;
+      }
+      else
+      {
+         throw SocketDisconnectException(std::string("Soft disconnect from ") + peername);
+      }
+   }
    else
+   {
       throw SocketDisconnectException(
          std::string("Recvfrom(): Hard disconnect from ") + peername + ": " +
          System::getErrString() );
+   }
 }
 
 /**

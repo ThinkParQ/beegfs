@@ -117,6 +117,8 @@ class NetMessage
       {
          Deserializer des(buf, bufLen);
          des % *outHeader;
+         if(unlikely(!des.good()))
+            outHeader->msgType = NETMSGTYPE_Invalid;
       }
 
       class ResponseContext

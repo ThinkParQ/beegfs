@@ -172,6 +172,15 @@ int ModeCheckFS::execute()
    if ( !FsckTkEx::checkReachability() )
       return APPCODE_COMMUNICATION_ERROR;
 
+   if (!FsckTkEx::checkConsistencyStates())
+   {
+      FsckTkEx::fsckOutput("At least one meta or storage target is in NEEDS_RESYNC state. "
+            "To prevent interference between fsck and resync operations, fsck will abort now. "
+            "Please make sure that no resyncs are currently pending or running.",
+            OutputOptions_DOUBLELINEBREAK | OutputOptions_ADDLINEBREAKBEFORE);
+      return APPCODE_RUNTIME_ERROR;
+   } 
+
    if(cfg->getNoFetch() )
    {
       try {
@@ -755,15 +764,14 @@ int64_t ModeCheckFS::checkDuplicateInodeIDs()
       &ModeCheckFS::logDuplicateInodeID, dummy);
 }
 
-void ModeCheckFS::logDuplicateInodeID(std::pair<db::EntryID, std::set<uint32_t> >& dups, int&)
+void ModeCheckFS::logDuplicateInodeID(checks::DuplicatedInode& dups, int&)
 {
    FsckTkEx::fsckOutput(">>> Found duplicated ID " + dups.first.str(),
       OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
-   for(std::set<uint32_t>::const_iterator it = dups.second.begin(), end = dups.second.end();
-         it != end; ++it)
+   for(auto it = dups.second.begin(); it != dups.second.end(); it++)
    {
-      FsckTkEx::fsckOutput("   * Found on node " + StringTk::uintToStr(*it),
-         OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
+      FsckTkEx::fsckOutput("   * Found on " + std::string(it->second ? "buddy group " : "node ")
+            + StringTk::uintToStr(it->first), OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
    }
 }
 
@@ -808,7 +816,9 @@ void ModeCheckFS::logDuplicateContDir(std::list<db::ContDir>& dups, int&)
       OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
    for (auto it = dups.begin(), end = dups.end(); it != end; ++it)
    {
-      FsckTkEx::fsckOutput("   * Found on node " + StringTk::uintToStr(it->saveNodeID),
+      FsckTkEx::fsckOutput("   * Found on " +
+            std::string(it->isBuddyMirrored ? "buddy group " : "node ") +
+            StringTk::uintToStr(it->saveNodeID),
          OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
    }
 }
@@ -826,8 +836,9 @@ int64_t ModeCheckFS::checkMismirroredDentries()
 void ModeCheckFS::logMismirroredDentry(db::DirEntry& entry, int&)
 {
    FsckTkEx::fsckOutput(">>> Found mismirrored dentry " +
-         database->getDentryTable()->getNameOf(entry) + " on node " +
-         StringTk::uintToStr(entry.saveNodeID));
+         database->getDentryTable()->getNameOf(entry) + " on " +
+         (entry.isBuddyMirrored ? "buddy group " : "node ") +
+         StringTk::uintToStr(entry.saveNodeID) + " " + StringTk::uintToStr(entry.entryOwnerNodeID));
 }
 
 int64_t ModeCheckFS::checkMismirroredDirectories()
@@ -842,8 +853,10 @@ int64_t ModeCheckFS::checkMismirroredDirectories()
 
 void ModeCheckFS::logMismirroredDirectory(db::DirInode& dir, int&)
 {
-   FsckTkEx::fsckOutput(">>> Found mismirrored directory " + dir.id.str() + " on node " +
+   FsckTkEx::fsckOutput(">>> Found mismirrored directory " + dir.id.str() + " on " +
+         (dir.isBuddyMirrored ? "buddy group " : "node ") +
          StringTk::uintToStr(dir.saveNodeID));
+;
 }
 
 int64_t ModeCheckFS::checkMismirroredFiles()
@@ -858,7 +871,8 @@ int64_t ModeCheckFS::checkMismirroredFiles()
 
 void ModeCheckFS::logMismirroredFile(db::FileInode& file, int&)
 {
-   FsckTkEx::fsckOutput(">>> Found mismirrored file " + file.id.str() + " on node " +
+   FsckTkEx::fsckOutput(">>> Found mismirrored file " + file.id.str() + " on " +
+         std::string(file.isBuddyMirrored ? "buddy group " : "node ") +
          StringTk::uintToStr(file.saveNodeID));
 }
 
@@ -881,7 +895,7 @@ void ModeCheckFS::repairMalformedChunk(FsckChunk& chunk, UserPrompter& prompt)
 {
    FsckRepairAction action = prompt.chooseAction("Chunk ID: " + chunk.getID() + " on " +
          (chunk.getBuddyGroupID()
-            ? "group " + StringTk::uintToStr(chunk.getBuddyGroupID())
+            ? "buddy group " + StringTk::uintToStr(chunk.getBuddyGroupID())
             : "target " + StringTk::uintToStr(chunk.getTargetID())));
 
    switch (action)
@@ -996,8 +1010,10 @@ void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry,
    FsckDirEntry fsckEntry = entry;
 
    FsckRepairAction action;
-   std::string promptText = "Entry ID: " + fsckEntry.getID() + "; Path: "
-      + this->database->getDentryTable()->getPathOf(entry);
+   std::string promptText = "Entry ID: " + fsckEntry.getID() + "; Path: " +
+         this->database->getDentryTable()->getPathOf(entry) + "; " +
+         (entry.isBuddyMirrored ? "Buddy group: " : "Node: ") +
+         StringTk::uintToStr(entry.saveNodeID);
 
    if(fsckEntry.getEntryType() == FsckDirEntryType_DIRECTORY)
       action = prompt.second->chooseAction(promptText);
@@ -1118,7 +1134,8 @@ void ModeCheckFS::repairWrongInodeOwnerInDentry(std::pair<db::DirEntry, NumNodeI
 
 void ModeCheckFS::repairOrphanedDirInode(FsckDirInode& inode, UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("Directory ID: " + inode.getID() );
+   FsckRepairAction action = prompt.chooseAction("Directory ID: " + inode.getID() + "; " +
+         (inode.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + inode.getSaveNodeID().str());
 
    switch(action)
    {
@@ -1164,7 +1181,9 @@ void ModeCheckFS::repairOrphanedDirInode(FsckDirInode& inode, UserPrompter& prom
 
 void ModeCheckFS::repairOrphanedFileInode(FsckFileInode& inode, UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("File ID: " + inode.getID() );
+   FsckRepairAction action = prompt.chooseAction("File ID: " + inode.getID() + "; " +
+         (inode.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + inode.getSaveNodeID().str());
+
 
    switch(action)
    {
@@ -1196,7 +1215,7 @@ void ModeCheckFS::repairOrphanedChunk(FsckChunk& chunk, RepairChunkState& state)
    if(state.lastID != chunk.getID() )
       state.lastChunkAction = state.prompt->chooseAction("Chunk ID: " + chunk.getID() + " on " +
             (chunk.getBuddyGroupID()
-               ? "group " + StringTk::uintToStr(chunk.getBuddyGroupID())
+               ? "buddy group " + StringTk::uintToStr(chunk.getBuddyGroupID())
                : "target " + StringTk::uintToStr(chunk.getTargetID())));
 
    state.lastID = chunk.getID();
@@ -1239,9 +1258,11 @@ void ModeCheckFS::repairOrphanedChunk(FsckChunk& chunk, RepairChunkState& state)
 
 void ModeCheckFS::repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("Directory ID: " + inode.getID()
-      + "; Path: "
-      + this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(inode.getID() ) ) );
+   FsckRepairAction action = prompt.chooseAction("Directory ID: " + inode.getID() +
+      "; Path: " +
+      this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(inode.getID())) + "; " +
+      (inode.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + inode.getSaveNodeID().str());
+
 
    switch(action)
    {
@@ -1275,7 +1296,9 @@ void ModeCheckFS::repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt
 
 void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("Directory ID: " + dir.getID() );
+   FsckRepairAction action = prompt.chooseAction("Directory ID: " + dir.getID() + "; " +
+         (dir.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + dir.getSaveNodeID().str());
+
 
    switch(action)
    {
@@ -1302,8 +1325,11 @@ void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt)
 void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::InodeAttribs>& error,
    UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("File ID: " + error.first.getID() + "; Path: "
-      + this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(error.first.getID() ) ) );
+   FsckRepairAction action = prompt.chooseAction("File ID: " + error.first.getID() + "; Path: " +
+         this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(error.first.getID())) +
+         "; " + (error.first.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") +
+         error.first.getSaveNodeID().str());
+
 
    switch(action)
    {
@@ -1337,8 +1363,11 @@ void ModeCheckFS::repairWrongDirAttribs(std::pair<FsckDirInode, checks::InodeAtt
 {
    std::string filePath = this->database->getDentryTable()->getPathOf(
       db::EntryID::fromStr(error.first.getID() ) );
-   FsckRepairAction action = prompt.chooseAction("Directory ID: " + error.first.getID()
-      + "; Path: " + filePath);
+   FsckRepairAction action = prompt.chooseAction("Directory ID: " + error.first.getID() +
+         "; Path: " + filePath + "; " +
+         (error.first.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") +
+         error.first.getSaveNodeID().str());
+
 
    switch(action)
    {
@@ -1373,8 +1402,11 @@ void ModeCheckFS::repairFileWithMissingTargets(db::DirEntry& entry, UserPrompter
 {
    FsckDirEntry fsckEntry = entry;
 
-   FsckRepairAction action = prompt.chooseAction("Entry ID: " + fsckEntry.getID()
-      + "; Path: " + this->database->getDentryTable()->getPathOf(entry) );
+   FsckRepairAction action = prompt.chooseAction("Entry ID: " + fsckEntry.getID() +
+         "; Path: " + this->database->getDentryTable()->getPathOf(entry) + "; " +
+         (entry.isBuddyMirrored ? "Buddy group: " : "Node: ") +
+         StringTk::uintToStr(entry.entryOwnerNodeID));
+
 
    switch(action)
    {
@@ -1406,8 +1438,10 @@ void ModeCheckFS::repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, UserProm
 {
    FsckDirEntry fsckEntry = entry;
 
-   FsckRepairAction action = prompt.chooseAction("Entry ID: " + fsckEntry.getID()
-      + "; Path: " + this->database->getDentryTable()->getPathOf(entry) );
+   FsckRepairAction action = prompt.chooseAction("Entry ID: " + fsckEntry.getID() +
+         "; Path: " + this->database->getDentryTable()->getPathOf(entry) + "; " +
+         (entry.isBuddyMirrored ? "Buddy group: " : "Node: ") +
+         StringTk::uintToStr(entry.entryOwnerNodeID));
 
    switch(action)
    {
@@ -1445,8 +1479,12 @@ void ModeCheckFS::repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, UserProm
 
 void ModeCheckFS::repairOrphanedDentryByIDFile(FsckFsID& id, UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("Entry ID: " + id.getID() + "; Path: "
-      + this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(id.getID() ) ) );
+   FsckRepairAction action = prompt.chooseAction(
+         "Entry ID: " + id.getID() +
+         "; Path: " +
+         this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(id.getID())) + "; " +
+         (id.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + id.getSaveNodeID().str());
+
 
    switch(action)
    {
@@ -1480,9 +1518,13 @@ void ModeCheckFS::repairOrphanedDentryByIDFile(FsckFsID& id, UserPrompter& promp
 void ModeCheckFS::repairChunkWithWrongPermissions(std::pair<FsckChunk, FsckFileInode>& error,
    UserPrompter& prompt)
 {
-   FsckRepairAction action = prompt.chooseAction("Chunk ID: " + error.first.getID()
-      + "; Target ID: " + StringTk::uintToStr(error.first.getTargetID()) + "; File path: "
-      + this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(error.first.getID() ) ) );
+   FsckRepairAction action = prompt.chooseAction(
+         "Chunk ID: " + error.first.getID() + "; "
+         + (error.first.getBuddyGroupID()
+         ? "Buddy group: " + StringTk::uintToStr(error.first.getBuddyGroupID())
+         : "Target: " + StringTk::uintToStr(error.first.getTargetID()))
+         + "; File path: "
+         + this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(error.first.getID())));
 
    switch(action)
    {

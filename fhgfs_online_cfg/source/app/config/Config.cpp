@@ -226,6 +226,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes) throw(InvalidC
       if(testConfigMapKeyMatch(iter, "tuneNumWorkers", addDashes) )
          tuneNumWorkers = StringTk::strToUInt(iter->second);
       else
+      IGNORE_CONFIG_CLIENT_VALUE("connMaxConcurrentAttempts")
       IGNORE_CONFIG_CLIENT_VALUE("tuneNumRetryWorkers")
       if(testConfigMapKeyMatch(iter, "tunePreferredMetaFile", addDashes) )
          tunePreferredMetaFile = iter->second;

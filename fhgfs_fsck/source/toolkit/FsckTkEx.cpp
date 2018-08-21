@@ -644,3 +644,59 @@ bool FsckTkEx::testVersions(NodeStore* metaNodes, NodeStore* storageNodes)
    return true;
 }
 
+bool FsckTkEx::checkConsistencyStates()
+{
+   auto mgmtdNode = Program::getApp()->getMgmtNodes()->referenceFirstNode();
+   if (!mgmtdNode)
+      throw std::runtime_error("Management node not found");
+
+   std::list<uint8_t> storageReachabilityStates;
+   std::list<uint8_t> storageConsistencyStates;
+   std::list<uint16_t> storageTargetIDs;
+   std::list<uint8_t> metaReachabilityStates;
+   std::list<uint8_t> metaConsistencyStates;
+   std::list<uint16_t> metaTargetIDs;
+
+   if (!NodesTk::downloadTargetStates(*mgmtdNode, NODETYPE_Storage, &storageTargetIDs,
+           &storageReachabilityStates, &storageConsistencyStates, false)
+         || !NodesTk::downloadTargetStates(*mgmtdNode, NODETYPE_Meta, &metaTargetIDs,
+           &metaReachabilityStates, &metaConsistencyStates, false))
+   {
+      throw std::runtime_error("Could not download target states from management.");
+   }
+
+
+   bool result = true;
+
+   {
+      auto idIt = storageTargetIDs.begin();
+      auto stateIt = storageConsistencyStates.begin();
+      for (; idIt != storageTargetIDs.end() && stateIt != storageConsistencyStates.end();
+            idIt++, stateIt++)
+      {
+         if (*stateIt == TargetConsistencyState_NEEDS_RESYNC)
+         {
+            FsckTkEx::fsckOutput("Storage target " + StringTk::uintToStr(*idIt) + " is set to "
+                  "NEEDS_RESYNC.", OutputOptions_LINEBREAK);
+            result = false;
+         }
+      }
+   }
+
+   {
+      auto idIt = metaTargetIDs.begin();
+      auto stateIt = metaConsistencyStates.begin();
+      for (; idIt != metaTargetIDs.end() && stateIt != metaConsistencyStates.end(); 
+            idIt++, stateIt++)
+      {
+         if (*stateIt == TargetConsistencyState_NEEDS_RESYNC)
+         {
+            FsckTkEx::fsckOutput("Meta node " + StringTk::uintToStr(*idIt) + " is set to "
+                  "NEEDS_RESYNC.", OutputOptions_LINEBREAK);
+            result = false;
+         }
+      }
+   }
+
+   return result;
+}

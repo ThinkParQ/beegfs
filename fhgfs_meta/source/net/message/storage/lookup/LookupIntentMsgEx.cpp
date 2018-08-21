@@ -301,8 +301,7 @@ FhgfsOpsErr LookupIntentMsgEx::stat(EntryInfo* entryInfo, bool loadFromDisk, Sta
    // check if we can stat on this machine or if entry is owned by another server
    NumNodeID expectedOwner;
    if (entryInfo->getIsBuddyMirrored())
-      expectedOwner = NumNodeID(
-         metaBuddyGroupMapper->getPrimaryTargetID(localNode.getNumID().val() ) );
+      expectedOwner = NumNodeID(metaBuddyGroupMapper->getLocalGroupID());
    else
       expectedOwner = localNode.getNumID();
 

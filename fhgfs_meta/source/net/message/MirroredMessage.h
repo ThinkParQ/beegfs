@@ -351,7 +351,9 @@ class MirroredMessage : public BaseT
             // of sync.
             LOG_CTX(NOTICE, mirrorLogContext(),
                   "Different return codes from primary and secondary buddy. "
-                  "Setting secondary to needs-reync");
+                  "Setting secondary to needs-resync.",
+                  as("Expected response", FhgfsOpsErrTk::toErrString(expectedResult)),
+                  as("Received response", FhgfsOpsErrTk::toErrString(respMsgRes)));
             setBuddyNeedsResync();
          }
 

@@ -341,6 +341,10 @@ int FhgfsOps_opendirIncremental(struct inode* inode, struct file* file)
       __FhgfsOps_setDirInfo(dirInfo, file);
    }
 
+#ifdef FMODE_KABI_ITERATE
+   file->f_mode |= FMODE_KABI_ITERATE;
+#endif
+
    return retVal;
 }
 

@@ -12,10 +12,11 @@
 
 #include <dirent.h>
 
-BuddyResyncerBulkSyncSlave::BuddyResyncerBulkSyncSlave(MetaSyncCandidateStore* syncCandidates,
-      uint8_t slaveID, const NumNodeID& buddyNodeID, BuddyResyncJob& parentJob) :
-   SyncSlaveBase("BuddyResyncerBulkSyncSlave_" + StringTk::uintToStr(slaveID), buddyNodeID),
-   syncCandidates(syncCandidates), parentJob(&parentJob)
+BuddyResyncerBulkSyncSlave::BuddyResyncerBulkSyncSlave(BuddyResyncJob& parentJob,
+      MetaSyncCandidateStore* syncCandidates, uint8_t slaveID, const NumNodeID& buddyNodeID) :
+   SyncSlaveBase("BuddyResyncerBulkSyncSlave_" + StringTk::uintToStr(slaveID), parentJob,
+         buddyNodeID),
+   syncCandidates(syncCandidates)
 {
 }
 

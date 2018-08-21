@@ -304,9 +304,23 @@ bool TargetMapper::loadFromFile()
       // add to attached states
       if ( states )
       {
+         const CombinedTargetState defaultState(TargetReachabilityState_POFFLINE,
+               TargetConsistencyState_GOOD);
+         CombinedTargetState ignoredReturnState;
          for ( TargetMapCIter iter = targets.begin(); iter != targets.end(); iter++ )
-            states->addIfNotExists(iter->first,
-               CombinedTargetState(TargetReachabilityState_POFFLINE, TargetConsistencyState_GOOD) );
+         {
+            if (!states->getState(iter->first, ignoredReturnState)) {
+               LogContext(logContext).log(Log_WARNING,
+                     "Storage target " + StringTk::intToStr(iter->first)
+                     + " missing in targetStates. Consistency state is lost.");
+               LogContext(logContext).log(Log_WARNING, "Adding default state for storage target "
+                     + StringTk::intToStr(iter->first) + ": "
+                     + states->stateToStr(defaultState));
+               IGNORE_UNUSED_VARIABLE(logContext);
+
+               states->addIfNotExists(iter->first, defaultState);
+            }
+         }
       }
 
       mappingsDirty = true;

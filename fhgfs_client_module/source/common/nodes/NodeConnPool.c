@@ -39,6 +39,9 @@ void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentN
 
    this->maxConns = Config_getConnMaxInternodeNum(cfg);
    this->fallbackExpirationSecs = Config_getConnFallbackExpirationSecs(cfg);
+   this->maxConcurrentAttempts = Config_getConnMaxConcurrentAttempts(cfg);
+
+   sema_init(&this->connSemaphore, this->maxConcurrentAttempts);
 
    this->parentNode = parentNode;
    this->streamPort = streamPort;
@@ -191,6 +194,12 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
 
    Mutex_unlock(&this->mutex); // U N L O C K
 
+   if (this->maxConcurrentAttempts > 0)
+   {
+      if (down_interruptible(&this->connSemaphore))
+         return NULL;
+   }
+
    // walk over all available NICs, create the corresponding socket and try to connect
 
    NicAddressListIter_init(&nicIter, &nicListCopy);
@@ -313,6 +322,12 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    continue_clean_endpointStr:
       kfree(endpointStr);
    }
+
+   if (this->maxConcurrentAttempts > 0)
+   {
+      up(&this->connSemaphore);
+   }
+
 
    Mutex_lock(&this->mutex); // L O C K
 

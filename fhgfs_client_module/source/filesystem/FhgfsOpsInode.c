@@ -465,7 +465,11 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
 
-   int refreshRes = maybeRefreshInode(inode, true, false, false);
+   int refreshRes;
+
+   forget_cached_acl(inode, type);
+
+   refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return ERR_PTR(refreshRes);
 

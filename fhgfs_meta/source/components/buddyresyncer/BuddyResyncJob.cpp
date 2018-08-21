@@ -32,10 +32,10 @@ BuddyResyncJob::BuddyResyncJob() :
 
    for (size_t i = 0; i < numSyncSlaves; i++)
       bulkSyncSlaves.emplace_back(
-            boost::make_unique<BuddyResyncerBulkSyncSlave>(&syncCandidates, i, buddyNodeID, *this));
+            boost::make_unique<BuddyResyncerBulkSyncSlave>(*this, &syncCandidates, i, buddyNodeID));
 
    sessionStoreResyncer = boost::make_unique<SessionStoreResyncer>(buddyNodeID);
-   modSyncSlave = boost::make_unique<BuddyResyncerModSyncSlave>(&syncCandidates, 1, buddyNodeID);
+   modSyncSlave = boost::make_unique<BuddyResyncerModSyncSlave>(*this, &syncCandidates, 1, buddyNodeID);
 }
 
 BuddyResyncJob::~BuddyResyncJob() = default;

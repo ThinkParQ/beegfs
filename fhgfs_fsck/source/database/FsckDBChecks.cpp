@@ -183,10 +183,10 @@ struct DuplicateIDGroup
 {
    typedef db::EntryID KeyType;
    typedef db::EntryID ProjType;
-   typedef std::set<uint32_t> GroupType;
+   typedef std::set<std::pair<uint32_t,bool>> GroupType;
 
    bool hasTarget;
-   uint32_t lastTarget;
+   std::pair<uint32_t, bool> lastTarget;
    GroupType group;
 
    DuplicateIDGroup()
@@ -200,32 +200,31 @@ struct DuplicateIDGroup
       group.clear();
    }
 
-   KeyType key(std::pair<db::EntryID, uint32_t> pair)
+   KeyType key(std::tuple<db::EntryID, uint32_t, bool>  tuple)
    {
-      return pair.first;
+      return std::get<0>(tuple);
    }
 
-   ProjType project(std::pair<db::EntryID, uint32_t> pair)
+   ProjType project(std::tuple<db::EntryID, uint32_t, bool> tuple)
    {
-      return pair.first;
+      return std::get<0>(tuple);
    }
 
-   void step(std::pair<db::EntryID, uint32_t> pair)
+   void step(std::tuple<db::EntryID, uint32_t, bool> tuple)
    {
       if(!hasTarget)
       {
-         lastTarget = pair.second;
+         lastTarget = std::make_pair(std::get<1>(tuple), std::get<2>(tuple));
          hasTarget = true;
          return;
       }
 
-      if(lastTarget != 0)
+      if(lastTarget.first != 0)
       {
          group.insert(lastTarget);
-         lastTarget = 0;
+         lastTarget.first = 0;
       }
-
-      group.insert(pair.second);
+      group.insert(std::make_pair(std::get<1>(tuple), std::get<2>(tuple)));
    }
 
    GroupType finish()
@@ -239,23 +238,23 @@ struct DuplicateIDGroup
 };
 }
 
-Cursor<std::pair<db::EntryID, std::set<uint32_t> > > FsckDB::findDuplicateInodeIDs()
+Cursor<checks::DuplicatedInode> FsckDB::findDuplicateInodeIDs()
 {
    struct ops
    {
-      static std::pair<db::EntryID, uint32_t> idAndTargetF(db::FileInode& file)
+      static std::tuple<db::EntryID, uint32_t, bool> idAndTargetF(const db::FileInode& file)
       {
-         return std::make_pair(file.id, file.saveNodeID);
+         return std::make_tuple(file.id, file.saveNodeID, !!file.isBuddyMirrored);
       }
 
-      static std::pair<db::EntryID, uint32_t> idAndTargetD(db::DirInode& file)
+      static std::tuple<db::EntryID, uint32_t, bool> idAndTargetD(const db::DirInode& file)
       {
-         return std::make_pair(file.id, file.saveNodeID);
+         return std::make_tuple(file.id, file.saveNodeID, !!file.isBuddyMirrored);
       }
 
-      static bool hasDuplicateID(std::pair<db::EntryID, std::set<uint32_t> >& pair)
+      static bool hasDuplicateID(const checks::DuplicatedInode& dInode)
       {
-         return !pair.second.empty();
+         return !dInode.second.empty();
       }
    };
 

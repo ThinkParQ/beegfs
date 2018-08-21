@@ -12,10 +12,12 @@
  */
 NetMessage* AbstractNetMessageFactory::createFromBuf(char* recvBuf, size_t bufLen)
 {
+   if(unlikely(bufLen < NETMSG_MIN_LENGTH))
+      return new SimpleMsg(NETMSGTYPE_Invalid);
+
    NetMessageHeader header;
 
    // decode the message header
-
    NetMessage::deserializeHeader(recvBuf, bufLen, &header);
 
    // delegate the rest of the work to another method...

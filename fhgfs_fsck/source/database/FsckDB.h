@@ -56,6 +56,10 @@ struct InodeAttribs
    uint64_t nlinks;
 };
 
+// represents a duplicated Inode. The set contains the IDs of the nodes / buddy groups where the 
+// entries were found. The boolean flag indicates if the corresponding ID is a node ID or a buddy 
+// group ID 
+typedef std::pair<db::EntryID, std::set<std::pair<uint32_t, bool>>> DuplicatedInode;
 }
 
 class FsckDB
@@ -70,7 +74,7 @@ class FsckDB
       void clear();
 
       // FsckDBChecks.cpp
-      Cursor<std::pair<db::EntryID, std::set<uint32_t> > > findDuplicateInodeIDs();
+      Cursor<checks::DuplicatedInode> findDuplicateInodeIDs();
       Cursor<std::list<FsckChunk> > findDuplicateChunks();
       Cursor<std::list<db::ContDir>> findDuplicateContDirs();
 

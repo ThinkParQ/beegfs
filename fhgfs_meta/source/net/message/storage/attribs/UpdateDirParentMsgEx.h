@@ -23,6 +23,8 @@ class UpdateDirParentMsgEx : public MirroredMessage<UpdateDirParentMsg, DirIDLoc
       bool isMirrored() override { return getEntryInfo()->getIsBuddyMirrored(); }
 
    private:
+      ResponseContext* rctx;
+
       bool forwardToSecondary(ResponseContext& ctx) override;
 
       FhgfsOpsErr processSecondaryResponse(NetMessage& resp) override
