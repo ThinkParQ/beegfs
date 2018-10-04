@@ -8,14 +8,34 @@
 #include <toolkit/StorageTkEx.h>
 #include "WriteLocalFileMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
 
 bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "WriteChunkFileMsg incoming";
+   App* app = Program::getApp();
 
-#ifdef BEEGFS_DEBUG
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a WriteLocalFileMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
+   bool success;
+   int64_t writeClientRes;
+
+   std::tie(success, writeClientRes) = write(ctx);
+
+   if (success)
+   {
+      ctx.sendResponse(WriteLocalFileRespMsg(writeClientRes) );
+
+      // update operation counters
+
+      if (likely(writeClientRes > 0))
+         app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
+               StorageOpCounter_WRITEOPS, writeClientRes, getMsgHeaderUserID());
+   }
+
+   return success;
+}
+
+std::pair<bool, int64_t> WriteLocalFileMsgEx::write(ResponseContext& ctx)
+{
+   const char* logContext = "WriteChunkFileMsg incoming";
 
    App* app = Program::getApp();
 
@@ -28,7 +48,7 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
    QuotaExceededErrorType quotaExceeded = QuotaExceededErrorType_NOT_EXCEEDED;
 
    SessionStore* sessions = Program::getApp()->getSessions();
-   Session* session = sessions->referenceSession(getClientNumID(), true);
+   auto session = sessions->referenceOrAddSession(getClientNumID());
    SessionLocalFileStore* sessionLocalFiles = session->getLocalFiles();
 
    ChunkLockStore* chunkLockStore = app->getChunkLockStore();
@@ -52,9 +72,23 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
             StringTk::uintToStr(getTargetID() ) );
    }
 
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+   {
+      if (isMirrorSession)
+      { /* buddy mirrored file => fail with Err_COMMUNICATION to make the requestor retry.
+           mgmt will mark this target as (p)offline in a few moments. */
+         LOG(GENERAL, NOTICE, "Unknown target ID, refusing request.", targetID);
+         return {false, FhgfsOpsErr_COMMUNICATION};
+      }
+
+      LOG(GENERAL, ERR, "Unknown target ID.", targetID);
+      return {false, FhgfsOpsErr_UNKNOWNTARGET};
+   }
+
    // check if we already have session for this file...
 
-   SessionLocalFile* sessionLocalFile = sessionLocalFiles->referenceSession(
+   auto sessionLocalFile = sessionLocalFiles->referenceSession(
       fileHandleID, targetID, isMirrorSession);
 
    if(!sessionLocalFile)
@@ -73,13 +107,13 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
       std::string fileID = SessionTk::fileIDFromHandleID(fileHandleID);
       int openFlags = SessionTk::sysOpenFlagsFromFhgfsAccessFlags(getAccessFlags() );
 
-      sessionLocalFile = new SessionLocalFile(fileHandleID, targetID, fileID, openFlags,
+      auto newFile = boost::make_unique<SessionLocalFile>(fileHandleID, targetID, fileID, openFlags,
          serverCrashed);
 
       if(isMirrorSession)
-         sessionLocalFile->setIsMirrorSession(true);
+         newFile->setIsMirrorSession(true);
 
-      sessionLocalFile = sessionLocalFiles->addAndReferenceSession(sessionLocalFile);
+      sessionLocalFile = sessionLocalFiles->addAndReferenceSession(std::move(newFile));
    }
    else
    { // session file exists
@@ -110,7 +144,7 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
             "GID: " + StringTk::uintToStr(this->getGroupID() ) );
 
          // receive the message content before return with error
-         incrementalRecvPadding(ctx, getCount(), sessionLocalFile);
+         incrementalRecvPadding(ctx, getCount(), sessionLocalFile.get());
          writeClientRes = -(int64_t) FhgfsOpsErr_DQUOT;
          goto cleanup;
       }
@@ -118,7 +152,7 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 
    try
    {
-      if(isMirrorSession && (app->getStorageTargets()->isBuddyResyncInProgress(targetID) ) )
+      if(isMirrorSession && target->getBuddyResyncInProgress())
       {
          // mirrored chunk should be modified, check if resync is in progress and lock chunk
          std::string chunkID = sessionLocalFile->getFileID();
@@ -127,20 +161,20 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
       }
 
       // prepare file descriptor (if file not open yet then create/open it)
-      FhgfsOpsErr openRes = openFile(sessionLocalFile);
+      FhgfsOpsErr openRes = openFile(*target, sessionLocalFile.get());
       if(unlikely(openRes != FhgfsOpsErr_SUCCESS) )
       {
-         incrementalRecvPadding(ctx, getCount(), sessionLocalFile);
+         incrementalRecvPadding(ctx, getCount(), sessionLocalFile.get());
          writeClientRes = -(int64_t)openRes;
          goto cleanup;
       }
 
       // store mirror node reference in session and init mirrorToSock member
       FhgfsOpsErr prepMirrorRes = prepareMirroring(ctx.getBuffer(), ctx.getBufferLength(),
-         sessionLocalFile);
+         sessionLocalFile.get(), *target);
       if(unlikely(prepMirrorRes != FhgfsOpsErr_SUCCESS) )
       { // mirroring failed
-         incrementalRecvPadding(ctx, getCount(), sessionLocalFile);
+         incrementalRecvPadding(ctx, getCount(), sessionLocalFile.get());
          writeClientRes = -(int64_t)prepMirrorRes;
          goto cleanup;
       }
@@ -148,7 +182,7 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 
       // the actual write workhorse
 
-      int64_t writeLocalRes = incrementalRecvAndWriteStateful(ctx, sessionLocalFile);
+      int64_t writeLocalRes = incrementalRecvAndWriteStateful(ctx, sessionLocalFile.get());
 
       // update client result, offset etc.
 
@@ -178,7 +212,7 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 
       sessionLocalFile->setOffset(-1); // invalidate offset
 
-      finishMirroring(ctx.getBuffer(), ctx.getBufferLength(), sessionLocalFile);
+      finishMirroring(sessionLocalFile.get(), *target);
 
       if (chunkLocked)
       {
@@ -186,15 +220,12 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
          chunkLockStore->unlockChunk(targetID, chunkID);
       }
 
-      sessionLocalFiles->releaseSession(sessionLocalFile);
-      sessions->releaseSession(session);
-
-      return false;
+      return {false, -1};
    }
 
 
 cleanup:
-   finishMirroringRes = finishMirroring(ctx.getBuffer(), ctx.getBufferLength(), sessionLocalFile);
+   finishMirroringRes = finishMirroring(sessionLocalFile.get(), *target);
 
    // check mirroring result (don't overwrite local error code, if any)
    if(likely(writeClientRes > 0) )
@@ -209,21 +240,10 @@ cleanup:
       chunkLockStore->unlockChunk(targetID, chunkID);
    }
 
-   sessionLocalFiles->releaseSession(sessionLocalFile);
-   sessions->releaseSession(session);
-
    if (serverCrashed)
       writeClientRes = -(int64_t) FhgfsOpsErr_STORAGE_SRV_CRASHED;
 
-   ctx.sendResponse(WriteLocalFileRespMsg(writeClientRes) );
-
-   // update operation counters
-
-   if(likely(writeClientRes > 0) )
-      app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), StorageOpCounter_WRITEOPS,
-         writeClientRes, getMsgHeaderUserID() );
-
-   return true;
+   return {true, writeClientRes};
 }
 
 /**
@@ -244,7 +264,7 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
       ? ctx.getBufferLength()
       : BEEGFS_MIN(ctx.getBufferLength(), (size_t)cfg->getTuneFileWriteSize() );
 
-   int fd = sessionLocalFile->getFD();
+   auto& fd = sessionLocalFile->getFD();
 
    int64_t oldOffset = sessionLocalFile->getOffset();
    int64_t newOffset = getOffset();
@@ -297,7 +317,7 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
       int errCode = 0;
       ssize_t writeRes = unlikely(isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_DISABLE_IO) )
          ? recvRes
-         : doWrite(fd, ctx.getBuffer(), recvRes, writeOffset, errCode);
+         : doWrite(*fd, ctx.getBuffer(), recvRes, writeOffset, errCode);
 
       toBeReceived -= recvRes;
 
@@ -314,7 +334,7 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
                "File: " + sessionLocalFile->getFileID() + ". "
                "SysErr: " + System::getErrString(errCode) );
             LogContext(logContext).log(Log_NOTICE, std::string("Additional info: "
-               "FD: ") + StringTk::intToStr(fd) + " " +
+               "FD: ") + StringTk::intToStr(*fd) + " " +
                "OpenFlags: " + StringTk::intToStr(sessionLocalFile->getOpenFlags() ) + " " +
                "received: " + StringTk::intToStr(recvRes) + ".");
 
@@ -357,7 +377,7 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
       off64_t syncSize = sessionLocalFile->getWriteCounter();
       off64_t syncOffset = getOffset() + getCount() - syncSize;
 
-      MsgHelperIO::syncFileRange(fd, syncOffset, syncSize);
+      MsgHelperIO::syncFileRange(*fd, syncOffset, syncSize);
       sessionLocalFile->resetWriteCounter();
    }
 
@@ -420,52 +440,32 @@ void WriteLocalFileMsgEx::incrementalRecvPadding(ResponseContext& ctx,
 }
 
 
-FhgfsOpsErr WriteLocalFileMsgEx::openFile(SessionLocalFile* sessionLocalFile)
+FhgfsOpsErr WriteLocalFileMsgEx::openFile(const StorageTarget& target,
+      SessionLocalFile* sessionLocalFile)
 {
    const char* logContext = "WriteChunkFileMsg (write incremental)";
 
    bool useQuota = isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_USE_QUOTA);
    bool enforceQuota = Program::getApp()->getConfig()->getQuotaEnableEnforcement();
 
-   App* app = Program::getApp();
-
-   int actualTargetID = sessionLocalFile->getTargetID();
    bool isBuddyMirrorChunk = sessionLocalFile->getIsMirrorSession();
-   TargetConsistencyState consistencyState = TargetConsistencyState_BAD; // silence gcc
 
 
-   if(sessionLocalFile->getFD() != -1)
+   if (sessionLocalFile->getFD().valid())
       return FhgfsOpsErr_SUCCESS; // file already open => nothing to be done here
 
 
    // file not open yet => get targetFD and check consistency state
 
-   int targetFD = app->getTargetFDAndConsistencyState(actualTargetID, isBuddyMirrorChunk,
-      &consistencyState);
-
-   if(unlikely(targetFD == -1) )
-   { // unknown targetID
-      if(isBuddyMirrorChunk)
-      { /* buddy mirrored file => fail with Err_COMMUNICATION to make the requestor retry.
-           mgmt will mark this target as (p)offline in a few moments. */
-         LogContext(logContext).log(Log_NOTICE, "Refusing request. "
-            "Unknown targetID: " + StringTk::uintToStr(actualTargetID) );
-
-         return FhgfsOpsErr_COMMUNICATION;
-      }
-
-      LogContext(logContext).logErr(
-         "Unknown targetID: " + StringTk::uintToStr(actualTargetID) );
-
-      return FhgfsOpsErr_UNKNOWNTARGET;
-   }
+   const auto consistencyState = target.getConsistencyState();
+   const int targetFD = isBuddyMirrorChunk ? *target.getMirrorFD() : *target.getChunkFD();
 
    if(unlikely(consistencyState != TargetConsistencyState_GOOD) &&
       isBuddyMirrorChunk &&
       !isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND) )
    { // this is a request for a buddymirrored chunk on a non-good primary
       LogContext(logContext).log(Log_NOTICE, "Refusing request. Target consistency is not good. "
-         "targetID: " + StringTk::uintToStr(actualTargetID) );;
+         "targetID: " + StringTk::uintToStr(target.getID()));
 
       return FhgfsOpsErr_COMMUNICATION;
    }
@@ -489,7 +489,7 @@ FhgfsOpsErr WriteLocalFileMsgEx::openFile(SessionLocalFile* sessionLocalFile)
  * @return FhgfsOpsErr_COMMUNICATION if communication with mirror failed.
  */
 FhgfsOpsErr WriteLocalFileMsgEx::prepareMirroring(char* buf, size_t bufLen,
-   SessionLocalFile* sessionLocalFile)
+   SessionLocalFile* sessionLocalFile, StorageTarget& target)
 {
    const char* logContext = "WriteFileMsg (prepare mirroring)";
 
@@ -529,15 +529,13 @@ FhgfsOpsErr WriteLocalFileMsgEx::prepareMirroring(char* buf, size_t bufLen,
    {
       if(secondaryState.reachabilityState == TargetReachabilityState_OFFLINE)
       { // buddy is offline => mark needed resync and continue with local operation
-         uint16_t primaryTargetID = mirrorBuddies->getPrimaryTargetID(getTargetID() );
-
          LOG_DEBUG(logContext, Log_DEBUG,
             "Secondary is offline and will need resync. "
             "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
          // buddy is marked offline, so local msg processing will be done and buddy needs resync
 
-         app->getStorageTargets()->setBuddyNeedsResync(primaryTargetID, true, secondaryTargetID);
+         target.setBuddyNeedsResync(true);
 
          return FhgfsOpsErr_SUCCESS;
       }
@@ -570,7 +568,7 @@ FhgfsOpsErr WriteLocalFileMsgEx::prepareMirroring(char* buf, size_t bufLen,
       {
          LogContext(logContext).logErr(
             "Unable to forward to mirror target: " + StringTk::uintToStr(secondaryTargetID) + "; "
-            "Error: " + FhgfsOpsErrTk::toErrString(referenceErr) );
+            "Error: " + boost::lexical_cast<std::string>(referenceErr));
          return referenceErr;
       }
 
@@ -696,11 +694,9 @@ FhgfsOpsErr WriteLocalFileMsgEx::sendToMirror(const char* buf, size_t bufLen,
             mirrorWriteMsg.addMsgHeaderFeatureFlag(WRITELOCALFILEMSG_FLAG_BUDDYMIRROR);
             mirrorWriteMsg.addMsgHeaderFeatureFlag(WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND);
 
-            std::pair<char*, unsigned> mirrorBuf = MessagingTk::createMsgBuf(&mirrorWriteMsg);
+            const auto mirrorBuf = MessagingTk::createMsgVec(mirrorWriteMsg);
 
-            mirrorToSock->send(mirrorBuf.first, mirrorBuf.second, 0);
-
-            free(mirrorBuf.first);
+            mirrorToSock->send(&mirrorBuf[0], mirrorBuf.size(), 0);
          }
 
          mirrorToSock->send(buf, bufLen, 0);
@@ -757,11 +753,9 @@ FhgfsOpsErr WriteLocalFileMsgEx::sendToMirror(const char* buf, size_t bufLen,
  * Receive response from mirror node, check result, clean up (release mirror sock).
  *
  * Note: Does not do retries on communication errors
- *
- * @param buf a buffer that can be used to receive the mirror node response
  */
-FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
-   SessionLocalFile* sessionLocalFile)
+FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(SessionLocalFile* sessionLocalFile,
+      StorageTarget& target)
 {
    const char* logContext = "WriteFileMsg (finish mirroring)";
 
@@ -773,7 +767,6 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
    App* app = Program::getApp();
    auto mirrorToNode = sessionLocalFile->getMirrorNode();
 
-   NetMessage* respMsg = NULL;
    WriteLocalFileRespMsg* writeRespMsg;
    int64_t mirrorWriteRes;
 
@@ -786,8 +779,8 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
    {
       // receive write msg response...
 
-      unsigned respLength = MessagingTk::recvMsgBuf(mirrorToSock, buf, bufLen);
-      if(unlikely(!respLength) )
+      auto resp = MessagingTk::recvMsgBuf(*mirrorToSock);
+      if (resp.empty())
       { // error
           LogContext(logContext).log(Log_WARNING,
              "Failed to receive response from mirror: " + mirrorToSock->getPeername() );
@@ -797,7 +790,7 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
 
       // got response => deserialize it...
 
-      respMsg = app->getNetMessageFactory()->createFromBuf(buf, respLength);
+      auto respMsg = app->getNetMessageFactory()->createFromBuf(std::move(resp));
 
       if(unlikely(respMsg->getMsgType() != NETMSGTYPE_WriteLocalFileResp) )
       { // response invalid (wrong msgType)
@@ -813,10 +806,8 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
 
       mirrorToNode->getConnPool()->releaseStreamSocket(mirrorToSock);
 
-      writeRespMsg = (WriteLocalFileRespMsg*)respMsg;
+      writeRespMsg = (WriteLocalFileRespMsg*)respMsg.get();
       mirrorWriteRes = writeRespMsg->getValue();
-
-      delete(respMsg);
 
       if(likely(mirrorWriteRes == getCount() ) )
          return FhgfsOpsErr_SUCCESS; // mirror successfully wrote all of the data
@@ -837,16 +828,11 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
             (this is normal when a storage is restarted without a broken secondary target, so we
             report success to a client in this case) */
 
-         uint16_t primaryTargetID = app->getMirrorBuddyGroupMapper()->getPrimaryTargetID(
-            getTargetID() );
-         uint16_t secondaryTargetID = app->getMirrorBuddyGroupMapper()->getSecondaryTargetID(
-            getTargetID() );
-
          LogContext(logContext).log(Log_DEBUG,
             "Secondary reports unknown target error and will need resync. "
             "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
-         app->getStorageTargets()->setBuddyNeedsResync(primaryTargetID, true, secondaryTargetID);
+         target.setBuddyNeedsResync(true);
 
          return FhgfsOpsErr_SUCCESS;
       }
@@ -874,7 +860,6 @@ FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(char* buf, size_t bufLen,
 
 cleanup_commerr:
    mirrorToNode->getConnPool()->invalidateStreamSocket(mirrorToSock);
-   SAFE_DELETE(respMsg);
 
    return FhgfsOpsErr_COMMUNICATION;
 }

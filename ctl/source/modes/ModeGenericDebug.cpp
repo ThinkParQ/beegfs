@@ -120,7 +120,14 @@ bool ModeGenericDebug::communicate(NodeStoreServers* nodes, std::string nodeID, 
       node = nodes->referenceNode(nodeNumID);
    }
    else
-      node = nodes->referenceNodeByStringID(nodeID);
+   {
+      auto allNodes = nodes->referenceAllNodes();
+      auto nodeIt = std::find_if(allNodes.begin(), allNodes.end(),
+            [&] (const auto& node) { return node->getID() == nodeID; });
+      node = nodeIt != allNodes.end()
+         ? *nodeIt
+         : nullptr;
+   }
 
    if(!node)
    {
@@ -128,32 +135,24 @@ bool ModeGenericDebug::communicate(NodeStoreServers* nodes, std::string nodeID, 
       return false;
    }
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GenericDebugRespMsg* respMsgCast;
 
    GenericDebugMsg msg(cmdStr.c_str() );
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *node, &msg, NETMSGTYPE_GenericDebugResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg, NETMSGTYPE_GenericDebugResp);
+   if (!respMsg)
    {
       std::cerr << "Failed to communicate with node: " << nodeID << std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (GenericDebugRespMsg*)respMsg;
+   respMsgCast = (GenericDebugRespMsg*)respMsg.get();
 
    *outCmdRespStr = respMsgCast->getCmdRespStr();
 
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 

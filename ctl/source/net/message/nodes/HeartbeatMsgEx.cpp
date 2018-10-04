@@ -2,12 +2,10 @@
 #include <program/Program.h>
 #include "HeartbeatMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("Heartbeat incoming");
-
-   //LOG_DEBUG_CONTEXT(log, 4, std::string("Received a HeartbeatMsg from: ") + peer);
-
    App* app = Program::getApp();
 
    bool isNodeNew;
@@ -16,13 +14,8 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    NicAddressList& nicList = getNicList();
 
-   auto node = std::make_shared<Node>(getNodeID(), getNodeNumID(), getPortUDP(), getPortTCP(),
-      nicList);
-
-   node->setNodeType(getNodeType() );
-   node->setFhgfsVersion(getFhgfsVersion() );
-
-   node->setFeatureFlags(&getNodeFeatureFlags() );
+   auto node = std::make_shared<Node>(getNodeType(), getNodeID(), getNodeNumID(), getPortUDP(),
+         getPortTCP(), nicList);
 
    // set local nic capabilities
 
@@ -41,11 +34,11 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    if(unlikely(!nodes) )
    {
       LOG(GENERAL, ERR, "Invalid node type.",
-            as("Node Type", Node::nodeTypeToStr(getNodeType())),
-            as("Sender", ctx.peerName()),
-            as("NodeID", getNodeID()),
-            as("Port (UDP)", getPortUDP()),
-            as("Port (TCP)", getPortTCP())
+            ("Node Type", getNodeType()),
+            ("Sender", ctx.peerName()),
+            ("NodeID", getNodeID()),
+            ("Port (UDP)", getPortUDP()),
+            ("Port (TCP)", getPortTCP())
          );
 
       goto ack_resp;
@@ -76,8 +69,7 @@ void HeartbeatMsgEx::processIncomingRoot()
       return;
 
    // try to apply the contained root info
-   Program::getApp()->getMetaNodes()->setRootNodeNumID(getRootNumID(), false,
-      getRootIsBuddyMirrored());
+   Program::getApp()->getMetaRoot().setIfDefault(getRootNumID(), getRootIsBuddyMirrored());
 }
 
 /**
@@ -94,7 +86,7 @@ void HeartbeatMsgEx::processNewNode(std::string nodeIDWithTypeStr, NodeType node
 
    bool supportsSDP = NetworkInterfaceCard::supportsSDP(nicList);
    bool supportsRDMA = NetworkInterfaceCard::supportsRDMA(nicList);
-   std::string nodeTypeStr = Node::nodeTypeToStr(nodeType);
+   std::string nodeTypeStr = boost::lexical_cast<std::string>(nodeType);
 
    log.log(Log_WARNING, std::string("New node: ") +
       nodeIDWithTypeStr + "; " +

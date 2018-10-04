@@ -83,7 +83,6 @@ typedef FhgfsOpsErrVec::const_iterator FhgfsOpsErrVecCIter;
 class FhgfsOpsErrTk
 {
    public:
-      static const char* toErrString(FhgfsOpsErr errCode);
       static int toSysErr(FhgfsOpsErr errCode);
       static FhgfsOpsErr fromSysErr(int errCode);
 
@@ -92,6 +91,6 @@ class FhgfsOpsErrTk
       FhgfsOpsErrTk() {}
 };
 
-
+std::ostream& operator<<(std::ostream& os, FhgfsOpsErr errCode);
 
 #endif /*STORAGEERRORS_H_*/

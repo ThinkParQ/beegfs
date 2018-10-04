@@ -66,12 +66,8 @@ bool StoragePoolEx::initFromDesBuf(Deserializer& des)
 
 void StoragePoolEx::saveQuotaLimits()
 {  // Note: no synchronization needed here; all done inside the Limits classes
-   if (quotaUserLimits->isStoreDirty())
-      quotaUserLimits->saveToFile();
-
-   if (quotaGroupLimits->isStoreDirty())
-      quotaGroupLimits->saveToFile();
-
+   quotaUserLimits->saveToFile();
+   quotaGroupLimits->saveToFile();
    quotaDefaultLimits->saveToFile();
 }
 

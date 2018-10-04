@@ -8,11 +8,8 @@ ChunkFetcher::ChunkFetcher()
    : log("ChunkFetcher")
 {
    // for each targetID, put one fetcher thread into list
-   UInt16List targetIDList;
-   Program::getApp()->getStorageTargets()->getAllTargetIDs(&targetIDList);
-
-   for (UInt16ListIter iter = targetIDList.begin(); iter != targetIDList.end(); iter++)
-      this->slaves.emplace_back(*iter);
+   for (const auto& mapping : Program::getApp()->getStorageTargets()->getTargets())
+      this->slaves.emplace_back(mapping.first);
 }
 
 ChunkFetcher::~ChunkFetcher()
@@ -29,15 +26,14 @@ bool ChunkFetcher::startFetching()
    const char* logContext = "ChunkFetcher (start)";
    bool retVal = true; // false if error occurred
 
-   SafeMutexLock mutexLock(&chunksListMutex);
-
-   isBad = false;
-
-   mutexLock.unlock();
+   {
+      const std::lock_guard<Mutex> lock(chunksListMutex);
+      isBad = false;
+   }
 
    for(ChunkFetcherSlaveListIter iter = slaves.begin(); iter != slaves.end(); iter++)
    {
-      SafeMutexLock safeLock(&(iter->statusMutex));
+      const std::lock_guard<Mutex> lock(iter->statusMutex);
 
       if(!iter->isRunning)
       {
@@ -56,8 +52,6 @@ bool ChunkFetcher::startFetching()
             retVal = false;
          }
       }
-
-      safeLock.unlock();
    }
 
    return retVal;
@@ -67,14 +61,12 @@ void ChunkFetcher::stopFetching()
 {
    for(ChunkFetcherSlaveListIter iter = slaves.begin(); iter != slaves.end(); iter++)
    {
-      SafeMutexLock safeLock(&(iter->statusMutex));
+      const std::lock_guard<Mutex> lock(iter->statusMutex);
 
       if(iter->isRunning)
       {
          iter->selfTerminate();
       }
-
-      safeLock.unlock();
    }
 }
 
@@ -82,7 +74,7 @@ void ChunkFetcher::waitForStopFetching()
 {
    for(ChunkFetcherSlaveListIter iter = slaves.begin(); iter != slaves.end(); iter++)
    {
-      SafeMutexLock safeLock(&(iter->statusMutex));
+      const std::lock_guard<Mutex> lock(iter->statusMutex);
 
       chunksListFetchedCondition.broadcast();
 
@@ -92,7 +84,5 @@ void ChunkFetcher::waitForStopFetching()
       }
 
       chunksList.clear();
-
-      safeLock.unlock();
    }
 }

@@ -83,7 +83,7 @@ int ModeRemoveTarget::removeTarget(uint16_t targetID)
    if(removeRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Failed to remove target: " << targetID <<
-         " (Error: " << FhgfsOpsErrTk::toErrString(removeRes) << ")" << std::endl;
+         " (Error: " << removeRes << ")" << std::endl;
    }
    else
    {
@@ -102,31 +102,23 @@ FhgfsOpsErr ModeRemoveTarget::removeTargetComm(uint16_t targetID)
    NodeStore* mgmtNodes = app->getMgmtNodes();
    auto mgmtNode = mgmtNodes->referenceFirstNode();
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    UnmapTargetRespMsg* respMsgCast;
 
    UnmapTargetMsg msg(targetID);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *mgmtNode, &msg, NETMSGTYPE_UnmapTargetResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg, NETMSGTYPE_UnmapTargetResp);
+   if (!respMsg)
    {
       //std::cerr << "Network error." << std::endl;
       retVal = FhgfsOpsErr_COMMUNICATION;
       goto err_cleanup;
    }
 
-   respMsgCast = (UnmapTargetRespMsg*)respMsg;
+   respMsgCast = (UnmapTargetRespMsg*)respMsg.get();
 
    retVal = (FhgfsOpsErr)respMsgCast->getValue();
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 

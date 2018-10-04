@@ -1,11 +1,7 @@
-#include <common/net/message/nodes/SetRootNodeIDMsg.h>
-#include <common/net/message/nodes/SetRootNodeIDRespMsg.h>
 #include <common/net/message/storage/mirroring/SetMetadataMirroringRespMsg.h>
-#include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/MetaStorageTk.h>
 #include <storage/DirInode.h>
 #include <storage/MetaStore.h>
-#include <toolkit/BuddyCommTk.h>
 
 #include <program/Program.h>
 
@@ -14,10 +10,6 @@
 
 bool SetMetadataMirroringMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("SetMetadataMirroringMsgEx incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetMetadataMirroringMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
    MirrorBuddyGroupMapper* metaBuddyGroupMapper = app->getMetaBuddyGroupMapper();
 
@@ -50,9 +42,6 @@ bool SetMetadataMirroringMsgEx::processIncoming(ResponseContext& ctx)
 
    FhgfsOpsErr setRes = setMirroring();
 
-   if (setRes == FhgfsOpsErr_SUCCESS)
-      BuddyCommTk::setBuddyNeedsResyncState(true);
-
    ctx.sendResponse(SetMetadataMirroringRespMsg(setRes) );
 
    return true;
@@ -60,8 +49,8 @@ bool SetMetadataMirroringMsgEx::processIncoming(ResponseContext& ctx)
 
 FhgfsOpsErr SetMetadataMirroringMsgEx::setMirroring()
 {
-   // no two threads must be allowed to run this code at the same time. this could happen if a user
-   // starts multiple ctl instances, or during bulk resync.
+   // no two threads must be allowed to run this code at the same time. this could happen during
+   // bulk resync.
    static Mutex setMirrorMtx;
    std::unique_lock<Mutex> setMirrorMtxLock(setMirrorMtx);
 
@@ -129,42 +118,7 @@ FhgfsOpsErr SetMetadataMirroringMsgEx::setMirroring()
    }
 
    // update root Node in meta store
-   bool updateNodeIDRes = app->getMetaNodes()->setRootNodeNumID(NumNodeID(buddyGroupID), true,
-      true);
-   if (!updateNodeIDRes)
-   {
-      // get inode back
-      moveRootInode(true);
-
-      // get dir back
-      moveRootDirectory(true);
-
-      // set old owner again and remove buddy mirror flag
-      dir->setAndStoreIsBuddyMirrored(false);
-      dir->setOwnerNodeID(localNodeNumID);
-
-      return FhgfsOpsErr_INTERNAL;
-   }
-
-   FhgfsOpsErr informMgmtRes = informMgmt(buddyGroupID);
-
-   if (informMgmtRes != FhgfsOpsErr_SUCCESS)
-   {
-      // get inode back
-      moveRootInode(true);
-
-      // get dir back
-      moveRootDirectory(true);
-
-      // set old owner again and remove buddy mirror flag
-      dir->setAndStoreIsBuddyMirrored(false);
-      dir->setOwnerNodeID(localNodeNumID);
-
-      // set old root in store
-      app->getMetaNodes()->setRootNodeNumID(localNodeNumID, true, false);
-
-      return informMgmtRes;
-   }
+   app->getMetaRoot().set(NumNodeID(buddyGroupID), true);
 
    return FhgfsOpsErr_SUCCESS;
 }
@@ -230,46 +184,4 @@ FhgfsOpsErr SetMetadataMirroringMsgEx::moveRootDirectory(bool revertMove)
    }
 
    return FhgfsOpsErr_SUCCESS;
-}
-
-FhgfsOpsErr SetMetadataMirroringMsgEx::informMgmt(uint16_t newRootNodeID)
-{
-   FhgfsOpsErr result = FhgfsOpsErr_SUCCESS;
-   NodeStore* mgmtdNodes = Program::getApp()->getMgmtNodes();
-
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-   SetRootNodeIDRespMsg* respMsgCast;
-   FhgfsOpsErr setIDRes;
-
-   SetRootNodeIDMsg setRootNodeIDMsg(newRootNodeID, true);
-
-   auto mgmtNode = mgmtdNodes->referenceFirstNode();
-
-   // request/response
-   commRes = MessagingTk::requestResponse(*mgmtNode, &setRootNodeIDMsg,
-      NETMSGTYPE_SetRootNodeIDResp, &respBuf, &respMsg);
-   if ( !commRes )
-   {
-      LogContext(__func__).logErr("Communication with management node failed.");
-      result = FhgfsOpsErr_COMMUNICATION;
-
-      goto err_cleanup;
-   }
-
-   respMsgCast = (SetRootNodeIDRespMsg*) respMsg;
-
-   setIDRes = (FhgfsOpsErr) respMsgCast->getValue();
-   if ( setIDRes != FhgfsOpsErr_SUCCESS )
-   {
-      LogContext(__func__).logErr("Failed to set new root node ID on management.");
-      result = setIDRes;
-   }
-
-   err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
-   return result;
 }

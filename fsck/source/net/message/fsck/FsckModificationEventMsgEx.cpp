@@ -5,7 +5,6 @@
 bool FsckModificationEventMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("FsckModificationEventMsg incoming");
-   LOG_DEBUG_CONTEXT(log, 4, "Received a FsckModificationEventMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
    ModificationEventHandler *eventHandler = app->getModificationEventHandler();

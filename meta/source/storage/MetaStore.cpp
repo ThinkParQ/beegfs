@@ -13,6 +13,8 @@
 #include <dirent.h>
 #include <sys/types.h>
 
+#include <boost/lexical_cast.hpp>
+
 #define MAX_DEBUG_LOCK_TRY_TIME 30 // max lock wait time in seconds
 
 /**
@@ -291,11 +293,7 @@ bool MetaStore::referenceInode(const std::string& entryID, bool isBuddyMirrored,
 
    outFileInode = referenceFile(&entryInfo);
 
-   if (outFileInode)
-      return true;
-
-   // neither worked as dir nor as file
-   return false;
+   return outFileInode;
 }
 
 
@@ -628,7 +626,7 @@ FhgfsOpsErr MetaStore::mkMetaFileUnlocked(DirInode& dir, const std::string& entr
                                     * deleted on inodeMetadata object destruction */
 
    // create a dir-entry with inlined inodes
-   FhgfsOpsErr makeRes = dir.makeDirEntryUnlocked(&newDentry, false);
+   FhgfsOpsErr makeRes = dir.makeDirEntryUnlocked(&newDentry);
 
    delete inode;
 
@@ -670,7 +668,7 @@ FhgfsOpsErr MetaStore::mkNewMetaFile(DirInode& dir, MkFileDetails* mkDetails,
       return FhgfsOpsErr_INVAL;
 
    // load DirInode on demand if required, we need it now
-   if (dir.loadIfNotLoadedUnlocked() == false)
+   if (!dir.loadIfNotLoadedUnlocked())
       return FhgfsOpsErr_PATHNOTEXISTS;
 
    CharVector aclXAttr;
@@ -755,7 +753,7 @@ FhgfsOpsErr MetaStore::mkNewMetaFile(DirInode& dir, MkFileDetails* mkDetails,
                                       be deleted in inodeMetaData destructor */
 
    // create a dir-entry with inlined inodes
-   FhgfsOpsErr makeRes = dir.makeDirEntryUnlocked(&newDentry, false);
+   FhgfsOpsErr makeRes = dir.makeDirEntryUnlocked(&newDentry);
 
    if(makeRes == FhgfsOpsErr_SUCCESS)
    { // new entry successfully created
@@ -789,7 +787,7 @@ FhgfsOpsErr MetaStore::mkNewMetaFile(DirInode& dir, MkFileDetails* mkDetails,
    }
 
    if (outEntryInfo)
-      *outEntryInfo = std::move(newEntryInfo);
+      *outEntryInfo = newEntryInfo;
 
    return makeRes;
 }
@@ -977,7 +975,7 @@ FhgfsOpsErr MetaStore::unlinkFile(DirInode& dir, const std::string& fileName,
          (inodeUnlinkRes != FhgfsOpsErr_SUCCESS) ) )
       {
          LogContext(logContext).logErr(std::string("Failed to unlink inode. Error: ") +
-            FhgfsOpsErrTk::toErrString(inodeUnlinkRes) );
+            boost::lexical_cast<std::string>(inodeUnlinkRes));
 
          retVal = inodeUnlinkRes;
       }
@@ -1185,7 +1183,7 @@ FhgfsOpsErr MetaStore::unlinkInodeLaterUnlocked(EntryInfo* entryInfo, bool wasIn
    {
       // Note: we assume that if the inode is mirrored, the parent is mirrored, too
       bool moveRes = moveReferenceToMetaFileStoreUnlocked(parentEntryID, isBuddyMirrored, entryID);
-      if (moveRes == false)
+      if (!moveRes)
          return FhgfsOpsErr_INTERNAL; /* a critical error happened, better don't do
                                        * anything with this inode anymore */
    }
@@ -1274,7 +1272,7 @@ FhgfsOpsErr MetaStore::getAllInodesIncremental(unsigned hashDirNum, int64_t last
           || bgm->getLocalGroupID() == 0))
       return FhgfsOpsErr_SUCCESS;
 
-   NumNodeID rootNodeNumID = app->getMetaNodes()->getRootNodeNumID();
+   NumNodeID rootNodeNumID = app->getMetaRoot().getID();
    NumNodeID localNodeNumID = isBuddyMirrored
       ? NumNodeID(app->getMetaBuddyGroupMapper()->getLocalGroupID())
       : app->getLocalNode().getNumID();
@@ -1376,7 +1374,7 @@ FhgfsOpsErr MetaStore::getAllInodesIncremental(unsigned hashDirNum, int64_t last
          else
          { // couldn't get the stat data
             LogContext(logContext).logErr(std::string("Unable to stat file inode: ") +
-               entryID + std::string(". SysErr: ") + FhgfsOpsErrTk::toErrString(statRes));
+               entryID + std::string(". SysErr: ") + boost::lexical_cast<std::string>(statRes));
 
             userID = 0;
             groupID = 0;
@@ -1669,7 +1667,7 @@ FhgfsOpsErr MetaStore::getRawMetadata(const Path& path, CharVector& contents)
             return FhgfsOpsErr_PATHNOTEXISTS;
          }
 
-         LOG(GENERAL, WARNING, "Unable to read metadata file", path, sysErr());
+         LOG(GENERAL, WARNING, "Unable to read metadata file", path, sysErr);
          return FhgfsOpsErr_INTERNAL;
       }
    }
@@ -1682,7 +1680,7 @@ FhgfsOpsErr MetaStore::getRawMetadata(const Path& path, CharVector& contents)
       {
          if (errno != ENOENT)
          {
-            LOG(GENERAL, WARNING, "Unable to read metadata file", path, sysErr());
+            LOG(GENERAL, WARNING, "Unable to read metadata file", path, sysErr);
             return FhgfsOpsErr_INTERNAL;
          }
 
@@ -1693,7 +1691,7 @@ FhgfsOpsErr MetaStore::getRawMetadata(const Path& path, CharVector& contents)
       readRes = ::read(fd, buf, META_SERBUF_SIZE);
       if (readRes <= 0)
       {
-         LOG(GENERAL, ERR, "Unable to read metadata file", path, sysErr());
+         LOG(GENERAL, ERR, "Unable to read metadata file", path, sysErr);
          close(fd);
          return FhgfsOpsErr_INTERNAL;
       }
@@ -1772,7 +1770,7 @@ FhgfsOpsErr MetaStore::unlinkRawMetadata(const Path& path)
       return FhgfsOpsErr_PATHNOTEXISTS;
    }
 
-   LOG(GENERAL, DEBUG, "Error unlinking metadata file", path, sysErr());
+   LOG(GENERAL, DEBUG, "Error unlinking metadata file", path, sysErr);
    return FhgfsOpsErr_INTERNAL;
 }
 

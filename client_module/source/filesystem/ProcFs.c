@@ -146,12 +146,8 @@ void ProcFs_createEntries(App* app)
 
    struct proc_dir_entry* procDir;
 
-#if defined(KERNEL_HAS_PROC_CREATE_DATA)
    const struct fhgfs_proc_file* procFile;
    const struct fhgfs_proc_file_rw* procFileRW;
-#else
-   struct proc_dir_entry* currentEntry;
-#endif // LINUX_VERSION_CODE
 
 
    // create unique directory for this clientID and store app pointer as "->data"
@@ -170,8 +166,6 @@ void ProcFs_createEntries(App* app)
 
    // create entries
 
-
-#if defined(KERNEL_HAS_PROC_CREATE_DATA)
 
    /* note: linux-3.10 kills create_proc_(read_)entry and uses proc_create_data instead.
       proc_create_data existed for ealier linux version already, so we use it there, too. */
@@ -207,64 +201,6 @@ void ProcFs_createEntries(App* app)
          goto clean_up;
       }
    }
-
-#else
-
-   // create read-only proc files
-
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_CONFIG, 0444, procDir,
-      ProcFs_read_config, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_STATUS, 0444, procDir,
-      ProcFs_read_status, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_MGMTNODES, 0444, procDir,
-      ProcFs_read_mgmtNodes, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_METANODES, 0444, procDir,
-      ProcFs_read_metaNodes, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_STORAGENODES, 0444, procDir,
-      ProcFs_read_storageNodes, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_CLIENTINFO, 0444, procDir,
-      ProcFs_read_clientInfo, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_METATARGETSTATES, 0444, procDir,
-      ProcFs_read_metaTargetStates, app);
-   create_proc_read_entry(BEEGFS_PROC_ENTRY_STORAGETARGETSTATES, 0444, procDir,
-      ProcFs_read_storageTargetStates, app);
-
-   // create read+write proc files
-
-   currentEntry = create_proc_entry(BEEGFS_PROC_ENTRY_RETRIESENABLED, 0664, procDir);
-   if(currentEntry)
-   {
-      currentEntry->read_proc = ProcFs_read_connRetriesEnabled;
-      currentEntry->write_proc = ProcFs_write_connRetriesEnabled;
-      currentEntry->data = app;
-   }
-
-   currentEntry = create_proc_entry(BEEGFS_PROC_ENTRY_NETBENCHENABLED, 0664, procDir);
-   if(currentEntry)
-   {
-      currentEntry->read_proc = ProcFs_read_netBenchModeEnabled;
-      currentEntry->write_proc = ProcFs_write_netBenchModeEnabled;
-      currentEntry->data = app;
-   }
-
-   currentEntry = create_proc_entry(BEEGFS_PROC_ENTRY_DROPCONNS, 0664, procDir);
-   if(currentEntry)
-   {
-      currentEntry->read_proc = ProcFs_read_nothing;
-      currentEntry->write_proc = ProcFs_write_dropConns;
-      currentEntry->data = app;
-   }
-
-   currentEntry = create_proc_entry(BEEGFS_PROC_ENTRY_LOGLEVELS, 0664, procDir);
-   if(currentEntry)
-   {
-      currentEntry->read_proc = ProcFs_read_logLevels;
-      currentEntry->write_proc = ProcFs_write_logLevels;
-      currentEntry->data = app;
-   }
-
-#endif // LINUX_VERSION_CODE
-
 
 clean_up:
    SAFE_VFREE(dirNameBuf);

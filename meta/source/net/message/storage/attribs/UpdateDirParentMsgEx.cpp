@@ -10,14 +10,6 @@
 
 bool UpdateDirParentMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "UpdateDirParentMsgEx incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a UpdateParentEntryIDMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
-   App* app = Program::getApp();
-
    EntryInfo* entryInfo = getEntryInfo();
    NumNodeID parentNodeID = getParentNodeID();
 
@@ -34,8 +26,7 @@ bool UpdateDirParentMsgEx::processIncoming(ResponseContext& ctx)
    BaseType::processIncoming(ctx);
 
    // update operation counters
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_UPDATEDIRPARENT,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_UPDATEDIRPARENT);
 
    return true;
 }

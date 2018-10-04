@@ -7,8 +7,6 @@ bool FindOwnerMsgEx::processIncoming(ResponseContext& ctx)
 {
    #ifdef BEEGFS_DEBUG
       const char* logContext = "FindOwnerMsg incoming";
-
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a FindOwnerMsg from: " + ctx.peerName() );
    #endif // BEEGFS_DEBUG
    
    LOG_DEBUG(logContext, Log_SPAM, "Path: '" + getPath().str() + "'");
@@ -20,7 +18,7 @@ bool FindOwnerMsgEx::processIncoming(ResponseContext& ctx)
    { // looking for the root node
       NumNodeID rootNodeID = Program::getApp()->getRootDir()->getOwnerNodeID();
       
-      if(rootNodeID != 0)
+      if (rootNodeID)
       {
          ownerInfo.set(rootNodeID, "", META_ROOTDIR_ID_STR, "/", DirEntryType_DIRECTORY, 0, 0);
          

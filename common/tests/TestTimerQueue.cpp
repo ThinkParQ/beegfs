@@ -7,9 +7,10 @@ class TestTimerQueue : public ::testing::Test {
    protected:
       std::unique_ptr<TimerQueue> queue;
 
-      void SetUp()
+      void SetUp() override
       {
          queue.reset(new TimerQueue(0, 20));
+         queue->start();
       }
 };
 

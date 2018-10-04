@@ -34,7 +34,6 @@ SOURCES := \
    common/net/sock/ibv/No_IBVSocket.c \
    common/net/sock/StandardSocket.c \
    common/net/message/control/PeerInfoMsg.c \
-   common/net/message/control/AckMsgEx.c \
    common/net/message/helperd/GetHostByNameMsg.c \
    common/net/message/helperd/LogMsg.c \
    common/net/message/helperd/GetHostByNameRespMsg.c \
@@ -61,12 +60,10 @@ SOURCES := \
    common/net/message/nodes/RegisterNodeRespMsg.c \
    common/net/message/nodes/HeartbeatRequestMsgEx.c \
    common/net/message/nodes/MapTargetsMsgEx.c \
-   common/net/message/nodes/GetMirrorBuddyGroupsRespMsg.c \
    common/net/message/nodes/GetTargetMappingsRespMsg.c \
    common/net/message/nodes/HeartbeatMsgEx.c \
    common/net/message/nodes/RemoveNodeMsgEx.c \
    common/net/message/nodes/GetStatesAndBuddyGroupsRespMsg.c \
-   common/net/message/nodes/GetTargetStatesRespMsg.c \
    common/net/message/nodes/RefreshTargetStatesMsgEx.c \
    common/net/message/nodes/GetNodesRespMsg.c \
    common/net/message/nodes/SetMirrorBuddyGroupMsgEx.c \
@@ -105,17 +102,14 @@ SOURCES := \
    common/toolkit/Random.c \
    common/toolkit/tree/IntMap.c \
    common/toolkit/tree/StrCpyMap.c \
-   common/toolkit/tree/TargetStateInfoMap.c \
-   common/toolkit/tree/TargetNodeMap.c \
    common/toolkit/tree/PointerRBTree.c \
-   common/toolkit/tree/MirrorBuddyGroupMap.c \
-   common/toolkit/tree/UInt16Map.c \
    common/toolkit/NodesTk.c \
    common/toolkit/SocketTk.c \
    common/toolkit/MetadataTk.c \
    common/toolkit/TimeAbs.c \
    common/toolkit/StringTk.c \
    common/toolkit/ListTk.c \
+   common/Types.c \
    common/nodes/Node.c \
    common/nodes/TargetMapper.c \
    common/nodes/MirrorBuddyGroup.c \

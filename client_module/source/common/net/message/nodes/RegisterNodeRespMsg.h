@@ -7,8 +7,6 @@ struct RegisterNodeRespMsg;
 typedef struct RegisterNodeRespMsg RegisterNodeRespMsg;
 
 static inline void RegisterNodeRespMsg_init(RegisterNodeRespMsg* this);
-static inline void RegisterNodeRespMsg_initFromNumNodeID(RegisterNodeRespMsg* this,
-   const NumNodeID nodeNumID);
 static inline NumNodeID RegisterNodeRespMsg_getNodeNumID(RegisterNodeRespMsg* this);
 
 // virtual functions
@@ -26,13 +24,6 @@ extern const struct NetMessageOps RegisterNodeRespMsg_Ops;
 void RegisterNodeRespMsg_init(RegisterNodeRespMsg* this)
 {
    NetMessage_init(&this->netMessage, NETMSGTYPE_RegisterNodeResp, &RegisterNodeRespMsg_Ops);
-}
-
-void RegisterNodeRespMsg_initFromNumNodeID(RegisterNodeRespMsg* this, const NumNodeID nodeNumID)
-{
-   RegisterNodeRespMsg_init(this);
-
-   this->nodeNumID = nodeNumID;
 }
 
 NumNodeID RegisterNodeRespMsg_getNodeNumID(RegisterNodeRespMsg* this)

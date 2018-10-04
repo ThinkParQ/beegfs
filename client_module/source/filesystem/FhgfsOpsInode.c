@@ -465,7 +465,11 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
 
-   int refreshRes = maybeRefreshInode(inode, true, false, false);
+   int refreshRes;
+
+   forget_cached_acl(inode, type);
+
+   refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
       return ERR_PTR(refreshRes);
 
@@ -697,7 +701,6 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
       return setAttrPrepRes;
 #endif
 
-#ifdef KERNEL_HAS_ATTR_OPEN
    /* we do trunc during open message on meta server, so we don't want this redundant trunc
       (and ctime/mtime update) from the kernel */
    if(iattr->ia_valid & ATTR_OPEN)
@@ -709,7 +712,6 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
 
       return 0;
    }
-#endif
 
    if(iattr->ia_valid & ATTR_SIZE)
    { // make sure we only update size of regular files
@@ -831,8 +833,6 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
       TimeAbs_init(&now);
 
       outInode->i_mtime.tv_sec = TimeAbs_getTimeval(&now)->tv_sec;
-
-      TimeAbs_uninit(&now);
    }
 
    if(iAttr->ia_valid & ATTR_ATIME_SET)
@@ -846,8 +846,6 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
       TimeAbs_init(&now);
 
       outInode->i_atime.tv_sec = TimeAbs_getTimeval(&now)->tv_sec;
-
-      TimeAbs_uninit(&now);
    }
 
    if(iAttr->ia_valid & ATTR_CTIME)
@@ -856,8 +854,6 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
       TimeAbs_init(&now);
 
       outInode->i_ctime.tv_sec = TimeAbs_getTimeval(&now)->tv_sec;
-
-      TimeAbs_uninit(&now);
    }
 
    spin_unlock(&outInode->i_lock);

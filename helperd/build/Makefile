@@ -1,6 +1,4 @@
-CAN_PACKAGE := yes
-
-include $(or $(root-dir),../..)/build/Makefile
+include ../../build/Makefile
 
 main := ../source/program/Main.cpp
 sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
@@ -8,7 +6,7 @@ sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
 $(call build-static-library,\
    Helperd,\
    $(sources),\
-   opentk common dl,\
+   common dl,\
    ../source)
 
 $(call define-dep-lib,\
@@ -19,9 +17,9 @@ $(call define-dep-lib,\
 $(call build-executable,\
    beegfs-helperd,\
    $(main),\
-   Helperd opentk common dl)
+   Helperd common dl)
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   Helperd opentk common dl)
+   Helperd common dl)

@@ -15,7 +15,6 @@
 #include <common/net/message/nodes/GetTargetStatesRespMsg.h>
 #include <common/net/message/nodes/RegisterNodeRespMsg.h>
 #include <common/net/message/nodes/RemoveNodeRespMsg.h>
-#include <common/net/message/nodes/SetRootNodeIDRespMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
 #include <common/net/message/nodes/storagepools/GetStoragePoolsRespMsg.h>
 #include <net/message/nodes/GenericDebugMsgEx.h>
@@ -44,7 +43,6 @@
 #include <common/net/message/storage/creating/MkFileRespMsg.h>
 #include <common/net/message/storage/creating/MkFileWithPatternRespMsg.h>
 #include <common/net/message/storage/creating/MkLocalDirRespMsg.h>
-#include <common/net/message/storage/creating/MkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/RmChunkPathsRespMsg.h>
 #include <common/net/message/storage/creating/RmDirRespMsg.h>
 #include <common/net/message/storage/creating/RmLocalDirRespMsg.h>
@@ -63,7 +61,6 @@
 #include <common/net/message/storage/TruncLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
-#include <common/net/message/storage/attribs/UpdateBacklinkRespMsg.h>
 #include <common/net/message/storage/attribs/GetEntryInfoRespMsg.h>
 #include <common/net/message/storage/attribs/RemoveXAttrRespMsg.h>
 #include <common/net/message/storage/attribs/SetXAttrRespMsg.h>
@@ -72,7 +69,6 @@
 #include <common/net/message/storage/SetStorageTargetInfoRespMsg.h>
 #include <common/net/message/storage/mirroring/StorageResyncStartedRespMsg.h>
 #include <net/message/storage/lookup/FindOwnerMsgEx.h>
-#include <net/message/storage/GetStorageTargetInfoMsgEx.h>
 #include <net/message/storage/listing/ListDirFromOffsetMsgEx.h>
 #include <net/message/storage/creating/MkDirMsgEx.h>
 #include <net/message/storage/creating/MkFileMsgEx.h>
@@ -104,7 +100,6 @@
 #include <net/message/storage/creating/UnlinkFileMsgEx.h>
 #include <net/message/storage/GetHighResStatsMsgEx.h>
 #include <net/message/storage/attribs/RefreshEntryInfoMsgEx.h>
-#include <net/message/storage/lookup/FindEntrynameMsgEx.h>
 #include <net/message/storage/lookup/FindLinkOwnerMsgEx.h>
 #include <net/message/storage/creating/HardlinkMsgEx.h>
 #include <net/message/storage/attribs/UpdateDirParentMsgEx.h>
@@ -162,7 +157,7 @@
  * @return NetMessage that must be deleted by the caller
  * (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
+std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short msgType) const
 {
    NetMessage* msg;
 
@@ -204,17 +199,14 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_RefreshCapacityPools: { msg = new RefreshCapacityPoolsMsgEx(); } break;
       case NETMSGTYPE_RefreshTargetStates: { msg = new RefreshTargetStatesMsgEx(); } break;
       case NETMSGTYPE_SetMirrorBuddyGroup: { msg = new SetMirrorBuddyGroupMsgEx(); } break;
-      case NETMSGTYPE_SetRootNodeIDResp: { msg = new SetRootNodeIDRespMsg(); } break;
       case NETMSGTYPE_SetTargetConsistencyStates: { msg = new SetTargetConsistencyStatesMsgEx(); } break;
       case NETMSGTYPE_SetTargetConsistencyStatesResp: { msg = new SetTargetConsistencyStatesRespMsg(); } break;
 
       // storage messages
-      case NETMSGTYPE_FindEntryname: { msg = new FindEntrynameMsgEx(); } break;
       case NETMSGTYPE_FindLinkOwner: { msg = new FindLinkOwnerMsgEx(); } break;
       case NETMSGTYPE_FindOwner: { msg = new FindOwnerMsgEx(); } break;
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;
       case NETMSGTYPE_GetChunkFileAttribsResp: { msg = new GetChunkFileAttribsRespMsg(); } break;
-      case NETMSGTYPE_GetStorageTargetInfo: { msg = new GetStorageTargetInfoMsgEx(); } break;
       case NETMSGTYPE_GetEntryInfo: { msg = new GetEntryInfoMsgEx(); } break;
       case NETMSGTYPE_GetEntryInfoResp: { msg = new GetEntryInfoRespMsg(); } break;
       case NETMSGTYPE_GetHighResStats: { msg = new GetHighResStatsMsgEx(); } break;
@@ -239,7 +231,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_MkFileWithPatternResp: { msg = new MkFileWithPatternRespMsg(); } break;
       case NETMSGTYPE_MkLocalDir: { msg = new MkLocalDirMsgEx(); } break;
       case NETMSGTYPE_MkLocalDirResp: { msg = new MkLocalDirRespMsg(); } break;
-      case NETMSGTYPE_MkLocalFileResp: { msg = new MkLocalFileRespMsg(); } break;
       case NETMSGTYPE_MovingDirInsert: { msg = new MovingDirInsertMsgEx(); } break;
       case NETMSGTYPE_MovingDirInsertResp: { msg = new MovingDirInsertRespMsg(); } break;
       case NETMSGTYPE_MovingFileInsert: { msg = new MovingFileInsertMsgEx(); } break;
@@ -279,7 +270,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_UnlinkFile: { msg = new UnlinkFileMsgEx(); } break;
       case NETMSGTYPE_UnlinkFileResp: { msg = new UnlinkFileRespMsg(); } break;
       case NETMSGTYPE_UnlinkLocalFileResp: { msg = new UnlinkLocalFileRespMsg(); } break;
-      case NETMSGTYPE_UpdateBacklinkResp: { msg = new UpdateBacklinkRespMsg(); } break;
       case NETMSGTYPE_UpdateDirParent: { msg = new UpdateDirParentMsgEx(); } break;
       case NETMSGTYPE_UpdateDirParentResp: { msg = new UpdateDirParentRespMsg(); } break;
 
@@ -330,6 +320,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       } break;
    }
 
-   return msg;
+   return std::unique_ptr<NetMessage>(msg);
 }
 

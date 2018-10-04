@@ -3,10 +3,28 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-
 #define SOCKETTK_MAX_HOSTNAME_RESOLVE_LEN 128
 
-bool SocketTk::getHostByName(const char* hostname, struct in_addr* outIPAddr)
+namespace {
+struct GetAddrInfoError : public std::error_category
+{
+   const char* name() const noexcept override
+   {
+      return "Name Resolution Error";
+   }
+
+   std::string message(int condition) const override
+   {
+      return gai_strerror(condition);
+   }
+};
+
+GetAddrInfoError gaic;
+};
+
+const std::error_category& gai_category() { return gaic; }
+
+nu::error_or<in_addr> SocketTk::getHostByName(const std::string& hostname)
 {
    struct addrinfo hint;
    struct addrinfo* addressList;
@@ -16,16 +34,15 @@ bool SocketTk::getHostByName(const char* hostname, struct in_addr* outIPAddr)
    hint.ai_family   = PF_INET;
    hint.ai_socktype = SOCK_DGRAM;
 
-   int getRes = getaddrinfo(hostname, NULL, &hint, &addressList);
+   int getRes = getaddrinfo(hostname.c_str(), NULL, &hint, &addressList);
    if(getRes)
-      return false;
+      return make_gai_error_code(getRes, errno);
+
+   std::unique_ptr<struct addrinfo, decltype(&freeaddrinfo)>
+      addressListPtr(addressList, freeaddrinfo);
 
    struct sockaddr_in* inetAddr = (struct sockaddr_in*)(addressList->ai_addr);
-   *outIPAddr = inetAddr->sin_addr;
-
-   freeaddrinfo(addressList);
-
-   return true;
+   return inetAddr->sin_addr;
 }
 
 /**

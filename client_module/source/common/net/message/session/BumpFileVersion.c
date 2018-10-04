@@ -4,10 +4,10 @@ static void BumpFileVersionMsg_serializePayload(NetMessage* this, SerializeCtx* 
 {
    struct BumpFileVersionMsg* msg = container_of(this, struct BumpFileVersionMsg, netMessage);
 
-   EntryInfo_serialize(msg->entryInfo, ctx);
+   EntryInfo_serialize(ctx, msg->entryInfo);
 
    if (this->msgHeader.msgFeatureFlags & BUMPFILEVERSIONMSG_FLAG_HASEVENT)
-      FileEvent_serialize(msg->fileEvent, ctx);
+      FileEvent_serialize(ctx, msg->fileEvent);
 }
 
 const struct NetMessageOps BumpFileVersionMsg_Ops = {

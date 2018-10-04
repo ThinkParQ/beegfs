@@ -176,7 +176,7 @@ IFS="
 
 if [ "$1" = "" ];then exit 1; fi
 
-#common and opentk package will be installed with the package dependencies and not with the script
+#common package will be installed with the package dependencies and not with the script
 if [ "$1" = "meta" ]
 then
    deploy_meta $2

@@ -17,11 +17,6 @@
    #error BEEGFS_VERSION undefined
 #endif
 
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
-#endif
-
-
 // program return codes
 #define APPCODE_NO_ERROR               0
 #define APPCODE_INVALID_CONFIG         1
@@ -42,10 +37,10 @@ class App : public AbstractApp
       App(int argc, char** argv);
       virtual ~App();
 
-      virtual void run();
+      virtual void run() override;
 
-      void stopComponents();
-      void handleComponentException(std::exception& e);
+      virtual void stopComponents() override;
+      virtual void handleComponentException(std::exception& e) override;
 
    private:
       int appResult;
@@ -55,7 +50,7 @@ class App : public AbstractApp
       Config*  cfg;
       LogContext* log;
 
-      int pidFileLockFD; // -1 if unlocked, >=0 otherwise
+      LockFD pidFileLockFD;
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
@@ -92,22 +87,22 @@ class App : public AbstractApp
 
    public:
       // getters & setters
-      virtual ICommonConfig* getCommonConfig()
+      virtual const ICommonConfig* getCommonConfig() const override
       {
          return cfg;
       }
 
-      virtual NetFilter* getNetFilter()
+      virtual const NetFilter* getNetFilter() const override
       {
          return netFilter;
       }
 
-      virtual NetFilter* getTcpOnlyFilter()
+      virtual const NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter;
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory()
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory;
       }

@@ -3,6 +3,7 @@
 #include <common/net/message/storage/mirroring/ResyncRawInodesRespMsg.h>
 #include <common/toolkit/StringTk.h>
 #include <common/toolkit/MessagingTk.h>
+#include <common/toolkit/DebugVariable.h>
 #include <common/Common.h>
 
 #include <net/message/storage/mirroring/ResyncRawInodesMsgEx.h>
@@ -10,9 +11,10 @@
 #include <program/Program.h>
 #include <toolkit/XAttrTk.h>
 
-BuddyResyncerModSyncSlave::BuddyResyncerModSyncSlave(MetaSyncCandidateStore* syncCandidates,
-      uint8_t slaveID, const NumNodeID& buddyNodeID) :
-   SyncSlaveBase("BuddyResyncerModSyncSlave_" + StringTk::uintToStr(slaveID), buddyNodeID),
+BuddyResyncerModSyncSlave::BuddyResyncerModSyncSlave(BuddyResyncJob& parentJob,
+      MetaSyncCandidateStore* syncCandidates, uint8_t slaveID, const NumNodeID& buddyNodeID) :
+   SyncSlaveBase("BuddyResyncerModSyncSlave_" + StringTk::uintToStr(slaveID), parentJob,
+         buddyNodeID),
    syncCandidates(syncCandidates)
 {
 }
@@ -60,6 +62,8 @@ bool resyncElemCmp(const MetaSyncCandidateFile::Element& a, const MetaSyncCandid
 
 FhgfsOpsErr BuddyResyncerModSyncSlave::streamCandidates(Socket& socket)
 {
+   DEBUG_ENV_VAR(unsigned, DEBUG_FAIL_MODSYNC, 0, "BEEGFS_DEBUG_FAIL_MODSYNC");
+
    while (!getSelfTerminateNotIdle())
    {
       if (syncCandidates->isFilesEmpty())
@@ -87,7 +91,7 @@ FhgfsOpsErr BuddyResyncerModSyncSlave::streamCandidates(Socket& socket)
          FhgfsOpsErr resyncRes;
 
          LOG_DBG(MIRRORING, DEBUG, "Syncing one modification.", element.path, element.isDeletion,
-               (int)element.type);
+               int(element.type));
 
          switch (element.type)
          {
@@ -109,11 +113,16 @@ FhgfsOpsErr BuddyResyncerModSyncSlave::streamCandidates(Socket& socket)
                return FhgfsOpsErr_INTERNAL;
          }
 
-         if (resyncRes != FhgfsOpsErr_SUCCESS)
+         if (resyncRes != FhgfsOpsErr_SUCCESS || DEBUG_FAIL_MODSYNC)
          {
             LOG(MIRRORING, ERR, "Modification resync failed.", element.path, element.isDeletion,
                 resyncRes);
             numErrors.increase();
+
+            // Since this error prevents the resync from reaching a GOOD state on the secondary,
+            // we abort here.
+            parentJob->abort();
+
             // terminate the current stream, start a new one if necessary. we could (in theory)
             // reuse the current stream, but terminating a stream that has seen an error is simpler
             // to handle than keeping it open. also, bulk resync would like "fail on error"

@@ -10,7 +10,7 @@ class ModeHelperGetNodes
       static void checkReachability(NodeType nodeType, const std::vector<NodeHandle>& nodes,
          std::set<NumNodeID>& outUnreachableNodes, unsigned numRetries, unsigned retryTimeoutMS);
       static void pingNodes(NodeType nodeType, const std::vector<NodeHandle>& nodes,
-         unsigned numPingsPerNode);
+         unsigned numPingRetries);
       static void connTest(NodeType nodeType, const std::vector<NodeHandle>& nodes,
          unsigned numConns);
 

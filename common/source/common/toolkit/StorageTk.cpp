@@ -370,14 +370,13 @@ std::string StorageTk::getPathBasename(std::string path)
 /**
  * Note: Works by non-exclusively creating of a lock file (incl. path if necessary) and then locking
  * it non-blocking via flock(2).
- * Note: Remember to call unlock later (if this method succeeded).
  * Note: The PID inside the file might no longer be up-to-date if this is called before a daemon
  * forks to background mode, so don't rely on it.
  *
  * @param pathStr path to a directory (not including a filename)
- * @return -1 on error, >=0 (valid fd) on success
+ * @return invalid on error, valid on success
  */
-int StorageTk::lockWorkingDirectory(std::string pathStr)
+LockFD StorageTk::lockWorkingDirectory(const std::string& pathStr)
 {
    Path dirPath(pathStr);
    bool createPathRes = StorageTk::createPathOnDisk(dirPath, false);
@@ -387,14 +386,14 @@ int StorageTk::lockWorkingDirectory(std::string pathStr)
       std::cerr << "Unable to create working directory: " << pathStr << "; " <<
          "SysErr: " << System::getErrString(errCode) << std::endl;
 
-      return -1;
+      return {};
    }
 
    Path filePath = dirPath / STORAGETK_DIR_LOCK_FILENAME;
    std::string filePathStr = filePath.str();
 
-   int fd = createAndLockPIDFile(filePathStr, false);
-   if(fd == -1)
+   LockFD fd = createAndLockPIDFile(filePathStr, false);
+   if (!fd.valid())
    {
       std::cerr << "Unable to lock working directory. Check if the directory is already in use: " <<
          pathStr << std::endl;
@@ -404,127 +403,39 @@ int StorageTk::lockWorkingDirectory(std::string pathStr)
 }
 
 /**
- * @param fd the fd you got from lockWorkingDirectory()
- */
-void StorageTk::unlockWorkingDirectory(int fd)
-{
-   unlockPIDFile(fd);
-}
-
-/**
  * Note: Works by non-exclusive creation of a pid file and then trying to lock it non-blocking via
  * flock(2).
- * Note: Remember to call unlock later (if this method succeeded).
  *
  * @param pathStr path (including a filename) of the pid file, parent dirs will not be created
  * @param writePIDToFile whether or not you want to write the PID to the file (if false, the file
  * will just be truncated to 0 size); false is useful before a daemon forked to background mode.
- * @return -1 on error, >=0 (valid fd) on success
+ * @return invalid on error, valid on success
  */
-int StorageTk::createAndLockPIDFile(std::string pathStr, bool writePIDToFile)
+LockFD StorageTk::createAndLockPIDFile(const std::string& pathStr, bool writePIDToFile)
 {
-   int readWriteflag = (O_CREAT | (writePIDToFile ? O_WRONLY : O_RDONLY)); 
-   int fd = open(pathStr.c_str(), readWriteflag, STORAGETK_DEFAULT_FILEMODE);
-   if(fd == -1)
-   { // error
-      int errCode = errno;
+   return LockFD::lock(pathStr, writePIDToFile)
+      .reduce(
+            [&] (LockFD lock) -> LockFD {
+               const auto updateErr = lock.updateWithPID();
+               if (writePIDToFile && updateErr)
+               {
+                  std::cerr << "Problem encountered during PID file update: " << updateErr.message()
+                     << std::endl;
+                  return {};
+               }
 
-      std::cerr << "Unable to create/open working directory lock file: " << pathStr << "; "
-         << "SysErr: " << System::getErrString(errCode) << std::endl;
+               return lock;
+            },
+            [&] (const std::error_code& error) -> LockFD {
+               if (error.value() == EWOULDBLOCK)
+                  std::cerr << "Unable to lock PID file: " << pathStr << " (already locked)."
+                     << std::endl << "Check if service is already running." << std::endl;
+               else
+                  std::cerr << "Unable to lock working directory lock file: " << pathStr
+                     << "; " << "SysErr: " << error.message() << std::endl;
 
-      return -1;
-   }
-
-   int flockRes = flock(fd, LOCK_EX | LOCK_NB);
-   if(flockRes == -1)
-   {
-      int errCode = errno;
-
-      if(errCode == EWOULDBLOCK)
-      { // file already locked
-         std::cerr << "Unable to lock PID file: " << pathStr << " (already locked)." << std::endl <<
-            "Check if service is already running." << std::endl;
-      }
-      else
-      { // error
-         std::cerr << "Unable to lock PID file: " << pathStr << "; " <<
-            "SysErr: " << System::getErrString(errCode) << std::endl;
-      }
-
-      close(fd);
-      return -1;
-   }
-
-   if(writePIDToFile)
-   { // update file with current PID
-      bool updateRes = updateLockedPIDFile(fd);
-      if(updateRes == false)
-      {
-         std::cerr << "Problem encountered during PID file update: " << pathStr << std::endl;
-
-         flock(fd, LOCK_UN);
-         close(fd);
-         return -1;
-      }
-   }
-   
-   return fd;
-}
-
-/**
- * Updates the pid file with the current pid. Typically required after calling daemon().
- *
- * Note: Make sure the file was already locked by createAndLockPIDFile() when calling this.
- */
-bool StorageTk::updateLockedPIDFile(int fd)
-{
-   int truncRes = ftruncate(fd, 0);
-   if(truncRes == -1)
-   { // error
-      int errCode = errno;
-
-      std::cerr << "Unable to truncate PID file. FD: " << fd << "; "
-         << "SysErr: " << System::getErrString(errCode) << std::endl;
-
-      return false;
-   }
-
-   std::string pidStr = StringTk::uint64ToStr(System::getPID() );
-   pidStr += '\n'; // add newline, because some shell tools don't like it when there is no newline
-
-   ssize_t writeRes = pwrite(fd, pidStr.c_str(), pidStr.length(), 0);
-   if(writeRes != (ssize_t)pidStr.length() )
-   { // error
-      int errCode = errno;
-
-      std::cerr << "Unable to write to PID file. FD: " << fd << "; "
-         << "SysErr: " << System::getErrString(errCode) << std::endl;
-
-      return false;
-   }
-
-   fsync(fd);
-
-   return true;
-}
-
-/**
- * @param fd the fd you got from createAndLockPIDFile()
- */
-void StorageTk::unlockPIDFile(int fd)
-{
-   flock(fd, LOCK_UN);
-   close(fd);
-}
-
-
-/**
- * @param fd the fd you got from createAndLockPIDFile()
- */
-void StorageTk::unlockAndDeletePIDFile(int fd, const std::string& path)
-{
-   unlockPIDFile(fd);
-   unlink(path.c_str());
+               return {};
+            });
 }
 
 bool StorageTk::writeFormatFile(const std::string& path, int formatVersion,
@@ -878,9 +789,9 @@ struct dirent* StorageTk::readdirFilteredEx(DIR* dirp, bool filterDots,
          if(!dirEntry)
             return dirEntry;
 
-         if( (!filterDots || strcmp(dirEntry->d_name, ".") ) &&
-             (!filterDots || strcmp(dirEntry->d_name, "..") ) &&
-             (!filterFSIDsDir || strcmp(dirEntry->d_name, META_DIRENTRYID_SUB_STR) ) )
+         if( (!filterDots || strcmp(dirEntry->d_name, ".") != 0 ) &&
+             (!filterDots || strcmp(dirEntry->d_name, "..") != 0 ) &&
+             (!filterFSIDsDir || strcmp(dirEntry->d_name, META_DIRENTRYID_SUB_STR) != 0 ) )
          {
             return dirEntry;
          }

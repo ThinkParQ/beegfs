@@ -4,6 +4,7 @@
 #include <program/Program.h>
 #include <app/App.h>
 
+#include <mutex>
 
 int DataRequestorStats::requestLoop()
 {
@@ -30,33 +31,31 @@ int DataRequestorStats::requestLoop()
       }
 
 
-      SafeMutexLock lock(&this->accessDataMutex);        // L O C K
-
-      // check if requestor is needed any more, check if the last request is older then
-      // 10x update interval
-      unsigned unsusedTimeLimit = 10 * this->cfgOptions.intervalSecs * 1000;
-      Time timeNow;
-      unsigned timeDiff = timeNow.elapsedSinceMS(&this->lastRequest);
-      if (timeDiff > unsusedTimeLimit)
       {
-         this->stop();
-         log.log(Log_DEBUG, "Stop requestor " + StringTk::uintToStr(id) + ". No client request "
-            "happens during the last " + StringTk::intToStr(10 * this->cfgOptions.intervalSecs) +
-            " seconds");
+         const std::lock_guard<Mutex> lock(this->accessDataMutex);        // L O C K
 
-         lock.unlock();                                  // U N L O C K
+         // check if requestor is needed any more, check if the last request is older then
+         // 10x update interval
+         unsigned unsusedTimeLimit = 10 * this->cfgOptions.intervalSecs * 1000;
+         Time timeNow;
+         unsigned timeDiff = timeNow.elapsedSinceMS(&this->lastRequest);
+         if (timeDiff > unsusedTimeLimit)
+         {
+            this->stop();
+            log.log(Log_DEBUG, "Stop requestor " + StringTk::uintToStr(id) + ". No client request "
+               "happens during the last " + StringTk::intToStr(10 * this->cfgOptions.intervalSecs) +
+               " seconds");
 
-         break;
+            break;
+         }
+
+         stats->currentToOldVectorMap();
+         statsRes = ClientStatsHelper::getStatsFromNodes(nodeStore, this->stats);
+         if (!statsRes)
+            log.log(Log_ERR, "Could not get client stats from Nodes.");
+
+         this->dataSequenceID++;
       }
-
-      stats->currentToOldVectorMap();
-      statsRes = ClientStatsHelper::getStatsFromNodes(nodeStore, this->stats);
-      if (!statsRes)
-         log.log(Log_ERR, "Could not get client stats from Nodes.");
-
-      this->dataSequenceID++;
-
-      lock.unlock();                                     // U N L O C K
 
       // do nothing but wait for the time of queryInterval
       if (PThread::waitForSelfTerminateOrder(this->cfgOptions.intervalSecs * 1000))
@@ -90,45 +89,37 @@ void DataRequestorStats::run()
 
 StatsAdmon* DataRequestorStats::getStatsCopy(uint64_t &outDataSequenceID)
 {
-   SafeMutexLock lock(&this->accessDataMutex);        // L O C K
+   const std::lock_guard<Mutex> lock(accessDataMutex);
 
    StatsAdmon* retStats = new StatsAdmon(this->stats);
 
    outDataSequenceID = this->dataSequenceID;
    this->lastRequest.setToNow();
 
-   lock.unlock();                                     // U N L O C K
-
    return retStats;
 }
 
 bool DataRequestorStats::setStatusToRunning()
 {
-   bool retVal = false;
-
-   SafeMutexLock lock(&statusMutex);              // L O C K
+   const std::lock_guard<Mutex> lock(statusMutex);
 
    if(!DATAREQUESTORSTATSSTATUS_IS_ACTIVE(this->status) )
    {
       this->status = DataRequestorStatsStatus_RUNNING;
       this->statusChangeCond.broadcast();
 
-      retVal = true;
+      return true;
    }
 
-   lock.unlock();                                 // U N L O C K
-
-   return retVal;
+   return false;
 }
 
 void DataRequestorStats::setStatusToStopped()
 {
-   SafeMutexLock lock(&statusMutex);              // L O C K
+   const std::lock_guard<Mutex> lock(statusMutex);
 
    this->status = DataRequestorStatsStatus_STOPPED;
    this->statusChangeCond.broadcast();
-
-   lock.unlock();                                 // U N L O C K
 }
 
 /*
@@ -142,12 +133,10 @@ void DataRequestorStats::shutdown()
 
 void DataRequestorStats::waitForShutdown()
 {
-   SafeMutexLock safeLock(&this->statusMutex);
+   const std::lock_guard<Mutex> lock(statusMutex);
 
    while(DATAREQUESTORSTATSSTATUS_IS_ACTIVE(this->status))
    {
       this->statusChangeCond.wait(&this->statusMutex);
    }
-
-   safeLock.unlock();
 }

@@ -8,10 +8,6 @@
 
 bool MovingDirInsertMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("MovingDirInsertMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, 4, "Received a MovingDirInsertMsg from: " + ctx.peerName() );
-
    rctx = &ctx;
 
    return BaseType::processIncoming(ctx);

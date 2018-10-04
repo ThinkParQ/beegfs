@@ -8,6 +8,7 @@
 #include <modes/modehelpers/ModeInterruptedException.h>
 #include <program/Program.h>
 
+#include <iostream>
 #include <termios.h>
 #include <poll.h>
 
@@ -156,6 +157,8 @@ void ModeClientStats::loop()
 
    do
    {
+      bool opValuesClean = true;
+
       if(diffLoop)
          std::cout << std::endl << "====== " << elapsedSecs << " s ======" << std::endl;
 
@@ -185,12 +188,16 @@ void ModeClientStats::loop()
 
       if (!idOpsMap.empty())
       {
-         if (filter.empty())
-            parseAndPrintOpsList("Sum:", sumOpsList);
+         if (filter.empty() && maxLines == 0)
+         {
+            const auto res = parseAndPrintOpsList("Sum:", sumOpsList);
+            if (res == ParseResult::DIRTY)
+               opValuesClean = false;
+         }
 
          unsigned lineCounter = 0;
          auto opsMapIter = idOpsMap.begin();
-         while (opsMapIter != idOpsMap.end() && lineCounter < maxLines)
+         while (opsMapIter != idOpsMap.end() && (lineCounter < maxLines || maxLines == 0))
          {
             std::string id;
             if (perUser)
@@ -219,12 +226,23 @@ void ModeClientStats::loop()
 
             if (filter.empty() || filter == id)
             {
-               parseAndPrintOpsList(id, opsMapIter->second);
-               lineCounter++;
+               const auto res = parseAndPrintOpsList(id, opsMapIter->second);
+               if (res == ParseResult::DIRTY)
+                  opValuesClean = false;
+
+               if (res != ParseResult::EMPTY)
+                  lineCounter++;
             }
 
             opsMapIter++;
          }
+      }
+
+      if(!opValuesClean)
+      {
+         std::cout << "Warning: Operation counters changed unexpectedly."
+               << "This is probably caused by a node going offline."
+               << std::endl;
       }
 
       clientOps.clear();
@@ -236,21 +254,29 @@ void ModeClientStats::loop()
 
 }
 
-void ModeClientStats::parseAndPrintOpsList(const std::string& id, const ClientOps::OpsList& opsList) const
+/**
+ * Parses and prints one list ops opCounters
+ *
+ * @return OK if all opValues are >= 0 and at least one > 0, EMPTY if all opValues are = 0,
+ * and DIRTY if at least one is < 0 (e.g. when a diff is negative).
+ */
+ModeClientStats::ParseResult ModeClientStats::parseAndPrintOpsList(
+      const std::string& id, const ClientOps::OpsList& opsList) const
 {
    std::ostringstream buf;
+   bool opValuesClean = true;
 
    unsigned opCounter = 0;
    for (auto listIter = opsList.begin(); listIter != opsList.end(); listIter++)
    {
-      if (*listIter > 0 || allStats)
-      {
-         std::string opName;
-         if (nodeType == NODETYPE_Meta)
-            opName = OpToStringMapping::mapMetaOpNum(opCounter);
-         else if (nodeType == NODETYPE_Storage)
-            opName = OpToStringMapping::mapStorageOpNum(opCounter);
+      std::string opName;
+      if (nodeType == NODETYPE_Meta)
+         opName = OpToStringMapping::mapMetaOpNum(opCounter);
+      else if (nodeType == NODETYPE_Storage)
+         opName = OpToStringMapping::mapStorageOpNum(opCounter);
 
+      if (*listIter != 0 || allStats)
+      {
          // special treatment for bytes read and written
          if (nodeType == NODETYPE_Storage
                && (opName == OpToStringMapping::mapStorageOpNum(StorageOpCounter_WRITEBYTES)
@@ -275,6 +301,9 @@ void ModeClientStats::parseAndPrintOpsList(const std::string& id, const ClientOp
 
          buf << "]  ";
       }
+
+      opValuesClean &= *listIter >= 0;
+
       opCounter++;
    }
 
@@ -282,6 +311,12 @@ void ModeClientStats::parseAndPrintOpsList(const std::string& id, const ClientOp
    {
       std::cout << std::setw(16) << std::setiosflags(std::ios::left) << id << std::setw(1);
       std::cout << buf.str() << std::endl;
+
+      return opValuesClean ? ParseResult::OK : ParseResult::DIRTY;
+   }
+   else
+   {
+      return ParseResult::EMPTY;
    }
 }
 
@@ -301,7 +336,9 @@ void ModeClientStats::printHelp()
    std::cout << "                         will exit after printing the absolute stats." << std::endl;
    std::cout << "                         (Default: 10)" << std::endl;
    std::cout << "  --maxlines=<lines>     Maximum number of output lines (clients/users)." << std::endl;
-   std::cout << "                         (Default: 20)" << std::endl;
+   std::cout << "                         Set to 0 to print all lines. Enabling this will disable" << std::endl;
+   std::cout << "                         the summarizing line." << std::endl;
+   std::cout << "                         (Default: all)" << std::endl;
    std::cout << "  --allstats             Print all values. By default, zero values are skipped." << std::endl;
    std::cout << "  --rwunit=<unit>        Unit for read/write bytes. (Values: MiB, B)" << std::endl;
    std::cout << "                         (Default: MiB)" << std::endl;

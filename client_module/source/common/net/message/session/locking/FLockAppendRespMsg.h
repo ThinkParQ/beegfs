@@ -13,10 +13,6 @@ typedef struct FLockAppendRespMsg FLockAppendRespMsg;
 
 static inline void FLockAppendRespMsg_init(FLockAppendRespMsg* this);
 
-// getters & setters
-static inline FhgfsOpsErr FLockAppendRespMsg_getResult(FLockAppendRespMsg* this);
-
-
 struct FLockAppendRespMsg
 {
    SimpleIntMsg simpleIntMsg;
@@ -27,11 +23,5 @@ void FLockAppendRespMsg_init(FLockAppendRespMsg* this)
 {
    SimpleIntMsg_init( (SimpleIntMsg*)this, NETMSGTYPE_FLockAppendResp);
 }
-
-FhgfsOpsErr FLockAppendRespMsg_getResult(FLockAppendRespMsg* this)
-{
-   return (FhgfsOpsErr)SimpleIntMsg_getValue( (SimpleIntMsg*)this);
-}
-
 
 #endif /* FLOCKAPPENDRESPMSG_H_ */

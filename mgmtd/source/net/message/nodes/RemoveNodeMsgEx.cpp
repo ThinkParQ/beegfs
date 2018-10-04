@@ -10,8 +10,6 @@ bool RemoveNodeMsgEx::processIncoming(ResponseContext& ctx)
 {
    App* app = Program::getApp();
 
-   LOG_DBG(GENERAL, DEBUG, "Received a RemoveNodeMsg.", ctx.peerName());
-
    LOG_DBG(GENERAL, SPAM, "Removing node.", getNodeNumID());
 
    bool nodeRemoved = false;
@@ -38,9 +36,9 @@ bool RemoveNodeMsgEx::processIncoming(ResponseContext& ctx)
       if(!nodes)
       { // invalid node type
          LOG(GENERAL, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(getNodeType())),
-               as("Sender", ctx.peerName()),
-               as("NodeID", getNodeNumID())
+               ("Node Type", getNodeType()),
+               ("Sender", ctx.peerName()),
+               ("NodeID", getNodeNumID())
             );
       }
       else
@@ -65,14 +63,14 @@ bool RemoveNodeMsgEx::processIncoming(ResponseContext& ctx)
 
    if(nodeRemoved)
    {
-      LOG(GENERAL, WARNING, "Node removed.", as("node", node->getNodeIDWithTypeStr()));
+      LOG(GENERAL, WARNING, "Node removed.", ("node", node->getNodeIDWithTypeStr()));
 
       if(getNodeType() != NODETYPE_Client) // don't print stats for every client unmount
          LOG(GENERAL, NOTICE, "Number of nodes: ",
-               as("meta", app->getMetaNodes()->getSize()),
-               as("storage", app->getStorageNodes()->getSize()),
-               as("client", app->getClientNodes()->getSize()),
-               as("mgmt", app->getMgmtNodes()->getSize()));
+               ("meta", app->getMetaNodes()->getSize()),
+               ("storage", app->getStorageNodes()->getSize()),
+               ("client", app->getClientNodes()->getSize()),
+               ("mgmt", app->getMgmtNodes()->getSize()));
 
       // force update of capacity pools (especially to update buddy mirror capacity pool)
       app->getInternodeSyncer()->setForcePoolsUpdate();

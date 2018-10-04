@@ -19,25 +19,20 @@ void HbMgrNotificationNodeAdded::processNotification()
 {
    App* app = Program::getApp();
 
-   NodeHandle node;
+   NodeHandle handle;
 
    if(nodeType == NODETYPE_Client)
-      node = app->getClientNodes()->referenceNode(nodeNumID);
+      handle = app->getClientNodes()->referenceNode(nodeNumID);
    else
-      node = app->getServerStoreFromType(nodeType)->referenceNode(nodeNumID);
+      handle = app->getServerStoreFromType(nodeType)->referenceNode(nodeNumID);
 
-   if(!node)
+   if (!handle)
       return;
 
-   LOG_DBG(GENERAL, SPAM, "Propagating new node information.", node->getNodeIDWithTypeStr());
+   LOG_DBG(GENERAL, SPAM, "Propagating new node information.", handle->getNodeIDWithTypeStr());
 
+   auto& node = *handle;
 
-   propagateAddedNode(*node);
-}
-
-void HbMgrNotificationNodeAdded::propagateAddedNode(Node& node)
-{
-   App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
    NodeStoreClients* clients = app->getClientNodes();
    NodeStoreServers* metaNodes = app->getMetaNodes();
@@ -45,17 +40,15 @@ void HbMgrNotificationNodeAdded::propagateAddedNode(Node& node)
 
    NumNodeID nodeNumID = node.getNumID();
    NicAddressList nicList(node.getNicList() );
-   const BitStore* nodeFeatureFlags = node.getNodeFeatures();
 
 
    if(nodeType == NODETYPE_Meta)
    {
-      NumNodeID rootNodeID = app->getMetaNodes()->getRootNodeNumID();
+      NumNodeID rootNodeID = app->getMetaRoot().getID();
 
-      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList, nodeFeatureFlags);
+      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList);
       hbMsg.setRootNumID(rootNodeID);
       hbMsg.setPorts(node.getPortUDP(), node.getPortTCP() );
-      hbMsg.setFhgfsVersion(node.getFhgfsVersion() );
 
       dgramLis->sendToNodesUDPwithAck(clients, &hbMsg);
       dgramLis->sendToNodesUDPwithAck(metaNodes, &hbMsg);
@@ -63,9 +56,8 @@ void HbMgrNotificationNodeAdded::propagateAddedNode(Node& node)
    else
    if(nodeType == NODETYPE_Storage)
    {
-      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList, nodeFeatureFlags);
+      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList);
       hbMsg.setPorts(node.getPortUDP(), node.getPortTCP() );
-      hbMsg.setFhgfsVersion(node.getFhgfsVersion() );
 
       dgramLis->sendToNodesUDPwithAck(storageNodes, &hbMsg);
       dgramLis->sendToNodesUDPwithAck(clients, &hbMsg);
@@ -74,9 +66,8 @@ void HbMgrNotificationNodeAdded::propagateAddedNode(Node& node)
    else
    if(nodeType == NODETYPE_Client)
    {
-      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList, nodeFeatureFlags);
+      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList);
       hbMsg.setPorts(node.getPortUDP(), node.getPortTCP() );
-      hbMsg.setFhgfsVersion(node.getFhgfsVersion() );
 
       dgramLis->sendToNodesUDPwithAck(metaNodes, &hbMsg);
    }
@@ -84,13 +75,8 @@ void HbMgrNotificationNodeAdded::propagateAddedNode(Node& node)
 
 void HbMgrNotificationNodeRemoved::processNotification()
 {
-   LOG_DBG(GENERAL, SPAM, "Propagating removed node information.", nodeNumID, Node::nodeTypeToStr(nodeType));
+   LOG_DBG(GENERAL, SPAM, "Propagating removed node information.", nodeNumID, nodeType);
 
-   propagateRemovedNode();
-}
-
-void HbMgrNotificationNodeRemoved::propagateRemovedNode()
-{
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
    NodeStoreClients* clients = app->getClientNodes();
@@ -125,11 +111,6 @@ void HbMgrNotificationTargetAdded::processNotification()
       "Propagating added target information: " + StringTk::uintToStr(targetID) + "; "
       "node: " + nodeID.str() );
 
-   propagateAddedTarget();
-}
-
-void HbMgrNotificationTargetAdded::propagateAddedTarget()
-{
    // note: we only submit a single target here to keep the UDP messages small
 
    App* app = Program::getApp();
@@ -138,10 +119,8 @@ void HbMgrNotificationTargetAdded::propagateAddedTarget()
    NodeStoreServers* metaNodes = app->getMetaNodes();
    NodeStoreServers* storageNodes = app->getStorageNodes();
 
-   TargetPoolPairVec targetVec;
-   targetVec.push_back(std::make_pair(targetID, storagePoolId));
-
-   MapTargetsMsg msg(&targetVec, nodeID);
+   const std::map<uint16_t, StoragePoolId> mappings = {{targetID, storagePoolId}};
+   MapTargetsMsg msg(mappings, nodeID);
 
    dgramLis->sendToNodesUDPwithAck(storageNodes, &msg);
    dgramLis->sendToNodesUDPwithAck(clients, &msg);
@@ -152,11 +131,6 @@ void HbMgrNotificationRefreshCapacityPools::processNotification()
 {
    LOG_DEBUG(__func__, Log_SPAM, std::string("Propagating capacity pools refresh order") );
 
-   propagateRefreshCapacityPools();
-}
-
-void HbMgrNotificationRefreshCapacityPools::propagateRefreshCapacityPools()
-{
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
    NodeStoreServers* metaNodes = app->getMetaNodes();
@@ -170,11 +144,6 @@ void HbMgrNotificationRefreshTargetStates::processNotification()
 {
    LOG_DEBUG(__func__, Log_SPAM, std::string("Propagating target states refresh order") );
 
-   propagateRefreshTargetStates();
-}
-
-void HbMgrNotificationRefreshTargetStates::propagateRefreshTargetStates()
-{
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
    RefreshTargetStatesMsg msg;
@@ -196,11 +165,6 @@ void HbMgrNotificationPublishCapacities::processNotification()
 {
    LOG_DEBUG(__func__, Log_SPAM, std::string("Propagating target capacity publish order") );
 
-   propagatePublishCapacities();
-}
-
-void HbMgrNotificationPublishCapacities::propagatePublishCapacities()
-{
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
    PublishCapacitiesMsg msg;
@@ -221,11 +185,6 @@ void HbMgrNotificationMirrorBuddyGroupAdded::processNotification()
       + "; targets: " + StringTk::uintToStr(primaryTargetID) + ","
       + StringTk::uintToStr(secondaryTargetID));
 
-   propagateAddedMirrorBuddyGroup();
-}
-
-void HbMgrNotificationMirrorBuddyGroupAdded::propagateAddedMirrorBuddyGroup()
-{
    // note: we only submit a single buddy group here to keep the UDP messages small
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
@@ -244,11 +203,6 @@ void HbMgrNotificationRefreshStoragePools::processNotification()
 {
    LOG_DBG(STORAGEPOOLS, SPAM, "Propagating storage target pool refresh order.");
 
-   propagateRefreshStoragePools();
-}
-
-void HbMgrNotificationRefreshStoragePools::propagateRefreshStoragePools()
-{
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
    NodeStoreServers* metaNodes = app->getMetaNodes();

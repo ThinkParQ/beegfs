@@ -803,8 +803,5 @@ bool DiskMetaData::checkFeatureFlagsCompat(unsigned usedFeatureFlags,
 {
    unsigned unsupportedFlags = ~supportedFeatureFlags;
 
-   if(unlikely(usedFeatureFlags & unsupportedFlags) )
-      return false; // an unsupported flag was set
-
-   return true;
+   return !(usedFeatureFlags & unsupportedFlags);
 }

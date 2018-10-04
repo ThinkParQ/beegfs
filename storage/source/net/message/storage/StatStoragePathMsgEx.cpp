@@ -6,11 +6,6 @@
 
 bool StatStoragePathMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "StatStoragePathMsgEx incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a StatStoragePathMsg from: " + ctx.peerName() );
-   IGNORE_UNUSED_VARIABLE(logContext);
-
    int64_t sizeTotal = 0;
    int64_t sizeFree = 0;
    int64_t inodesTotal = 0;
@@ -34,15 +29,14 @@ FhgfsOpsErr StatStoragePathMsgEx::statStoragePath(int64_t* outSizeTotal, int64_t
 
    App* app = Program::getApp();
 
-   std::string targetPath;
-   bool gotTargetPath = app->getStorageTargets()->getPath(getTargetID(), &targetPath);
-   if(unlikely(!gotTargetPath) )
-   { // unknown targetID
+   auto* const target = app->getStorageTargets()->getTarget(getTargetID());
+   if (!target)
+   {
       LogContext(logContext).logErr("Unknown targetID: " + StringTk::uintToStr(getTargetID() ) );
-
       return FhgfsOpsErr_UNKNOWNTARGET;
    }
 
+   const auto& targetPath = target->getPath().str();
 
    bool statSuccess = StorageTk::statStoragePath(targetPath, outSizeTotal, outSizeFree,
       outInodesTotal, outInodesFree);

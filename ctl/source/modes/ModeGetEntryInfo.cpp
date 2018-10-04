@@ -84,7 +84,7 @@ int ModeGetEntryInfo::execute()
       Path path(cfgPathStr);
 
       if(!ModeHelper::getEntryAndOwnerFromPath(path, cfgUseMountedPath, false,
-            *metaNodes, *app->getMetaMirrorBuddyGroupMapper(),
+            *metaNodes, app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
             entryInfo, ownerNode))
       {
          retVal = APPCODE_RUNTIME_ERROR;
@@ -195,9 +195,6 @@ bool ModeGetEntryInfo::getAndPrintEntryInfo(Node& ownerNode, EntryInfo* entryInf
 
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetEntryInfoRespMsg* respMsgCast;
 
    FhgfsOpsErr getInfoRes;
@@ -205,23 +202,22 @@ bool ModeGetEntryInfo::getAndPrintEntryInfo(Node& ownerNode, EntryInfo* entryInf
 
    GetEntryInfoMsg getInfoMsg(entryInfo);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &getInfoMsg, NETMSGTYPE_GetEntryInfoResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, getInfoMsg,
+         NETMSGTYPE_GetEntryInfoResp);
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << ownerNode.getNodeIDWithTypeStr() <<
          std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (GetEntryInfoRespMsg*)respMsg;
+   respMsgCast = (GetEntryInfoRespMsg*)respMsg.get();
 
    getInfoRes = (FhgfsOpsErr)respMsgCast->getResult();
    if(getInfoRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Server encountered an error: " << ownerNode.getNodeIDWithTypeStr() << "; " <<
-         "Error: " << FhgfsOpsErrTk::toErrString(getInfoRes) << std::endl;
+         "Error: " << getInfoRes << std::endl;
       goto err_cleanup;
    }
 
@@ -241,9 +237,6 @@ bool ModeGetEntryInfo::getAndPrintEntryInfo(Node& ownerNode, EntryInfo* entryInf
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -301,7 +294,7 @@ void ModeGetEntryInfo::printPattern(StripePattern* pattern, DirEntryType entryTy
          /* note: we check size of stripeTargetIDs, because this might be a directory and thus
             it doesn't have any stripe targets */
 
-         if(stripeTargetIDs->size() )
+         if (!stripeTargetIDs->empty())
          { // list storage targets
             if (patternType == StripePatternType_BuddyMirror)
                std::cout << "+ Storage mirror buddy groups:" << std::endl;

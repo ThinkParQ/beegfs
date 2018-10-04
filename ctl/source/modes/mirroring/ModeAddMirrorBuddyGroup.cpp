@@ -20,7 +20,8 @@
 
 int ModeAddMirrorBuddyGroup::execute()
 {
-   const int mgmtTimeoutMS = 2500;
+   const unsigned mgmtTimeoutMS = 2500;
+   const unsigned mgmtNameResolutionRetries = 3;
 
    App* app = Program::getApp();
    DatagramListener* dgramLis = app->getDatagramListener();
@@ -214,7 +215,8 @@ int ModeAddMirrorBuddyGroup::execute()
 
    // check mgmt node
    if(!NodesTk::waitForMgmtHeartbeat(
-      NULL, dgramLis, this->mgmtNodes, mgmtHost, mgmtPortUDP, mgmtTimeoutMS) )
+            NULL, dgramLis, this->mgmtNodes, mgmtHost, mgmtPortUDP, mgmtTimeoutMS,
+            mgmtNameResolutionRetries))
    {
       std::cerr << "Management node communication failed: " << mgmtHost << std::endl;
       return APPCODE_RUNTIME_ERROR;
@@ -251,9 +253,16 @@ int ModeAddMirrorBuddyGroup::execute()
       }
 
       auto addRes = addGroup(cfgPrimaryTargetID, cfgSecondaryTargetID, cfgGroupID);
-      if (addRes != FhgfsOpsErr_SUCCESS)
+      if (addRes == FhgfsOpsErr_NOTOWNER && nodeType == NODETYPE_Meta)
       {
-         std::cerr << "Could not add buddy group: " << FhgfsOpsErrTk::toErrString(addRes) << "\n";
+         std::cerr << "Could not add buddy group: new group would own the root inode, but the root\n"
+            "inode is owned by the secondary of the new group. Only the primary of a\n"
+            "new group may own the root inode; try switching primary and secondary.\n";
+         return APPCODE_RUNTIME_ERROR;
+      }
+      else if (addRes != FhgfsOpsErr_SUCCESS)
+      {
+         std::cerr << "Could not add buddy group: " << addRes << "\n";
          return APPCODE_RUNTIME_ERROR;
       }
       else
@@ -331,18 +340,15 @@ FhgfsOpsErr ModeAddMirrorBuddyGroup::doAutomaticMode()
 
    if (this->nodeType == NODETYPE_Storage)
    {
-      UInt16List mappedTargetIDs;
-      NumNodeIDList mappedNodeIDs;
-
-      // download the target mappings from management daemon
-      if(!NodesTk::downloadTargetMappings(*mgmtNode, &mappedTargetIDs, &mappedNodeIDs, false) )
+      auto mappings = NodesTk::downloadTargetMappings(*mgmtNode, false);
+      if (!mappings.first)
       {
          std::cerr << "Target mappings download failed." << std::endl;
          return FhgfsOpsErr_COMMUNICATION;
       }
 
-      this->systemTargetMapper.syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
-      this->localTargetMapper.syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
+      systemTargetMapper.syncTargets(mappings.second);
+      localTargetMapper.syncTargets(std::move(mappings.second));
    }
    else
    {
@@ -494,7 +500,7 @@ void ModeAddMirrorBuddyGroup::printAutomaticResults(FhgfsOpsErr retValGeneration
    UInt16List* oldPrimaryIDs, UInt16List* oldSecondaryIDs)
 {
    std::cout << std::endl;
-   if(oldBuddyGroupIDs->size() > 0)
+   if (!oldBuddyGroupIDs->empty())
    {
       std::cout << "Existing mirror groups:" << std::endl;
       printMirrorBuddyGroups(oldBuddyGroupIDs, oldPrimaryIDs, oldSecondaryIDs);

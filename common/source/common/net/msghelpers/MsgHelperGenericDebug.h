@@ -34,11 +34,12 @@ class MsgHelperGenericDebug
       static std::string processOpGetLogLevel(std::istringstream& commandStream);
       static std::string processOpSetLogLevel(std::istringstream& commandStream);
       static std::string processOpNetOut(std::istringstream& commandStream,
-         NodeStoreServers* mgmtNodes, NodeStoreServers* metaNodes, NodeStoreServers* storageNodes);
+         const NodeStoreServers* mgmtNodes, const NodeStoreServers* metaNodes,
+         const NodeStoreServers* storageNodes);
       static std::string processOpQuotaExceeded(std::istringstream& commandStream,
          const ExceededQuotaStore* store);
       static std::string processOpListTargetStates(std::istringstream& commandStream,
-         TargetStateStore* targetStateStore);
+         const TargetStateStore* targetStateStore);
       static std::string processOpListStoragePools(std::istringstream& commandStream,
          const StoragePoolStore* storagePoolStore);
 
@@ -49,7 +50,7 @@ class MsgHelperGenericDebug
    private:
       MsgHelperGenericDebug() {}
 
-      static std::string printNodeStoreConns(NodeStoreServers* nodes, std::string headline);
+      static std::string printNodeStoreConns(const NodeStoreServers* nodes, std::string headline);
       static std::string printNodeConns(Node& node);
 
    public:

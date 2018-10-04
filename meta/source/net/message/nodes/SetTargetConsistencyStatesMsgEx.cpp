@@ -8,8 +8,6 @@
 bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "Set target states incoming";
-   LOG_DEBUG(logContext, Log_DEBUG,
-      "Received a SetTargetConsistencyStatesMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
    InternodeSyncer* internodeSyncer = app->getInternodeSyncer();

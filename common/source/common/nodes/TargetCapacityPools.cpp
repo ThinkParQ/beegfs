@@ -357,7 +357,7 @@ void TargetCapacityPools::chooseStorageTargets(unsigned numTargets, unsigned min
    if(!preferredTargets || preferredTargets->empty() )
    { // no preference => start with first pool that contains any targets
 
-      if(pools[CapacityPool_NORMAL].size() )
+      if (!pools[CapacityPool_NORMAL].empty())
       {
          chooseStorageNodesNoPref(pools[CapacityPool_NORMAL], numTargets, outTargets);
 
@@ -368,7 +368,7 @@ void TargetCapacityPools::chooseStorageTargets(unsigned numTargets, unsigned min
       /* note: no "else if" here, because we want to continue with next pool if we didn't find
          enough targets for minNumRequiredTargets in previous pool */
 
-      if(pools[CapacityPool_LOW].size() )
+      if (!pools[CapacityPool_LOW].empty())
       {
          chooseStorageNodesNoPref(pools[CapacityPool_LOW], numTargets - outTargets->size(),
                                   outTargets);
@@ -451,9 +451,9 @@ void TargetCapacityPools::chooseStorageTargetsRoundRobin(unsigned numTargets,
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
 
    // no preference settings supported => use first pool that contains any targets
-   if(pools[CapacityPool_NORMAL].size() )
+   if (!pools[CapacityPool_NORMAL].empty())
       chooseStorageNodesNoPrefRoundRobin(pools[CapacityPool_NORMAL], numTargets, outTargets);
-   else if(pools[CapacityPool_LOW].size() )
+   else if (!pools[CapacityPool_LOW].empty())
       chooseStorageNodesNoPrefRoundRobin(pools[CapacityPool_LOW], numTargets, outTargets);
    else
       chooseStorageNodesNoPrefRoundRobin(pools[CapacityPool_EMERGENCY], numTargets, outTargets);

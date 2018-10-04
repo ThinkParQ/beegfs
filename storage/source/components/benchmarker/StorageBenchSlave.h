@@ -9,6 +9,7 @@
 #include <common/toolkit/TimeFine.h>
 #include <common/Common.h>
 
+#include <mutex>
 
 // struct for the informations about a thread which simulates a client
 struct StorageBenchThreadData
@@ -101,18 +102,16 @@ class StorageBenchSlave : public PThread
       bool closeFiles(void);
 
       int64_t getNextPackageSize(int threadID);
-      int64_t getResult(uint16_t targetId);
-      void getResults(UInt16List* targetIds, StorageBenchResultsMap* results);
-      void getAllResults(StorageBenchResultsMap* results);
+      int64_t getResult(uint16_t targetID);
+      void getResults(UInt16List* targetIDs, StorageBenchResultsMap* outResults);
+      void getAllResults(StorageBenchResultsMap* outResults);
 
       void setStatus(StorageBenchStatus newStatus)
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
          this->status = newStatus;
          this->statusChangeCond.broadcast();
-
-         safeLock.unlock();
       }
 
    public:
@@ -124,15 +123,9 @@ class StorageBenchSlave : public PThread
 
       StorageBenchStatus getStatus()
       {
-         StorageBenchStatus retVal;
+         const std::lock_guard<Mutex> lock(statusMutex);
 
-         SafeMutexLock safeLock(&statusMutex);
-
-         retVal = this->status;
-
-         safeLock.unlock();
-
-         return retVal;
+         return this->status;
       }
 
       StorageBenchType getType()

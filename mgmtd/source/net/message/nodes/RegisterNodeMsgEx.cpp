@@ -1,16 +1,14 @@
 #include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/RegisterNodeRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
-#include <common/toolkit/VersionTk.h>
 #include <program/Program.h>
 #include "RegisterNodeMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
 
 bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("RegisterNodeMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a RegisterNodeMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
 
@@ -37,7 +35,7 @@ bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
    {
       log.log(Log_WARNING, "Rejecting registration of node with empty string ID "
          "from: " + ctx.peerName()  + "; "
-         "type: " + Node::nodeTypeToStr(nodeType) );
+         "type: " + boost::lexical_cast<std::string>(nodeType));
 
       return false;
    }
@@ -83,12 +81,8 @@ bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
 
    // construct node
 
-   node = constructNode(nodeID, getNodeNumID(), getPortUDP(), getPortTCP(), getNicList() );
-
-   node->setNodeType(getNodeType() );
-   node->setFhgfsVersion(getFhgfsVersion() );
-
-   node->setFeatureFlags(&getNodeFeatureFlags() );
+   node = constructNode(getNodeType(), nodeID, getNodeNumID(), getPortUDP(), getPortTCP(),
+         getNicList());
 
    // add node to store (or update it)
 
@@ -97,7 +91,7 @@ bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
    if(!newNodeNumID)
    { // unable to add node to store
       LOG(GENERAL, WARNING, "Unable to add node with given numeric ID.",
-          as("numID",  getNodeNumID()), as("stringID", getNodeID()), nodeType);
+          ("numID",  getNodeNumID()), ("stringID", getNodeID()), nodeType);
 
       goto send_response;
    }
@@ -111,8 +105,7 @@ bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
 
    if(isNodeNew)
    { // this node is new
-      processNewNode(nodeID, newNodeNumID, nodeType, getFhgfsVersion(), &getNicList(),
-         ctx.peerName() );
+      processNewNode(nodeID, newNodeNumID, nodeType, &getNicList(), ctx.peerName());
    }
 
 send_response:
@@ -144,8 +137,7 @@ bool RegisterNodeMsgEx::checkNewServerAllowed(AbstractNodeStore* nodeStore, NumN
          Config* cfg = Program::getApp()->getConfig();
          bool newServersAllowed = cfg->getSysAllowNewServers();
 
-         if(!newServersAllowed &&
-            ( (nodeNumID == 0) || (!servers->isNodeActive(nodeNumID)) ) )
+         if (!newServersAllowed && (!nodeNumID || !servers->isNodeActive(nodeNumID)))
             isAllowed = false;
       } break;
 
@@ -161,14 +153,14 @@ bool RegisterNodeMsgEx::checkNewServerAllowed(AbstractNodeStore* nodeStore, NumN
 /**
  * Instantiate new node object and intialize it properly
  */
-std::shared_ptr<Node> RegisterNodeMsgEx::constructNode(std::string nodeID, NumNodeID nodeNumID,
-   unsigned short portUDP, unsigned short portTCP, NicAddressList& nicList)
+std::shared_ptr<Node> RegisterNodeMsgEx::constructNode(NodeType nodeType, std::string nodeID,
+   NumNodeID nodeNumID, unsigned short portUDP, unsigned short portTCP, NicAddressList& nicList)
 {
    App* app = Program::getApp();
 
    // alloc node
 
-   auto node = std::make_shared<Node>(nodeID, nodeNumID, portUDP, portTCP, nicList);
+   auto node = std::make_shared<Node>(nodeType, nodeID, nodeNumID, portUDP, portTCP, nicList);
 
    // set local nic capabilities
 
@@ -205,7 +197,7 @@ void RegisterNodeMsgEx::processIncomingRoot(NumNodeID rootNumID, NodeType nodeTy
  * "Post-processing" of newly added nodes: pring log msg, notify other nodes, ...
  */
 void RegisterNodeMsgEx::processNewNode(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType,
-   unsigned fhgfsVersion, NicAddressList* nicList, std::string sourcePeer)
+   NicAddressList* nicList, std::string sourcePeer)
 {
    LogContext log("Node registration");
 
@@ -217,18 +209,14 @@ void RegisterNodeMsgEx::processNewNode(std::string nodeID, NumNodeID nodeNumID, 
 
    bool supportsSDP = NetworkInterfaceCard::supportsSDP(nicList);
    bool supportsRDMA = NetworkInterfaceCard::supportsRDMA(nicList);
-   std::string nodeTypeStr = Node::nodeTypeToStr(nodeType);
+   std::string nodeTypeStr = boost::lexical_cast<std::string>(nodeType);
 
    std::string nodeIDWithTypeStr = Node::getNodeIDWithTypeStr(nodeID, nodeNumID, nodeType);
-
-   std::string fhgfsPseudoVersionStr = VersionTk::versionCodeToPseudoVersionStr(fhgfsVersion);
-
 
    log.log(Log_WARNING, std::string("New node: ") +
       nodeIDWithTypeStr + "; " +
       std::string(supportsSDP ? "SDP; " : "") +
       std::string(supportsRDMA ? "RDMA; " : "") +
-      std::string("Ver: ") + fhgfsPseudoVersionStr  + "; " +
       std::string("Source: ") + sourcePeer);
 
    log.log(Log_DEBUG, std::string("Number of nodes: ") +

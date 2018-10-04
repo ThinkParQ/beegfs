@@ -43,8 +43,7 @@ bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)
    const std::string& parentEntryID = getParentInfo()->getEntryID();
    const std::string& entryName = getEntryName();
 
-   LOG_DBG(GENERAL, DEBUG, "Received a LookupIntentMsg", as("peer", ctx.peerName()), parentEntryID,
-        entryName, as("isBuddyMirrored", getParentInfo()->getIsBuddyMirrored()));
+   LOG_DBG(GENERAL, DEBUG, "", parentEntryID, entryName, getParentInfo()->getIsBuddyMirrored());
 
    // sanity checks
    if (unlikely(parentEntryID.empty() || entryName.empty()))
@@ -86,7 +85,7 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
          case FhgfsOpsErr_SUCCESS:
             // Successful Create, which implies Lookup-before-create would have been failed.
             response.setLookupResult(FhgfsOpsErr_PATHNOTEXISTS);
-            response.setEntryInfo(std::move(diskEntryInfo));
+            response.setEntryInfo(diskEntryInfo);
             response.addResponseCreate(createRes);
             break;
 
@@ -114,7 +113,7 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
             &diskEntryInfo, &inodeData, inodeDataOutdated);
 
       response.setLookupResult(lookupRes);
-      response.setEntryInfo(std::move(diskEntryInfo));
+      response.setEntryInfo(diskEntryInfo);
 
       if (unlikely(lookupRes != FhgfsOpsErr_SUCCESS && createFlag))
       {
@@ -207,8 +206,7 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
             std::unique_ptr<StripePattern>(pattern->clone()), pathInfo);
    }
 
-   Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
-         getOpCounterType(), getMsgHeaderUserID());
+   updateNodeOp(ctx, getOpCounterType());
 
    return boost::make_unique<ResponseState>(std::move(response));
 }
@@ -311,8 +309,7 @@ FhgfsOpsErr LookupIntentMsgEx::stat(EntryInfo* entryInfo, bool loadFromDisk, Sta
    // check if we can stat on this machine or if entry is owned by another server
    NumNodeID expectedOwner;
    if (entryInfo->getIsBuddyMirrored())
-      expectedOwner = NumNodeID(
-         metaBuddyGroupMapper->getPrimaryTargetID(localNode.getNumID().val() ) );
+      expectedOwner = NumNodeID(metaBuddyGroupMapper->getLocalGroupID());
    else
       expectedOwner = localNode.getNumID();
 
@@ -370,7 +367,7 @@ FhgfsOpsErr LookupIntentMsgEx::open(EntryInfo* entryInfo, std::string* outFileHa
 
       if (!addRes)
          LOG(GENERAL, NOTICE, "Couldn't add sessionFile on secondary",
-            as("sessionID", this->getSessionID()), sessionFileID);
+            ("sessionID", this->getSessionID()), sessionFileID);
    }
 
    sessions->releaseSession(session);

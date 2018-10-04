@@ -6,6 +6,7 @@
 #include <program/Program.h>
 #include "LockEntryNotificationWork.h"
 
+#include <mutex>
 
 Mutex LockEntryNotificationWork::ackCounterMutex;
 unsigned LockEntryNotificationWork::ackCounter = 0;
@@ -25,7 +26,7 @@ void LockEntryNotificationWork::process(char* bufIn, unsigned bufInLen, char* bu
    AcknowledgmentStore* ackStore = app->getAckStore();
    DatagramListener* dgramLis = app->getDatagramListener();
    MetaStore* metaStore = app->getMetaStore();
-   NodeStoreClientsEx* clients = app->getClientNodes();
+   NodeStoreClients* clients = app->getClientNodes();
    NumNodeID localNodeID = app->getLocalNode().getNumID();
 
    // max total time is ackWaitMS * numRetries, defaults to 333ms * 15 => 5s
@@ -72,11 +73,12 @@ void LockEntryNotificationWork::process(char* bufIn, unsigned bufInLen, char* bu
    {
       // create waitAcks copy
 
-      SafeMutexLock waitAcksLock(&notifier.waitAcksMutex);
+      WaitAckMap currentWaitAcks;
+      {
+         const std::lock_guard<Mutex> lock (notifier.waitAcksMutex);
 
-      WaitAckMap currentWaitAcks(waitAcks);
-
-      waitAcksLock.unlock();
+         currentWaitAcks = waitAcks;
+      }
 
       // send messages
 
@@ -174,10 +176,6 @@ void LockEntryNotificationWork::process(char* bufIn, unsigned bufInLen, char* bu
  */
 void LockEntryNotificationWork::unlockWaiter(FileInode& inode, EntryLockDetails* lockDetails)
 {
-   const char* logContext = "LockEntryNotificationWork::unlockWaiter";
-   Logger* logger = Logger::getLogger();
-
-
    lockDetails->setUnlock();
 
 
@@ -187,7 +185,7 @@ void LockEntryNotificationWork::unlockWaiter(FileInode& inode, EntryLockDetails*
    if(lockType == LockEntryNotifyType_FLOCK)
       inode.flockEntry(*lockDetails);
    else
-      logger->logErr(logContext, "Invalid lockType given: " + StringTk::uintToStr(lockType) );
+      LOG(GENERAL, ERR, "Invalid lockType given.", lockType);
 }
 
 /**
@@ -198,29 +196,20 @@ void LockEntryNotificationWork::unlockWaiter(FileInode& inode, EntryLockDetails*
  */
 void LockEntryNotificationWork::cancelAllWaiters(FileInode& inode)
 {
-   const char* logContext = "LockEntryNotificationWork::unlockWaiter";
-   Logger* logger = Logger::getLogger();
-
    if(lockType == LockEntryNotifyType_APPEND)
       inode.flockAppendCancelAllWaiters();
    else
    if(lockType == LockEntryNotifyType_FLOCK)
       inode.flockEntryCancelAllWaiters();
    else
-      logger->logErr(logContext, "Invalid lockType given: " + StringTk::uintToStr(lockType) );
+      LOG(GENERAL, ERR, "Invalid lockType given.", lockType);
 }
 
 unsigned LockEntryNotificationWork::incAckCounter()
 {
-   unsigned currentAckCounter;
+   const std::lock_guard<Mutex> lock(ackCounterMutex);
 
-   SafeMutexLock mutexLock(&ackCounterMutex);
-
-   currentAckCounter = ackCounter++;
-
-   mutexLock.unlock();
-
-   return currentAckCounter;
+   return ackCounter++;
 }
 
 Mutex* LockEntryNotificationWork::getDGramLisMutex(AbstractDatagramListener* dgramLis)

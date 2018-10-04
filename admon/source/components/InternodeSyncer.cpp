@@ -90,8 +90,7 @@ unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServers* nodes)
 
    unsigned numDroppedConns = 0;
 
-   auto node = nodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : nodes->referenceAllNodes())
    {
       /* don't do any idle disconnect stuff with local node
          (the LocalNodeConnPool doesn't support and doesn't need this kind of treatment) */
@@ -102,8 +101,6 @@ unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServers* nodes)
 
          numDroppedConns += connPool->disconnectAndResetIdleStreams();
       }
-
-      node = nodes->referenceNextNode(node); // iterate to next node
    }
 
    return numDroppedConns;

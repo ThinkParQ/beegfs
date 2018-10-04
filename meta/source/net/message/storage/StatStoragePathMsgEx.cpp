@@ -6,11 +6,6 @@
 
 bool StatStoragePathMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "StatStoragePathMsgEx incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a StatStoragePathMsg from: " + ctx.peerName() );
-   IGNORE_UNUSED_VARIABLE(logContext);
-
    int64_t sizeTotal = 0;
    int64_t sizeFree = 0;
    int64_t inodesTotal = 0;

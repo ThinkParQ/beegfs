@@ -14,7 +14,7 @@ class ModeAddMirrorBuddyGroup : public Mode, public MirrorBuddyGroupCreator
       ModeAddMirrorBuddyGroup() :
          MirrorBuddyGroupCreator(
             Program::getApp()->getMgmtNodes(),
-            Program::getApp()->getMetaNodes(),
+            Program::getApp()->getMetaNodes(), &Program::getApp()->getMetaRoot(),
             Program::getApp()->getStoragePoolStore()),
          cfgAutomatic(false) { }
 

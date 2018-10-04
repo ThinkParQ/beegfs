@@ -12,6 +12,6 @@ void RemoveXAttrMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 {
    RemoveXAttrMsg* thisCast = (RemoveXAttrMsg*)this;
 
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
    Serialization_serializeStr(ctx, strlen(thisCast->name), thisCast->name);
 }

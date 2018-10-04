@@ -7,7 +7,7 @@ TEST(NIC, nic)
    NicAddressList list;
    StringList allowedInterfaces;
 
-   ASSERT_TRUE(NetworkInterfaceCard::findAll(&allowedInterfaces, true, true, &list));
+   ASSERT_TRUE(NetworkInterfaceCard::findAll(&allowedInterfaces, true, &list));
 
    ASSERT_FALSE(list.empty());
 

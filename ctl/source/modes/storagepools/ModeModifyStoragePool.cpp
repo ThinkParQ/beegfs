@@ -221,7 +221,7 @@ int ModeModifyStoragePool::execute()
          buddyMappedTargets.push_back(rmTargetsVec[i]);
    }
 
-   if (buddyMappedTargets.size() > 0)
+   if (!buddyMappedTargets.empty())
    {
       for (size_t i = 0; i < buddyMappedTargets.size(); i++)
       {
@@ -233,29 +233,23 @@ int ModeModifyStoragePool::execute()
    }
 
    // all fine, send the message
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    ModifyStoragePoolRespMsg* respMsgCast;
 
    ModifyStoragePoolMsg msg(poolId, &addTargetsVec, &rmTargetsVec, &addBuddyGroupsVec,
          &rmBuddyGroupsVec, &description);
 
-   // request/response
-   bool commRes = MessagingTk::requestResponse(*mgmtNode, &msg, NETMSGTYPE_ModifyStoragePoolResp,
-         &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+         NETMSGTYPE_ModifyStoragePoolResp);
 
-   if (!commRes)
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << mgmtNode->getNodeIDWithTypeStr()
          << std::endl;
 
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
-
       return APPCODE_RUNTIME_ERROR;
    }
 
-   respMsgCast = static_cast<ModifyStoragePoolRespMsg*>(respMsg);
+   respMsgCast = static_cast<ModifyStoragePoolRespMsg*>(respMsg.get());
 
    FhgfsOpsErr modifyRes = respMsgCast->getResult();
 
@@ -279,9 +273,6 @@ int ModeModifyStoragePool::execute()
                 << std::endl
                 << std::endl;
    }
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return APPCODE_NO_ERROR;
 }

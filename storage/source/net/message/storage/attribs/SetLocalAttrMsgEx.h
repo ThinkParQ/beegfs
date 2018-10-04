@@ -4,15 +4,17 @@
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/attribs/SetLocalAttrMsg.h>
 
+class StorageTarget;
+
 class SetLocalAttrMsgEx : public SetLocalAttrMsg
 {
    public:
       virtual bool processIncoming(ResponseContext& ctx);
 
    private:
-      int getTargetFD(ResponseContext& ctx, uint16_t actualTargetID, bool* outResponseSent);
-      FhgfsOpsErr forwardToSecondary(ResponseContext& ctx, uint16_t actualTargetID,
-         bool* outChunkLocked);
+      int getTargetFD(const StorageTarget& target, ResponseContext& ctx, bool* outResponseSent);
+      FhgfsOpsErr forwardToSecondary(StorageTarget& target, ResponseContext& ctx,
+            bool* outChunkLocked);
 };
 
 

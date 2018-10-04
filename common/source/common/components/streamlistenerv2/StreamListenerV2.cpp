@@ -181,7 +181,7 @@ void StreamListenerV2::onIncomingData(Socket* sock)
 
       // (note: userID intToStr (not uint) because default userID (~0) looks better this way)
       LOG_DEBUG("StreamListenerV2::onIncomingData", Log_DEBUG,
-         "Incoming message: " + NetMsgStrMapping().defineToStr(msgHeader.msgType) + "; "
+         "Incoming message: " + netMessageTypeToStr(msgHeader.msgType) + "; "
          "from: " + sock->getPeername() + "; "
          "userID: " + StringTk::intToStr(msgHeader.msgUserID) +
          (msgHeader.msgTargetID
@@ -404,7 +404,7 @@ void StreamListenerV2::rdmaConnIdleCheck()
       pollList.removeByFD(*iter);
    }
 
-   if(disposalFDs.size() )
+   if (!disposalFDs.empty())
    { // logging
       LOG_DEBUG("StreamListenerV2::rdmaConnIdleCheck", Log_SPAM, std::string("Check results: ") +
          std::string("disposed ") + StringTk::int64ToStr(disposalFDs.size() ) + "/" +

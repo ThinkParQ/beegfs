@@ -154,9 +154,7 @@ struct address_space_operations fhgfs_address_ops =
    .readpage       = FhgfsOpsPages_readpage,
    .readpages      = FhgfsOpsPages_readpages,
    .writepage      = FhgfsOpsPages_writepage,
-#ifdef KERNEL_HAS_WRITE_CACHE_PAGES
    .writepages     = FhgfsOpsPages_writepages,
-#endif
    .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
 
@@ -177,9 +175,7 @@ struct address_space_operations fhgfs_address_pagecache_ops =
    .readpage       = FhgfsOpsPages_readpage,
    .readpages      = FhgfsOpsPages_readpages,
    .writepage      = FhgfsOpsPages_writepage,
-#ifdef KERNEL_HAS_WRITE_CACHE_PAGES
    .writepages     = FhgfsOpsPages_writepages,
-#endif
    .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
 
@@ -814,22 +810,10 @@ int FhgfsOps_lock(struct file* file, int cmd, struct file_lock* fileLock)
       /* note: it's questionable if returning remote locks makes sense (because the local app could
          misinterpret the pid of the lock-holder), so we do local only for now. */
 
-      #ifdef KERNEL_HAS_TEST_LOCK_VOID_TWOARGS
+      posix_test_lock(file, fileLock);
 
-         posix_test_lock(file, fileLock);
-
-         /* note: "fileLock->fl_type != F_UNLCK" would tell us now whether a conflicting local lock
-            was found */
-      #else
-         /* note: there are a lots of different versions of posix_test_lock() in the
-            different kernels, so we only support the most recent one for now (kernels >=2.6.23).
-            later, we can switch to remote conflicts check and thus won't need the posix_test_lock
-            calls, anyways. */
-
-         fileLock->fl_type = F_UNLCK;
-
-      #endif // KERNEL_HAS_TEST_LOCK_VOID_TWOARGS
-
+      /* note: "fileLock->fl_type != F_UNLCK" would tell us now whether a conflicting local lock
+         was found */
 
       return 0;
    }

@@ -4,11 +4,11 @@
 #include <common/net/sock/RDMASocket.h>
 #include <common/nodes/LocalNode.h>
 #include <common/storage/striping/Raid0Pattern.h>
-#include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include "App.h"
 
-#include <signal.h>
+#include <csignal>
+#include <syslog.h>
 
 
 #define APP_WORKERS_DIRECT_NUM   1
@@ -22,7 +22,6 @@ App::App(int argc, char** argv)
    this->argv = argv;
 
    this->appResult = APPCODE_NO_ERROR;
-   this->pidFileLockFD = -1;
 
    this->cfg = NULL;
    this->netFilter = NULL;
@@ -49,19 +48,17 @@ App::~App()
    SAFE_DELETE(this->tcpOnlyFilter);
    SAFE_DELETE(this->netFilter);
 
-   unlockAndDeletePIDFile(pidFileLockFD, cfg->getPIDFile()); // ignored if fd is -1
-
    SAFE_DELETE(this->cfg);
 
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 void App::run()
 {
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -157,14 +154,11 @@ void App::runNormal()
 
    // start component threads
 
-   if ( this->cfg->getDebugRunComponentThreads() )
-   {
-      startComponents();
+   startComponents();
 
-      // wait for termination
+   // wait for termination
 
-      joinComponents();
-   }
+   joinComponents();
 
    log->log(1, "All components stopped. Exiting now!");
 }
@@ -180,14 +174,11 @@ void App::initDataObjects(int argc, char** argv)
 
    // (check absolute log path to avoid chdir() problems)
    Path logStdPath(cfg->getLogStdFile() );
-   Path logErrPath(cfg->getLogErrFile() );
-   if( (!logStdPath.empty() && !logStdPath.absolute() ) ||
-       (!logErrPath.empty() && !logErrPath.absolute() ) )
+   if(!logStdPath.empty() && !logStdPath.absolute())
       throw InvalidConfigException("Path to log file must be absolute");
 
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(), 
-      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-      cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
    this->log = new LogContext("App");
 
    this->workQueue = new MultiWorkQueue();
@@ -203,14 +194,12 @@ void App::initDataObjects(int argc, char** argv)
 
 void App::initLocalNodeInfo()
 {
-   bool useSDP = cfg->getConnUseSDP();
-
    StringList allowedInterfaces;
    std::string interfacesFilename = cfg->getConnInterfacesFile();
    if(interfacesFilename.length() )
-      cfg->loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
+      Config::loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
 
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, useSDP, localNicList);
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
 
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -218,10 +207,8 @@ void App::initLocalNodeInfo()
    localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
 
    std::string nodeID = System::getHostname();
-   localNode = std::make_shared<LocalNode>(nodeID, NumNodeID(1), 0, 0, localNicList);
-
-   localNode->setNodeType(NODETYPE_Helperd);
-   localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
+   localNode = std::make_shared<LocalNode>(NODETYPE_Helperd, nodeID, NumNodeID(1), 0, 0,
+         localNicList);
 }
 
 void App::initStorage()

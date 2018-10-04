@@ -1,7 +1,7 @@
 #include <common/toolkit/Serialization.h>
 #include "NumNodeID.h"
 
-void NumNodeID_serialize(const NumNodeID* this, SerializeCtx* ctx)
+void NumNodeID_serialize(SerializeCtx* ctx, const NumNodeID* this)
 {
    Serialization_serializeUInt(ctx, this->value);
 }

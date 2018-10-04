@@ -103,7 +103,7 @@ FhgfsOpsErr StorageTkEx::getContDirIDsIncremental(unsigned hashDirNum, bool budd
       *outNewOffset = dirEntry->d_off;
 
       // skip root dir if this is not the root MDS
-      NumNodeID rootNodeNumID = Program::getApp()->getMetaNodes()->getRootNodeNumID();
+      NumNodeID rootNodeNumID = Program::getApp()->getMetaRoot().getID();
       NumNodeID localNodeNumID = buddyMirrored
          ? NumNodeID(Program::getApp()->getMetaBuddyGroupMapper()->getLocalGroupID())
          : Program::getApp()->getLocalNode().getNumID();

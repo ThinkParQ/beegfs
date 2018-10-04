@@ -9,7 +9,6 @@ struct NicAddressListIter;
 typedef struct NicAddressListIter NicAddressListIter;
 
 static inline void NicAddressListIter_init(NicAddressListIter* this, NicAddressList* list);
-static inline bool NicAddressListIter_hasNext(NicAddressListIter* this);
 static inline void NicAddressListIter_next(NicAddressListIter* this);
 static inline NicAddress* NicAddressListIter_value(NicAddressListIter* this);
 static inline bool NicAddressListIter_end(NicAddressListIter* this);
@@ -24,11 +23,6 @@ struct NicAddressListIter
 void NicAddressListIter_init(NicAddressListIter* this, NicAddressList* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool NicAddressListIter_hasNext(NicAddressListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void NicAddressListIter_next(NicAddressListIter* this)

@@ -47,11 +47,14 @@ static void deserializeStringCollection(Deserializer& des, Collection& value)
    {
       des.skip(lengthRemaining);
 
-      if(unlikely(rawStringArray[lengthRemaining - 1]) )
-         des.setBad();
-
       if(unlikely(!des.good() ) )
          return;
+
+      if(unlikely(rawStringArray[lengthRemaining - 1]) )
+      {
+         des.setBad();
+         return;
+      }
    }
 
    while(size > 0 && lengthRemaining > 0)

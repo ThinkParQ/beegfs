@@ -41,9 +41,7 @@
 # you want your Makefile to build a shared library from /source/lib and an executable from
 # /source/exe. the you could write your Makefile like this:
 #
-# # must be the location of the file you are reading now.
-# # the $(or ...) allows for package builds that copy a subproject directory around.
-# include $(or $(root-dir),../..)/build/Makefile
+# include ,../../build/Makefile
 #
 # # will generate a libFancy.so in /build, uses libz
 # $(call build-static-library,\
@@ -75,7 +73,6 @@ define HELP_ARGS_GENERIC
 	@echo  '  DISTCC=distcc              Enables the usage of distcc'
 	@echo  '  V=1                        Print command lines of tool invocations'
 	@echo  '  BEEGFS_COMMON_PATH=<path>  Path to the common directory'
-	@echo  '  BEEGFS_OPENTK_PATH=<path>  Path to the opentk_lib directory'
 	@echo  '  BEEGFS_THIRDPARTY_PATH=<path>'
 	@echo  '                             Path to the thirdparty directory'
 endef
@@ -85,19 +82,6 @@ define HELP_TARGETS_GENERIC
 	@echo '  help              print this help message'
 endef
 
-ifneq ($(CAN_PACKAGE),)
-define HELP_TARGETS_PACKAGE
-	@echo '  rpm               create an rpm package'
-	@echo '  deb               create debian package file'
-endef
-
-rpm:
-	./make-rpm
-
-deb:
-	./make-deb
-endif
-
 help:
 	@echo 'Optional arguments:'
 	$(HELP_ARGS_GENERIC)
@@ -106,29 +90,26 @@ help:
 	@echo 'Targets:'
 	$(HELP_TARGETS_GENERIC)
 	$(HELP_TARGETS_SPECIFIC)
-	$(HELP_TARGETS_PACKAGE)
 
 root_dir := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 build_dir := $(realpath $(dir $(firstword $(MAKEFILE_LIST))))
 
-BEEGFS_VERSION_PATH            ?= $(root_dir)/beegfs-version
 BEEGFS_COMMON_PATH             ?= $(root_dir)/common
-BEEGFS_OPENTK_PATH             ?= $(root_dir)/opentk_lib
 BEEGFS_THIRDPARTY_PATH         ?= $(root_dir)/thirdparty
 ADMON_GUI_PATH                 ?= $(root_dir)/admon_gui
 BEEGFS_ONLINE_CFG_PATH         ?= $(root_dir)/ctl
+BEEGFS_COMM_DEBUG_PATH         ?= $(root_dir)/comm_debug
 BEEGFS_FSCK_PATH               ?= $(root_dir)/fsck
 BEEGFS_EVENT_LISTENER_PATH     ?= $(root_dir)/event_listener
 BEEGFS_DEVEL_INCLUDE_PATH      ?= $(root_dir)/client_devel/include
 BEEGFS_JAVA_LIB_PATH           ?= $(root_dir)/java_lib
-BEEGFS_DEEPER_COMMON_PATH      ?= $(root_dir)/deeper_common
-BEEGFS_DEEPER_LIB_INCLUDE_PATH ?= $(root_dir)/deeper_lib/include
 
 SQLITE_INC_PATH   ?= $(BEEGFS_THIRDPARTY_PATH)/source/sqlite
 OPENSSL_INC_PATH  ?= $(BEEGFS_THIRDPARTY_PATH)/source/openssl/include
 TICPP_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/ticpp
 MONGOOSE_INC_PATH ?= $(BEEGFS_THIRDPARTY_PATH)/source/mongoose
 BOOST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/boost
+NU_INC_PATH       ?= $(BEEGFS_THIRDPARTY_PATH)/source/nu/include
 
 GTEST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/gtest/googletest/include
 GTEST_LIB_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/build
@@ -144,6 +125,7 @@ SHELL := /bin/bash
 STRIP ?= strip
 CXX   ?= g++
 AR    ?= ar
+CLANG_TIDY ?= clang-tidy
 
 # if -T is supported by ar, use it. thin archives are quicker to create and maintain.
 ifeq ($(shell ar -TM 2>&1 <<<""),)
@@ -151,8 +133,8 @@ AR += -T
 endif
 
 CXXFLAGS = \
-   -std=gnu++0x -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
-   -isystem $(BOOST_INC_PATH) \
+   -std=gnu++1y -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
+   -isystem $(BOOST_INC_PATH) -isystem $(NU_INC_PATH) \
    -pthread \
    -fno-strict-aliasing -fmessage-length=0 \
    -Wall -Wextra -Wunused-variable -Woverloaded-virtual -Wno-unused-parameter -Wuninitialized \
@@ -165,7 +147,7 @@ CXXFLAGS_DEBUG = -O1 -D_FORTIFY_SOURCE=2 \
    -DDEBUG_BACKTRACE  -DLOG_DEBUG_MESSAGES
 CXXFLAGS_COVERAGE = --coverage -O1 -fno-inline
 
-LDFLAGS = -std=c++0x \
+LDFLAGS = -std=c++1y \
    -rdynamic \
    -pthread -lrt \
    -Wl,-rpath,'$$ORIGIN/../lib' \
@@ -182,27 +164,14 @@ CXXFLAGS += $(CXXFLAGS_RELEASE)
 endif
 
 
-BEEGFS_VERSION := $(shell bash -c "BEEGFS_VERSION=$(BEEGFS_VERSION) \
-   $(BEEGFS_VERSION_PATH) --print_version || echo **FAIL**")
-BEEGFS_VERSION_CODE := $(shell bash -c "BEEGFS_VERSION=$(BEEGFS_VERSION) \
-   $(BEEGFS_VERSION_PATH) --print_version_code || echo **FAIL**")
-
-ifneq ($(filter **FAIL**,$(BEEGFS_VERSION) $(BEEGFS_VERSION_CODE)),)
-   $(error failed version check)
-endif
-
-$(info [VER]   BEEGFS_VERSION="$(BEEGFS_VERSION)" BEEGFS_VERSION_CODE=$(BEEGFS_VERSION_CODE))
-
-CXXFLAGS += \
-   -DBEEGFS_VERSION="\"$(BEEGFS_VERSION)\"" \
-   -DBEEGFS_VERSION_CODE=$(BEEGFS_VERSION_CODE)
+CXXFLAGS += -DBEEGFS_VERSION="\"$(BEEGFS_VERSION)\""
 
 
 ###### KNOWN LIBRARIES
 #
 # this is our local registry of known libraries, both our own and thirdparty libraries.
 #
-# currently supports building with our own libraries common, opentk, and client-devel.
+# currently supports building with our own libraries common and client-devel.
 # thirdparty packages supported are:
 #  * dl (from system)
 #  * sqlite (from thirdparty, or from system if not built in thirdparty)
@@ -275,27 +244,16 @@ ifeq ($(strip $(MAKECMDGOALS)),clean)
    resolve-dep-ldflags :=
    resolve-dep-deps :=
 else
-   $(call define-dep-lib, opentk,\
-      -I $(BEEGFS_OPENTK_PATH)/include,\
-      $(BEEGFS_OPENTK_PATH)/build/libbeegfs-opentk.*,\
-      -L $(BEEGFS_OPENTK_PATH)/build/ -lbeegfs-opentk)
-
-   $(call define-dep-lib, opentk-static,\
-      -I $(BEEGFS_OPENTK_PATH)/include,\
-      $(BEEGFS_OPENTK_PATH)/build/libbeegfs-opentk.a)
-
    $(call define-dep-lib, common,\
       -I $(BEEGFS_COMMON_PATH)/source,\
-      $(BEEGFS_COMMON_PATH)/build/libbeegfs-common.a)
+      -ldl $(BEEGFS_COMMON_PATH)/build/libbeegfs-common.a)
 
    $(call define-dep-lib, client-devel,\
       -I $(BEEGFS_DEVEL_INCLUDE_PATH),)
 
-   $(call define-dep-lib, deeper-common,\
-      -I $(BEEGFS_DEEPER_COMMON_PATH)/source,\
-      $(BEEGFS_DEEPER_COMMON_PATH)/build/libbeegfs-deeper-common.a)
-
    $(call define-dep-lib, dl, , , -ldl)
+
+   $(call define-dep-lib, rdma, , -lrdmacm -libverbs)
 
    $(call define-dep-lib, ticpp,\
       -isystem $(TICPP_INC_PATH),\
@@ -308,6 +266,8 @@ else
    $(call define-dep-lib, gtest,\
       -isystem $(GTEST_INC_PATH)/include,\
       $(GTEST_LIB_PATH)/libgtest.a)
+
+   $(call define-dep-lib, cassandra, -I$(BEEGFS_THIRDPARTY_PATH)/source/datastax)
 
    ifneq ($(realpath $(BEEGFS_THIRDPARTY_PATH)/build/libsqlite3.a),)
       $(info [NOTE] Using packaged sqlite3)
@@ -348,6 +308,133 @@ NONDEP_MAKEFILES = $(filter-out %.d,$(MAKEFILE_LIST))
 	$V$(CXX) $(CXXFLAGS) -c $< -E -MMD -MP -MF$<.d -MT$@ -o/dev/null
 	$V$(DISTCC) $(CXX) $(CXXFLAGS) -o$@ -c $(realpath $<)
 
+# first partial list: checks we want to exclude on a general basis right now
+# second list: very minor problems we don't want to be bugged about yet, but want to fix over time
+# third list: definite errors, fix as soon as possible
+define -clang_tidy_checks
+-clang-analyzer-alpha.deadcode.UnreachableCode
+-fuchsia-default-arguments
+-fuchsia-overloaded-operator
+-google-build-using-namespace
+-google-readability-braces-around-statements
+-google-readability-casting
+-google-readability-namespace-comments
+-hicpp-braces-around-statements
+-llvm-header-guard
+-llvm-include-order
+-llvm-namespace-comment
+-readability-braces-around-statements
+-readability-implicit-bool-conversion
+
+-android-cloexec-accept
+-android-cloexec-creat
+-android-cloexec-dup
+-android-cloexec-epoll-create
+-android-cloexec-fopen
+-android-cloexec-open
+-boost-use-to-string
+-clang-analyzer-deadcode.DeadStores
+-cppcoreguidelines-interfaces-global-init
+-cppcoreguidelines-pro-bounds-array-to-pointer-decay
+-cppcoreguidelines-pro-bounds-constant-array-index
+-cppcoreguidelines-pro-bounds-pointer-arithmetic
+-cppcoreguidelines-pro-type-const-cast
+-cppcoreguidelines-pro-type-cstyle-cast
+-cppcoreguidelines-pro-type-member-init
+-cppcoreguidelines-pro-type-reinterpret-cast
+-cppcoreguidelines-pro-type-static-cast-downcast
+-cppcoreguidelines-pro-type-union-access
+-cppcoreguidelines-pro-type-vararg
+-cppcoreguidelines-special-member-functions
+-google-default-arguments
+-google-explicit-constructor
+-google-readability-redundant-smartptr-get
+-google-readability-todo
+-google-runtime-int
+-google-runtime-references
+-hicpp-deprecated-headers
+-hicpp-explicit-conversions
+-hicpp-member-init
+-hicpp-no-array-decay
+-hicpp-no-assembler
+-hicpp-no-malloc
+-hicpp-signed-bitwise
+-hicpp-special-member-functions
+-hicpp-use-auto
+-hicpp-use-emplace
+-hicpp-use-equals-default
+-hicpp-use-equals-delete
+-hicpp-use-noexcept
+-hicpp-use-nullptr
+-hicpp-vararg
+-misc-misplaced-widening-cast
+-misc-move-constructor-init
+-misc-redundant-expression
+-misc-string-compare
+-misc-unused-parameters
+-modernize-loop-convert
+-modernize-make-shared
+-modernize-make-unique
+-modernize-pass-by-value
+-modernize-raw-string-literal
+-modernize-replace-random-shuffle
+-modernize-return-braced-init-list
+-modernize-use-auto
+-modernize-use-default
+-modernize-use-default-member-init
+-modernize-use-emplace
+-modernize-use-equals-default
+-modernize-use-equals-delete
+-modernize-use-noexcept
+-modernize-use-nullptr
+-modernize-use-using
+-performance-faster-string-find
+-performance-inefficient-string-concatenation
+-performance-unnecessary-copy-initialization
+-performance-unnecessary-value-param
+-readability-else-after-return
+-readability-implicit-bool-cast
+-readability-named-parameter
+-readability-non-const-parameter
+-readability-redundant-control-flow
+-readability-redundant-smartptr-get
+-readability-redundant-string-cstr
+
+-cert-err58-cpp
+-cert-err60-cpp
+-cert-msc30-c
+-cert-msc50-cpp
+-clang-analyzer-alpha.cplusplus.VirtualCall
+-clang-analyzer-core.DivideZero
+-clang-analyzer-optin.cplusplus.VirtualCall
+-cppcoreguidelines-no-malloc
+-cppcoreguidelines-owning-memory
+-readability-misleading-indentation
+endef
+clang_tidy_checks := *,$(shell echo $(strip $(-clang_tidy_checks)) | tr ' ' ',')
+
+# make-tidy-rule
+#
+# add a rule to invoke clang-tidy for the given source files
+# arguments:
+#  #1: identifier for library/executable
+#  #2: source files
+#  #3: include paths and defines
+make-tidy-rule = $(eval $(call -make-tidy-rule,$(strip $1),$2,$3))
+define -specific-tidy-rule
+$1:
+	@echo "[TIDY]  $2"
+	$V$(CLANG_TIDY) -checks='$(clang_tidy_checks)' -quiet $2 -- $$(CXXFLAGS) $3
+endef
+define -make-tidy-rule
+.PHONY: tidy
+tidy: tidy-$1
+
+.PHONY: tidy-$1 $(foreach file,$2,$(file).tidy-$1)
+tidy-$1: $(foreach file,$2,$(file).tidy-$1)
+
+$(foreach file,$2,$(eval $(call -specific-tidy-rule,$(file).tidy-$1,$(file),$3)))
+endef
 
 # build-executable
 #
@@ -363,7 +450,7 @@ all: $1
 
 CLEANUP_FILES += $1 $(addsuffix .o,$2) $(addsuffix .d,$2)
 
-$(addsuffix .o,$2): CXXFLAGS += \
+$(addsuffix .o .tidy-%,$2): CXXFLAGS += \
    $(foreach lib,$3,$(call resolve-dep-cflags,$(lib))) $(addprefix -I, $4)
 
 $1: LDFLAGS += \
@@ -374,6 +461,9 @@ $1: $(addsuffix .o,$2) $(foreach lib,$3,$(call resolve-dep-deps,$(lib)))
 	$$V$$(CXX) -o $$@ $(addsuffix .o,$2) $$(LDFLAGS)
 
 -include $(addsuffix .d,$2)
+
+$(call make-tidy-rule, $1, $2,\
+   $(foreach lib,$3,$(call resolve-dep-cflags,$(lib))) $(addprefix -I, $4))
 endef
 
 # build-test
@@ -404,7 +494,7 @@ all: $1
 
 CLEANUP_FILES += $1 $(addsuffix .o,$2) $(addsuffix .d,$2)
 
-$(addsuffix .o,$2): CXXFLAGS += \
+$(addsuffix .o .tidy-%,$2): CXXFLAGS += \
    $(foreach lib,$3,$(call resolve-dep-cflags,$(lib))) $(addprefix -I, $4)
 
 $(build_dir)/$1: $(addsuffix .o,$2)
@@ -415,6 +505,9 @@ $(build_dir)/$1: $(addsuffix .o,$2)
 $1: $(build_dir)/$1
 
 -include $(addsuffix .d,$2)
+
+$(call make-tidy-rule, $1, $2,\
+   $(foreach lib,$3,$(call resolve-dep-cflags,$(lib))) $(addprefix -I, $4))
 endef
 
 # build-shared-library
@@ -431,7 +524,7 @@ all: $1
 
 CLEANUP_FILES += $1 $(addsuffix .o,$2) $(addsuffix .d,$2)
 
-$(addsuffix .o,$2): CXXFLAGS += \
+$(addsuffix .o .tidy-%,$2): CXXFLAGS += \
    -fPIC $(foreach lib,$3,$(call resolve-dep-cflags,$(lib))) $(addprefix -I, $4)
 
 $1: LDFLAGS += \
@@ -445,4 +538,7 @@ $(build_dir)/$1: $(addsuffix .o,$2) $(foreach lib,$3,$(call resolve-dep-deps,$(l
 $1: $(build_dir)/$1
 
 -include $(addsuffix .d,$2)
+
+$(call make-tidy-rule, $1, $2,\
+   $(foreach lib,$3,$(call resolve-dep-cflags,$(lib))) $(addprefix -I, $4))
 endef

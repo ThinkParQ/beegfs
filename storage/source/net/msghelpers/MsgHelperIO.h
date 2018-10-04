@@ -130,44 +130,6 @@ class MsgHelperIO
       }
 
       /**
-       * Simulate non-existing getxattrat()
-       */
-      static int getXattrAt(int dirFD, const char* path, const char* name, void* value, size_t size)
-      {
-         int fd = ::openat(dirFD, path, O_RDONLY);
-         if (fd == -1)
-            return -1;
-
-         int retVal = ::fgetxattr(fd, name, value, size);
-
-         ::close(fd); // ignore close error, no idea what to do with it, fd is read-only anyway
-
-         return retVal;
-      }
-
-      /**
-       * Simulate non-existing getxattrat()
-       */
-      static int setXattrAt(int dirFD, const char* path, const char* name, const void* value,
-         size_t size, int flags)
-      {
-         int fd = ::openat(dirFD, path, O_WRONLY);
-         if (fd == -1)
-            return -1;
-
-         int setRes = ::fsetxattr(fd, name, value, size, flags);
-
-         int closeRes = ::close(fd);
-
-         int retVal = 0;
-
-         if (setRes == -1 || closeRes == -1)
-            retVal = -1;
-
-         return retVal;
-      }
-
-      /**
        * Simulate non-existing truncateat()
        */
       static int truncateAt(const int dirFD, const char *path, const off_t length)

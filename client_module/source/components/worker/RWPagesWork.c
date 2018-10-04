@@ -58,11 +58,7 @@ bool RWPagesWork_init(RWPagesWork* this, App* app, struct inode* inode,
    if (unlikely(referenceRes != FhgfsOpsErr_SUCCESS) )
       return false;
 
-   #ifdef KERNEL_HAS_2_PARAM_INIT_WORK
-      INIT_WORK(&this->kernelWork, RWPagesWork_process);
-   #else
-      INIT_WORK(&this->kernelWork, RWPagesWork_oldProcess, &this->kernelWork);
-   #endif
+   INIT_WORK(&this->kernelWork, RWPagesWork_process);
 
    return true;
 }

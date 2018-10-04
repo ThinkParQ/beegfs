@@ -5,7 +5,6 @@
 #include <common/app/log/LogContext.h>
 #include <common/net/message/admon/RequestMetaDataMsg.h>
 #include <common/net/message/admon/RequestMetaDataRespMsg.h>
-#include <nodes/NodeStoreEx.h>
 
 class RequestMetaDataMsgEx : public RequestMetaDataMsg
 {

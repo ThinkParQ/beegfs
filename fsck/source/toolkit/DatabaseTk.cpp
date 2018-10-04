@@ -246,10 +246,7 @@ std::string DatabaseTk::calculateExpectedChunkPath(std::string entryID, unsigned
    std::string resStr;
 
    bool hasOrigFeature;
-   if (pathInfoFlags == PATHINFO_FEATURE_ORIG)
-      hasOrigFeature = true;
-   else
-      hasOrigFeature = false;
+   hasOrigFeature = pathInfoFlags == PATHINFO_FEATURE_ORIG;
 
    PathInfo pathInfo(origParentUID, origParentEntryID, pathInfoFlags);
    Path chunkDirPath;

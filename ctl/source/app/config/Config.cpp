@@ -166,8 +166,6 @@ void Config::loadDefaults(bool addDashes)
 
    configMapRedefine("connInterfacesFile",               "", addDashes);
 
-   configMapRedefine("debugRunComponentThreads",         "true", addDashes);
-
    configMapRedefine("tuneNumWorkers",                   "3", addDashes);
    configMapRedefine("tunePreferredMetaFile",            "", addDashes);
    configMapRedefine("tunePreferredStorageFile",         "", addDashes);
@@ -249,8 +247,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          logEnabled = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connInterfacesFile", addDashes))
          connInterfacesFile = iter->second;
-      else if (testConfigMapKeyMatch(iter, "debugRunComponentThreads", addDashes))
-         debugRunComponentThreads = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "tuneNumWorkers", addDashes))
          tuneNumWorkers = StringTk::strToUInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "tunePreferredMetaFile", addDashes))

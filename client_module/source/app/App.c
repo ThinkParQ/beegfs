@@ -1,7 +1,6 @@
 #include <app/config/Config.h>
 #include <app/log/Logger.h>
 #include <app/App.h>
-#include <common/nodes/NodeFeatureFlags.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/TargetMapper.h>
 #include <common/nodes/TargetStateStore.h>
@@ -27,26 +26,9 @@
 
 #include <linux/xattr.h>
 
-#define APP_FEATURES_ARRAY_LEN      (sizeof(APP_FEATURES)/sizeof(unsigned) )
-
-
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
 #endif
-
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
-#endif
-
-
-/**
- * Array of the feature bit numbers that are supported by this node/service.
- */
-unsigned const APP_FEATURES[] =
-{
-   CLIENT_FEATURE_DUMMY,
-};
-
 
 /**
  * @param mountConfig belongs to the app afterwards (and will automatically be destructed
@@ -105,19 +87,6 @@ void App_init(App* this, MountConfig* mountConfig)
 
 }
 
-/**
- * @param mountConfig belongs to the app afterwards (and will automatically be destructed
- * by the app)
- */
-App* App_construct(MountConfig* mountConfig)
-{
-   App* this = (App*)os_kmalloc(sizeof(*this) );
-
-   App_init(this, mountConfig);
-
-   return this;
-}
-
 void App_uninit(App* this)
 {
    SAFE_DESTRUCT(this->flusher, Flusher_destruct);
@@ -167,14 +136,6 @@ void App_uninit(App* this)
 #endif // BEEGFS_DEBUG
 }
 
-void App_destruct(App* this)
-{
-   App_uninit(this);
-
-   kfree(this);
-}
-
-
 int App_run(App* this)
 {
    // init data objects & storage
@@ -195,13 +156,6 @@ int App_run(App* this)
       return this->appResult;
    }
 
-
-   if(!__App_initStorage(this) )
-   {
-      printk_fhgfs(KERN_WARNING, "Configuration error: Initialization of storage failed\n");
-      this->appResult = APPCODE_INVALID_CONFIG;
-      return this->appResult;
-   }
 
    // init components
 
@@ -543,12 +497,11 @@ bool __App_initLocalNodeInfo(App* this)
    TimeAbs nowT;
    pid_t currentPID;
    char* nodeID;
-   bool useSDP = Config_getConnUseSDP(this->cfg);
    bool useRDMA = Config_getConnUseRDMA(this->cfg);
 
    NicAddressList_init(&nicList);
 
-   NIC_findAll(&this->allowedInterfaces, useSDP, useRDMA, &nicList);
+   NIC_findAll(&this->allowedInterfaces, useRDMA, &nicList);
 
    if(!NicAddressList_length(&nicList) )
    {
@@ -575,24 +528,9 @@ bool __App_initLocalNodeInfo(App* this)
    this->localNode = Node_construct(this, nodeID, (NumNodeID){0},
       Config_getConnClientPortUDP(this->cfg), 0, &sortedNicList);
 
-   Node_setFhgfsVersion(this->localNode, BEEGFS_VERSION_CODE);
-
-   { // nodeFeatureFlags
-      BitStore nodeFeatureFlags;
-
-      BitStore_init(&nodeFeatureFlags, true);
-
-      __App_featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);
-      Node_setFeatureFlags(this->localNode, &nodeFeatureFlags);
-
-      BitStore_uninit(&nodeFeatureFlags);
-   }
-
-
    // clean up
    kfree(nodeID);
    kfree(hostname);
-   TimeAbs_uninit(&nowT);
 
    // delete nicList elems
    ListTk_kfreeNicAddressListElems(&sortedNicList);
@@ -600,13 +538,6 @@ bool __App_initLocalNodeInfo(App* this)
 
    NicAddressList_uninit(&sortedNicList);
    NicAddressList_uninit(&nicList);
-
-   return true;
-}
-
-bool __App_initStorage(App* this)
-{
-   // nothing to be done here (client does not use any harddisk storage)
 
    return true;
 }
@@ -920,43 +851,4 @@ error_resetRetries:
 const char* App_getVersionStr(void)
 {
    return BEEGFS_VERSION;
-}
-
-/**
- * Returns highest feature bit number found in array.
- *
- * @param numArrayElems must be larger than zero.
- */
-unsigned __App_featuresGetHighestNum(const unsigned* featuresArray, unsigned numArrayElems)
-{
-   unsigned i;
-
-   unsigned maxBit = 0;
-
-   for(i=0; i < numArrayElems; i++)
-   {
-      if(featuresArray[i] > maxBit)
-         maxBit = featuresArray[i];
-   }
-
-   return maxBit;
-}
-
-/**
- * Walk over featuresArray and add found feature bits to outBitStore.
- *
- * @param outBitStore will be resized and cleared before bits are set.
- */
-void __App_featuresToBitStore(const unsigned* featuresArray, unsigned numArrayElems,
-   BitStore* outBitStore)
-{
-   unsigned i;
-
-   unsigned maxFeatureBit = __App_featuresGetHighestNum(featuresArray, numArrayElems);
-
-   BitStore_setSize(outBitStore, maxFeatureBit);
-   BitStore_clearBits(outBitStore);
-
-   for(i=0; i < numArrayElems; i++)
-      BitStore_setBit(outBitStore, featuresArray[i], true);
 }

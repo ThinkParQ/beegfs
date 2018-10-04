@@ -116,8 +116,6 @@ TimerQueue::TimerQueue(unsigned minPoolSize, unsigned maxPoolSize)
       workerPool[i].reset(new TimerWorker(*this, workList, i, i < minPoolSize));
       inactiveWorkers[i] = workerPool[i].get();
    }
-
-   start();
 }
 
 TimerQueue::~TimerQueue()

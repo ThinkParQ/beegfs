@@ -73,28 +73,22 @@ int ModeRemoveStoragePool::execute()
           return APPCODE_NO_ERROR;
     }
 
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    RemoveStoragePoolRespMsg* respMsgCast;
 
    RemoveStoragePoolMsg msg(id);
 
-   // request/response
-   bool commRes = MessagingTk::requestResponse(*mgmtNode,
-      &msg, NETMSGTYPE_RemoveStoragePoolResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+         NETMSGTYPE_RemoveStoragePoolResp);
 
-   if (!commRes)
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << mgmtNode->getNodeIDWithTypeStr()
          << std::endl;
 
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
-
       return APPCODE_RUNTIME_ERROR;
    }
 
-   respMsgCast = static_cast<RemoveStoragePoolRespMsg*>(respMsg);
+   respMsgCast = static_cast<RemoveStoragePoolRespMsg*>(respMsg.get());
 
    FhgfsOpsErr rmRes = respMsgCast->getResult();
 
@@ -117,9 +111,6 @@ int ModeRemoveStoragePool::execute()
       std::cerr << "Failed to remove storage pool with ID " << id
                 << ". Please see the management daemon log file for more information." << std::endl;
    }
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return APPCODE_NO_ERROR;
 }

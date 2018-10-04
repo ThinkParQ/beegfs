@@ -6,10 +6,8 @@
 #include <common/net/message/helperd/LogRespMsg.h>
 // nodes messages
 #include <common/net/message/nodes/GetNodesRespMsg.h>
-#include <common/net/message/nodes/GetMirrorBuddyGroupsRespMsg.h>
 #include <common/net/message/nodes/GetStatesAndBuddyGroupsRespMsg.h>
 #include <common/net/message/nodes/GetTargetMappingsRespMsg.h>
-#include <common/net/message/nodes/GetTargetStatesRespMsg.h>
 #include <common/net/message/nodes/HeartbeatRequestMsgEx.h>
 #include <common/net/message/nodes/HeartbeatMsgEx.h>
 #include <common/net/message/nodes/MapTargetsMsgEx.h>
@@ -21,11 +19,9 @@
 // storage messages
 #include <common/net/message/storage/creating/MkDirRespMsg.h>
 #include <common/net/message/storage/creating/MkFileRespMsg.h>
-#include <common/net/message/storage/creating/MkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/RmDirRespMsg.h>
 #include <common/net/message/storage/creating/HardlinkRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
-#include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
 #include <common/net/message/storage/listing/ListDirFromOffsetRespMsg.h>
 #include <common/net/message/storage/attribs/ListXAttrRespMsg.h>
 #include <common/net/message/storage/attribs/GetXAttrRespMsg.h>
@@ -168,11 +164,9 @@ NetMessage* NetMessageFactory_createFromMsgType(unsigned short msgType)
       HANDLE(GetHostByNameResp, GetHostByNameRespMsg);
       HANDLE(LogResp, LogRespMsg);
       // nodes messages
-      HANDLE(GetMirrorBuddyGroupsResp, GetMirrorBuddyGroupsRespMsg);
       HANDLE(GetNodesResp, GetNodesRespMsg);
       HANDLE(GetStatesAndBuddyGroupsResp, GetStatesAndBuddyGroupsRespMsg);
       HANDLE(GetTargetMappingsResp, GetTargetMappingsRespMsg);
-      HANDLE(GetTargetStatesResp, GetTargetStatesRespMsg);
       HANDLE(HeartbeatRequest, HeartbeatRequestMsgEx);
       HANDLE(Heartbeat, HeartbeatMsgEx);
       HANDLE(MapTargets, MapTargetsMsgEx);
@@ -190,8 +184,6 @@ NetMessage* NetMessageFactory_createFromMsgType(unsigned short msgType)
       HANDLE(RenameResp, RenameRespMsg);
       HANDLE(HardlinkResp, HardlinkRespMsg);;
       HANDLE(UnlinkFileResp, UnlinkFileRespMsg);
-      HANDLE(MkLocalFileResp, MkLocalFileRespMsg);
-      HANDLE(UnlinkLocalFileResp, UnlinkLocalFileRespMsg);
       HANDLE(ListDirFromOffsetResp, ListDirFromOffsetRespMsg);
       HANDLE(SetAttrResp, SetAttrRespMsg);
       HANDLE(StatResp, StatRespMsg);

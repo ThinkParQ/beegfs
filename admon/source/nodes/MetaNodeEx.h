@@ -6,11 +6,12 @@
  * data structures and methods to handle admon-relevant statistics
  */
 
-#include <common/threading/SafeMutexLock.h>
 #include <common/nodes/Node.h>
 #include <common/net/message/admon/GetNodeInfoRespMsg.h>
 #include <common/toolkit/HighResolutionStats.h>
 #include <common/Common.h>
+
+#include <mutex>
 
 // forward declaration
 class Database;
@@ -70,47 +71,38 @@ class MetaNodeEx: public Node
 
       MetaNodeDataContent getContent()
       {
-         SafeMutexLock mutexLock(&mutex);
-         MetaNodeDataContent res = this->data;
-         mutexLock.unlock();
-         return res;
+         const std::lock_guard<Mutex> lock(mutex);
+         return this->data;
       }
 
       void setContent(MetaNodeDataContent content)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          this->data = content;
-         mutexLock.unlock();
       }
 
       void setHighResStatsList(HighResStatsList stats)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          this->highResStats = stats;
-         mutexLock.unlock();
       }
 
       HighResStatsList getHighResData()
       {
-         SafeMutexLock mutexLock(&mutex);
-         HighResStatsList res = this->highResStats;
-         mutexLock.unlock();
-         return res;
+         const std::lock_guard<Mutex> lock(mutex);
+         return this->highResStats;
       }
 
       void setGeneralInformation(GeneralNodeInfo& info)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          this->generalInfo = info;
-         mutexLock.unlock();
       }
 
       GeneralNodeInfo getGeneralInformation()
       {
-         SafeMutexLock mutexLock(&mutex);
-         GeneralNodeInfo info = this->generalInfo;
-         mutexLock.unlock();
-         return info;
+         const std::lock_guard<Mutex> lock(mutex);
+         return this->generalInfo;
       }
 
 

@@ -6,8 +6,6 @@
 
 bool RecreateFsIDsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("RecreateFsIDsMsg incoming", 4, "Received a RecreateFsIDsMsg from: " + ctx.peerName());
-
    EntryLockStore* entryLockStore = Program::getApp()->getMirroredSessions()->getEntryLockStore();
 
    LogContext log("RecreateFsIDsMsgEx");

@@ -61,8 +61,6 @@ bool RemoveBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
 {
    App* app = Program::getApp();
 
-   LOG_DBG(MIRRORING, DEBUG, "Received RemoveBuddyGroupMsg.", ctx.peerName());
-
    if (type != NODETYPE_Storage)
    {
       ctx.sendResponse(RemoveBuddyGroupRespMsg(FhgfsOpsErr_INTERNAL));
@@ -79,7 +77,15 @@ bool RemoveBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
       return true;
    }
 
-   const int dirFD = openat(Program::getApp()->getTargetFD(targetID, true), ".", O_RDONLY);
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+   {
+      LOG(MIRRORING, ERR, "Could not open directory file descriptor.", groupID);
+      ctx.sendResponse(RemoveBuddyGroupRespMsg(FhgfsOpsErr_INTERNAL));
+      return true;
+   }
+
+   const int dirFD = openat(*target->getMirrorFD(), ".", O_RDONLY);
    if (dirFD < 0)
    {
       LOG(MIRRORING, ERR, "Could not open directory file descriptor.", groupID);

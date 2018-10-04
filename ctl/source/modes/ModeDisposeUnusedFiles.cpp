@@ -151,8 +151,7 @@ FhgfsOpsErr ModeDisposeUnusedFiles::handleItem(Node& owner, const std::string& e
       else if (err == FhgfsOpsErr_INUSE)
          std::cerr << "[" << entryID <<  "] File still in use" << std::endl;
       else if (err != FhgfsOpsErr_SUCCESS)
-         std::cerr << "[" << entryID << "] Node encountered an error: " <<
-            FhgfsOpsErrTk::toErrString(err) << std::endl;
+         std::cerr << "[" << entryID << "] Node encountered an error: " << err << std::endl;
       else
          numUnlinkedTotal += 1;
    }
@@ -173,8 +172,7 @@ void ModeDisposeUnusedFiles::printStats()
 
 void ModeDisposeUnusedFiles::handleError(Node& node, FhgfsOpsErr err)
 {
-   std::cerr << "Metadata server " << node.getNumID() << " encoutered an error: "
-      << FhgfsOpsErrTk::toErrString(err) << "\n";
+   std::cerr << "Metadata server " << node.getNumID() << " encoutered an error: " << err << "\n";
 }
 
 void ModeDisposeUnusedFiles::handleNodes(NodeStoreServers* metaNodes)

@@ -14,19 +14,17 @@ void GetMetaNodesWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
       *mgmtdNode, NODETYPE_Meta, metaNodesList, false, &rootNodeID, &rootIsBuddyMirrored) )
    {
       // sync the downloaded list with the node store
-      metaNodes->syncNodes(metaNodesList, &addedMetaNodes, &removedMetaNodes, true);
+      metaNodes->syncNodes(metaNodesList, &addedMetaNodes, &removedMetaNodes);
 
-      metaNodes->setRootNodeNumID(rootNodeID, false, rootIsBuddyMirrored);
+      Program::getApp()->getMetaRoot().setIfDefault(rootNodeID, rootIsBuddyMirrored);
 
-      if(addedMetaNodes.size())
-         log.log(Log_WARNING, "Nodes added (sync results): "
-            + StringTk::uintToStr(addedMetaNodes.size())
-            + " (Type: " + Node::nodeTypeToStr(NODETYPE_Meta) + ")");
+      if(!addedMetaNodes.empty())
+         log.log(Log_WARNING, "Meta nodes added (sync results): "
+            + StringTk::uintToStr(addedMetaNodes.size()));
 
-      if(removedMetaNodes.size())
-         log.log(Log_WARNING, "Nodes removed (sync results): "
-            + StringTk::uintToStr(removedMetaNodes.size())
-            + " (Type: " + Node::nodeTypeToStr(NODETYPE_Meta) + ")");
+      if(!removedMetaNodes.empty())
+         log.log(Log_WARNING, "Meta nodes removed (sync results): "
+            + StringTk::uintToStr(removedMetaNodes.size()));
 
       // for each node added, get some general information
       for(NumNodeIDListIter iter = addedMetaNodes.begin(); iter != addedMetaNodes.end(); iter++)

@@ -111,8 +111,6 @@ bool QuotaTk::requestQuotaForList(QuotaBlockDeviceMap* blockDevices, UIntList* i
  */
 bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, ZfsSession* session)
 {
-   const char* logContext = "GetQuotaInfo (request quota)";
-
    bool retVal = true;
    int errorCode = 0;
 
@@ -138,9 +136,9 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
                outData->getID(), (caddr_t)&xfsQuotaData);
          else
          {
-            LogContext(logContext).logErr("Error: Quota request - useless quota type. Type: " +
-               QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
-               StringTk::uintToStr(outData->getID() ) );
+            LOG(QUOTA, ERR, "Quota request - useless quota type.",
+                  ("Type", QuotaData::QuotaDataTypeToString(outData->getType())),
+                  ("ID", outData->getID()));
 
             return false;
          }
@@ -158,9 +156,9 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
             errorCode = FhgfsOpsErr_SUCCESS;
          else
          {
-            LogContext(logContext).logErr("Error: Quota request - useless quota type. Type: " +
-               QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
-               StringTk::uintToStr(outData->getID() ) );
+            LOG(QUOTA, ERR, "Quota request - useless quota type.",
+                  ("Type", QuotaData::QuotaDataTypeToString(outData->getType())),
+                  ("ID", outData->getID()));
 
             return false;
          }
@@ -178,9 +176,9 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
                outData->getID(), (caddr_t)&quotaData);
          else
          {
-            LogContext(logContext).logErr("Error: Quota request - useless quota type. Type: " +
-               QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
-               StringTk::uintToStr(outData->getID() ) );
+            LOG(QUOTA, ERR, "Quota request - useless quota type.",
+                  ("Type", QuotaData::QuotaDataTypeToString(outData->getType())),
+                  ("ID", outData->getID()));
 
             return false;
          }
@@ -194,11 +192,11 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
          if( (errorCode != ESRCH) &&
             !((iter->second.getFsType() == QuotaBlockDeviceFsType_XFS) && (errorCode == ENOENT) ) )
          {
-            LogContext(logContext).logErr("Error: Quota request - quotactl failed. Type: " +
-               QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
-               StringTk::uintToStr(outData->getID()) + "; SysErr: " +
-               System::getErrString(errorCode) +"; fstype = " +
-               boost::lexical_cast<std::string>(iter->second.getFsType()));
+            LOG(QUOTA, ERR, "Quota request - quotactl failed.",
+               ("Type", QuotaData::QuotaDataTypeToString(outData->getType())),
+               ("ID", outData->getID()),
+               ("sysErr", System::getErrString(errorCode)),
+               ("fstype", boost::lexical_cast<std::string>(iter->second.getFsType())));
 
             return false;
          }
@@ -226,9 +224,9 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
          {
             // set return value to false, but do not abort the quota request from the other targets,
             // maybe the other targets returns valid values
-            LogContext(logContext).logErr("Error: Quota request - values not valid. Type: " +
-               QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
-               StringTk::uintToStr(outData->getID() ) );
+            LOG(QUOTA, ERR, "Quota request - values not valid.",
+                  ("Type", QuotaData::QuotaDataTypeToString(outData->getType())),
+                  ("ID", outData->getID()));
 
             retVal = false;
          }
@@ -246,9 +244,9 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
          {
             // set return value to false, but do not abort the quota request from the other targets,
             // maybe the other targets returns valid values
-            LogContext(logContext).logErr("Error: Quota request - values not valid. Type: " +
-               QuotaData::QuotaDataTypeToString(outData->getType() ) + "; ID: " +
-               StringTk::uintToStr(outData->getID() ) );
+            LOG(QUOTA, ERR, "Quota request - values not valid.",
+                  ("Type", QuotaData::QuotaDataTypeToString(outData->getType())),
+                  ("ID", outData->getID()));
 
             retVal = false;
          }
@@ -267,16 +265,14 @@ bool QuotaTk::checkQuota(QuotaBlockDeviceMap* blockDevices, QuotaData* outData, 
 void* QuotaTk::initLibZfs(void* dlHandle)
 {
    App* app = Program::getApp();
-   Logger* log = Logger::getLogger();
 
    char* dlErrorString;
-   void* (*libzfs_init)(void);
+   void* (*libzfs_init)();
 
-   libzfs_init = (void* (*)(void))dlsym(dlHandle, "libzfs_init");
+   libzfs_init = (void* (*)())dlsym(dlHandle, "libzfs_init");
    if ( (dlErrorString = dlerror() ) != NULL)
    {
-      log->logErr("initLibZfs", "error during dynamic load of function libzfs_init: " +
-         std::string(dlErrorString) );
+      LOG(QUOTA, ERR, "Error during dynamic load of function libzfs_init.", dlErrorString);
       app->setLibZfsErrorReported(true);
       return NULL;
    }
@@ -284,7 +280,7 @@ void* QuotaTk::initLibZfs(void* dlHandle)
    void* libZfsHandle = (*libzfs_init)();
    if(!libZfsHandle)
    {
-      log->logErr("initLibZfs", "error during create of libzfs_handle_t.");
+      LOG(QUOTA, ERR, "Error during create of libzfs_handle_t.");
       app->setLibZfsErrorReported(true);
       return NULL;
    }
@@ -302,7 +298,6 @@ void* QuotaTk::initLibZfs(void* dlHandle)
 bool QuotaTk::uninitLibZfs(void* dlHandle, void* libZfsHandle)
 {
    App* app = Program::getApp();
-   Logger* log = Logger::getLogger();
 
    if( (!dlHandle) || (!libZfsHandle) )
       return true;
@@ -313,8 +308,7 @@ bool QuotaTk::uninitLibZfs(void* dlHandle, void* libZfsHandle)
    libzfs_fini = (void (*)(void*))dlsym(dlHandle, "libzfs_fini");
    if ( (dlErrorString = dlerror() ) != NULL)
    {
-      log->logErr("uninitLibZfs", "error during dynamic load of function libzfs_fini: " +
-         std::string(dlErrorString) );
+      LOG(QUOTA, ERR, "Error during dynamic load of function libzfs_fini.", dlErrorString);
       app->setLibZfsErrorReported(true);
       return false;
    }
@@ -343,7 +337,7 @@ bool QuotaTk::checkRequiredLibZfsFunctions(QuotaBlockDevice* blockDevice, uint16
    if(!session.initZfsSession(app->getDlOpenHandleLibZfs() ) )
    {
       if(!app->getConfig()->getQuotaDisableZfsSupport() )
-         Logger::getLogger()->logErr("InitLibZFS", "Cannot initialize libzfs. "
+         LOG(QUOTA, ERR, "Cannot initialize libzfs. "
             "The quota system for all zfs blockdevices/pools on this machine won't work.");
 
       return false;
@@ -381,10 +375,6 @@ bool QuotaTk::checkRequiredLibZfsFunctions(QuotaBlockDevice* blockDevice, uint16
 bool QuotaTk::requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t targetNumID,
    QuotaData* outData, ZfsSession* session)
 {
-   std::string logContext("requestQuotaFromZFS");
-
-   Logger* log = Logger::getLogger();
-
    if(!session->isSessionValid() )
    {
       outData->setIsValid(false);
@@ -414,9 +404,10 @@ bool QuotaTk::requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t target
 
    if ((*session->zfs_prop_get_userquota_int)(zfsHandle, sizeProp.c_str(), &usedSizeValue))
    {
-      std::string errorDec( (*session->libzfs_error_description)(session->getlibZfsHandle() ) );
-      std::string errorAct( (*session->libzfs_error_action)(session->getlibZfsHandle() ) );
-      log->logErr(logContext, "error during request quota data. " + errorAct + "; " + errorDec);
+      LOG(QUOTA, ERR, "Error during request quota data.",
+            ("ErrorAction", (*session->libzfs_error_action)(session->getlibZfsHandle())),
+            ("ErrorDescription", (*session->libzfs_error_description)(session->getlibZfsHandle()))
+         );
       return false;
    }
 
@@ -426,11 +417,9 @@ bool QuotaTk::requestQuotaFromZFS(QuotaBlockDevice* blockDevice, uint16_t target
        {
            // could not read inode quota (which is only supported since zfs 0.7.4)
            // log the error and set 0 as inode quota
-           log->logErr(logContext,
-                   "Inode quota could not be requested. Please note that inode quota on"
-                         " ZFS is not supported for zfs versions prior to 0.7.4. ZFS Error: "
-                         + std::string((*session->libzfs_error_description)
-                         (session->getlibZfsHandle())));
+          LOG(QUOTA, ERR, "Inode quota could not be requested. Please note that inode quota on"
+                " ZFS is not supported for zfs versions prior to 0.7.4.",
+                ("ZFS Error", (*session->libzfs_error_description)(session->getlibZfsHandle())));
            return false;
        }
     }

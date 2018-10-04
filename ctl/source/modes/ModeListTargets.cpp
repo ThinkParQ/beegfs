@@ -13,6 +13,8 @@
 
 #include <algorithm>
 
+#include <boost/lexical_cast.hpp>
+
 
 #define MODELISTTARGETS_ARG_PRINTNODESFIRST     "--nodesfirst"
 #define MODELISTTARGETS_ARG_PRINTLONGNODES      "--longnodes"
@@ -297,23 +299,20 @@ bool ModeListTargets::getPoolsComm(NodeStoreServers* nodes, NumNodeID nodeID,
 
    bool retVal = false;
 
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetNodeCapacityPoolsRespMsg* respMsgCast;
 
    GetNodeCapacityPoolsMsg msg(poolQueryType);
 
-  // request/response
-   const bool commRes = MessagingTk::requestResponse(
-      *node, &msg, NETMSGTYPE_GetNodeCapacityPoolsResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg,
+         NETMSGTYPE_GetNodeCapacityPoolsResp);
+   if (!respMsg)
    {
       std::cerr << "Pools download failed: " << nodeID << std::endl;
       goto err_cleanup;
    }
 
    {
-      respMsgCast = (GetNodeCapacityPoolsRespMsg*) respMsg;
+      respMsgCast = (GetNodeCapacityPoolsRespMsg*) respMsg.get();
 
       // for storage nodes we might receive multiple capacity pool map elements (sorted by storage
       // pool here). However, we're totally not interested in the "storage pools" right here, so we
@@ -334,9 +333,6 @@ bool ModeListTargets::getPoolsComm(NodeStoreServers* nodes, NumNodeID nodeID,
       retVal = true;
    }
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -494,18 +490,17 @@ int ModeListTargets::print()
    if(cfgNodeType == NODETYPE_Meta)
    {
       NodeStoreServers* metaServers = app->getMetaNodes();
-      auto node = metaServers->referenceFirstNode();
-      if (!node)
+      const auto nodes = metaServers->referenceAllNodes();
+      if (nodes.empty())
       {
          fprintf(stderr, " [ERROR: No metadata servers found]\n");
          retVal = (retVal == APPCODE_NO_ERROR) ? APPCODE_RUNTIME_ERROR : retVal;
       }
 
-      while(node)
+      for (const auto& node : nodes)
       {
          int err = printTarget(node->getNumID().val(), false, *node, 0, 0);
          retVal = (retVal == APPCODE_NO_ERROR) ? err : retVal;
-         node = metaServers->referenceNextNode(node);
       }
    }
 
@@ -877,7 +872,7 @@ int ModeListTargets::addSpaceToLine(char* inOutString, int* inOutOffset, uint16_
    {
       // don't log to stderr directly, because that would distort console output if server down
       fprintf(stderr, " [ERROR from %s: %s]\n", node.getNodeIDWithTypeStr().c_str(),
-         FhgfsOpsErrTk::toErrString(statRes) );
+         boost::lexical_cast<std::string>(statRes).c_str());
    }
 
    // make values human readable

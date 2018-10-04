@@ -21,29 +21,19 @@ void DataRequestorIOStats::run()
 
 void DataRequestorIOStats::requestLoop()
 {
-   NodeHandle node;
-
    // do loop until terminate is set
    while (!getSelfTerminate())
    {
       // create work packets for the meta nodes; for each metadata node a RequestMetaDataWork is
       // put into the work queue, where it will be fetched by a worker
-      node = metaNodes->referenceFirstNode();
-      while (node)
-      {
+      for (const auto& node : metaNodes->referenceAllNodes())
          this->workQueue->addIndirectWork(
                new RequestMetaDataWork(std::static_pointer_cast<MetaNodeEx>(node)));
-         node = metaNodes->referenceNextNode(node);
-      }
 
       // same for storage nodes
-      node = storageNodes->referenceFirstNode();
-      while (node)
-      {
+      for (const auto& node : storageNodes->referenceAllNodes())
          this->workQueue->addIndirectWork(
             new RequestStorageDataWork(std::static_pointer_cast<StorageNodeEx>(node)));
-         node = storageNodes->referenceNextNode(node);
-      }
 
       // if stats for clients, etc. should be gathered, this would be the right place for it
 

@@ -7,8 +7,7 @@
 
 AdjustChunkPermissionsWork::AdjustChunkPermissionsWork(Node& node, SynchronizedCounter* counter,
    AtomicUInt64* fileCount, AtomicUInt64* errorCount)
-    : Work(),
-      log("AdjustChunkPermissionsWork"),
+    : log("AdjustChunkPermissionsWork"),
       node(node),
       counter(counter),
       fileCount(fileCount),
@@ -57,25 +56,20 @@ void AdjustChunkPermissionsWork::doWork(bool isBuddyMirrored)
 
          int64_t hashDirOffset = 0;
          int64_t contDirOffset = 0;
-         std::string currentContDirID = "";
+         std::string currentContDirID;
          unsigned resultCount = 0;
 
          do
          {
-            bool commRes;
-            char *respBuf = NULL;
-            NetMessage *respMsg = NULL;
-
             AdjustChunkPermissionsMsg adjustChunkPermissionsMsg(hashDirNum, currentContDirID,
                ADJUST_AT_ONCE, hashDirOffset, contDirOffset, isBuddyMirrored);
 
-            commRes = MessagingTk::requestResponse(node, &adjustChunkPermissionsMsg,
-               NETMSGTYPE_AdjustChunkPermissionsResp, &respBuf, &respMsg);
+            const auto respMsg = MessagingTk::requestResponse(node, adjustChunkPermissionsMsg,
+               NETMSGTYPE_AdjustChunkPermissionsResp);
 
-            if ( commRes )
+            if (respMsg)
             {
-               AdjustChunkPermissionsRespMsg* adjustChunkPermissionsRespMsg =
-                  (AdjustChunkPermissionsRespMsg*) respMsg;
+               auto* adjustChunkPermissionsRespMsg = (AdjustChunkPermissionsRespMsg*) respMsg.get();
 
                // set new parameters
                currentContDirID = adjustChunkPermissionsRespMsg->getCurrentContDirID();
@@ -87,14 +81,9 @@ void AdjustChunkPermissionsWork::doWork(bool isBuddyMirrored)
 
                if (adjustChunkPermissionsRespMsg->getErrorCount() > 0)
                   this->errorCount->increase(adjustChunkPermissionsRespMsg->getErrorCount());
-
-               SAFE_DELETE(respMsg);
-               SAFE_FREE(respBuf);
             }
             else
             {
-               SAFE_DELETE(respMsg);
-               SAFE_FREE(respBuf);
                throw FsckException("Communication error occured with node " + node.getID());
             }
 

@@ -2,15 +2,15 @@
 #include <program/Program.h>
 #include "GetNodesMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("GetNodes incoming");
 
-   LOG_DEBUG_CONTEXT(log, 4, "Received a GetNodesMsg from: " + ctx.peerName() );
-
    NodeType nodeType = (NodeType)getValue();
 
-   LOG_DEBUG_CONTEXT(log, 5, std::string("NodeType: ") + Node::nodeTypeToStr(nodeType) );
+   LOG_DEBUG_CONTEXT(log, 5, "NodeType: " + boost::lexical_cast<std::string>(nodeType));
 
    App* app = Program::getApp();
 
@@ -18,8 +18,8 @@ bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
    if(unlikely(!nodes) )
    {
       LOG(GENERAL, ERR, "Invalid node type.",
-            as("Node Type", Node::nodeTypeToStr(getNodeType())),
-            as("Sender", ctx.peerName())
+            ("Node Type", getNodeType()),
+            ("Sender", ctx.peerName())
          );
 
       return true;
@@ -27,8 +27,8 @@ bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
 
    auto nodeList = nodes->referenceAllNodes();
 
-   NumNodeID rootID = nodes->getRootNodeNumID();
-   bool rootIsBuddyMirrored = nodes->getRootIsBuddyMirrored();
+   NumNodeID rootID = app->getMetaRoot().getID();
+   bool rootIsBuddyMirrored = app->getMetaRoot().getIsMirrored();
 
    ctx.sendResponse(GetNodesRespMsg(rootID, rootIsBuddyMirrored, nodeList) );
 

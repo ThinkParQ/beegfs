@@ -13,6 +13,7 @@
 #include <common/Common.h>
 #include "ComponentInitException.h"
 
+#include <mutex>
 
 #define DGRAMMGR_RECVBUF_SIZE    65536
 #define DGRAMMGR_SENDBUF_SIZE    DGRAMMGR_RECVBUF_SIZE
@@ -32,11 +33,11 @@ class AbstractDatagramListener : public PThread
    public:
       virtual ~AbstractDatagramListener();
 
-      void sendToNodesUDP(AbstractNodeStore* nodes, NetMessage* msg, int numRetries,
+      void sendToNodesUDP(const AbstractNodeStore* nodes, NetMessage* msg, int numRetries,
          int timeoutMS=0);
       void sendToNodesUDP(const std::vector<NodeHandle>& nodes, NetMessage* msg, int numRetries,
          int timeoutMS=0);
-      bool sendToNodesUDPwithAck(AbstractNodeStore* nodes, AcknowledgeableMsg* msg,
+      bool sendToNodesUDPwithAck(const AbstractNodeStore* nodes, AcknowledgeableMsg* msg,
          int ackWaitSleepMS = 1000, int numRetries=2);
       bool sendToNodesUDPwithAck(const std::vector<NodeHandle>& nodes, AcknowledgeableMsg* msg,
          int ackWaitSleepMS = 1000, int numRetries=2);
@@ -89,41 +90,17 @@ class AbstractDatagramListener : public PThread
       ssize_t sendto(const void* buf, size_t len, int flags,
          const struct sockaddr* to, socklen_t tolen)
       {
-         SafeMutexLock mutexLock(&sendMutex); // L O C K
+         const std::lock_guard<Mutex> lock(sendMutex);
 
-         try
-         {
-            ssize_t sendRes = udpSock->sendto(buf, len, flags, to, tolen);
-
-            mutexLock.unlock(); // U N L O C K
-
-            return sendRes;
-         }
-         catch(...)
-         {
-            mutexLock.unlock(); // U N L O C K
-            throw;
-         }
+         return udpSock->sendto(buf, len, flags, to, tolen);
       }
 
       ssize_t sendto(const void *buf, size_t len, int flags,
          struct in_addr ipAddr, unsigned short port)
       {
-         SafeMutexLock mutexLock(&sendMutex); // L O C K
+         const std::lock_guard<Mutex> lock(sendMutex);
 
-         try
-         {
-            ssize_t sendRes = udpSock->sendto(buf, len, flags, ipAddr, port);
-
-            mutexLock.unlock(); // U N L O C K
-
-            return sendRes;
-         }
-         catch(...)
-         {
-            mutexLock.unlock(); // U N L O C K
-            throw;
-         }
+         return udpSock->sendto(buf, len, flags, ipAddr, port);
       }
 
       // getters & setters

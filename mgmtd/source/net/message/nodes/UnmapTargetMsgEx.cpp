@@ -8,10 +8,6 @@
 
 bool UnmapTargetMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("UnmapTargetMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a UnmapTargetMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
 
    if (app->isShuttingDown())

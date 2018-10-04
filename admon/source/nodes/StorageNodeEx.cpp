@@ -1,13 +1,14 @@
 #include "StorageNodeEx.h"
 #include <program/Program.h>
 
+#include <mutex>
 
 #define STORAGENODEDATA_LOGFILEPATH "/var/log/beegfs-storage.log"
 
 
 StorageNodeEx::StorageNodeEx(std::string nodeID, NumNodeID nodeNumID,
    unsigned short portUDP, unsigned short portTCP, NicAddressList& nicList)
-   : Node(nodeID, nodeNumID, portUDP, portTCP, nicList)
+   : Node(NODETYPE_Storage, nodeID, nodeNumID, portUDP, portTCP, nicList)
 {
    initialize();
 }
@@ -54,23 +55,23 @@ void StorageNodeEx::initialize()
 
 void StorageNodeEx::setNotResponding()
 {
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   this->data.isResponding = false;
-   this->data.diskSpaceFree = 0;
-   this->data.diskSpaceTotal = 0;
-   this->data.directWorkListSize = 0;
-   this->data.indirectWorkListSize = 0;
-   this->data.sessionCount = 0;
-
-   mutexLock.unlock();
+      this->data.isResponding = false;
+      this->data.diskSpaceFree = 0;
+      this->data.diskSpaceTotal = 0;
+      this->data.directWorkListSize = 0;
+      this->data.indirectWorkListSize = 0;
+      this->data.sessionCount = 0;
+   }
 
    Program::getApp()->getMailer()->addDownNode(getNumID(), getID(), NODETYPE_Storage);
 }
 
 void StorageNodeEx::initializeDBData()
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    // add the node to the list of storage nodes (only happens if not already
    // in there)
@@ -108,8 +109,6 @@ void StorageNodeEx::initializeDBData()
       long offset = 86400 - (now - firstHourly);
       dailyData.nextUpdate = now + offset;
    }
-
-   mutexLock.unlock();
 }
 
 void StorageNodeEx::average(std::list<StorageNodeDataContent> *originalData,
@@ -120,7 +119,7 @@ void StorageNodeEx::average(std::list<StorageNodeDataContent> *originalData,
 
    StorageNodeDataContent content;
    content.time = t.getTimeval()->tv_sec; // seconds since the epoch
-   content.isResponding = 1; //fixed!
+   content.isResponding = true; //fixed!
 
    unsigned aggregatedIndirectWorkListSize = 0;
    unsigned aggregatedDirectWorkListSize = 0;
@@ -178,7 +177,7 @@ void StorageNodeEx::average(std::list<StorageNodeDataContent> *originalData,
 
 void StorageNodeEx::update(StorageNodeEx *newNode)
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    // if old data is too big delete the oldest entry
    if (oldData.data.size() >= maxSizeOldData) //
@@ -241,8 +240,6 @@ void StorageNodeEx::update(StorageNodeEx *newNode)
       this->db->insertStorageNodeData(this->getID(), this-> getNumID(), TABTYPE_Daily,
          this->dailyData.data.front());
    }
-
-   mutexLock.unlock();
 }
 
 void StorageNodeEx::addHighResStatsList(HighResStatsList stats)
@@ -371,7 +368,7 @@ void StorageNodeEx::addHighResStatsList(HighResStatsList stats)
    this->data.diskRead = (uint64_t) readPerSecSum;
    this->data.diskWrite = (uint64_t) writePerSecSum;
    // calculate a average of disk Performance for this measurement
-   if (stats.size() != 0)
+   if (!stats.empty())
    {
       this->data.diskReadPerSec = (int64_t) readPerSecSum / stats.size();
       this->data.diskWritePerSec = (int64_t) writePerSecSum / stats.size();

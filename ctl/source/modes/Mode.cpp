@@ -40,14 +40,15 @@ void Mode::initializeCommonObjects()
 
    const std::string mgmtHost = app->getConfig()->getSysMgmtdHost();
    const unsigned short mgmtPortUDP = app->getConfig()->getConnMgmtdPortUDP();
-   const int mgmtTimeoutMS = 2500;
+   const unsigned mgmtTimeoutMS = 2500;
+   const unsigned mgmtNameResolutionRetries = 3;
 
    if (mgmtHost.empty())
       throw ComponentInitException("Management node not configured");
 
    // check mgmt node
    if(!NodesTk::waitForMgmtHeartbeat(NULL, dgramLis, mgmtNodes, mgmtHost, mgmtPortUDP,
-      mgmtTimeoutMS))
+            mgmtTimeoutMS, mgmtNameResolutionRetries))
    {
       throw ComponentInitException("Management node communication failed: " + mgmtHost);
    }
@@ -65,7 +66,7 @@ void Mode::initializeCommonObjects()
 
       NodesTk::applyLocalNicCapsToList(app->getLocalNode(), metaNodesList);
       NodesTk::moveNodesFromListToStore(metaNodesList, metaNodes);
-      metaNodes->setRootNodeNumID(rootNodeID, false, rootIsBuddyMirrored);
+      app->getMetaRoot().setIfDefault(rootNodeID, rootIsBuddyMirrored);
    }
 
    { // download storage nodes
@@ -89,49 +90,35 @@ void Mode::initializeCommonObjects()
    }
 
    { // download target mappings
-      UInt16List targetIDs;
-      NumNodeIDList nodeIDs;
-
-      if (!NodesTk::downloadTargetMappings(*mgmtNode, &targetIDs, &nodeIDs, false))
+      auto mappings = NodesTk::downloadTargetMappings(*mgmtNode, false);
+      if (!mappings.first)
          throw ComponentInitException("Target mappings download failed");
 
-      targetMapper->syncTargetsFromLists(targetIDs, nodeIDs);
+      targetMapper->syncTargets(std::move(mappings.second));
    }
 
    { // download storage buddy groups and target states
-      UInt16List buddyGroupIDs;
-      UInt16List primaryTargetIDs;
-      UInt16List secondaryTargetIDs;
-      UInt16List targetIDs;
-      UInt8List reachabilityStates;
-      UInt8List consistencyStates;
+      MirrorBuddyGroupMap buddyGroups;
+      TargetStateMap states;
 
-      if (!NodesTk::downloadStatesAndBuddyGroups(*mgmtNode, NODETYPE_Storage, &buddyGroupIDs,
-            &primaryTargetIDs, &secondaryTargetIDs, &targetIDs, &reachabilityStates,
-            &consistencyStates, false))
+      if (!NodesTk::downloadStatesAndBuddyGroups(*mgmtNode, NODETYPE_Storage, buddyGroups,
+            states, false))
          throw ComponentInitException("Storage buddy groups and target states download failed");
 
-      storageTargetStateStore->syncStatesAndGroupsFromLists(storageBuddyGroupMapper, targetIDs,
-         reachabilityStates, consistencyStates, buddyGroupIDs, primaryTargetIDs,
-         secondaryTargetIDs, app->getLocalNode().getNumID());
+      storageTargetStateStore->syncStatesAndGroups(storageBuddyGroupMapper,
+         states, std::move(buddyGroups), app->getLocalNode().getNumID());
    }
 
    { // download meta buddy groups and target states
-      UInt16List buddyGroupIDs;
-      UInt16List primaryTargetIDs;
-      UInt16List secondaryTargetIDs;
-      UInt16List targetIDs;
-      UInt8List reachabilityStates;
-      UInt8List consistencyStates;
+      MirrorBuddyGroupMap buddyGroups;
+      TargetStateMap states;
 
-      if(!NodesTk::downloadStatesAndBuddyGroups(*mgmtNode, NODETYPE_Meta, &buddyGroupIDs,
-            &primaryTargetIDs, &secondaryTargetIDs, &targetIDs, &reachabilityStates,
-            &consistencyStates, false))
+      if(!NodesTk::downloadStatesAndBuddyGroups(*mgmtNode, NODETYPE_Meta, buddyGroups,
+               states, false))
          throw ComponentInitException("Meta buddy groups and target states download failed");
 
-      metaTargetStateStore->syncStatesAndGroupsFromLists(metaMirrorBuddyGroupMapper, targetIDs,
-         reachabilityStates, consistencyStates, buddyGroupIDs, primaryTargetIDs,
-         secondaryTargetIDs, app->getLocalNode().getNumID());
+      metaTargetStateStore->syncStatesAndGroups(metaMirrorBuddyGroupMapper,
+         states, std::move(buddyGroups), app->getLocalNode().getNumID());
    }
 
    { // download storage pools

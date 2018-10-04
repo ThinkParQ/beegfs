@@ -14,6 +14,8 @@
 
 #include <ftw.h>
 
+#include <boost/lexical_cast.hpp>
+
 template<unsigned Actions>
 UserPrompter::UserPrompter(const FsckRepairAction (&possibleActions)[Actions],
    FsckRepairAction defaultRepairAction)
@@ -90,11 +92,6 @@ static FhgfsOpsErr handleDisposalItem(Node& owner, const std::string& entryID,
       return FhgfsOpsErr_SUCCESS;
    else
       return err;
-}
-
-static void handleDisposalError(Node& node, FhgfsOpsErr err, uint64_t& errors)
-{
-   errors += 1;
 }
 
 
@@ -445,7 +442,7 @@ void ModeCheckFS::disposeUnusedFiles()
    DisposalCleaner dc(*Program::getApp()->getMetaMirrorBuddyGroupMapper());
    dc.run(*Program::getApp()->getMetaNodes(),
          handleDisposalItem,
-         std::bind(handleDisposalError, _1, _2, std::ref(errors)));
+         [&] (const auto&, const auto&) { errors += 1; });
 
    if (errors > 0)
       FsckTkEx::fsckOutput("Some files could not be deleted.");
@@ -998,7 +995,7 @@ void ModeCheckFS::checkAndRepair()
 
       auto setRes = MsgHelperRepair::setNodeState(secondary, TargetConsistencyState_NEEDS_RESYNC);
       if (setRes != FhgfsOpsErr_SUCCESS)
-         FsckTkEx::fsckOutput(std::string("Failed: ") + FhgfsOpsErrTk::toErrString(setRes),
+         FsckTkEx::fsckOutput("Failed: " + boost::lexical_cast<std::string>(setRes),
                OutputOptions_LINEBREAK);
    }
 

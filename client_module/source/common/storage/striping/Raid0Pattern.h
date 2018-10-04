@@ -15,7 +15,6 @@ static inline Raid0Pattern* Raid0Pattern_construct(
    unsigned chunkSize, UInt16Vec* stripeTargetIDs, unsigned defaultNumTargets);
 static inline Raid0Pattern* Raid0Pattern_constructFromChunkSize(unsigned chunkSize);
 static inline void Raid0Pattern_uninit(StripePattern* this);
-static inline void Raid0Pattern_destruct(StripePattern* this);
 
 static inline void __Raid0Pattern_assignVirtualFunctions(Raid0Pattern* this);
 
@@ -108,15 +107,6 @@ void Raid0Pattern_uninit(StripePattern* this)
    Raid0Pattern* thisCast = (Raid0Pattern*)this;
 
    UInt16Vec_uninit(&thisCast->stripeTargetIDs);
-
-   StripePattern_uninit( (StripePattern*)this);
-}
-
-void Raid0Pattern_destruct(StripePattern* this)
-{
-   Raid0Pattern_uninit( (StripePattern*)this);
-
-   kfree(this);
 }
 
 void __Raid0Pattern_assignVirtualFunctions(Raid0Pattern* this)

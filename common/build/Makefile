@@ -1,15 +1,21 @@
-include $(or $(root-dir),../..)/build/Makefile
+include ../../build/Makefile
 
 
 $(call build-static-library,\
    beegfs-common,\
    $(shell find ../source -iname '*.cpp'),\
-   opentk,\
+   dl,\
    ../source)
+
+$(call build-shared-library,\
+   beegfs_ib,\
+   $(shell find ../ib_lib -iname '*.cpp'),\
+   rdma,\
+   ../source ../ib_lib)
 
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   common opentk,\
+   common,\
    ../tests)

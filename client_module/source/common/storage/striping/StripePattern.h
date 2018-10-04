@@ -22,8 +22,8 @@
 
 // pattern serialization defs
 #define STRIPEPATTERN_HEADER_LENGTH \
-   (sizeof(unsigned) + sizeof(unsigned) + sizeof(unsigned) + sizeof(StoragePoolId))
-/* length + type + chunkSize + storagePoolId*/
+   (sizeof(unsigned) + sizeof(unsigned) + sizeof(unsigned))
+/* length + type + chunkSize*/
 
 
 struct StripePatternHeader
@@ -45,24 +45,17 @@ typedef struct StripePattern StripePattern;
 
 static inline void StripePattern_initFromPatternType(StripePattern* this,
    unsigned patternType, unsigned chunkSize);
-static inline StripePattern* StripePattern_constructFromPatternType(
-   unsigned patternType, unsigned chunkSize);
-static inline void StripePattern_uninit(StripePattern* this);
-static inline void StripePattern_destruct(StripePattern* this);
 
 extern void StripePattern_virtualDestruct(struct StripePattern* this);
 
-extern bool __StripePattern_deserializeHeader(DeserializeCtx ctx,
+extern bool StripePattern_deserializePatternPreprocess(DeserializeCtx* ctx,
+   const char** outPatternStart, uint32_t* outPatternLength);
+extern bool __StripePattern_deserializeHeader(DeserializeCtx* ctx,
    struct StripePatternHeader* outPatternHeader);
 
-extern const char* StripePattern_getPatternTypeStr(StripePattern* this);
-
-
 // static functions
-static inline bool StripePattern_deserializePatternPreprocess(DeserializeCtx* ctx,
-   struct StripePatternHeader* outHeader, const char** outPatternStart);
 extern StripePattern* StripePattern_createFromBuf(const char* patternStart,
-   struct StripePatternHeader* patternHeader);
+   uint32_t patternLength);
 
 // virtual functions
 extern UInt16Vec* StripePattern_getMirrorTargetIDs(StripePattern* this);
@@ -73,7 +66,6 @@ static inline unsigned StripePattern_getChunkSize(StripePattern* this);
 static inline int64_t StripePattern_getChunkStart(StripePattern* this, int64_t pos);
 static inline int64_t StripePattern_getNextChunkStart(StripePattern* this, int64_t pos);
 static inline int64_t StripePattern_getChunkEnd(StripePattern* this, int64_t pos);
-static inline void _StripePattern_setPatternType(StripePattern* this, unsigned patternType);
 
 
 struct StripePattern
@@ -109,41 +101,6 @@ void StripePattern_initFromPatternType(StripePattern* this, unsigned patternType
 
    // pre-defined virtual methods
    this->getMirrorTargetIDs = StripePattern_getMirrorTargetIDs;
-}
-
-StripePattern* StripePattern_constructFromPatternType(unsigned patternType, unsigned chunkSize)
-{
-   struct StripePattern* this = os_kmalloc(sizeof(*this) );
-
-   StripePattern_initFromPatternType(this, patternType, chunkSize);
-
-   return this;
-}
-
-void StripePattern_uninit(StripePattern* this)
-{
-   // nothing to be done here
-}
-
-void StripePattern_destruct(StripePattern* this)
-{
-   StripePattern_uninit(this);
-
-   kfree(this);
-}
-
-bool StripePattern_deserializePatternPreprocess(DeserializeCtx* ctx,
-   struct StripePatternHeader* outHeader, const char** outPatternStart)
-{
-   if(!__StripePattern_deserializeHeader(*ctx, outHeader) )
-      return false;
-
-   *outPatternStart = ctx->data;
-
-   ctx->data += outHeader->patternLength;
-   ctx->length -= outHeader->patternLength;
-
-   return true;
 }
 
 
@@ -185,12 +142,5 @@ int64_t StripePattern_getChunkEnd(StripePattern* this, int64_t pos)
 {
    return StripePattern_getNextChunkStart(this, pos) - 1;
 }
-
-void _StripePattern_setPatternType(StripePattern* this, unsigned patternType)
-{
-   this->patternType = patternType;
-}
-
-
 
 #endif /*STRIPEPATTERN_H_*/

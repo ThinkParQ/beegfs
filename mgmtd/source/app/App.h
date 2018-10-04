@@ -7,10 +7,9 @@
 #include <common/components/worker/Worker.h>
 #include <common/components/StatsCollector.h>
 #include <common/components/StreamListener.h>
-#include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/NodeCapacityPools.h>
+#include <common/nodes/RootInfo.h>
 #include <common/nodes/TargetCapacityPools.h>
-#include <common/nodes/TargetMapper.h>
 #include <common/toolkit/AcknowledgmentStore.h>
 #include <common/toolkit/NetFilter.h>
 #include <common/threading/Atomics.h>
@@ -23,18 +22,15 @@
 #include <nodes/NodeStoreClientsEx.h>
 #include <nodes/NodeStoreServersEx.h>
 #include <nodes/NumericIDMapper.h>
+#include <nodes/MirrorBuddyGroupMapperEx.h>
 #include <nodes/MgmtdTargetStateStore.h>
 #include <nodes/StoragePoolStoreEx.h>
+#include <nodes/TargetMapperEx.h>
 #include "config/Config.h"
 
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
 #endif
-
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
-#endif
-
 
 // program return codes
 #define APPCODE_NO_ERROR               0
@@ -63,10 +59,10 @@ class App : public AbstractApp
       App(int argc, char** argv);
       virtual ~App();
 
-      virtual void run();
+      virtual void run() override;
 
       void shutDown(bool clean);
-      void handleComponentException(std::exception& e);
+      virtual void handleComponentException(std::exception& e) override;
 
    private:
       int appResult;
@@ -76,8 +72,8 @@ class App : public AbstractApp
       Config*  cfg;
       LogContext* log;
 
-      int pidFileLockFD; // -1 if unlocked, >=0 otherwise
-      int workingDirLockFD; // -1 if unlocked, >=0 otherwise
+      LockFD pidFileLockFD;
+      LockFD workingDirLockFD;
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
@@ -93,12 +89,14 @@ class App : public AbstractApp
       NodeStoreServersEx* storageNodes;
       NodeStoreClientsEx* clientNodes;
 
+      RootInfo metaRoot;
+
       NodeCapacityPools* metaCapacityPools;
       NodeCapacityPools* metaBuddyCapacityPools;
-      TargetMapper* targetMapper; // maps targetNumIDs to nodes
+      TargetMapperEx* targetMapper; // maps targetNumIDs to nodes
       NumericIDMapper* targetNumIDMapper; // maps targetStringIDs to targetNumIDs
-      MirrorBuddyGroupMapper* storageBuddyGroupMapper; // maps storage targets to MBGs
-      MirrorBuddyGroupMapper* metaBuddyGroupMapper; // maps metadata nodes to MBGs
+      MirrorBuddyGroupMapperEx* storageBuddyGroupMapper; // maps storage targets to MBGs
+      MirrorBuddyGroupMapperEx* metaBuddyGroupMapper; // maps metadata nodes to MBGs
       MgmtdTargetStateStore* targetStateStore; // map storage targets to a state
       MgmtdTargetStateStore* metaStateStore; // map mds targets (i.e. nodeIDs) to a state
       std::unique_ptr<StoragePoolStoreEx> storagePoolStore; // stores (category) storage pools
@@ -120,7 +118,7 @@ class App : public AbstractApp
 
       void runNormal();
 
-      void stopComponents();
+      virtual void stopComponents() override;
 
       void workersInit();
       void workersStart();
@@ -131,8 +129,6 @@ class App : public AbstractApp
       void initDataObjects(int argc, char** argv);
       void initLocalNodeInfo();
       bool preinitStorage();
-      template<typename StoreT> void loadStoreFromFile(int format, LogContext& log, StoreT& store,
-            char storeFlag, const std::string& path, const std::string& description);
       void initStorage(const bool firstRun);
       void readTargetStates(const bool firstRun, StringMap& formatProperties,
             MgmtdTargetStateStore* stateStore);
@@ -203,22 +199,22 @@ class App : public AbstractApp
 
       // getters & setters
 
-      virtual ICommonConfig* getCommonConfig()
+      virtual const ICommonConfig* getCommonConfig() const override
       {
          return cfg;
       }
 
-      virtual NetFilter* getNetFilter()
+      virtual const NetFilter* getNetFilter() const override
       {
          return netFilter;
       }
 
-      virtual NetFilter* getTcpOnlyFilter()
+      virtual const NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter;
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory()
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory;
       }
@@ -268,17 +264,17 @@ class App : public AbstractApp
          return metaCapacityPools;
       }
 
-      TargetMapper* getTargetMapper() const
+      TargetMapperEx* getTargetMapper() const
       {
          return targetMapper;
       }
 
-      MirrorBuddyGroupMapper* getStorageBuddyGroupMapper() const
+      MirrorBuddyGroupMapperEx* getStorageBuddyGroupMapper() const
       {
          return storageBuddyGroupMapper;
       }
 
-      MirrorBuddyGroupMapper* getMetaBuddyGroupMapper() const
+      MirrorBuddyGroupMapperEx* getMetaBuddyGroupMapper() const
       {
          return metaBuddyGroupMapper;
       }
@@ -362,6 +358,9 @@ class App : public AbstractApp
       {
          return shuttingDown.read() != App_RUNNING;
       }
+
+      const RootInfo& getMetaRoot() const { return metaRoot; }
+      RootInfo& getMetaRoot() { return metaRoot; }
 };
 
 

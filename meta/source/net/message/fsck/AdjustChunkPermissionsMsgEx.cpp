@@ -9,7 +9,6 @@
 bool AdjustChunkPermissionsMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Incoming AdjustChunkPermissionsMsg");
-   LOG_DEBUG_CONTEXT(log, 4, "Received a AdjustChunkPermissionsMsg from: " + ctx.peerName() );
 
    MetaStore *metaStore = Program::getApp()->getMetaStore();
 

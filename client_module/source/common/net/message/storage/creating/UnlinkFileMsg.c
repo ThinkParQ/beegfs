@@ -14,11 +14,11 @@ void UnlinkFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    UnlinkFileMsg* thisCast = (UnlinkFileMsg*)this;
 
    // parentInf
-   EntryInfo_serialize(thisCast->parentInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->parentInfoPtr);
 
    // delFileName
    Serialization_serializeStrAlign4(ctx, thisCast->delFileNameLen, thisCast->delFileName);
 
    if (this->msgHeader.msgFeatureFlags & UNLINKFILEMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

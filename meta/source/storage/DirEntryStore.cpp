@@ -1,5 +1,3 @@
-#include <common/threading/SafeMutexLock.h>
-#include <net/msghelpers/MsgHelperChunkBacklinks.h>
 #include <program/Program.h>
 #include <toolkit/StorageTkEx.h>
 #include "DirEntryStore.h"
@@ -425,57 +423,6 @@ FhgfsOpsErr DirEntryStore::renameEntry(const std::string& fromEntryName,
       }
 
    return retVal;
-}
-
-
-/**
- * Warning: Returns all names without any limit => can be a very high number => don't use this!
- */
-void DirEntryStore::list(StringVector* outNames)
-{
-   const char* logContext = "DirEntryStore::list";
-
-   errno = 0; // recommended by posix (readdir(3p) )
-
-   SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
-
-   DIR* dirHandle = opendir(getDirEntryPathUnlocked().c_str() );
-   if(!dirHandle)
-   {
-      LogContext(logContext).logErr(std::string("Unable to open dentry directory: ") +
-         getDirEntryPathUnlocked() + ". SysErr: " + System::getErrString() );
-      goto err_unlock;
-   }
-
-   struct dirent* dirEntry;
-
-   while( (dirEntry = StorageTk::readdirFiltered(dirHandle) ) )
-   {
-      outNames->push_back(dirEntry->d_name);
-   }
-
-   if(errno)
-   {
-      LogContext(logContext).logErr(std::string("Unable to fetch dentry directory entry from: ") +
-         getDirEntryPathUnlocked() + ". SysErr: " + System::getErrString() );
-   }
-
-   closedir(dirHandle);
-
-err_unlock:
-   safeLock.unlock(); // U N L O C K
-}
-
-/**
- * Note: See listIncrementalEx for comments; this is just a wrapper for it that doesn't retrieve
- * the direntry types.
- */
-FhgfsOpsErr DirEntryStore::listIncremental(int64_t serverOffset,
-   unsigned maxOutNames, StringList* outNames, int64_t* outNewServerOffset)
-{
-   ListIncExOutArgs outArgs(outNames, NULL, NULL, NULL, outNewServerOffset);
-
-   return listIncrementalEx(serverOffset, maxOutNames, true, outArgs);
 }
 
 /**

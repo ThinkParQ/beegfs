@@ -307,7 +307,7 @@ typedef monotonic_clock steady_clock;
  *    available otherwise
  * - DEBUG_REFCOUNT: Enables debugging of ObjectReferencer::refCount. Error messages will
  *    be logged if refCount is less than zero
- * - DEBUG_MUTEX_LOCKING: Enables the debug functionality of the SafeMutexLock class
+ * - DEBUG_MUTEX_LOCKING: Enables the debug functionality of the SafeRWLock class
  * - BEEGFS_DEBUG_PROFILING: Additional timestamps in log messages.
  */
 
@@ -338,5 +338,9 @@ extern void assertMsg(const char* file, unsigned line, const char* condition);
 #else
 # define BEEGFS_FALLTHROUGH
 #endif
+
+// version number of both the network protocol and the on-disk data structures that are versioned.
+// must be kept in sync with client.
+#define BEEGFS_DATA_VERSION (uint32_t(0))
 
 #endif /*COMMON_H_*/

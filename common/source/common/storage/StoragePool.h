@@ -40,6 +40,8 @@ class StoragePool
 
       StoragePool(const StoragePool& rhs) = delete;
 
+      virtual ~StoragePool() = default;
+
       StoragePoolId getId() const;
       std::string getDescription() const;
       void setDescription(const std::string& description);

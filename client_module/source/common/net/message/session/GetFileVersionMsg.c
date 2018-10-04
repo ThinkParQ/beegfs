@@ -4,7 +4,7 @@ static void GetFileVersionMsg_serializePayload(NetMessage* this, SerializeCtx* c
 {
    struct GetFileVersionMsg* msg = container_of(this, struct GetFileVersionMsg, netMessage);
 
-   EntryInfo_serialize(msg->entryInfo, ctx);
+   EntryInfo_serialize(ctx, msg->entryInfo);
 }
 
 const struct NetMessageOps GetFileVersionMsg_Ops = {

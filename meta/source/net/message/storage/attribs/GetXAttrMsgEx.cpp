@@ -13,8 +13,7 @@ bool GetXAttrMsgEx::processIncoming(ResponseContext& ctx)
    ssize_t size = this->getSize();
    const std::string& name = this->getName();
 
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a GetXAttrMsg from: " + ctx.peerName() + "; name: "
-      + name + "; size: " + StringTk::intToStr(size) + ";");
+   LOG_DEBUG(logContext, Log_DEBUG, "name: " + name + "; size: " + StringTk::intToStr(size) + ";");
 
    CharVector xAttrValue;
    FhgfsOpsErr getXAttrRes;

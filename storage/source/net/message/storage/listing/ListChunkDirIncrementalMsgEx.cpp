@@ -4,13 +4,6 @@
 
 bool ListChunkDirIncrementalMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("ListChunkDirIncrementalMsg incoming");
-
-   #ifdef BEEGFS_DEBUG
-      LOG_DEBUG_CONTEXT(log, Log_DEBUG,
-         "Received a ListChunkDirIncrementalMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
    uint16_t targetID = getTargetID();
    bool isMirror = getIsMirror();
    std::string relativeDir = getRelativeDir();
@@ -21,7 +14,7 @@ bool ListChunkDirIncrementalMsgEx::processIncoming(ResponseContext& ctx)
    FhgfsOpsErr result;
    StringList names;
    IntList entryTypes;
-   int64_t newOffset;
+   int64_t newOffset{0};
 
    result = readChunks(targetID, isMirror, relativeDir, offset, maxOutEntries, onlyFiles, names,
       entryTypes, newOffset);
@@ -44,13 +37,19 @@ FhgfsOpsErr ListChunkDirIncrementalMsgEx::readChunks(uint16_t targetID, bool isM
    uint64_t numEntries = 0;
    struct dirent* dirEntry = NULL;
 
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+      return FhgfsOpsErr_UNKNOWNTARGET;
+
+   const int targetFD = isMirror ? *target->getMirrorFD() : *target->getChunkFD();
+
    int dirFD;
 
    if (likely(!relativeDir.empty()))
-      dirFD = openat(app->getTargetFD(targetID, isMirror), relativeDir.c_str(), O_RDONLY);
+      dirFD = openat(targetFD, relativeDir.c_str(), O_RDONLY);
    else
    {
-      dirFD = dup(app->getTargetFD(targetID, isMirror));
+      dirFD = dup(targetFD);
       fcntl(dirFD, F_SETFL, O_RDONLY);
    }
 

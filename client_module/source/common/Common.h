@@ -146,15 +146,6 @@
    set_fs(fs_varname)
 
 
-// get effective ID of current FS user/group access
-#if !defined(KERNEL_HAS_CURRENT_FSUID)
-   #define currentFsUserID       (current->fsuid)
-   #define currentFsGroupID      (current->fsgid)
-#else
-   #define currentFsUserID       current_fsuid()
-   #define currentFsGroupID      current_fsgid()
-#endif
-
 // in 4.13 wait_queue_t got renamed to wait_queue_entry_t
 #if defined(KERNEL_HAS_WAIT_QUEUE_ENTRY_T)
  typedef wait_queue_entry_t wait_queue_t;
@@ -185,34 +176,18 @@ static inline struct timespec current_fs_time(struct super_block *sb)
    #define swap(a, b) do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
 #endif
 
-static inline kuid_t FhgfsCommon_getCurrentKernelUserID(void);
-static inline kgid_t FhgfsCommon_getCurrentKernelGroupID(void);
 static inline unsigned FhgfsCommon_getCurrentUserID(void);
 static inline unsigned FhgfsCommon_getCurrentGroupID(void);
 
 
-kuid_t FhgfsCommon_getCurrentKernelUserID(void)
-{
-   return currentFsUserID;
-}
-
-kgid_t FhgfsCommon_getCurrentKernelGroupID(void)
-{
-   return currentFsGroupID;
-}
-
 unsigned FhgfsCommon_getCurrentUserID(void)
 {
-   kuid_t kernelUID = FhgfsCommon_getCurrentKernelUserID();
-
-   return from_kuid(&init_user_ns, kernelUID);
+   return from_kuid(&init_user_ns, current_fsuid());
 }
 
 unsigned FhgfsCommon_getCurrentGroupID(void)
 {
-   kgid_t kernelUID = FhgfsCommon_getCurrentKernelGroupID();
-
-   return from_kgid(&init_user_ns, kernelUID);
+   return from_kgid(&init_user_ns, current_fsgid());
 }
 
 
@@ -224,5 +199,160 @@ unsigned FhgfsCommon_getCurrentGroupID(void)
  *    be logged if refCount is less than zero.
  */
 
+/**
+ * BEEGFS_KFREE_LIST() - destroys and kfree()s all element of a list, leaving an empty list
+ *
+ * expands to ``BEEGFS_KFREE_LIST_DTOR(List, ElemType, Member, (void))``, ie no destructor is
+ * called.
+ */
+#define BEEGFS_KFREE_LIST(List, ElemType, Member) \
+   BEEGFS_KFREE_LIST_DTOR(List, ElemType, Member, (void))
+/**
+ * BEEGFS_KFREE_LIST_DTOR() - destroys and kfree()s all element of a list, leaving an empty list
+ * @List the &struct list_head to free
+ * @ElemType type of elements contained in the list
+ * @Member name of the &struct list_head in @ElemType that links to the next element of the list
+ * @Dtor for each element of the list, ``Dtor(entry)`` is evaluated before the entry is freed
+ */
+#define BEEGFS_KFREE_LIST_DTOR(List, ElemType, Member, Dtor) \
+   do { \
+      ElemType* entry; \
+      ElemType* n; \
+      list_for_each_entry_safe(entry, n, List, Member) \
+      { \
+         Dtor(entry); \
+         kfree(entry); \
+      } \
+      INIT_LIST_HEAD(List); \
+   } while (0)
+
+/**
+ * Generic key comparison function for integer types and pointers, to be used by the
+ * RBTREE_FUNCTIONS as KeyCmp.
+ */
+#define BEEGFS_RB_KEYCMP_LT_INTEGRAL(lhs, rhs) \
+   ( lhs < rhs ? -1 : (lhs == rhs ? 0 : 1) )
+
+/**
+ * BEEGFS_KFREE_RBTREE() - destroys and kfree()s all elements an rbtree
+ *
+ * expands to ``BEEGFS_KFREE_RBTREE_DTOR(TreeRoot, ElemType, Member, (void))``, ie no destructor is
+ * called.
+ */
+#define BEEGFS_KFREE_RBTREE(TreeRoot, ElemType, Member) \
+   BEEGFS_KFREE_RBTREE_DTOR(TreeRoot, ElemType, Member, (void))
+/**
+ * BEEGFS_KFREE_RBTREE_DTOR() - destroys and kfree()s all elements an rbtree, leaving an empty tree
+ * @TreeRoot &struct rb_root to free
+ * @ElemType type of elements contained in the tree
+ * @Member name of the &struct rb_node in @ElemType that links to further entries in the tree
+ * @Dtor for each element of the tree, ``Dtor(elem)`` is evaluated before the entry is freed
+ */
+#define BEEGFS_KFREE_RBTREE_DTOR(TreeRoot, ElemType, Member, Dtor) \
+   do { \
+      ElemType* pos; \
+      ElemType* n; \
+      rbtree_postorder_for_each_entry_safe(pos, n, TreeRoot, Member) \
+      { \
+         Dtor(pos); \
+         kfree(pos); \
+      } \
+      *(TreeRoot) = RB_ROOT; \
+   } while (0)
+
+/**
+ * BEEGFS_RBTREE_FUNCTIONS() - defines a default set of rbtree functions
+ * @Access access modifier of generated functions
+ * @NS namespace prefix for all defined functions
+ * @RootTy type of the struct that contains the tree we are building functions for
+ * @RootNode name of the &struct rb_root of our tree in @RootTy
+ * @KeyTy type of the trees sort key
+ * @ElemTy type of the tree element. must contain a field of type @KeyTy
+ * @ElemKey name of the key member in @ElemTy (must be of type @KeyTy)
+ * @ElemNode node of the &struct rb_node of our tree in @ElemTy
+ * @KeyCmp function or macro used to compare to @KeyTy values for tree ordering
+ *
+ * This macro declares a number of functions with names prefixed by @NS:
+ *
+ *  * ``Access ElemTy* NS##_find(const RootTy*, KeyTy key)`` finds the @ElemTy with key ``key`` and
+ *    returns it. If none exists, %NULL is returned.
+ *  * ``Access bool NS##_insert(RootTy*, ElemTy* data)`` inserts the element ``data`` into the tree
+ *    if no  element with the same key exists and return %true. If an element with the same key does
+ *    exist, returns %false.
+ *  * ``Access ElemTy* NS##_insertOrReplace(RootTy*, ElemTy* data)`` inserts ``data`` into the tree
+ *    if no element with the same key exists or replaced the existing item with the same key. If no
+ *    item existed %NULL is returned, otherwise the pointer to the previous element is returned.
+ *    This is analogous to how std::map::operator[] works in C++.
+ *  * ``access void NS##_erase(RootTy*, ElemTy* data)`` removes ``data`` from the tree. ``data`` is
+ *    not freed or otherwise processed, this function only removes the item and rebalances the tree
+ *    if necessary.
+ */
+#define BEEGFS_RBTREE_FUNCTIONS(Access, NS, RootTy, RootNode, KeyTy, ElemTy, ElemKey, ElemNode, \
+      KeyCmp) \
+   __attribute__((unused)) \
+   Access ElemTy* NS##_find(const RootTy* root, KeyTy key) \
+   { \
+      struct rb_node* node = root->RootNode.rb_node; \
+      while (node) \
+      { \
+         ElemTy* data = rb_entry(node, ElemTy, ElemNode); \
+         int cmp = KeyCmp(key, data->ElemKey); \
+         \
+         if (cmp < 0) \
+            node = node->rb_left; \
+         else if (cmp > 0) \
+            node = node->rb_right; \
+         else \
+            return data; \
+      } \
+      return NULL; \
+   } \
+   __attribute__((unused)) \
+   Access bool NS##_insert(RootTy* root, ElemTy* data) \
+   { \
+      struct rb_node** new = &root->RootNode.rb_node; \
+      struct rb_node* parent = NULL; \
+      while (*new) \
+      { \
+         ElemTy* cur = container_of(*new, ElemTy, ElemNode); \
+         int cmp = KeyCmp(data->ElemKey, cur->ElemKey); \
+         \
+         parent = *new; \
+         if (cmp < 0) \
+            new = &(*new)->rb_left; \
+         else if (cmp > 0) \
+            new = &(*new)->rb_right; \
+         else \
+            return false; \
+      } \
+      rb_link_node(&data->ElemNode, parent, new); \
+      rb_insert_color(&data->ElemNode, &root->RootNode); \
+      return true; \
+   } \
+   __attribute__((unused)) \
+   Access ElemTy* NS##_insertOrReplace(RootTy* root, ElemTy* data) \
+   { \
+      ElemTy* existing; \
+      if (NS##_insert(root, data)) \
+         return NULL; \
+      \
+      existing = NS##_find(root, data->ElemKey); \
+      rb_replace_node(&existing->ElemNode, &data->ElemNode, &root->RootNode); \
+      return existing; \
+   } \
+   __attribute__((unused)) \
+   Access void NS##_erase(RootTy* root, ElemTy* data) \
+   { \
+      rb_erase(&data->ElemNode, &root->RootNode); \
+   }
+
+#define BEEGFS_RBTREE_FOR_EACH_ENTRY(Pos, Root, Node) \
+   for (Pos = rb_entry_safe(rb_first(Root), typeof(*Pos), Node); \
+         Pos; \
+         Pos = rb_entry_safe(rb_next(&Pos->Node), typeof(*Pos), Node))
+
+/* version number of both the network protocol and the on-disk data structures that are versioned.
+ * must be kept in sync with userspace. */
+#define BEEGFS_DATA_VERSION ((uint32_t)0)
 
 #endif /*COMMON_H_*/

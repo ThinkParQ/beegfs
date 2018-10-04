@@ -21,12 +21,7 @@ class NodeStoreMetaEx : public NodeStoreServers
      virtual bool addOrUpdateNode(std::shared_ptr<Node> node);
      virtual bool addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* outNodeNumID);
 
-     std::string isRootMetaNode(NumNodeID nodeID);
-     std::string getRootMetaNode();
-     std::string getRootMetaNodeIDWithTypeStr();
-     std::string getRootMetaNodeAsTypedNodeID();
-
-     bool statusMeta(NumNodeID nodeID, std::string *outInfo);
+     bool statusMeta(NumNodeID nodeNumID, std::string *outInfo);
 
      unsigned sessionCountMeta(NumNodeID nodeID);
 

@@ -8,10 +8,6 @@
 
 bool SetMirrorBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("SetMirrorBuddyGroupMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetMirrorBuddyGroupMsg from: " + ctx.peerName() );
-
    uint16_t buddyGroupID = this->getBuddyGroupID();
 
    if (getNodeType() != NODETYPE_Storage)

@@ -26,27 +26,20 @@ extern void BitStore_setBit(BitStore* this, unsigned bitIndex, bool isSet);
 extern void BitStore_setSize(BitStore* this, unsigned newSize);
 extern void BitStore_clearBits(BitStore* this);
 
-extern void BitStore_serialize(const BitStore* this, SerializeCtx* ctx);
+extern void BitStore_serialize(SerializeCtx* ctx, const BitStore* this);
 extern bool BitStore_deserializePreprocess(DeserializeCtx* ctx, const char** outBitStoreStart);
 extern void BitStore_deserialize(BitStore* this, DeserializeCtx* ctx);
 
-extern bool BitStore_compare(BitStore* this, BitStore* second);
 extern void BitStore_copy(BitStore* this, BitStore* other);
 extern void BitStore_copyThreadSafe(BitStore* this, const BitStore* other);
-
-// private
-
-extern void __BitStore_freeHigherBits(BitStore* this);
 
 // public inliners
 
 static inline bool BitStore_getBit(const BitStore* this, unsigned bitIndex);
-static inline bool BitStore_getBitNonAtomic(BitStore* this, unsigned bitIndex);
 
 static inline unsigned BitStore_getBitBlockIndex(unsigned bitIndex);
 static inline unsigned BitStore_getBitIndexInBitBlock(unsigned bitIndex);
 static inline unsigned BitStore_calculateBitBlockCount(unsigned size);
-static inline bitstore_store_type BitStore_calculateBitMaskInBitBlock(unsigned bitIndexInBitBlock);
 
 
 /**
@@ -103,30 +96,6 @@ bool BitStore_getBit(const BitStore* this, unsigned bitIndex)
       return test_bit(indexInBitBlock, &this->higherBits[index - 1]);
 }
 
-/**
- * Test whether the bit at the given index is set or not.
- *
- * Note: The bit operations in here are non-atomic.
- */
-bool BitStore_getBitNonAtomic(BitStore* this, unsigned bitIndex)
-{
-   unsigned index;
-   unsigned indexInBitBlock;
-   bitstore_store_type mask;
-
-   if(unlikely(bitIndex >= this->numBits) )
-      return false;
-
-   index = BitStore_getBitBlockIndex(bitIndex);
-   indexInBitBlock = BitStore_getBitIndexInBitBlock(bitIndex);
-   mask = BitStore_calculateBitMaskInBitBlock(indexInBitBlock);
-
-   if (index == 0)
-      return (this->lowerBits & mask) ? true : false;
-   else
-      return (this->higherBits[index - 1] & mask) ? true : false;
-}
-
 
 /**
  * returns the index of the bit block (array value) which contains the searched bit
@@ -163,22 +132,6 @@ unsigned BitStore_calculateBitBlockCount(unsigned size)
       retVal++; // we need another (partial) block
 
    return retVal;
-}
-
-/**
- * calculates the bit mask for selecting a bit in a bit block, is needed for AND or OR bit
- * operations with a bit block
- */
-bitstore_store_type BitStore_calculateBitMaskInBitBlock(unsigned bitIndexInBitBlock)
-{
-   bitstore_store_type mask;
-
-   if(unlikely(bitIndexInBitBlock >= BITSTORE_BLOCK_BIT_COUNT) )
-      return BITSTORE_BLOCK_INIT_MASK;
-
-   mask = (1UL << bitIndexInBitBlock);
-
-   return mask;
 }
 
 #endif /* BITSTORE_H_ */

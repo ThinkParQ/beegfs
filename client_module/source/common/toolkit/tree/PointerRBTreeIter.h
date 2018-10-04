@@ -9,7 +9,6 @@ typedef struct RBTreeIter RBTreeIter;
 static inline void PointerRBTreeIter_init(
    RBTreeIter* this, RBTree* tree, RBTreeElem* treeElem);
 
-static inline bool PointerRBTreeIter_hasNext(RBTreeIter* this);
 static inline void* PointerRBTreeIter_next(RBTreeIter* this);
 static inline void* PointerRBTreeIter_key(RBTreeIter* this);
 static inline void* PointerRBTreeIter_value(RBTreeIter* this);
@@ -26,11 +25,6 @@ void PointerRBTreeIter_init(RBTreeIter* this, RBTree* tree, RBTreeElem* treeElem
 {
    this->tree = tree;
    this->treeElem = treeElem;
-}
-
-bool PointerRBTreeIter_hasNext(RBTreeIter* this)
-{
-   return this->treeElem && rb_next(&this->treeElem->treenode);
 }
 
 void* PointerRBTreeIter_next(RBTreeIter* this)

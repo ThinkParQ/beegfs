@@ -5,8 +5,6 @@
 
 bool GetStoragePoolsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STORAGEPOOLS, DEBUG, "Received a GetStoragePoolsMsg.", ctx.peerName() );
-      
    App* app = Program::getApp();
    StoragePoolStore* storagePoolStore = app->getStoragePoolStore();
 

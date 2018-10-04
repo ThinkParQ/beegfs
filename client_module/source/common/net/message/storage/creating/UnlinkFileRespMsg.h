@@ -8,7 +8,6 @@ struct UnlinkFileRespMsg;
 typedef struct UnlinkFileRespMsg UnlinkFileRespMsg;
 
 static inline void UnlinkFileRespMsg_init(UnlinkFileRespMsg* this);
-static inline void UnlinkFileRespMsg_initFromValue(UnlinkFileRespMsg* this, int value);
 
 // getters & setters
 static inline int UnlinkFileRespMsg_getValue(UnlinkFileRespMsg* this);
@@ -22,11 +21,6 @@ struct UnlinkFileRespMsg
 void UnlinkFileRespMsg_init(UnlinkFileRespMsg* this)
 {
    SimpleIntMsg_init( (SimpleIntMsg*)this, NETMSGTYPE_UnlinkFileResp);
-}
-
-void UnlinkFileRespMsg_initFromValue(UnlinkFileRespMsg* this, int value)
-{
-   SimpleIntMsg_initFromValue( (SimpleIntMsg*)this, NETMSGTYPE_UnlinkFileResp, value);
 }
 
 int UnlinkFileRespMsg_getValue(UnlinkFileRespMsg* this)

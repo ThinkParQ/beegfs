@@ -7,6 +7,7 @@
 #include <common/net/message/control/DummyMsg.h>
 #include "AbstractDatagramListener.h"
 
+#include <mutex>
 
 AbstractDatagramListener::AbstractDatagramListener(const std::string& threadName,
    NetFilter* netFilter, NicAddressList& localNicList, AcknowledgmentStore* ackStore,
@@ -34,7 +35,7 @@ AbstractDatagramListener::~AbstractDatagramListener()
 
 bool AbstractDatagramListener::initSock(unsigned short udpPort)
 {
-   ICommonConfig* cfg = PThread::getCurrentThreadApp()->getCommonConfig();
+   auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
 
    udpPortNetByteOrder = htons(udpPort);
    loopbackAddrNetByteOrder = htonl(INADDR_LOOPBACK);
@@ -131,9 +132,8 @@ void AbstractDatagramListener::listenLoop()
             continue;
          }
 
-         AbstractNetMessageFactory* netMessageFactory =
-            PThread::getCurrentThreadApp()->getNetMessageFactory();
-         NetMessage* msg = netMessageFactory->createFromBuf(recvBuf, recvRes);
+         auto netMessageFactory = PThread::getCurrentThreadApp()->getNetMessageFactory();
+         auto msg = netMessageFactory->createFromRaw(recvBuf, recvRes);
 
          if (msg->getMsgType() == NETMSGTYPE_Invalid
                || msg->getLength() != unsigned(recvRes)
@@ -141,15 +141,12 @@ void AbstractDatagramListener::listenLoop()
                || msg->getSequenceNumberDone() != 0)
          {
             LOG(COMMUNICATION, NOTICE, "Received invalid message from peer",
-                  as("peer", Socket::ipaddrToStr(&fromAddr.sin_addr)));
+                  ("peer", Socket::ipaddrToStr(&fromAddr.sin_addr)));
          }
          else
          {
-            handleIncomingMsg(&fromAddr, msg);
+            handleIncomingMsg(&fromAddr, msg.get());
          }
-
-         delete(msg);
-
       }
       catch(SocketTimeoutException& ste)
       {
@@ -204,7 +201,7 @@ void AbstractDatagramListener::sendToNodesUDP(const std::vector<NodeHandle>& nod
  * @param numRetries 0 to send only once
  * @timeoutMS between retries (0 for default)
  */
-void AbstractDatagramListener::sendToNodesUDP(AbstractNodeStore* nodes, NetMessage* msg,
+void AbstractDatagramListener::sendToNodesUDP(const AbstractNodeStore* nodes, NetMessage* msg,
    int numRetries, int timeoutMS)
 {
    sendToNodesUDP(nodes->referenceAllNodes(), msg, numRetries, timeoutMS);
@@ -256,11 +253,12 @@ bool AbstractDatagramListener::sendToNodesUDPwithAck(const std::vector<NodeHandl
    {
       // create waitAcks copy
 
-      SafeMutexLock waitAcksLock(&notifier.waitAcksMutex);
+      WaitAckMap currentWaitAcks;
+      {
+         const std::lock_guard<Mutex> lock(notifier.waitAcksMutex);
 
-      WaitAckMap currentWaitAcks(waitAcks);
-
-      waitAcksLock.unlock();
+         currentWaitAcks = waitAcks;
+      }
 
       // send messages
 
@@ -299,7 +297,7 @@ bool AbstractDatagramListener::sendToNodesUDPwithAck(const std::vector<NodeHandl
  *
  * @return true if all acks received within a reasonable timeout.
  */
-bool AbstractDatagramListener::sendToNodesUDPwithAck(AbstractNodeStore* nodes,
+bool AbstractDatagramListener::sendToNodesUDPwithAck(const AbstractNodeStore* nodes,
    AcknowledgeableMsg* msg, int ackWaitSleepMS, int numRetries)
 {
    return sendToNodesUDPwithAck(nodes->referenceAllNodes(), msg, ackWaitSleepMS, numRetries);
@@ -346,11 +344,9 @@ void AbstractDatagramListener::sendBufToNode(Node& node, const char* buf, size_t
  */
 void AbstractDatagramListener::sendMsgToNode(Node& node, NetMessage* msg)
 {
-   std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(msg);
+   const auto msgBuf = MessagingTk::createMsgVec(*msg);
 
-   sendBufToNode(node, msgBuf.first, msgBuf.second);
-
-   free(msgBuf.first);
+   sendBufToNode(node, &msgBuf[0], msgBuf.size());
 }
 
 /**
@@ -363,11 +359,9 @@ void AbstractDatagramListener::sendDummyToSelfUDP()
    hostAddr.s_addr = loopbackAddrNetByteOrder;
 
    DummyMsg msg;
-   std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(&msg);
+   const auto msgBuf = MessagingTk::createMsgVec(msg);
 
-   this->sendto(msgBuf.first, msgBuf.second, 0, hostAddr, ntohs(udpPortNetByteOrder) );
-
-   free(msgBuf.first);
+   this->sendto(&msgBuf[0], msgBuf.size(), 0, hostAddr, ntohs(udpPortNetByteOrder) );
 }
 
 /**
@@ -389,8 +383,5 @@ bool AbstractDatagramListener::isDGramFromSelf(struct sockaddr_in* fromAddr)
          return true;
    }
 
-   if(loopbackAddrNetByteOrder == fromAddr->sin_addr.s_addr)
-      return true;
-
-   return false;
+   return loopbackAddrNetByteOrder == fromAddr->sin_addr.s_addr;
 }

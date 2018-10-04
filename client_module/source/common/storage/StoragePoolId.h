@@ -31,7 +31,7 @@ static inline char* StoragePoolId_str(const StoragePoolId* this)
    return StringTk_uintToStr(this->value);
 }
 
-extern void StoragePoolId_serialize(const StoragePoolId* this, SerializeCtx* ctx);
+extern void StoragePoolId_serialize(SerializeCtx* ctx, const StoragePoolId* this);
 extern bool StoragePoolId_deserialize(DeserializeCtx* ctx, StoragePoolId* outThis);
 
 #endif /* CLIENT_STORAGEPOOLID_H */

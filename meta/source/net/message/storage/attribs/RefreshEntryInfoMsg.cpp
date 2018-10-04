@@ -23,9 +23,7 @@ bool RefreshEntryInfoMsgEx::processIncoming(ResponseContext& ctx)
 
    BaseType::processIncoming(ctx);
 
-   App* app = Program::getApp();
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_REFRESHENTRYINFO,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_REFRESHENTRYINFO);
 
    return true;
 }

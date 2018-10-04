@@ -1,8 +1,9 @@
 #include <common/app/log/LogContext.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/toolkit/StorageTk.h>
 #include <common/toolkit/StringTk.h>
 #include "System.h"
+
+#include <mutex>
 
 #include <sys/utsname.h>
 #include <sys/syscall.h>
@@ -23,24 +24,16 @@ std::string System::getErrString()
 {
    int errcode = errno;
 
-   SafeMutexLock mutexLock(&strerrorMutex);
+   const std::lock_guard<Mutex> lock(strerrorMutex);
 
-   std::string errString = strerror(errcode);
-
-   mutexLock.unlock();
-
-   return errString;
+   return strerror(errcode);
 }
 
 std::string System::getErrString(int errcode)
 {
-   SafeMutexLock mutexLock(&strerrorMutex);
+   const std::lock_guard<Mutex> lock(strerrorMutex);
 
-   std::string errString = strerror(errcode);
-
-   mutexLock.unlock();
-
-   return errString;
+   return strerror(errcode);
 }
 
 std::string System::getHostname()
@@ -477,9 +470,9 @@ void System::getAllUserIDs(UIntList* outUserIDs, bool ignoreSystemUsers)
          outUserIDs->push_back(userData->pw_uid);
       else
       if( (userData->pw_uid > 100) &&
-          strcmp(userData->pw_shell, "/sbin/nologin") &&
-          strcmp(userData->pw_shell, "/usr/sbin/nologin") &&
-          strcmp(userData->pw_shell, "/bin/false") )
+          strcmp(userData->pw_shell, "/sbin/nologin") != 0 &&
+          strcmp(userData->pw_shell, "/usr/sbin/nologin") != 0 &&
+          strcmp(userData->pw_shell, "/bin/false") != 0 )
          outUserIDs->push_back(userData->pw_uid);
 
       userData = getpwent();

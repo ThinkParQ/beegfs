@@ -126,7 +126,6 @@ extern ssize_t __FhgfsOps_readSparse(struct file* file, char __user *buf, size_t
 
 // getters & setters
 static inline FsObjectInfo* __FhgfsOps_getObjectInfo(struct file* file);
-static inline void __FhgfsOps_setObjectInfo(FsObjectInfo* objectInfo, struct file* file);
 static inline FsDirInfo* __FhgfsOps_getDirInfo(struct file* file);
 static inline void __FhgfsOps_setDirInfo(FsDirInfo* dirInfo, struct file* outFile);
 static inline FsFileInfo* __FhgfsOps_getFileInfo(struct file* file);
@@ -138,11 +137,6 @@ static inline int64_t __FhgfsOps_getCurrentLockFD(struct file* file);
 FsObjectInfo* __FhgfsOps_getObjectInfo(struct file* file)
 {
    return (FsObjectInfo*)file->private_data;
-}
-
-void __FhgfsOps_setObjectInfo(FsObjectInfo* objectInfo, struct file* file)
-{
-   file->private_data = objectInfo;
 }
 
 FsDirInfo* __FhgfsOps_getDirInfo(struct file* file)

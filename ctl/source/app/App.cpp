@@ -7,11 +7,11 @@
 #include <common/toolkit/TimeAbs.h>
 #include <modes/modehelpers/ModeInterruptedException.h>
 #include <modes/ModeHelp.h>
-#include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include "App.h"
 
-#include <signal.h>
+#include <csignal>
+#include <syslog.h>
 
 #define APP_WORKERS_DIRECT_NUM   1
 #define APP_SYSLOG_IDENTIFIER    "beegfs-ctl"
@@ -43,7 +43,6 @@ App::App(int argc, char** argv)
    this->netMessageFactory = NULL;
 
    this->dgramListener = NULL;
-   this->heartbeatMgr = NULL;
 }
 
 App::~App()
@@ -53,7 +52,6 @@ App::~App()
 
    workersDelete();
 
-   SAFE_DELETE(heartbeatMgr);
    SAFE_DELETE(dgramListener);
    SAFE_DELETE(allowedInterfaces);
    SAFE_DELETE(netMessageFactory);
@@ -75,7 +73,7 @@ App::~App()
    SAFE_DELETE(cfg);
 
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 void App::run()
@@ -86,7 +84,7 @@ void App::run()
 
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -125,7 +123,6 @@ void App::run()
 
 void App::runNormal()
 {
-   bool componentsStarted = false;
    const RunModesElem* runMode;
 
    // init data objects
@@ -174,24 +171,15 @@ void App::runNormal()
 
    // start component threads
 
-   if(this->cfg->getDebugRunComponentThreads() )
-   {
-      startComponents();
+   startComponents();
 
-      componentsStarted = true;
+   appResult = executeMode(runMode);
 
-      appResult = executeMode(runMode);
+   // self-termination
+   stopComponents();
 
-      // self-termination
-      stopComponents();
-   }
-
-
-   if(componentsStarted)
-   {
-      joinComponents();
-      log->log(3, "All components stopped. Exiting now!");
-   }
+   joinComponents();
+   log->log(3, "All components stopped. Exiting now!");
 }
 
 int App::executeMode(const RunModesElem* runMode)
@@ -227,16 +215,16 @@ void App::initDataObjects()
    tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
 
    // mute the standard logger if it has not been explicitly enabled
-   Logger::createLogger(cfg->getLogEnabled() ? cfg->getLogLevel() : 0, cfg->getLogType(), 
-      cfg->getLogErrsToStdlog(), cfg->getLogNoDate(), cfg->getLogStdFile(), 
-      cfg->getLogErrFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogEnabled() ? cfg->getLogLevel() : 0, cfg->getLogType(),
+      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogNumLines(),
+      cfg->getLogNumRotatedFiles());
 
    log = new LogContext("App");
 
    allowedInterfaces = new StringList();
    std::string interfacesFilename = cfg->getConnInterfacesFile();
    if(interfacesFilename.length() )
-      cfg->loadStringListFile(interfacesFilename.c_str(), *allowedInterfaces);
+      Config::loadStringListFile(interfacesFilename.c_str(), *allowedInterfaces);
 
    RDMASocket::rdmaForkInitOnce();
 
@@ -251,7 +239,7 @@ void App::initDataObjects()
    mgmtNodes = new NodeStoreServers(NODETYPE_Mgmt, false);
    metaNodes = new NodeStoreServers(NODETYPE_Meta, false);
    storageNodes = new NodeStoreServers(NODETYPE_Storage, false);
-   clientNodes = new NodeStoreClients(false);
+   clientNodes = new NodeStoreClients();
    workQueue = new MultiWorkQueue();
    ackStore = new AcknowledgmentStore();
 
@@ -264,10 +252,9 @@ void App::initDataObjects()
 
 void App::initLocalNodeInfo()
 {
-   bool useSDP = this->cfg->getConnUseSDP();
    bool useRDMA = this->cfg->getConnUseRDMA();
 
-   NetworkInterfaceCard::findAll(allowedInterfaces, useSDP, useRDMA, &localNicList);
+   NetworkInterfaceCard::findAll(allowedInterfaces, useRDMA, &localNicList);
 
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -277,10 +264,8 @@ void App::initLocalNodeInfo()
    std::string nodeID = System::getHostname() + "-" + StringTk::uint64ToHexStr(System::getPID() ) +
       "-" + StringTk::uintToHexStr(TimeAbs().getTimeMS() ) + "-" "ctl";
 
-   localNode = std::make_shared<LocalNode>(nodeID, NumNodeID(), 0, 0, localNicList);
-
-   localNode->setNodeType(NODETYPE_Client);
-   localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
+   localNode = std::make_shared<LocalNode>(NODETYPE_Client, nodeID, NumNodeID(), 0, 0,
+         localNicList);
 }
 
 void App::initComponents()
@@ -292,8 +277,6 @@ void App::initComponents()
    this->dgramListener = new DatagramListener(
       netFilter, localNicList, ackStore, udpListenPort);
    this->dgramListener->setRecvTimeoutMS(20);
-
-   this->heartbeatMgr = new HeartbeatManager(this->dgramListener);
 
    workersInit();
 
@@ -308,10 +291,6 @@ void App::startComponents()
    PThread::blockInterruptSignals();
 
    this->dgramListener->start();
-
-   // Note: We use the heartbeatmgr inline, not in a separate thread
-   //this->heartbeatMgr->start();
-   //this->heartbeatMgr->waitForInitialHeartbeatReqs();
 
    workersStart();
 

@@ -5,8 +5,6 @@ bool AckMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Ack incoming");
 
-   LOG_DEBUG_CONTEXT(log, 4, "Received a AckMsg from: " + ctx.peerName() );
-
    LOG_DEBUG_CONTEXT(log, 5, std::string("Value: ") + getValue() );
    
    AcknowledgmentStore* ackStore = Program::getApp()->getAckStore();

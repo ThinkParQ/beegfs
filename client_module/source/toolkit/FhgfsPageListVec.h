@@ -27,7 +27,6 @@ static inline bool FhgfsPageListVec_pushPage(FhgfsPageListVec* this, struct page
    int usedPageLength);
 
 static inline size_t FhgfsPageListVec_getMaxPages(FhgfsPageListVec* this);
-static inline size_t FhgfsPageListVec_getNumUsedPages(FhgfsPageListVec* this);
 
 static inline FhgfsPage* FhgfsPageListVec_getFhgfsPage(FhgfsPageListVec* this, size_t index);
 
@@ -147,14 +146,6 @@ bool FhgfsPageListVec_pushPage(FhgfsPageListVec* this, struct page* page, int us
 size_t FhgfsPageListVec_getMaxPages(FhgfsPageListVec* this)
 {
    return BEEGFS_LIST_VEC_MAX_PAGES;
-}
-
-/**
- * Return the number of used pages of this vector
- */
-size_t FhgfsPageListVec_getNumUsedPages(FhgfsPageListVec* this)
-{
-   return this->usedPages;
 }
 
 /**

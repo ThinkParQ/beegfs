@@ -10,15 +10,17 @@
 #include <common/net/message/storage/mirroring/SetMetadataMirroringMsg.h>
 #include <common/net/message/storage/mirroring/SetMetadataMirroringRespMsg.h>
 #include <common/nodes/Node.h>
+#include <common/storage/striping/BuddyMirrorPattern.h>
 #include <common/storage/striping/Raid0Pattern.h>
 #include <common/storage/striping/Raid10Pattern.h>
-#include <common/storage/striping/BuddyMirrorPattern.h>
 #include <common/toolkit/MetadataTk.h>
 #include <program/Program.h>
 #include <toolkit/bashtk.h>
 #include "managementhelper.h"
 
+#include <mutex>
 
+#include <boost/lexical_cast.hpp>
 
 namespace managementhelper
 {
@@ -59,7 +61,6 @@ namespace managementhelper
       bool retVal = false;
 
       App* app = Program::getApp();
-      Logger* log = Logger::getLogger();
       auto metaNodes = app->getMetaNodes();
       auto metaBuddyGroupMapper = app->getMetaBuddyGroupMapper();
       auto storageBuddyGroupMapper = app->getStorageBuddyGroupMapper();
@@ -72,28 +73,25 @@ namespace managementhelper
       EntryInfo entryInfo;
 
       FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, false, metaNodes, ownerNode,
-         &entryInfo, metaBuddyGroupMapper);
+         &entryInfo, app->getMetaRoot(), metaBuddyGroupMapper);
 
       if (findRes != FhgfsOpsErr_SUCCESS)
       {
-         log->logErr("getEntryInfo", "Unable to find metadata node for path: " + pathStr +
-            ". Error: " + FhgfsOpsErrTk::toErrString(findRes) );
+         LOG(GENERAL, ERR, "Unable to find metadata node for path.",
+               ("Path", pathStr), ("Error", findRes));
       }
       else
       {
-         bool commRes;
-         char* respBuf = NULL;
-         NetMessage* respMsg = NULL;
          GetEntryInfoRespMsg* respMsgCast;
 
          GetEntryInfoMsg getInfoMsg(&entryInfo);
 
-         commRes = MessagingTk::requestResponse(*ownerNode, &getInfoMsg,
-            NETMSGTYPE_GetEntryInfoResp, &respBuf, &respMsg);
+         const auto respMsg = MessagingTk::requestResponse(*ownerNode, getInfoMsg,
+            NETMSGTYPE_GetEntryInfoResp);
 
-         if (commRes)
+         if (respMsg)
          {
-            respMsgCast = (GetEntryInfoRespMsg*) respMsg;
+            respMsgCast = (GetEntryInfoRespMsg*) respMsg.get();
 
             StripePattern& pattern = respMsgCast->getPattern();
 
@@ -143,13 +141,10 @@ namespace managementhelper
          }
          else
          {
-            log->logErr("getEntryInfo", "Error during communication with owner node. Node: " +
-               ownerNode->getNodeIDWithTypeStr() + ". Path: " + pathStr + ". Error: " +
-               FhgfsOpsErrTk::toErrString(findRes) );
+            LOG(GENERAL, ERR, "Error during communication with owner node.",
+               ("Node", ownerNode->getNodeIDWithTypeStr()), ("Path", pathStr),
+               findRes);
          }
-
-         SAFE_DELETE(respMsg);
-         SAFE_FREE(respBuf);
       }
 
       return retVal;
@@ -177,18 +172,14 @@ namespace managementhelper
       log->log(Log_SPAM, "setPattern", std::string("Set pattern for path: ") + pathStr );
 
       FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, false, metaNodes, ownerNode,
-         &entryInfo, metaBuddyGroupMapper);
+         &entryInfo, app->getMetaRoot(), metaBuddyGroupMapper);
 
       if(findRes != FhgfsOpsErr_SUCCESS)
       {
-         log->logErr("setPattern", "Unable to find metadata node for path: " + pathStr + "Error: " +
-            std::string(FhgfsOpsErrTk::toErrString(findRes) ) );
+         LOG(GENERAL, ERR, "Unable to find metadata node for path.", ("Path", pathStr),
+               findRes);
          return retVal;
       }
-
-      char* respBuf = NULL;
-      char* respBufMirror = NULL;
-      NetMessage* respMsg = NULL;
 
       // generate a new StripePattern with an empty list of stripe nodes (will be
       // ignored on the server side)
@@ -207,8 +198,7 @@ namespace managementhelper
          pattern = new BuddyMirrorPattern(chunkSize, stripeNodeIDs, defaultNumNodes);
       else
       {
-         log->logErr("setPattern", "Set pattern: Invalid/unknown pattern type number: " +
-            StringTk::uintToStr(patternID) );
+         LOG(GENERAL, ERR, "Set pattern: Invalid/unknown pattern type.", patternID);
       }
 
       if(pattern)
@@ -217,26 +207,26 @@ namespace managementhelper
 
          SetDirPatternMsg setPatternMsg(&entryInfo, pattern);
 
-         bool commRes = MessagingTk::requestResponse(*ownerNode, &setPatternMsg,
-            NETMSGTYPE_SetDirPatternResp, &respBuf, &respMsg);
+         const auto respMsg = MessagingTk::requestResponse(*ownerNode, setPatternMsg,
+            NETMSGTYPE_SetDirPatternResp);
 
-         if(!commRes)
+         if (!respMsg)
          {
-            log->logErr("setPattern", "Communication failed with node: " +
-               ownerNode->getNodeIDWithTypeStr() );
+            LOG(COMMUNICATION, ERR, "Communication failed with node.",
+                  ("Node", ownerNode->getNodeIDWithTypeStr()));
 
             goto cleanup;
          }
 
-         SetDirPatternRespMsg *setDirPatternRespMsg = (SetDirPatternRespMsg *)respMsg;
+         SetDirPatternRespMsg *setDirPatternRespMsg = (SetDirPatternRespMsg *)respMsg.get();
          FhgfsOpsErr result = setDirPatternRespMsg->getResult();
 
          if (result != FhgfsOpsErr_SUCCESS)
          {
-            log->logErr("setPattern", "Modification of stripe pattern failed on server. "
-               "Path: " + pathStr + "; "
-               "Server: " + ownerNode->getNodeIDWithTypeStr() + "; "
-               "Error: " + FhgfsOpsErrTk::toErrString(result) );
+            LOG(COMMUNICATION, ERR, "Modification of stripe pattern failed on server.",
+               ("Path", pathStr),
+               ("Server", ownerNode->getNodeIDWithTypeStr()),
+               result);
 
             goto cleanup;
          }
@@ -247,31 +237,29 @@ namespace managementhelper
 
       if(doMetaMirroring)
       {
-         NetMessage* respMsgMirror = NULL;
          SetMetadataMirroringRespMsg* respMsgCast;
 
          FhgfsOpsErr setRemoteRes;
 
          SetMetadataMirroringMsg setMsg;
 
-         // request/response
-         bool commRes = MessagingTk::requestResponse(*ownerNode, &setMsg,
-            NETMSGTYPE_SetMetadataMirroringResp, &respBufMirror, &respMsgMirror);
-         if(!commRes)
+         const auto respMsgMirror = MessagingTk::requestResponse(*ownerNode, setMsg,
+            NETMSGTYPE_SetMetadataMirroringResp);
+         if (!respMsgMirror)
          {
-            log->logErr("setPattern", "Communication with server failed: " +
-               ownerNode->getNodeIDWithTypeStr() );
+            LOG(COMMUNICATION, ERR, "Communication with server failed.",
+                  ("Node", ownerNode->getNodeIDWithTypeStr()));
             goto cleanup;
          }
 
-         respMsgCast = (SetMetadataMirroringRespMsg*)respMsgMirror;
+         respMsgCast = (SetMetadataMirroringRespMsg*)respMsgMirror.get();
 
          setRemoteRes = respMsgCast->getResult();
          if(setRemoteRes != FhgfsOpsErr_SUCCESS)
          {
-            log->logErr("setPattern", "Operation failed on server: " +
-               ownerNode->getNodeIDWithTypeStr() + "; " + "Error: " +
-               FhgfsOpsErrTk::toErrString(setRemoteRes) );
+            LOG(COMMUNICATION, ERR, "Operation failed on server.",
+                  ("Node", ownerNode->getNodeIDWithTypeStr()),
+                  ("Error", setRemoteRes));
             goto cleanup;
          }
 
@@ -279,10 +267,7 @@ namespace managementhelper
       }
 
    cleanup:
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
       SAFE_DELETE(pattern);
-      SAFE_FREE(respBufMirror);
 
       return retVal;
    }
@@ -313,42 +298,36 @@ namespace managementhelper
       EntryInfo dirEntryInfo;
 
       FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, false, metaNodes, ownerNode,
-         &dirEntryInfo, metaBuddyGroupMapper);
+         &dirEntryInfo, app->getMetaRoot(), metaBuddyGroupMapper);
       if (findRes != FhgfsOpsErr_SUCCESS)
       {
-         log->logErr("listDirFromOffset", "Unable to find metadata node for path: " + pathStr +
-            ". (Error: " + FhgfsOpsErrTk::toErrString(findRes) + ")");
+         LOG(GENERAL, ERR, "Unable to find metadata node for path.",
+               ("Path", pathStr), findRes);
          return -1;
       }
       else
       {
          // get the contents
 
-         bool commRes;
-         char* respListBuf = NULL;
-         NetMessage* respListDirMsg = NULL;
          ListDirFromOffsetRespMsg* listDirRespMsg;
          ListDirFromOffsetMsg listDirMsg(&dirEntryInfo, *offset, count, true);
 
-         commRes = MessagingTk::requestResponse(*ownerNode, &listDirMsg,
-            NETMSGTYPE_ListDirFromOffsetResp, &respListBuf, &respListDirMsg);
+         const auto respListDirMsg = MessagingTk::requestResponse(*ownerNode, listDirMsg,
+            NETMSGTYPE_ListDirFromOffsetResp);
          StringList* fileNames;
 
-         if (commRes)
+         if (respListDirMsg)
          {
-            listDirRespMsg = (ListDirFromOffsetRespMsg*) respListDirMsg;
+            listDirRespMsg = (ListDirFromOffsetRespMsg*) respListDirMsg.get();
             fileNames = &listDirRespMsg->getNames();
             *offset = listDirRespMsg->getNewServerOffset();
          }
          else
          {
-            SAFE_FREE(respListBuf);
-            SAFE_DELETE(respListDirMsg);
             return -1;
          }
 
          // get attributes
-         NetMessage* respAttrMsg = NULL;
          StringListIter nameIter;
 
          /* check for equal length of fileNames and fileTypes is
@@ -361,18 +340,17 @@ namespace managementhelper
             EntryInfo entryInfo;
             NodeHandle entryOwnerNode;
 
-            if (MetadataTk::referenceOwner(&tmpPath, false, metaNodes,
-               entryOwnerNode, &entryInfo, metaBuddyGroupMapper) == FhgfsOpsErr_SUCCESS)
+            if (MetadataTk::referenceOwner(&tmpPath, false, metaNodes, entryOwnerNode, &entryInfo,
+                     app->getMetaRoot(), metaBuddyGroupMapper) == FhgfsOpsErr_SUCCESS)
             {
                StatRespMsg* statRespMsg;
 
                StatMsg statMsg(&entryInfo);
-               char* respAttrBuf = NULL;
-               commRes = MessagingTk::requestResponse(*entryOwnerNode, &statMsg,
-                  NETMSGTYPE_StatResp, &respAttrBuf, &respAttrMsg);
-               if (commRes)
+               const auto respAttrMsg = MessagingTk::requestResponse(*entryOwnerNode, statMsg,
+                  NETMSGTYPE_StatResp);
+               if (respAttrMsg)
                {
-                  statRespMsg = (StatRespMsg*) respAttrMsg;
+                  statRespMsg = (StatRespMsg*) respAttrMsg.get();
 
                   StatData* statData = statRespMsg->getStatData();
 
@@ -385,24 +363,15 @@ namespace managementhelper
                }
                else
                {
-                  SAFE_DELETE(respAttrMsg);
-                  SAFE_FREE(respAttrBuf);
-                  SAFE_FREE(respListBuf);
-                  SAFE_DELETE(respListDirMsg);
-
                   return -1;
                }
-               SAFE_DELETE(respAttrMsg);
-               SAFE_FREE(respAttrBuf);
             }
             else
             {
-               log->logErr("listDirFromOffset", "Metadata for entry " + *nameIter +
-                  " could not be read.");
+               LOG(GENERAL, ERR, "Metadata for entry could not be read.",
+                     ("Entry name", *nameIter));
             }
          }
-         SAFE_FREE(respListBuf);
-         SAFE_DELETE(respListDirMsg);
       }
       return 0;
    }
@@ -470,15 +439,16 @@ namespace managementhelper
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(BASH + " " + SCRIPT_START_PARALLEL + " " + service, &mutex);
+         job = jobRunner->addJob(BASH + " " + SCRIPT_START_PARALLEL + " " + service, &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       std::ifstream outFile((job->outputFile).c_str());
       if (!(outFile.is_open()))
@@ -491,7 +461,7 @@ namespace managementhelper
       {
          std::string line;
          getline(outFile, line);
-         if (StringTk::trim(line) != "")
+         if (!StringTk::trim(line).empty())
          {
             failedNodes->push_back(line);
          }
@@ -513,16 +483,17 @@ namespace managementhelper
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(BASH + " " + SCRIPT_START_PARALLEL + " " + service + " " + host,
-         &mutex);
+         job = jobRunner->addJob(BASH + " " + SCRIPT_START_PARALLEL + " " + service + " " + host,
+            &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       int retVal = job->returnCode;
       jobRunner->delJob(job->id);
@@ -534,15 +505,16 @@ namespace managementhelper
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(BASH + " " + SCRIPT_STOP_PARALLEL + " " + service, &mutex);
+         job = jobRunner->addJob(BASH + " " + SCRIPT_STOP_PARALLEL + " " + service, &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       std::ifstream outFile((job->outputFile).c_str());
       if (!(outFile.is_open()))
@@ -555,7 +527,7 @@ namespace managementhelper
       {
          std::string line;
          getline(outFile, line);
-         if (StringTk::trim(line) != "")
+         if (!StringTk::trim(line).empty())
          {
             failedNodes->push_back(line);
          }
@@ -578,15 +550,16 @@ namespace managementhelper
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(BASH + " " + SCRIPT_STOP + " " + service + " " + host, &mutex);
+         job = jobRunner->addJob(BASH + " " + SCRIPT_STOP + " " + service + " " + host, &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       int retVal = job->returnCode;
       jobRunner->delJob(job->id);
@@ -598,16 +571,17 @@ namespace managementhelper
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(BASH + " " + SCRIPT_CHECK_STATUS + " " + service
-         + " " + host, &mutex);
+         job = jobRunner->addJob(BASH + " " + SCRIPT_CHECK_STATUS + " " + service
+            + " " + host, &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       if (job->returnCode != 0)
       {
@@ -641,15 +615,16 @@ namespace managementhelper
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(BASH + " " + SCRIPT_CHECK_STATUS_PARALLEL + " " + service, &mutex);
+         job = jobRunner->addJob(BASH + " " + SCRIPT_CHECK_STATUS_PARALLEL + " " + service, &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       std::ifstream outFile((job->outputFile).c_str());
       if (!(outFile.is_open()))
@@ -768,23 +743,24 @@ namespace managementhelper
       {
          log->log(Log_ERR, __FUNCTION__, "Destination hostname is empty. nodeID: " + nodeID +
             "; nodeNumID: " + StringTk::uintToStr(nodeNumID) +
-            "; nodeType: " + Node::nodeTypeToStr(nodeType) );
+            "; nodeType: " + boost::lexical_cast<std::string>(nodeType));
          return -1;
       }
 
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job* job = nullptr;
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      std::string cmdLine = BASH + " " + SCRIPT_GET_REMOTE_FILE + " " + hostname + " " +
-         logFilePath + " " + StringTk::uintToStr(lines);
-      Job *job = jobRunner->addJob(cmdLine, &mutex);
+         std::string cmdLine = BASH + " " + SCRIPT_GET_REMOTE_FILE + " " + hostname + " " +
+            logFilePath + " " + StringTk::uintToStr(lines);
+         job = jobRunner->addJob(cmdLine, &mutex);
 
-      while(!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while(!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       if(job->returnCode == 0)
       {

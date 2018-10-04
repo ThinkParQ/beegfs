@@ -17,7 +17,7 @@ FileEventLogger::FileEventLogger(const std::string& address):
       throw InvalidConfigException("Bad address for FileEventLogger");
 
    targetAddr.sun_family = AF_UNIX;
-   strcpy(targetAddr.sun_path, pathStr.c_str());
+   strcpy(targetAddr.sun_path, pathStr.c_str()); // NOLINT
 }
 
 FileEventLogger::~FileEventLogger()
@@ -95,7 +95,7 @@ void FileEventLogger::log(const FileEvent& event, const std::string& entryId,
       LOG(EVENTLOGGER, ERR, "Could not serialize file event.");
       droppedEventsSeq += 1;
       return;
-   } while (0);
+   } while (false);
 
    ssize_t sendRes = ::send(sockFD, serializedItem, itemSize, MSG_NOSIGNAL | MSG_DONTWAIT);
    if (sendRes >= 0 && size_t(sendRes) == itemSize)
@@ -123,7 +123,7 @@ void FileEventLogger::log(const FileEvent& event, const std::string& entryId,
       return;
    }
 
-   LOG(EVENTLOGGER, ERR, "Send of file event failed.", sysErr());
+   LOG(EVENTLOGGER, ERR, "Send of file event failed.", sysErr);
    close(sockFD);
    sockFD = -1;
    droppedEventsSeq += 1;
@@ -140,7 +140,7 @@ bool FileEventLogger::tryReconnect()
    sockFD = socket(AF_UNIX, SOCK_SEQPACKET, 0);
    if (sockFD < 0)
    {
-      LOG(EVENTLOGGER, ERR, "Failed to create FileEventLogger socket.", sysErr());
+      LOG(EVENTLOGGER, ERR, "Failed to create FileEventLogger socket.", sysErr);
       return false;
    }
 
@@ -148,7 +148,7 @@ bool FileEventLogger::tryReconnect()
    {
       close(sockFD);
       sockFD = -1;
-      LOG(EVENTLOGGER, ERR, "Failed to create FileEventLogger socket.", sysErr());
+      LOG(EVENTLOGGER, ERR, "Failed to create FileEventLogger socket.", sysErr);
       return false;
    }
 
@@ -156,8 +156,8 @@ bool FileEventLogger::tryReconnect()
    {
       close(sockFD);
       sockFD = -1;
-      LOG(EVENTLOGGER, ERR, "Failed to connect to FileEventLogger listener socket.", sysErr(),
-            as("sockPath", targetAddr.sun_path));
+      LOG(EVENTLOGGER, ERR, "Failed to connect to FileEventLogger listener socket.", sysErr,
+            ("sockPath", targetAddr.sun_path));
       return false;
    }
 
@@ -169,8 +169,8 @@ void FileEventLogItem::serialize(const FileEventLogItem* obj, Serializer& ctx)
 
    const auto startOffset = ctx.size();
    ctx
-         % obj->formatVersionMajor
-         % obj->formatVersionMinor;
+         % FileEventLogItem::formatVersionMajor
+         % FileEventLogItem::formatVersionMinor;
    auto sizeMarker = ctx.mark();
    ctx
          % uint32_t(0)   // placeholder for size

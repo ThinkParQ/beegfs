@@ -2,7 +2,6 @@
 #include <common/app/AbstractApp.h>
 #include <common/components/worker/Worker.h>
 #include <common/net/message/NetMessage.h>
-#include <common/net/sock/NamedSocket.h>
 #include <common/threading/PThread.h>
 #include "LocalConnWorker.h"
 
@@ -99,7 +98,6 @@ bool LocalConnWorker::processIncomingData(
    const int recvTimeoutMS = 5000;
 
    unsigned numReceived = 0;
-   NetMessage* msg = NULL;
    HighResolutionStats stats; // ignored currently
 
    try
@@ -128,7 +126,7 @@ bool LocalConnWorker::processIncomingData(
 
       // we got the complete message => deserialize and process it
 
-      msg = netMessageFactory->createFromBuf(bufIn, msgLength);
+      auto msg = netMessageFactory->createFromRaw(bufIn, msgLength);
 
       if(msg->getMsgType() == NETMSGTYPE_Invalid)
       { // message invalid
@@ -137,8 +135,6 @@ bool LocalConnWorker::processIncomingData(
             workerEndpoint->getPeername() );
 
          invalidateConnection();
-         delete(msg);
-
          return false;
       }
 
@@ -151,14 +147,10 @@ bool LocalConnWorker::processIncomingData(
             workerEndpoint->getPeername() );
 
          invalidateConnection();
-         delete(msg);
-
          return false;
       }
 
       // completed successfully.
-      delete(msg);
-
       return true;
 
    }
@@ -180,7 +172,6 @@ bool LocalConnWorker::processIncomingData(
    }
 
    invalidateConnection();
-   SAFE_DELETE(msg);
 
    return false;
 }

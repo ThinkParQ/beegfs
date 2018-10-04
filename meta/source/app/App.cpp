@@ -7,20 +7,20 @@
 #include <common/net/message/nodes/RegisterNodeRespMsg.h>
 #include <common/net/sock/RDMASocket.h>
 #include <common/nodes/LocalNode.h>
-#include <common/nodes/NodeFeatureFlags.h>
 #include <common/storage/striping/Raid0Pattern.h>
 #include <common/toolkit/NodesTk.h>
 #include <components/FileEventLogger.h>
 #include <components/ModificationEventFlusher.h>
-#include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include <session/SessionStore.h>
 #include <storage/MetadataEx.h>
+#include <toolkit/BuddyCommTk.h>
 #include <toolkit/StorageTkEx.h>
 #include "App.h"
 
 #include <mntent.h>
-#include <signal.h>
+#include <csignal>
+#include <syslog.h>
 #include <sys/resource.h>
 #include <sys/statfs.h>
 
@@ -35,22 +35,12 @@
 #define APP_SYSLOG_IDENTIFIER       "beegfs-meta"
 
 
-/**
- * Array of the feature bit numbers that are supported by this node/service.
- */
-unsigned const APP_FEATURES[] =
-{
-   META_FEATURE_DUMMY,
-};
-
 App::App(int argc, char** argv)
 {
    this->argc = argc;
    this->argv = argv;
 
    this->appResult = APPCODE_NO_ERROR;
-   this->pidFileLockFD = -1;
-   this->workingDirLockFD = -1;
 
    this->cfg = NULL;
    this->netFilter = NULL;
@@ -145,15 +135,10 @@ App::~App()
    SAFE_DELETE(this->tcpOnlyFilter);
    SAFE_DELETE(this->netFilter);
 
-   if(workingDirLockFD != -1)
-      StorageTk::unlockWorkingDirectory(workingDirLockFD);
-
-   unlockAndDeletePIDFile(pidFileLockFD, cfg->getPIDFile()); // ignored if fd is -1
-
    SAFE_DELETE(this->cfg);
 
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 /**
@@ -163,7 +148,7 @@ void App::run()
 {
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -281,7 +266,7 @@ void App::runNormal()
          throw InvalidConfigException("Pre-registration at management node canceled");
    }
 
-   if(localNodeNumID == 0) // just a sanity check that should never fail
+   if (!localNodeNumID) // just a sanity check that should never fail
       throw InvalidConfigException("Failed to retrieve numeric local node ID from mgmt");
 
    // we have all local node data now => init localNode
@@ -308,6 +293,9 @@ void App::runNormal()
       initialConsistencyState = TargetConsistencyState_NEEDS_RESYNC;
 
    // init components
+
+   BuddyCommTk::prepareBuddyNeedsResyncState(*mgmtNodes->referenceFirstNode(),
+         *metaBuddyGroupMapper, *timerQueue, localNode->getNumID());
 
    try
    {
@@ -354,17 +342,14 @@ void App::initLogging()
 {
    // check absolute log path to avoid chdir() problems
    Path logStdPath(cfg->getLogStdFile() );
-   Path logErrPath(cfg->getLogErrFile() );
 
-   if( (!logStdPath.empty() && !logStdPath.absolute() ) ||
-       (!logErrPath.empty() && !logErrPath.absolute() ) )
+   if(!logStdPath.empty() && !logStdPath.absolute())
    {
       throw InvalidConfigException("Path to log file must be absolute");
    }
 
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(), 
-      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-      cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
    this->log = new LogContext("App");
 
    if (!cfg->getFileEventLogTarget().empty())
@@ -376,10 +361,10 @@ void App::initLogging()
  */
 void App::initDataObjects()
 {
-   this->mgmtNodes = new NodeStoreServersEx(NODETYPE_Mgmt);
-   this->metaNodes = new NodeStoreServersEx(NODETYPE_Meta);
-   this->storageNodes = new NodeStoreServersEx(NODETYPE_Storage);
-   this->clientNodes = new NodeStoreClientsEx();
+   this->mgmtNodes = new NodeStoreServers(NODETYPE_Mgmt, true);
+   this->metaNodes = new NodeStoreServers(NODETYPE_Meta, true);
+   this->storageNodes = new NodeStoreServers(NODETYPE_Storage, false);
+   this->clientNodes = new NodeStoreClients();
 
    NicAddressList nicList;
 
@@ -452,7 +437,7 @@ void App::initBasicNetwork()
    }
 
    // discover local NICs and filter them
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, cfg->getConnUseSDP(), localNicList);
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
 
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -506,17 +491,8 @@ void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
    unsigned portTCP = cfg->getConnMetaPortTCP();
 
    // create localNode object
-   localNode = std::make_shared<LocalNode>(localNodeID, localNodeNumID, portUDP, portTCP,
-         localNicList);
-
-   localNode->setNodeType(NODETYPE_Meta);
-   localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
-
-   // nodeFeatureFlags
-   BitStore nodeFeatureFlags;
-
-   featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);
-   localNode->setFeatureFlags(&nodeFeatureFlags);
+   localNode = std::make_shared<LocalNode>(NODETYPE_Meta, localNodeID, localNodeNumID, portUDP,
+         portTCP, localNicList);
 
    // attach to metaNodes store
    metaNodes->setLocalNode(this->localNode);
@@ -564,7 +540,7 @@ bool App::preinitStorage()
          " (" + System::getErrString(errno) + ")" );
 
    this->workingDirLockFD = StorageTk::lockWorkingDirectory(cfg->getStoreMetaDirectory() );
-   if(workingDirLockFD == -1)
+   if (!workingDirLockFD.valid())
       throw InvalidConfigException("Unable to lock working directory: " + metaPathStr);
 
    return !formatFileExists;
@@ -624,7 +600,6 @@ void App::initStorage()
             StringTk::uintToStr(oldLimit) + " " +
             "(SysErr: " + System::getErrString() + ")");
    }
-
 }
 
 void App::initXAttrLimit()
@@ -643,7 +618,7 @@ void App::initXAttrLimit()
 
    if (::statfs(cfg->getStoreMetaDirectory().c_str(), &metaRootStat))
    {
-      LOG(GENERAL, CRITICAL, "Could not statfs() meta root directory.", sysErr());
+      LOG(GENERAL, CRITICAL, "Could not statfs() meta root directory.", sysErr);
       throw InvalidConfigException("Could not statfs() meta root directory.");
    }
 
@@ -659,20 +634,21 @@ void App::initXAttrLimit()
 
    // the metadata root directory does not support overly long xattrs. check for filesystems mounted
    // beneath the metadata root, and enable xattrs limiting if any are found.
-   char metaRootPath[PATH_MAX + 1];
+   std::string metaRootPath(PATH_MAX, '\0');
 
-   if (!realpath(cfg->getStoreMetaDirectory().c_str(), metaRootPath))
+   if (!realpath(cfg->getStoreMetaDirectory().c_str(), &metaRootPath[0]))
    {
-      LOG(GENERAL, CRITICAL, "Could not check meta root dir for xattr compatibility.", sysErr());
+      LOG(GENERAL, CRITICAL, "Could not check meta root dir for xattr compatibility.", sysErr);
       throw InvalidConfigException("Could not check meta root dir for xattr compatibility.");
    }
 
-   strcat(metaRootPath, "/");
+   metaRootPath.resize(strlen(metaRootPath.c_str()));
+   metaRootPath += '/';
 
    FILE* mounts = setmntent("/etc/mtab", "r");
    if (!mounts)
    {
-      LOG(GENERAL, CRITICAL, "Could not open mtab.", sysErr());
+      LOG(GENERAL, CRITICAL, "Could not open mtab.", sysErr);
       throw InvalidConfigException("Could not open mtab.");
    }
 
@@ -684,7 +660,7 @@ void App::initXAttrLimit()
    errno = 0;
    while ((mount = getmntent_r(mounts, &mountBuf, buf, sizeof(buf))))
    {
-      if (strstr(mount->mnt_dir, metaRootPath) == mount->mnt_dir)
+      if (strstr(mount->mnt_dir, metaRootPath.c_str()) == mount->mnt_dir)
       {
          cfg->setLimitXAttrListLength(true);
          break;
@@ -695,7 +671,7 @@ void App::initXAttrLimit()
 
    if (errno)
    {
-      LOG(GENERAL, ERR, "Could not read mtab.", sysErr());
+      LOG(GENERAL, ERR, "Could not read mtab.", sysErr);
       throw InvalidConfigException("Could not read mtab.");
    }
 
@@ -726,8 +702,7 @@ void App::initRootDir(NumNodeID localNodeNumID)
       bool rootIsBuddyMirrored = rootDir->getIsBuddyMirrored();
 
       // try to set rootDirOwner as root node
-      if((rootDirOwner  != 0) && metaNodes->setRootNodeNumID(rootDirOwner, false,
-         rootIsBuddyMirrored) )
+      if (rootDirOwner && metaRoot.setIfDefault(rootDirOwner, rootIsBuddyMirrored))
       { // new root node accepted (check if rootNode is localNode)
          NumNodeID primaryRootDirOwner;
          if (rootIsBuddyMirrored)
@@ -873,6 +848,8 @@ void App::startComponents()
    // make sure child threads don't receive SIGINT/SIGTERM (blocked signals are inherited)
    PThread::blockInterruptSignals();
 
+   timerQueue->start();
+
    this->dgramListener->start();
 
    // wait for nodes list download before we start handling client requests
@@ -890,7 +867,7 @@ void App::startComponents()
    this->internodeSyncer->start();
 
    timerQueue->enqueue(std::chrono::minutes(5),
-         std::bind(InternodeSyncer::downloadAndSyncClients, true));
+         [] { InternodeSyncer::downloadAndSyncClients(true); });
 
    this->modificationEventFlusher->start();
 
@@ -1324,7 +1301,8 @@ void App::signalHandler(int sig)
  */
 bool App::waitForMgmtNode()
 {
-   int waitTimeoutMS = 0; // infinite wait
+   const unsigned waitTimeoutMS = 0; // infinite wait
+   const unsigned nameResolutionRetries = 3;
 
    unsigned udpListenPort = cfg->getConnMetaPortUDP();
    unsigned udpMgmtdPort = cfg->getConnMgmtdPortUDP();
@@ -1339,7 +1317,7 @@ bool App::waitForMgmtNode()
 
 
    bool gotMgmtd = NodesTk::waitForMgmtHeartbeat(
-      this, &regDGramLis, mgmtNodes, mgmtdHost, udpMgmtdPort, waitTimeoutMS);
+      this, &regDGramLis, mgmtNodes, mgmtdHost, udpMgmtdPort, waitTimeoutMS, nameResolutionRetries);
 
    regDGramLis.selfTerminate();
    regDGramLis.sendDummyToSelfUDP(); // for faster termination
@@ -1365,22 +1343,15 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
       return false;
    }
 
-   NumNodeID rootNodeID = metaNodes->getRootNodeNumID();
-
-   BitStore nodeFeatureFlags;
-   featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);
+   NumNodeID rootNodeID = metaRoot.getID();
 
    RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Meta, &localNicList,
-      &nodeFeatureFlags, cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
-   msg.setFhgfsVersion(BEEGFS_VERSION_CODE);
+      cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
    msg.setRootNumID(rootNodeID);
 
    Time startTime;
    Time lastRetryTime;
    unsigned nextRetryDelayMS = 0;
-
-   char* respBuf;
-   NetMessage* respMsg;
 
    // wait for mgmt node to appear and periodically resend request
    /* note: we usually expect not to loop here, because we already waited for mgmtd in
@@ -1395,14 +1366,12 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
             break;
       }
 
-      // time to (re-)send request
+      const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+            NETMSGTYPE_RegisterNodeResp);
 
-      bool commRes = MessagingTk::requestResponse(
-         *mgmtNode, &msg, NETMSGTYPE_RegisterNodeResp, &respBuf, &respMsg);
-
-      if(commRes)
+      if (respMsg)
       { // communication successful
-         RegisterNodeRespMsg* respMsgCast = (RegisterNodeRespMsg*)respMsg;
+         RegisterNodeRespMsg* respMsgCast = (RegisterNodeRespMsg*)respMsg.get();
 
          outLocalNodeNumID = respMsgCast->getNodeNumID();
 
@@ -1413,9 +1382,6 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
          }
          else
             log->log(Log_WARNING, "Node ID reservation successful.");
-
-         delete(respMsg);
-         free(respBuf);
 
          break;
       }
@@ -1435,7 +1401,7 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
       nextRetryDelayMS = NodesTk::getRetryDelayMS(startTime.elapsedMS() );
    }
 
-   return (outLocalNodeNumID != 0);
+   return bool(outLocalNodeNumID);
 }
 
 /**

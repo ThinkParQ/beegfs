@@ -11,17 +11,15 @@ void GetStorageNodesWork::process(char* bufIn, unsigned bufInLen, char* bufOut, 
    if(NodesTk::downloadNodes(*mgmtdNode, NODETYPE_Storage, storageNodesList, false))
    {
       // sync the downloaded list with the node store
-      storageNodes->syncNodes(storageNodesList, &addedStorageNodes, &removedStorageNodes, true);
+      storageNodes->syncNodes(storageNodesList, &addedStorageNodes, &removedStorageNodes);
 
-      if(addedStorageNodes.size())
-         log.log(Log_WARNING, "Nodes added (sync results): "
-            + StringTk::uintToStr(addedStorageNodes.size())
-            + " (Type: " + Node::nodeTypeToStr(NODETYPE_Storage) + ")");
+      if(!addedStorageNodes.empty())
+         log.log(Log_WARNING, "Storage nodes added (sync results): "
+            + StringTk::uintToStr(addedStorageNodes.size()));
 
-      if(removedStorageNodes.size())
-         log.log(Log_WARNING, "Nodes removed (sync results): "
-            + StringTk::uintToStr(removedStorageNodes.size())
-            + " (Type: " + Node::nodeTypeToStr(NODETYPE_Storage) + ")");
+      if(!removedStorageNodes.empty())
+         log.log(Log_WARNING, "Storage nodes removed (sync results): "
+            + StringTk::uintToStr(removedStorageNodes.size()));
 
       // for each node added, get some general information
       for(NumNodeIDListIter iter = addedStorageNodes.begin(); iter != addedStorageNodes.end();

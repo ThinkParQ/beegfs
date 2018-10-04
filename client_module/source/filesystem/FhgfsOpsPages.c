@@ -558,13 +558,7 @@ int _FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_co
 
    if (!page)
    {  // writepages
-      #ifdef KERNEL_HAS_WRITE_CACHE_PAGES
-         retVal = write_cache_pages(mapping, wbc, FhgfsOpsPages_writePageCallBack, &pageData);
-      #else
-         printk_fhgfs(KERN_ERR, "Bug: unhandled code path write_cache_pages for this kernel!\n");
-         dump_stack();
-         retVal = -EIO;
-      #endif
+      retVal = write_cache_pages(mapping, wbc, FhgfsOpsPages_writePageCallBack, &pageData);
    }
    else
    {  // Called with a single page only, so we are called from ->writepage
@@ -652,7 +646,6 @@ int FhgfsOpsPages_writepage(struct page *page, struct writeback_control *wbc)
    return _FhgfsOpsPages_writepages(page->mapping, wbc, page);
 }
 
-#ifdef KERNEL_HAS_WRITE_CACHE_PAGES
 int FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_control* wbc)
 {
    #ifdef LOG_DEBUG_MESSAGES
@@ -671,7 +664,6 @@ int FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_con
 
    return _FhgfsOpsPages_writepages(mapping, wbc, NULL);
 }
-#endif // KERNEL_HAS_WRITE_CACHE_PAGES
 
 
 /**
@@ -1102,11 +1094,8 @@ int FhgfsOpsPages_writeBackPage(struct inode *inode, struct page *page)
    wbc.sync_mode = WB_SYNC_ALL;
    wbc.nr_to_write = 0;
 
-   #ifdef KERNEL_HAS_WRITE_CACHE_PAGES
-      // older kernels do not have wbc.rage_start/end
-      wbc.range_start = range_start;
-      wbc.range_end = range_end;
-   #endif
+   wbc.range_start = range_start;
+   wbc.range_end = range_end;
 
    IGNORE_UNUSED_VARIABLE(range_start);
    IGNORE_UNUSED_VARIABLE(range_end);

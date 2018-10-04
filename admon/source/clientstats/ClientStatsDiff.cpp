@@ -45,11 +45,11 @@ UInt64Vector* ClientStatsDiff::newDiffVector(uint64_t IP)
       return NULL;
    }
 
-   UInt64Vector* diffVec = new UInt64Vector(*currentVec); // copy of the current values first
+   std::unique_ptr<UInt64Vector> diffVec(new UInt64Vector(*currentVec)); // copy of the current values first
 
    UInt64Vector* oldVec     = ClientStats::getVectorFromMap(this->oldVecMap, IP);
    if (!oldVec)
-      return diffVec; // IP just did not do any IO last time, so old values are zero
+      return diffVec.release(); // IP just did not do any IO last time, so old values are zero
 
 
    uint64_t oldIP = oldVec->at(OPCOUNTERVECTOR_POS_IP);
@@ -85,7 +85,7 @@ UInt64Vector* ClientStatsDiff::newDiffVector(uint64_t IP)
       diffIter++;
    } while (oldIter != oldVec->end() );
 
-   return diffVec;
+   return diffVec.release();
 }
 
 /**
@@ -106,7 +106,7 @@ void ClientStatsDiff::sumDiffVectors()
    {
       UInt64Vector* diffVec = *diffVecIter;
 
-      if (this->sumVec.size() == 0)
+      if (this->sumVec.empty())
       {
          this->sumVec = *diffVec; // initialization of diffVec
          diffVecIter++;

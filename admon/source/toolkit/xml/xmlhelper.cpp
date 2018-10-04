@@ -12,6 +12,7 @@
 
 #include <common/toolkit/ZipIterator.h>
 
+#include <boost/lexical_cast.hpp>
 
 
 /*
@@ -1052,7 +1053,7 @@ void xmlhelper::getRemoteLogFile(struct mg_connection *conn,
          if(managementhelper::getLogFile(nodeType, nodeNumID, lines, &logFile, nodeID) )
          {
             logFile = "Internal error: Could not load log file from node: " + nodeID +
-               ". Node type: " + Node::nodeTypeToStr(nodeType);
+               ". Node type: " + boost::lexical_cast<std::string>(nodeType);
             log->log(Log_ERR, __func__, logFile);
          }
       }
@@ -1823,7 +1824,8 @@ void xmlhelper::metaNode(struct mg_connection *conn,
       }
 
       TiXmlElement *rootNodeElement = new TiXmlElement("rootNode");
-      rootNodeElement->LinkEndChild(new TiXmlText(metaNodes->isRootMetaNode(nodeNumID)));
+      rootNodeElement->LinkEndChild(
+            new TiXmlText(nodeNumID == Program::getApp()->getMetaRoot().getID() ? "Yes" : "No"));
       generalElement->LinkEndChild(rootNodeElement);
 
       TiXmlElement *lastMessageElement = new TiXmlElement("lastMessage");
@@ -1934,7 +1936,11 @@ void xmlhelper::metaNodesOverview(struct mg_connection *conn,
       generalElement->LinkEndChild(nodeCountElement);
 
       TiXmlElement *rootNodeElement = new TiXmlElement("rootNode");
-      rootNodeElement->LinkEndChild(new TiXmlText(metaNodes->getRootMetaNodeAsTypedNodeID() ) );
+      {
+         auto rootNode = metaNodes->referenceNode(Program::getApp()->getMetaRoot().getID());
+         rootNodeElement->LinkEndChild(
+               new TiXmlText(rootNode ? rootNode->getTypedNodeID() : ""));
+      }
       generalElement->LinkEndChild(rootNodeElement);
 
       TiXmlElement *statusElement = new TiXmlElement("status");
@@ -2043,8 +2049,7 @@ void xmlhelper::nodeList(struct mg_connection *conn,
       rootElement->LinkEndChild(mgmtdElement);
 
       NodeStoreMgmtEx *mgmtdNodeStore = app->getMgmtNodes();
-      auto node = mgmtdNodeStore->referenceFirstNode();
-      while (node)
+      for (const auto& node : mgmtdNodeStore->referenceAllNodes())
       {
          std::string groupName = "Default";
          std::string nodeID = node->getID();
@@ -2055,16 +2060,13 @@ void xmlhelper::nodeList(struct mg_connection *conn,
          nodeElement->SetAttribute("nodeNumID", nodeNumID.str() );
          nodeElement->LinkEndChild(new TiXmlText(nodeID));
          mgmtdElement->LinkEndChild(nodeElement);
-
-         node = mgmtdNodeStore->referenceNextNode(node);
       }
 
       TiXmlElement *metaElement = new TiXmlElement("meta");
       rootElement->LinkEndChild(metaElement);
 
       NodeStoreMetaEx *metaNodeStore = app->getMetaNodes();
-      node = metaNodeStore->referenceFirstNode();
-      while (node != NULL)
+      for (const auto& node : metaNodeStore->referenceAllNodes())
       {
          std::string groupName = "Default";
          std::string nodeID = node->getID();
@@ -2079,15 +2081,12 @@ void xmlhelper::nodeList(struct mg_connection *conn,
          nodeElement->SetAttribute("nodeNumID", nodeNumID.str());
          nodeElement->LinkEndChild(new TiXmlText(nodeID));
          metaElement->LinkEndChild(nodeElement);
-
-         node = metaNodeStore->referenceNextNode(node);
       }
 
       TiXmlElement *storageElement = new TiXmlElement("storage");
       rootElement->LinkEndChild(storageElement);
       NodeStoreStorageEx *storageNodeStore = app->getStorageNodes();
-      node = storageNodeStore->referenceFirstNode();
-      while (node)
+      for (const auto& node : storageNodeStore->referenceAllNodes())
       {
          std::string groupName = "Default";
          std::string nodeID = node->getID();
@@ -2102,8 +2101,6 @@ void xmlhelper::nodeList(struct mg_connection *conn,
          nodeElement->SetAttribute("nodeNumID", nodeNumID.str());
          nodeElement->LinkEndChild(new TiXmlText(nodeID));
          storageElement->LinkEndChild(nodeElement);
-
-         node = storageNodeStore->referenceNextNode(node);
       }
 
       if (clients)
@@ -2113,8 +2110,7 @@ void xmlhelper::nodeList(struct mg_connection *conn,
 
          NodeStoreClients *clientNodeStore = app->getClientNodes();
 
-         auto node = clientNodeStore->referenceFirstNode();
-         while (node)
+         for (const auto& node : clientNodeStore->referenceAllNodes())
          {
             std::string groupName = "Default";
             std::string nodeID = node->getID();
@@ -2125,8 +2121,6 @@ void xmlhelper::nodeList(struct mg_connection *conn,
             nodeElement->SetAttribute("nodeNumID", nodeNumID.str());
             nodeElement->LinkEndChild(new TiXmlText(nodeID));
             clientElement->LinkEndChild(nodeElement);
-
-            node = clientNodeStore->referenceNextNode(node);
          }
       }
 
@@ -3098,19 +3092,17 @@ void xmlhelper::striping(struct mg_connection *conn,
             }
 
 
-            if(!isDir)
+            auto mgmtNode = mgmtNodes->referenceFirstNode();
+            if (!isDir && !mgmtNode)
+               log->log(Log_ERR, __func__, "Failed to download target mappings from mgmtd.");
+            else if (!isDir && mgmtNode)
             { // file => add stripe nodes
-               UInt16List mappedTargetIDs;
-               NumNodeIDList mappedNodeIDs;
                bool targetMappingSuccess = false;
 
-               auto mgmtNode = mgmtNodes->referenceFirstNode();
-
-               if( (mgmtNode != NULL) &&
-                  NodesTk::downloadTargetMappings(*mgmtNode, &mappedTargetIDs, &mappedNodeIDs,
-                     false) )
+               auto mappings = NodesTk::downloadTargetMappings(*mgmtNode, false);
+               if (mappings.first)
                {
-                  targetMapper->syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
+                  targetMapper->syncTargets(std::move(mappings.second));
                   targetMappingSuccess = true;
                }
                else

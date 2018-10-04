@@ -27,15 +27,10 @@ static inline void WaitAckNotification_init(WaitAckNotification* this);
 static inline void WaitAckNotification_uninit(WaitAckNotification* this);
 
 static inline void WaitAck_init(WaitAck* this, char* ackID, void* privateData);
-static inline WaitAck* WaitAck_construct(char* ackID, void* privateData);
-static inline void WaitAck_uninit(WaitAck* this);
-static inline void WaitAck_destruct(WaitAck* this);
 
 
 static inline void WaitAckMap_init(WaitAckMap* this);
-static inline WaitAckMap* WaitAckMap_construct(void);
 static inline void WaitAckMap_uninit(WaitAckMap* this);
-static inline void WaitAckMap_destruct(WaitAckMap* this);
 
 static inline bool WaitAckMap_insert(WaitAckMap* this, char* newKey,
    WaitAck* newValue);
@@ -84,7 +79,6 @@ void WaitAckNotification_init(WaitAckNotification* this)
 
 void WaitAckNotification_uninit(WaitAckNotification* this)
 {
-   Condition_uninit(&this->waitAcksCompleteCond);
    Mutex_uninit(&this->waitAcksMutex);
 }
 
@@ -98,56 +92,14 @@ void WaitAck_init(WaitAck* this, char* ackID, void* privateData)
    this->privateData = privateData;
 }
 
-/**
- * @param ackID is not copied, so don't free or touch it while you use this object
- * @param privateData any private data that helps the caller to identify to ack later
- */
-WaitAck* WaitAck_construct(char* ackID, void* privateData)
-{
-   WaitAck* this = (WaitAck*)os_kmalloc(sizeof(*this) );
-
-   WaitAck_init(this, ackID, privateData);
-
-   return this;
-}
-
-void WaitAck_uninit(WaitAck* this)
-{
-   // nothing to do here
-}
-
-void WaitAck_destruct(WaitAck* this)
-{
-   WaitAck_uninit(this);
-
-   kfree(this);
-}
-
-
 void WaitAckMap_init(WaitAckMap* this)
 {
    PointerRBTree_init( (RBTree*)this, compareWaitAckMapElems);
 }
 
-WaitAckMap* WaitAckMap_construct(void)
-{
-   WaitAckMap* this = (WaitAckMap*)os_kmalloc(sizeof(*this) );
-
-   WaitAckMap_init(this);
-
-   return this;
-}
-
 void WaitAckMap_uninit(WaitAckMap* this)
 {
    PointerRBTree_uninit( (RBTree*)this);
-}
-
-void WaitAckMap_destruct(WaitAckMap* this)
-{
-   WaitAckMap_uninit(this);
-
-   kfree(this);
 }
 
 

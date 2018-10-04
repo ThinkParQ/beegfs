@@ -12,7 +12,7 @@ FlatTest::FlatTest()
 void FlatTest::SetUp()
 {
    if(::mkdir(this->dirName.c_str(), 0770) < 0 && errno != EEXIST)
-      throw "could not create dir";
+      throw std::runtime_error("could not create dir");
 }
 
 void FlatTest::TearDown()

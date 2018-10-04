@@ -19,38 +19,17 @@ class LocalNode : public Node
       /**
        * @param portTCP not used internally, but required when connection info is exported
        */
-      LocalNode(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
-         unsigned short portTCP, NicAddressList& nicList) : Node(nodeID, nodeNumID, portUDP)
+      LocalNode(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
+            unsigned short portTCP, NicAddressList& nicList):
+         Node(nodeType, std::move(nodeID), nodeNumID, portUDP)
       {
          this->portTCP = portTCP;
-         this->namedSocketPath = "";
 
          setConnPool(new LocalNodeConnPool(*this, nicList) );
       }
 
-      /**
-       * @param portTCP not used internally, but required when connection info is exported
-       */
-      LocalNode(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
-         unsigned short portTCP, std::string namedSocketPath, NodeType destinationNodeType)
-         : Node(nodeID, nodeNumID, portUDP)
-      {
-         this->portTCP = portTCP;
-         this->namedSocketPath = namedSocketPath;
-         this->nodeType = destinationNodeType;
-
-         if(nodeType == NODETYPE_CacheLib)
-            setConnPool(new LocalNodeConnPool(*this, namedSocketPath) );
-         else
-            setConnPool(new NodeConnPool(*this, namedSocketPath) );
-      }
-
-
    private:
       unsigned short portTCP; // not used internally, but required when connection info is exported
-
-      std::string namedSocketPath;
-
 
    public:
       virtual unsigned short getPortTCP()

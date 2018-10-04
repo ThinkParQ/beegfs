@@ -39,13 +39,55 @@ struct StripePatternHeader
    StoragePoolId storagePoolId;
    bool hasPoolId; // used for deserialization to be compatible with v6 format
 
+   // we use some of the high bits of type to store flags in the binary format.
+   // HasNoPool indicates that the stripe pattern has no pool id in it, even if hasPoolId is true.
+   // this is required to correctly transport stripe patterns without pool ids across the network.
+   // in 7.0 release a few things happened:
+   //  * the client always deserializes a pool id.
+   //  * for patterns read from inodes the server serializes a pool id only if it was present in
+   //    the inode
+   //  * pattern deserialized from scratch in userspace always deserialize a pool id
+   //
+   // old metadata formats (eg 2014) do not contain pool ids. the server will then not serialize a
+   // pool id, but both clients and tools will expect one. we thus need a flag to indicate that no
+   // pool id is present. using a flag to indicate that a pool id *is* present does not work because
+   // "present" is the default and must be overridden in special cases.
+   //
+   // this is a change to the disk and wire format that has no effect on the in-memory layout of
+   // stripe patterns in userspace and client if the pattern is read correctly:
+   //  * from an inode with a pool id: the flag will never be set
+   //  * from an inode without a pool id:
+   //    * if the inode was not updated, nothing has changed
+   //    * if the inode was updated the NoPool flag is set and has no effect.
+   //  * from a buffer with a pool id: the flag will not be set
+   //  * from a buffer without a pool id: the flag will be set and allow deserialization at all.
+   //    deserializers of 7.0 rejected the pattern as erroneous in this case.
+   static constexpr uint32_t HasNoPoolFlag = 1 << 24;
+
    template<typename This, typename Ctx>
    static void serialize(This obj, Ctx& ctx)
    {
-      ctx
-         % obj->length
-         % serdes::as<uint32_t>(obj->type)
-         % obj->chunkSize;
+      ctx % obj->length;
+
+      struct {
+         void operator()(const StripePatternHeader* obj, Serializer& ctx) {
+            uint32_t typeWithFlags = uint32_t(obj->type) | (obj->hasPoolId ? 0 : HasNoPoolFlag);
+
+            ctx % typeWithFlags;
+         }
+
+         void operator()(StripePatternHeader* obj, Deserializer& ctx) {
+            uint32_t typeWithFlags;
+
+            ctx % typeWithFlags;
+
+            obj->hasPoolId &= !(typeWithFlags & HasNoPoolFlag);
+            obj->type = StripePatternType(typeWithFlags & ~HasNoPoolFlag);
+         }
+      } chunkTypeAndFlags;
+      chunkTypeAndFlags(obj, ctx);
+
+      ctx % obj->chunkSize;
 
       if (obj->hasPoolId)
          ctx % obj->storagePoolId;
@@ -156,10 +198,7 @@ class StripePattern
        */
       size_t getStripeTargetIndex(int64_t pos) const
       {
-         const unsigned chunkSize = getChunkSize();
-         const unsigned stripeSetSize = getNumStripeTargetIDs() * chunkSize;
-
-         return (pos % stripeSetSize) / chunkSize;
+         return (pos / getChunkSize()) % getNumStripeTargetIDs();
       }
 
       /**

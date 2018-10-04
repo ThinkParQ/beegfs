@@ -1,0 +1,5 @@
+jar-not-in-usr-share
+binary-without-manpage
+script-not-executable
+init.d-script-does-not-source-init-functions
+extra-license-file

@@ -47,7 +47,7 @@ FhgfsOpsErr MsgHelperOpen::openFile(EntryInfo* entryInfo, unsigned accessFlags,
          "entryInfo: " + entryInfo->getEntryID() );
 
       openMetaFileCompensate(entryInfo, std::move(outFileInode), accessFlags);
-      openRes = FhgfsOpsErr_INTERNAL;
+      return FhgfsOpsErr_INTERNAL;
    }
 
    if(truncLocalRequired)

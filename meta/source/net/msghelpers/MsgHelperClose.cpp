@@ -9,6 +9,8 @@
 #include <storage/MetaStore.h>
 #include "MsgHelperClose.h"
 
+#include <boost/lexical_cast.hpp>
+
 /**
  * The wrapper for closeSessionFile() and closeChunkFile().
  *
@@ -168,7 +170,6 @@ FhgfsOpsErr MsgHelperClose::closeChunkFileSequential(const NumNodeID sessionID,
 
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
-   Config* cfg = Program::getApp()->getConfig();
    TargetMapper* targetMapper = Program::getApp()->getTargetMapper();
    TargetStateStore* targetStates = Program::getApp()->getTargetStateStore();
    NodeStore* nodes = Program::getApp()->getStorageNodes();
@@ -190,18 +191,6 @@ FhgfsOpsErr MsgHelperClose::closeChunkFileSequential(const NumNodeID sessionID,
 
       CloseChunkFileMsg closeMsg(sessionID, fileHandleID, targetID, &pathInfo);
 
-      bool backlinksEnabled = cfg->getStoreBacklinksEnabled();
-
-      boost::scoped_array<char> serialEntryInfoBuf;
-      ssize_t serialEntryInfoBufLen = 0;
-
-      // generate chunk backlink info, if enabled in config ; ignore if entryInfo is NULL
-      if(backlinksEnabled && entryInfo)
-      {
-         serialEntryInfoBufLen = serializeIntoNewBuffer(*entryInfo, serialEntryInfoBuf);
-         closeMsg.setEntryInfoBuf(serialEntryInfoBuf.get(), serialEntryInfoBufLen);
-      }
-
       closeMsg.setMsgHeaderUserID(msgUserID);
 
       RequestResponseArgs rrArgs(NULL, &closeMsg, NETMSGTYPE_CloseChunkFileResp);
@@ -217,7 +206,7 @@ FhgfsOpsErr MsgHelperClose::closeChunkFileSequential(const NumNodeID sessionID,
          LogContext(logContext).log(Log_WARNING,
             "Communication with storage target failed: " + StringTk::uintToStr(targetID) + "; "
             "FileHandle: " + fileHandleID + "; "
-            "Error: " + FhgfsOpsErrTk::toErrString(requestRes) );
+            "Error: " + boost::lexical_cast<std::string>(requestRes));
 
          if(retVal == FhgfsOpsErr_SUCCESS)
             retVal = requestRes;
@@ -226,7 +215,7 @@ FhgfsOpsErr MsgHelperClose::closeChunkFileSequential(const NumNodeID sessionID,
       }
 
       // correct response type received
-      CloseChunkFileRespMsg* closeRespMsg = (CloseChunkFileRespMsg*)rrArgs.outRespMsg;
+      CloseChunkFileRespMsg* closeRespMsg = (CloseChunkFileRespMsg*)rrArgs.outRespMsg.get();
 
       FhgfsOpsErr closeRemoteRes = closeRespMsg->getResult();
 
@@ -246,7 +235,7 @@ FhgfsOpsErr MsgHelperClose::closeChunkFileSequential(const NumNodeID sessionID,
 
          LogContext(logContext).log(logLevel,
             "Storage target was unable to close chunk file: " + StringTk::uintToStr(targetID) + "; "
-            "Error: " + FhgfsOpsErrTk::toErrString(closeRemoteRes) + "; "
+            "Error: " + boost::lexical_cast<std::string>(closeRemoteRes) + "; "
             "Session: " + sessionID.str() + "; "
             "FileHandle: " + fileHandleID);
 
@@ -308,8 +297,6 @@ FhgfsOpsErr MsgHelperClose::closeChunkFileParallel(const NumNodeID sessionID,
    {
       CloseChunkFileWork* work = new CloseChunkFileWork(sessionID, fileHandleID, pattern,
          (*targetIDs)[i], &pathInfo, &(dynAttribsVec[i]), &(nodeResults[i]), &counter);
-
-      work->setEntryInfo(entryInfo);
 
       work->setMsgUserID(msgUserID);
 

@@ -10,7 +10,7 @@
 IncompleteInode::~IncompleteInode()
 {
    if (fd >= 0 && close(fd) < 0)
-      LOG(GENERAL, ERR, "Failed to close file", fd, sysErr());
+      LOG(GENERAL, ERR, "Failed to close file", fd, sysErr);
 }
 
 FhgfsOpsErr IncompleteInode::setXattr(const char* name, const void* value, size_t size)
@@ -52,7 +52,7 @@ FhgfsOpsErr IncompleteInode::clearUnsetXAttrs()
    const ssize_t listRes = ::flistxattr(fd, xattrNameBuf, sizeof(xattrNameBuf));
    if (listRes < 0)
    {
-      LOG(GENERAL, ERR, "could not list xattrs", fileName(), sysErr());
+      LOG(GENERAL, ERR, "could not list xattrs", fileName(), sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
@@ -79,7 +79,7 @@ FhgfsOpsErr IncompleteInode::clearUnsetXAttrs()
       if (removeRes != 0)
       {
          LOG(GENERAL, ERR, "could not remove superfluous xattr",
-             fileName(), as("name", *it), sysErr());
+             fileName(), ("name", *it), sysErr);
          return FhgfsOpsErr_INTERNAL;
       }
    }
@@ -102,7 +102,7 @@ std::string IncompleteInode::fileName() const
    ssize_t readRes = ::readlink(buffer, &result[0], PATH_MAX);
    if (readRes < 0)
    {
-      LOG(GENERAL, ERR, "Failed to resolve file for fd", fd, sysErr());
+      LOG(GENERAL, ERR, "Failed to resolve file for fd", fd, sysErr);
       return "<resolve error>";
    }
 

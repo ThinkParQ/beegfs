@@ -14,7 +14,7 @@ class ParentNameLockTestThread : public PThread
       {
       }
 
-      virtual void run()
+      void run() override
       {
          const unsigned maxSleepSeconds = 1;
 
@@ -57,7 +57,7 @@ class FileIDLockTestThread : public PThread
       {
       }
 
-      virtual void run()
+      void run() override
       {
          const unsigned maxSleepSeconds = 1;
 
@@ -99,7 +99,7 @@ class DirIDLockTestThread : public PThread
       {
       }
 
-      virtual void run()
+      void run() override
       {
          const unsigned maxSleepSeconds = 1;
          const std::string logInfo(writeLock ? dirID + "/write" : dirID + "/read");

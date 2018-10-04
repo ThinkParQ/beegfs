@@ -6,12 +6,16 @@ Introduction
 ------------
 
 The BeeGFS monitoring service (beegfs-mon) collects statistical data from the
-various BeeGFS nodes and stores it into a time series database (at the moment only
-InfluxDB is supported).
+various BeeGFS nodes and stores it into a time series database (at the moment InfluxDB and Apache
+Cassandra are supported).
 
 
 Prerequisites and dependencies
 ------------------------------
+
+We highly recommend to use InfluxDB as backend unless you already have a Cassandra Cluster in use
+that you want to utilize for mon. The next sections only refer to InfluxDB, if you want to use
+Cassandra, please refer to the last paragraph.
 
 InfluxDB and Grafana are NOT included within this package for several reasons:
 
@@ -86,3 +90,15 @@ properly, you should already see some data being collected.
 For more documentation and help in using Grafana, please visit the official website
 http://docs.grafana.org.
 
+
+Apache Cassandra
+----------------
+
+If you want to use Cassandra, please be aware that currently there are no Grafana panels for it
+available.
+
+To configure beegfs-mon to use Cassandra, you need to install the datastax cassandra client library
+on your system which you can find here: https://github.com/datastax/cpp-driver.
+It has to be the version 2.9. beegfs-mon loads the library dynamically, so no recompilation is
+required. The beegfs-mon config file needs to be edited to use the cassandra plugin. The available 
+options are explained over there.

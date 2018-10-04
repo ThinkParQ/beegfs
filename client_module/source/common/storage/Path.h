@@ -12,20 +12,16 @@ typedef struct Path Path;
 
 static inline void Path_init(Path* this);
 static inline void Path_initFromString(Path* this, const char* pathStr);
-static inline void Path_initFromPaths(Path* this, Path* parentPath, Path* childPath);
 static inline void Path_uninit(Path* this);
 
 static inline void Path_parseStr(Path* this, const char* pathStr);
 static inline bool Path_isPathStrAbsolute(const char* pathStr);
-
-static inline void Path_appendElem(Path* this, const char* newElem);
 
 // getters & setters
 static inline StrCpyList* Path_getPathElems(Path* this);
 static inline char* Path_getPathAsStrCopy(Path* this);
 static inline bool Path_isAbsolute(Path* this);
 static inline void Path_setAbsolute(Path* this, bool absolute);
-static inline const char* Path_getLastElem(Path* this);
 
 
 struct Path
@@ -49,32 +45,6 @@ void Path_initFromString(Path* this, const char* pathStr)
    Path_parseStr(this, pathStr);
 }
 
-void Path_initFromPaths(Path* this, Path* parentPath, Path* childPath)
-{
-   StrCpyListIter iter;
-
-   this->isPathAbsolute = Path_isAbsolute(parentPath);
-
-   // copy parentPath elems
-   StrCpyListIter_init(&iter, Path_getPathElems(parentPath) );
-
-   for( ; !StrCpyListIter_end(&iter); StrCpyListIter_next(&iter) )
-   {
-      char* currentPathElem = StrCpyListIter_value(&iter);
-      StrCpyList_append(&this->pathElems, currentPathElem);
-   }
-
-
-   // copy childPath elems
-   StrCpyListIter_init(&iter, Path_getPathElems(childPath) );
-
-   for( ; !StrCpyListIter_end(&iter); StrCpyListIter_next(&iter) )
-   {
-      char* currentPathElem = StrCpyListIter_value(&iter);
-      StrCpyList_append(&this->pathElems, currentPathElem);
-   }
-}
-
 void Path_uninit(Path* this)
 {
    StrCpyList_uninit(&this->pathElems);
@@ -88,11 +58,6 @@ void Path_parseStr(Path* this, const char* pathStr)
 bool Path_isPathStrAbsolute(const char* pathStr)
 {
    return (strlen(pathStr) && (pathStr[0] == '/') );
-}
-
-void Path_appendElem(Path* this, const char* newElem)
-{
-   StrCpyList_append(&this->pathElems, newElem);
 }
 
 StrCpyList* Path_getPathElems(Path* this)
@@ -173,11 +138,5 @@ void Path_setAbsolute(Path* this, bool absolute)
 {
    this->isPathAbsolute = absolute;
 }
-
-const char* Path_getLastElem(Path* this)
-{
-   return StrCpyList_getTailValue(&this->pathElems);
-}
-
 
 #endif /*PATH_H_*/

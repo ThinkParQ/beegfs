@@ -1,6 +1,7 @@
 #include <program/Program.h>
 #include "ExternalJobRunner.h"
 
+#include <mutex>
 
 #define JOBRUNNER_OUTPUT_DIR "/tmp/beegfs/jobrunner"
 
@@ -43,65 +44,65 @@ void ExternalJobRunner::workLoop()
 
    while(!getSelfTerminate() )
    {
-      SafeMutexLock mutexLock(&jobsMutex); // L O C K _ R U N N E R
-
-      if(waitingJobs.empty() )
-         jobAddedCond.timedwait(&jobsMutex, jobAddWaitMS);
-
-      if(waitingJobs.empty() )
+      Job* job (nullptr);
       {
-         mutexLock.unlock(); // U N L O C K _ R U N N E R
-         continue;
+         const std::lock_guard<Mutex> lock(jobsMutex);
+
+         if(waitingJobs.empty() )
+            jobAddedCond.timedwait(&jobsMutex, jobAddWaitMS);
+
+         if(waitingJobs.empty() )
+         {
+            continue;
+         }
+
+         // take the oldest job from the front of the queue and execute it
+
+         job = waitingJobs.front();
+         waitingJobs.pop_front();
+
+         /* (note: we move the job to finished queue here to avoid taking the runner lock again later.
+            nobody will care about it being in the finished queue as long as we don't broadcast that
+            it's finished.) */
+         finishedJobs.push_back(job);
       }
 
-      // take the oldest job from the front of the queue and execute it
-
-      Job *job = waitingJobs.front();
-      waitingJobs.pop_front();
-
-      /* (note: we move the job to finished queue here to avoid taking the runner lock again later.
-         nobody will care about it being in the finished queue as long as we don't broadcast that
-         it's finished.) */
-      finishedJobs.push_back(job);
-
-      mutexLock.unlock(); // U N L O C K _ R U N N E R
-
-
-      SafeMutexLock jobMutexLock(job->mutex); // L O C K _ J O B
-
-      std::string cmd = job->cmd + " > " + job->outputFile + " 2>&1";
-      job->startTime = time(NULL);
-
-      log.log(Log_DEBUG, "Executing job: " + cmd);
-
-      /*
-      * In mongoose.c we disabled ignore SIGCHILD. Ignore SIGCHILD breaks the installation process
-      * from the admon GUI, the system call system() returns every time -1. SIGCHILD is required for
-      * the system call system().
-      */
-      int systemRes = system(cmd.c_str() );
-
-      if(WIFEXITED(systemRes) )
-         job->returnCode = WEXITSTATUS(systemRes);
-      else
-         job->returnCode = -1;
-
-      if(job->returnCode != 0)
       {
-         log.log(Log_ERR, "Job complete with return code: " + StringTk::intToStr(job->returnCode) +
-            " - command: " + job->cmd);
+         const std::lock_guard<Mutex> lock(*job->mutex);
+
+         std::string cmd = job->cmd + " > " + job->outputFile + " 2>&1";
+         job->startTime = time(NULL);
+
+         log.log(Log_DEBUG, "Executing job: " + cmd);
+
+         /*
+          * In mongoose.c we disabled ignore SIGCHILD. Ignore SIGCHILD breaks the installation process
+          * from the admon GUI, the system call system() returns every time -1. SIGCHILD is required for
+          * the system call system().
+          */
+         // NOLINTNEXTLINE sigh. there is at this point no sensible way of fixing this.
+         int systemRes = system(cmd.c_str() );
+
+         if(WIFEXITED(systemRes) )
+            job->returnCode = WEXITSTATUS(systemRes);
+         else
+            job->returnCode = -1;
+
+         if(job->returnCode != 0)
+         {
+            log.log(Log_ERR, "Job complete with return code: " + StringTk::intToStr(job->returnCode) +
+               " - command: " + job->cmd);
+         }
+         else
+         {
+            log.log(Log_SPAM, "Job complete with return code: " + StringTk::intToStr(job->returnCode) +
+               " - command: " + job->cmd);
+         }
+
+         job->finished = true;
+
+         job->jobFinishedCond.broadcast();
       }
-      else
-      {
-         log.log(Log_SPAM, "Job complete with return code: " + StringTk::intToStr(job->returnCode) +
-            " - command: " + job->cmd);
-      }
-
-      job->finished = true;
-
-      job->jobFinishedCond.broadcast();
-
-      jobMutexLock.unlock(); // U N L O C K _ J O B
    }
 }
 
@@ -125,7 +126,7 @@ Job* ExternalJobRunner::addJob(std::string cmd, Mutex* mutex)
    job->finished = false;
 
 
-   SafeMutexLock mutexLock(&jobsMutex); // L O C K
+   const std::lock_guard<Mutex> lock(jobsMutex);
 
    uint64_t nowTime = time(NULL);
 
@@ -137,9 +138,6 @@ Job* ExternalJobRunner::addJob(std::string cmd, Mutex* mutex)
 
    waitingJobs.push_back(job);
    jobAddedCond.broadcast();
-
-   mutexLock.unlock(); // U N L O C K
-
 
    return job;
 }
@@ -153,9 +151,7 @@ Job* ExternalJobRunner::addJob(std::string cmd, Mutex* mutex)
  */
 bool ExternalJobRunner::delJob(std::string id)
 {
-   bool retVal = false;
-
-   SafeMutexLock safeLock(&jobsMutex); // L O C K
+   const std::lock_guard<Mutex> lock(jobsMutex);
 
    for(JobListIter iter = finishedJobs.begin(); iter != finishedJobs.end(); iter++)
    {
@@ -168,14 +164,11 @@ bool ExternalJobRunner::delJob(std::string id)
          SAFE_DELETE(job);
          finishedJobs.erase(iter);
 
-         retVal = true;
-         break;
+         return true;
       }
    }
 
-   safeLock.unlock(); // U N L O C K
-
-   return retVal;
+   return false;
 }
 
 ExternalJobRunner::~ExternalJobRunner()

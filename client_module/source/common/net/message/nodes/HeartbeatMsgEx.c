@@ -18,9 +18,6 @@ void HeartbeatMsgEx_serializePayload(NetMessage* this, SerializeCtx* ctx)
 {
    HeartbeatMsgEx* thisCast = (HeartbeatMsgEx*)this;
 
-   // nodeFeatureFlags
-   BitStore_serialize(thisCast->nodeFeatureFlags, ctx);
-
    // instanceVersion
    Serialization_serializeUInt64(ctx, thisCast->instanceVersion);
 
@@ -30,9 +27,6 @@ void HeartbeatMsgEx_serializePayload(NetMessage* this, SerializeCtx* ctx)
    // nodeType
    Serialization_serializeInt(ctx, thisCast->nodeType);
 
-   // fhgfsVersion
-   Serialization_serializeUInt(ctx, thisCast->fhgfsVersion);
-
    // nodeID
    Serialization_serializeStr(ctx, thisCast->nodeIDLen, thisCast->nodeID);
 
@@ -40,10 +34,10 @@ void HeartbeatMsgEx_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeStrAlign4(ctx, thisCast->ackIDLen, thisCast->ackID);
 
    // nodeNumID
-   NumNodeID_serialize(&thisCast->nodeNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->nodeNumID);
 
    // rootNumID
-   NumNodeID_serialize(&thisCast->rootNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->rootNumID);
 
    // rootIsBuddyMirrored
    Serialization_serializeBool(ctx, thisCast->rootIsBuddyMirrored);
@@ -62,10 +56,6 @@ bool HeartbeatMsgEx_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
 {
    HeartbeatMsgEx* thisCast = (HeartbeatMsgEx*)this;
 
-   // nodeFeatureFlags
-   if(!BitStore_deserializePreprocess(ctx, &thisCast->nodeFeatureFlagsStart) )
-      return false;
-
    // instanceVersion
    if(!Serialization_deserializeUInt64(ctx, &thisCast->instanceVersion) )
       return false;
@@ -76,10 +66,6 @@ bool HeartbeatMsgEx_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
 
    // nodeType
    if(!Serialization_deserializeInt(ctx, &thisCast->nodeType) )
-      return false;
-
-   // fhgfsVersion
-   if(!Serialization_deserializeInt(ctx, &thisCast->fhgfsVersion) )
       return false;
 
    // nodeID
@@ -184,18 +170,6 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
       // (will belong to the NodeStore => no destruct() required)
 
    Node_setNodeType(node, HeartbeatMsgEx_getNodeType(thisCast) );
-   Node_setFhgfsVersion(node, HeartbeatMsgEx_getFhgfsVersion(thisCast) );
-
-   {// set nodeFeatureFlags
-      BitStore nodeFeatureFlags;
-
-      BitStore_init(&nodeFeatureFlags, false);
-
-      HeartbeatMsgEx_parseNodeFeatureFlags(thisCast, &nodeFeatureFlags);
-      Node_setFeatureFlags(node, &nodeFeatureFlags);
-
-      BitStore_uninit(&nodeFeatureFlags);
-   }
 
    // set local nic capabilities
 

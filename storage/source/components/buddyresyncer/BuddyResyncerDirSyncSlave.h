@@ -39,7 +39,7 @@ class BuddyResyncerDirSyncSlave : public PThread
       FhgfsOpsErr getBuddyDirContents(Node& node, const std::string& dirPath, uint16_t targetID,
          int64_t offset, StringList& outNames, IntList& outEntryTypes, int64_t& outNewOffset);
       FhgfsOpsErr findChunks(uint16_t targetID, const std::string& dirPath, StringList& inOutNames,
-         IntList& inOutEntryType);
+         IntList& inOutEntryTypes);
       FhgfsOpsErr removeBuddyChunkPaths(Node& node, uint16_t localTargetID, uint16_t buddyTargetID,
          StringList& paths);
 
@@ -47,13 +47,9 @@ class BuddyResyncerDirSyncSlave : public PThread
       // getters & setters
       bool getIsRunning()
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
-         bool retVal = this->isRunning;
-
-         safeLock.unlock();
-
-         return retVal;
+         return this->isRunning;
       }
 
       void setOnlyTerminateIfIdle(bool value)
@@ -92,12 +88,10 @@ class BuddyResyncerDirSyncSlave : public PThread
 
       void setIsRunning(bool isRunning)
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
          this->isRunning = isRunning;
          isRunningChangeCond.broadcast();
-
-         safeLock.unlock();
       }
 
       bool getSelfTerminateNotIdle()

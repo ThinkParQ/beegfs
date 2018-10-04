@@ -13,12 +13,6 @@ FileIDLock TruncFileMsgEx::lock(EntryLockStore& store)
 
 bool TruncFileMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "TruncFileMsgEx incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a TruncFileMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    return BaseType::processIncoming(ctx);
 }
 
@@ -27,8 +21,7 @@ std::unique_ptr<MirroredMessageResponseState> TruncFileMsgEx::executeLocally(Res
 {
    App* app = Program::getApp();
    // update operation counters
-   Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
-      MetaOpCounter_TRUNCATE, getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_TRUNCATE);
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 

@@ -7,11 +7,8 @@
 #include <common/threading/PThread.h>
 #include <common/toolkit/BitStore.h>
 #include <common/toolkit/NetFilter.h>
+#include <common/toolkit/LockFD.h>
 #include <common/Common.h>
-
-
-#define APP_FEATURES_ARRAY_LEN      (sizeof(APP_FEATURES)/sizeof(unsigned) ) /* APP_FEATURES is
-                                                                        defined in App.cpp files */
 
 
 class StreamListenerV2; // forward declaration
@@ -23,18 +20,17 @@ class AbstractApp : public PThread
       virtual void stopComponents() = 0;
       virtual void handleComponentException(std::exception& e) = 0;
 
-      int createAndLockPIDFile(std::string pidFile);
-      void updateLockedPIDFile(int pidFileFD);
-      void unlockAndDeletePIDFile(int pidFileFD, const std::string& pidFile);
+      LockFD createAndLockPIDFile(const std::string& pidFile);
+      void updateLockedPIDFile(LockFD& pidFileFD);
 
       void waitForComponentTermination(PThread* component);
 
       static void handleOutOfMemFromNew();
 
-      virtual ICommonConfig* getCommonConfig() = 0;
-      virtual NetFilter* getNetFilter() = 0;
-      virtual NetFilter* getTcpOnlyFilter() = 0;
-      virtual AbstractNetMessageFactory* getNetMessageFactory() = 0;
+      virtual const ICommonConfig* getCommonConfig() const = 0;
+      virtual const NetFilter* getNetFilter() const = 0;
+      virtual const NetFilter* getTcpOnlyFilter() const = 0;
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const = 0;
 
       static bool didRunTimeInit;
 
@@ -63,11 +59,6 @@ class AbstractApp : public PThread
       {
          basicDestructions();
       }
-
-      static unsigned featuresGetHighestNum(const unsigned* featuresArray, unsigned numArrayElems);
-      static void featuresToBitStore(const unsigned* featuresArray, unsigned numArrayElems,
-         BitStore* outBitStore);
-
 
    private:
       static bool basicInitializations();

@@ -70,7 +70,7 @@ int ModeRemoveDirEntry::execute()
       EntryInfo entryInfo;
 
       if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, true,
-            *metaNodes, *metaBuddyGroupMapper,
+            *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
             entryInfo, ownerNode))
       {
          retVal = APPCODE_RUNTIME_ERROR;
@@ -132,28 +132,23 @@ bool ModeRemoveDirEntry::removeDirEntry(Node& ownerNode, EntryInfo* parentInfo,
 {
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    RmDirEntryRespMsg* respMsgCast;
 
    FhgfsOpsErr rmLinkRes;
 
    RmDirEntryMsg rmDirEntryMsg(parentInfo, entryName);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &rmDirEntryMsg, NETMSGTYPE_RmDirEntryResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, rmDirEntryMsg,
+         NETMSGTYPE_RmDirEntryResp);
+   if (!respMsg)
       goto err_cleanup;
 
-   respMsgCast = (RmDirEntryRespMsg*)respMsg;
+   respMsgCast = (RmDirEntryRespMsg*)respMsg.get();
 
    rmLinkRes = (FhgfsOpsErr)respMsgCast->getValue();
    if(rmLinkRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Server encountered an error: " << FhgfsOpsErrTk::toErrString(rmLinkRes) <<
-         std::endl;
+      std::cerr << "Server encountered an error: " << rmLinkRes << std::endl;
       goto err_cleanup;
    }
 
@@ -163,9 +158,6 @@ bool ModeRemoveDirEntry::removeDirEntry(Node& ownerNode, EntryInfo* parentInfo,
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 

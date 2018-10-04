@@ -68,41 +68,14 @@ endif # BEEGFS_OPENTK_IBVERBS
 # include in their rdma headers, leading to implicit function declarations.
 $(call define_if_matches, KERNEL_HAS_SCSI_FC_COMPAT, "vlan_dev_vlan_id", scsi/fc_compat.h)
 
-# Find out whether the kernel has a drop_nlink function.
-# Note: Was added in vanilla 2.6.19, but RedHat adds it to 2.6.18.
-$(call define_if_matches, KERNEL_HAS_DROP_NLINK, -F "drop_nlink(struct inode *inode)", fs.h)
-
-# Find out whether the kernel has a clear_nlink function.
-# Note: Was added in vanilla 2.6.19, but RedHat adds it to 2.6.18.
-$(call define_if_matches, KERNEL_HAS_CLEAR_NLINK, -F "clear_nlink(struct inode *inode)", fs.h)
-
-# Find out whether kernel has posix_test_lock method with two args and void return value.
-# Note: There were at least three different versions since 2.6.16 before this
-# was introduced in vanilla 2.6.23
-$(call define_if_matches, KERNEL_HAS_TEST_LOCK_VOID_TWOARGS, \
-   -F "void posix_test_lock(struct file *, struct file_lock *);", fs.h)
-
-# Find out whether kernel defines ATTR_OPEN.
-# Note: Was introduced in vanilla 2.6.24
-$(call define_if_matches, KERNEL_HAS_ATTR_OPEN, "define ATTR_OPEN", fs.h)
-
 # Find out whether the kernel has a ihold function.
 # Note: Was added in vanilla 2.6.37, but RedHat adds it to their 2.6.32.
 $(call define_if_matches, KERNEL_HAS_IHOLD, ' ihold(struct inode.*)', fs.h)
-
-# Find out whether the kernel has task_io_account_read/write.
-# Note: Was introduced in vanilla 2.6.20, but RedHat adds it to 2.6.18.
-$(call define_if_matches, KERNEL_HAS_TASK_IO_ACCOUNTING, ' task_io_account_read(size_t .*)', \
-   task_io_accounting_ops.h)
 
 # Find out whether the kernel has fsync start and end range arguments.
 # Note: fsync start and end were added in vanilla 3.1, but SLES11SP3 adds it to its 3.0 kernel.
 $(call define_if_matches, KERNEL_HAS_FSYNC_RANGE, \
    -F "int (*fsync) (struct file *, loff_t, loff_t, int datasync);", fs.h)
-
-# Find out whether the kernel has inc_nlink()
-# Note: inc_nlink was added in vanilla 2.6.19, but RHEL5 also has it.
-$(call define_if_matches, KERNEL_HAS_INC_NLINK, " inc_nlink(struct inode.*)", fs.h)
 
 # Find out whether the kernel has define struct dentry_operations *s_d_op
 # in struct super_block. If it has it used that to check if the file system
@@ -122,11 +95,6 @@ $(call define_if_matches, KERNEL_HAS_D_MATERIALISE_UNIQUE, \
 # Note: This method was added in vanilla linux-3.10
 $(call define_if_matches, KERNEL_HAS_PDE_DATA, -F "PDE_DATA(const struct inode *)", proc_fs.h)
 
-# Find out whether the kernel has get_unaligned_le{16,32,64}
-#
-# Note: added to 2.6.26, but at least backported to RHEL6
-$(call define_if_matches, KERNEL_HAS_GET_UNALIGNED_LE, "get_unaligned_le16", unaligned/access_ok.h)
-
 # Find out whether the kernel has i_uid_read
 #
 # Note: added to 3.5
@@ -141,22 +109,6 @@ $(call define_if_matches, KERNEL_HAS_ATOMIC_OPEN, "atomic_open", fs.h)
 #
 # Note: added to 3.3
 $(call define_if_matches, KERNEL_HAS_UMODE_T, -E "(\*mkdir).*umode_t", fs.h)
-
-# Find out whether the kernel removed 1 parameter from INIT_WORK
-#
-# Note: INIT_WORK takes only two parameters since 2.6.20
-$(call define_if_matches, KERNEL_HAS_2_PARAM_INIT_WORK, -F "define INIT_WORK(_work, _func)", \
-   workqueue.h)
-
-# FIND out if the kernel has write_cache_pages
-#
-# Note: Added to 2.6.35, backported to RHEL6 kernels
-$(call define_if_matches, KERNEL_HAS_WRITE_CACHE_PAGES, "write_cache_pages", writeback.h)
-
-# FIND out if the kernel has list_is_last
-#
-# Note: Added to 2.6.18
-$(call define_if_matches, KERNEL_HAS_LIST_IS_LAST, "list_is_last", list.h)
 
 # Find out if the kernel has an iov_iter arg for the direct_IO method.
 #
@@ -189,14 +141,6 @@ $(call define_if_matches, KERNEL_HAS_CONST_XATTR_HANDLER, \
 $(call define_if_matches, KERNEL_HAS_DENTRY_XATTR_HANDLER, \
    "int (\*set).struct dentry \*dentry", xattr.h)
 
-# struct iov_iter was originally new to to 2.6.23, but some distro kernels have it too
-# iov_iter_advance was added a little bit later
-# Note: we need to check that in multiple files, because it is declared in uio.h in vanilla kernels, but at least RHEL backports put it in fs.h
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_TYPE, "struct iov_iter {", fs.h)
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_FUNCTIONS, "void iov_iter_advance", fs.h)
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_TYPE, "struct iov_iter {", uio.h)
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_FUNCTIONS, "void iov_iter_advance", uio.h)
-
 # iov_iter_truncate was new to 3.16, but was backported in distro kernels
 # Note: we need to check that in multiple files, because it is declared in uio.h in vanilla kernels, but at least RHEL backports put it in fs.h
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_TRUNCATE, "static inline void iov_iter_truncate(struct iov_iter \*i, size_t count)", fs.h)
@@ -228,13 +172,6 @@ $(call define_if_matches, KERNEL_HAS_LOCKS_LOCK_INODE_WAIT, -F "static inline in
 
 # get_link() replaces follow_link() in 4.5
 $(call define_if_matches, KERNEL_HAS_GET_LINK, -F "const char * (*get_link) (struct dentry *, struct inode *, struct delayed_call *);", fs.h)
-
-# older kernel versions have arch-specific struct semaphore, newer versions do not
-KERNEL_FEATURE_DETECTION += $(shell \
-   test -f ${KSRCDIR_PRUNED_HEAD}/include/linux/semaphore.h \
-      && echo "-DKERNEL_HAS_GENERIC_SEMAPHORE")
-
-$(call define_if_matches, KERNEL_HAS_IS_VMALLOC_ADDR, -F "is_vmalloc_addr", mm.h)
 
 $(call define_if_matches, KERNEL_HAS_I_MMAP_LOCK, -F "i_mmap_lock_read", fs.h)
 $(call define_if_matches, KERNEL_HAS_I_MMAP_RWSEM, -F "i_mmap_rwsem", fs.h)
@@ -275,15 +212,8 @@ KERNEL_FEATURE_DETECTION += $(shell \
       && echo "-DKERNEL_HAS_RECVMSG_SIZE")
 
 $(call define_if_matches, KERNEL_HAS_MEMDUP_USER, "memdup_user", string.h)
-$(call define_if_matches, KERNEL_HAS_CURRENT_FSUID, "current_fsuid", cred.h)
-$(call define_if_matches, KERNEL_HAS_FIRST_NET_DEVICE_NS, "first_net_device.struct net", \
-   netdevice.h)
-$(call define_if_matches, KERNEL_HAS_FIRST_NET_DEVICE, "first_net_device.void.", netdevice.h)
 $(call define_if_matches, KERNEL_HAS_FAULTATTR_DNAME, -F "struct dentry *dname", fault-inject.h)
-$(call define_if_matches, KERNEL_HAS_MNT_WANT_WRITE, "mnt_want_write", mount.h)
 $(call define_if_matches, KERNEL_HAS_SYSTEM_UTSNAME, "system_utsname", utsname.h)
-$(call define_if_matches, KERNEL_HAS_IN4_PTON, "in4_pton", inet.h)
-$(call define_if_matches, KERNEL_HAS_KSTRNDUP, "kstrndup", string.h)
 $(call define_if_matches, KERNEL_HAS_SOCK_CREATE_KERN_NS, "sock_create_kern.struct net", net.h)
 $(call define_if_matches, KERNEL_HAS_SOCK_SENDMSG_NOLEN, "sock_sendmsg.*msg.;", net.h)
 $(call define_if_matches, KERNEL_HAS_MSGHDR_ITER, "msg_iter", socket.h)
@@ -297,7 +227,6 @@ $(call define_if_matches, KERNEL_HAS_GENERIC_FILE_LLSEEK_UNLOCKED, "generic_file
    fs.h)
 $(call define_if_matches, KERNEL_HAS_SET_NLINK, "set_nlink", fs.h)
 $(call define_if_matches, KERNEL_HAS_DENTRY_PATH_RAW, "dentry_path_raw", dcache.h)
-$(call define_if_matches, KERNEL_HAS_MAPPING_SET_ERROR, "mapping_set_error", pagemap.h)
 $(call define_if_matches, KERNEL_HAS_PREPARE_WRITE, -F "(*prepare_write)", fs.h)
 $(call define_if_matches, KERNEL_HAS_FSYNC_DENTRY, -P "(\*fsync).*dentry", fs.h)
 $(call define_if_matches, KERNEL_HAS_ITER_FILE_SPLICE_WRITE, "iter_file_splice_write", fs.h)
@@ -338,14 +267,11 @@ KERNEL_FEATURE_DETECTION += $(shell \
    grep -sFA5 "kmem_cache_create" ${KSRCDIR_PRUNED_HEAD}/include/linux/slab.h \
       | grep -qsxP "\s+void \(\*\)\(.*?\)," \
       && echo "-DKERNEL_HAS_KMEMCACHE_DTOR")
-$(call define_if_matches, KERNEL_HAS_PROC_CREATE_DATA, -F "proc_create_data", proc_fs.h)
 $(call define_if_matches, KERNEL_HAS_SB_BDI, -F "struct backing_dev_info *s_bdi", fs.h)
 $(call define_if_matches, KERNEL_HAS_BDI_SETUP_AND_REGISTER, "bdi_setup_and_register", \
    backing-dev.h)
 $(call define_if_matches, KERNEL_HAS_FOLLOW_LINK_COOKIE, \
    -P "const char \* \(\*follow_link\) \(struct dentry \*. void \*\*\);", fs.h)
-$(call define_if_matches, KERNEL_HAS_FILEMAP_WRITE_AND_WAIT_RANGE, "filemap_write_and_wait_range", \
-   fs.h)
 $(call define_if_matches, KERNEL_HAS_FSYNC_2, \
    -F "int (*fsync) (struct file *, int datasync);", fs.h)
 KERNEL_FEATURE_DETECTION += $(shell \
@@ -361,7 +287,6 @@ KERNEL_FEATURE_DETECTION += $(shell \
       | grep -qsF "loff_t *" \
       && echo "-DKERNEL_HAS_GENERIC_FILE_DIRECT_WRITE_POSP")
 $(call define_if_matches, KERNEL_HAS_COPY_FROM_ITER, "copy_from_iter", uio.h)
-$(call define_if_matches, KERNEL_HAS_INIT_WORK_2, -F "INIT_WORK(_work, _func)", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_ALLOC_WORKQUEUE, "alloc_workqueue", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WAIT_QUEUE_ENTRY_T, "wait_queue_entry_t", wait.h)

@@ -5,8 +5,6 @@
 #include <common/nodes/TargetCapacityPools.h>
 #include <common/nodes/TargetStateStore.h>
 #include <common/storage/quota/ExceededQuotaPerTarget.h>
-#include <common/threading/SafeRWLock.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/Common.h>
 
 
@@ -23,9 +21,8 @@ class TargetMapper
       bool unmapTarget(uint16_t targetID);
       bool unmapByNodeID(NumNodeID nodeID);
 
-      void syncTargetsFromLists(UInt16List& targetIDs, NumNodeIDList& nodeIDs);
+      void syncTargets(TargetMap newTargets);
       void getMappingAsLists(UInt16List& outTargetIDs, NumNodeIDList& outNodeIDs) const;
-      void getMapping(TargetMap& outTargetMap) const;
       void getTargetsByNode(NumNodeID nodeID, UInt16List& outTargetIDs) const;
 
       void attachStateStore(TargetStateStore* states);
@@ -33,23 +30,14 @@ class TargetMapper
       void attachStoragePoolStore(StoragePoolStore* storagePools);
       void attachExceededQuotaStores(ExceededQuotaPerTarget* exceededQuotaStores);
 
-      bool loadFromFile();
-      bool saveToFile();
-
-
-   private:
+   protected:
       mutable RWLock rwlock;
+
       TargetMap targets; // keys: targetIDs, values: nodeNumIDs
 
       TargetStateStore* states; // optional for auto add/remove on map/unmap (may be NULL)
       StoragePoolStore* storagePools; // for auto add/remove on map/unmap (may be NULL)
       ExceededQuotaPerTarget* exceededQuotaStores; // for auto add/remove on map/unmap (may be NULL)
-
-      bool mappingsDirty; // true if saved mappings file needs to be updated
-      std::string storePath; // set to enable load/save methods (setting is not thread-safe)
-
-      void exportToStringMap(StringMap& outExportMap) const;
-      void importFromStringMap(StringMap& importMap);
 
 
    public:
@@ -60,58 +48,30 @@ class TargetMapper
        */
       NumNodeID getNodeID(uint16_t targetID) const
       {
-         NumNodeID nodeID;
+         RWLockGuard const lock(rwlock, SafeRWLock_READ);
 
-         RWLockGuard safeLock(rwlock, SafeRWLock_READ); // L O C K
-
-         TargetMapCIter iter = targets.find(targetID);
-         if(iter != targets.end() )
-         {
-            nodeID = iter->second;
-         }
-
-         return nodeID;
+         const auto iter = targets.find(targetID);
+         return iter != targets.end()
+            ? iter->second
+            : NumNodeID{};
       }
 
       size_t getSize() const
       {
-         RWLockGuard safeLock(rwlock, SafeRWLock_READ); // L O C K
-
-         size_t targetsSize = targets.size();
-
-         return targetsSize;
-      }
-
-      void setStorePath(std::string storePath)
-      {
-         this->storePath = storePath;
-      }
-
-      bool isMapperDirty() const
-      {
-         RWLockGuard safeLock(rwlock, SafeRWLock_READ); // L O C K
-
-         bool retVal = mappingsDirty;
-
-         return retVal;
+         RWLockGuard const lock(rwlock, SafeRWLock_READ);
+         return targets.size();
       }
 
       bool targetExists(uint16_t targetID) const
       {
-         bool retVal = false;
+         RWLockGuard const lock(rwlock, SafeRWLock_READ);
+         return targets.count(targetID) != 0;
+      }
 
-         RWLockGuard safeLock(rwlock, SafeRWLock_READ); // L O C K
-
-         for (TargetMapCIter iter = targets.begin(); iter != targets.end(); iter++)
-         {
-            if (iter->first == targetID)
-            {
-               retVal = true;
-               break;
-            }
-         }
-
-         return retVal;
+      TargetMap getMapping() const
+      {
+         RWLockGuard const lock(rwlock, SafeRWLock_READ);
+         return targets;
       }
 };
 

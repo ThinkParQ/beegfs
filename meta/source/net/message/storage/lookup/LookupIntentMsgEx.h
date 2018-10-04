@@ -199,9 +199,9 @@ class LookupIntentMsgEx : public MirroredMessage<LookupIntentMsg,
 
    private:
       FhgfsOpsErr lookup(const std::string& parentEntryID, const std::string& entryName,
-         bool isBuddyMirrored, EntryInfo* outEntryInfo, FileInodeStoreData* outInodeMetaData,
+         bool isBuddyMirrored, EntryInfo* outEntryInfo, FileInodeStoreData* outInodeStoreData,
          bool& outInodeDataOutdated);
-      FhgfsOpsErr revalidate(EntryInfo* entryInfo);
+      FhgfsOpsErr revalidate(EntryInfo* diskEntryInfo);
       FhgfsOpsErr create(EntryInfo* parentInfo, const std::string& entryName,
          EntryInfo* outEntryInfo, FileInodeStoreData* outInodeData, bool isSecondary);
       FhgfsOpsErr stat(EntryInfo* entryInfo, bool loadFromDisk, StatData& outStatData);

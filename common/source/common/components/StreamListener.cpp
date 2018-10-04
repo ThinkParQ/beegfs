@@ -75,7 +75,7 @@ bool StreamListener::initSockReturnPipe()
 
 bool StreamListener::initSocks(unsigned short listenPort, NicListCapabilities* localNicCaps)
 {
-   ICommonConfig* cfg = PThread::getCurrentThreadApp()->getCommonConfig();
+   auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
 
    rdmaListenSock = NULL;
    sdpListenSock = NULL;
@@ -88,7 +88,7 @@ bool StreamListener::initSocks(unsigned short listenPort, NicListCapabilities* l
    { // RDMA usage is enabled
       try
       {
-         rdmaListenSock = new RDMASocket();
+         rdmaListenSock = RDMASocket::create().release();
          rdmaListenSock->bind(listenPort);
          rdmaListenSock->listen();
 
@@ -538,7 +538,7 @@ void StreamListener::rdmaConnIdleCheck()
       pollList.removeByFD(*iter);
    }
 
-   if(disposalFDs.size() )
+   if (!disposalFDs.empty())
    { // logging
       LOG_DEBUG("StreamListener::rdmaConnIdleCheck", 5, std::string("Check results: ") +
          std::string("disposed ") + StringTk::int64ToStr(disposalFDs.size() ) + "/" +

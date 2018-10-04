@@ -5,7 +5,6 @@
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/FhgfsTypes.h>
 #include <common/toolkit/MessagingTk.h>
-#include <common/toolkit/VersionTk.h>
 #include <common/storage/StorageErrors.h>
 #include <common/threading/Thread.h>
 #include <filesystem/FhgfsInode.h>

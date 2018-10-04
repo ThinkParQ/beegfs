@@ -1,11 +1,10 @@
-CAN_PACKAGE := yes
+include ../../build/Makefile
 
-include $(or $(root-dir),../..)/build/Makefile
+TARGETS = ctl fsck java_lib event_listener
 
-all: ctl fsck java_lib event_listener
+all: $(TARGETS)
 
 export BEEGFS_COMMON_PATH
-export BEEGFS_OPENTK_PATH
 export BEEGFS_THIRDPARTY_PATH
 export BEEGFS_EVENT_LISTENER_PATH
 export BEEGFS_VERSION

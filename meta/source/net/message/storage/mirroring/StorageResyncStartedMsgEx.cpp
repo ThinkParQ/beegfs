@@ -11,9 +11,6 @@
 
 bool StorageResyncStartedMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("StorageResyncStartedMsg incoming", Log_DEBUG,
-      "Received a StorageResyncStartedMsg from: " + ctx.peerName() );
-
    NumNodeID nodeID = Program::getApp()->getLocalNodeNumID();
 
    uint16_t targetID = getValue();

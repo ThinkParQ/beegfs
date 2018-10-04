@@ -247,66 +247,6 @@ loff_t generic_file_llseek_unlocked(struct file *file, loff_t offset, int origin
 #endif // LINUX_VERSION_CODE
 #endif
 
-#ifndef KERNEL_HAS_DROP_NLINK
-
-/**
- * Note: This is just an exact copy of the kernel method (from kernel 2.6.30), which was introduced
- * in 2.6.19.
- *
- * drop_nlink - directly drop an inode's link count
- * @inode: inode
- *
- * This is a low-level filesystem helper to replace any
- * direct filesystem manipulation of i_nlink.  In cases
- * where we are attempting to track writes to the
- * filesystem, a decrement to zero means an imminent
- * write when the file is truncated and actually unlinked
- * on the filesystem.
- */
-void drop_nlink(struct inode *inode)
-{
-   inode->i_nlink--;
-}
-
-#endif // KERNEL_HAS_DROP_NLINK
-
-#ifndef KERNEL_HAS_CLEAR_NLINK
-/**
- * Note: This is just an exact copy of the kernel method (from kernel 2.6.30), which was introduced
- * in 2.6.19.
- *
- * clear_nlink - directly zero an inode's link count
- * @inode: inode
- *
- * This is a low-level filesystem helper to replace any
- * direct filesystem manipulation of i_nlink.  See
- * drop_nlink() for why we care about i_nlink hitting zero.
- */
-void clear_nlink(struct inode *inode)
-{
-   inode->i_nlink = 0;
-}
-
-#endif // KERNEL_HAS_CLEAR_NLINK
-
-#ifndef KERNEL_HAS_INC_NLINK
-/**
- * Note: Add inc_nlink for compatibility
- *
- * inc_nlink - directly zero an inode's link count
- * @inode: inode
- *
- * This is a low-level filesystem helper to replace any
- * direct filesystem manipulation of i_nlink.  See
- * drop_nlink() for why we care about i_nlink hitting zero.
- */
-void inc_nlink(struct inode *inode)
-{
-   inode->i_nlink++;
-}
-#endif // KERNEL_HAS_INC_NLINK
-
-
 #ifndef KERNEL_HAS_DENTRY_PATH_RAW
 /**
  * Get the relative path of a dentry to the mount point

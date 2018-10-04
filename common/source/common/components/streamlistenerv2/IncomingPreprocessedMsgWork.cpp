@@ -14,7 +14,7 @@ void IncomingPreprocessedMsgWork::process(char* bufIn, unsigned bufInLen,
    const int recvTimeoutMS = 5000;
 
    unsigned numReceived = NETMSG_HEADER_LENGTH; // (header actually received by stream listener)
-   NetMessage* msg = NULL;
+   std::unique_ptr<NetMessage> msg;
 
 
    try
@@ -50,8 +50,8 @@ void IncomingPreprocessedMsgWork::process(char* bufIn, unsigned bufInLen,
       // we got the complete message buffer => create msg object
 
       AbstractApp* app = PThread::getCurrentThreadApp();
-      ICommonConfig* cfg = app->getCommonConfig();
-      AbstractNetMessageFactory* netMessageFactory = app->getNetMessageFactory();
+      auto cfg = app->getCommonConfig();
+      auto netMessageFactory = app->getNetMessageFactory();
 
       msg = netMessageFactory->createFromPreprocessedBuf(&msgHeader, bufIn, msgPayloadLength);
 
@@ -62,8 +62,6 @@ void IncomingPreprocessedMsgWork::process(char* bufIn, unsigned bufInLen,
 
          sock->unsetStats();
          invalidateConnection(sock);
-         delete(msg);
-
          return;
       }
 
@@ -76,6 +74,8 @@ void IncomingPreprocessedMsgWork::process(char* bufIn, unsigned bufInLen,
          (msg->getMsgType() == NETMSGTYPE_AuthenticateChannel) ) )
       { // auth disabled or channel is auth'ed or this is an auth msg => process
          NetMessage::ResponseContext rctx(NULL, sock, bufOut, bufOutLen, &stats);
+         LOG_DBG(COMMUNICATION, DEBUG, "Beginning message processing.", sock->getPeername(),
+               msg->getMsgTypeStr());
          processRes = msg->processIncoming(rctx);
       }
       else
@@ -86,8 +86,7 @@ void IncomingPreprocessedMsgWork::process(char* bufIn, unsigned bufInLen,
 
       bool needSockRelease = msg->getReleaseSockAfterProcessing();
 
-      delete(msg);
-      msg = NULL;
+      msg.reset();
 
       if(!needSockRelease)
          return; // sock release was already done within msg->processIncoming() method
@@ -132,8 +131,6 @@ void IncomingPreprocessedMsgWork::process(char* bufIn, unsigned bufInLen,
       sock->unsetStats();
       invalidateConnection(sock);
    }
-
-   SAFE_DELETE(msg);
 }
 
 /**

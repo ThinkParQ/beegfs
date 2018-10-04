@@ -9,7 +9,6 @@ connMgmtdPortUDP=8008
 connStoragePortTCP=8003
 connStoragePortUDP=8003
 connUseRDMA=false
-connUseSDP=false
 storeMetaDirectory=/data/beegfs/meta
 storeMgmtdDirectory=/data/beegfs/mgmtd
 storeStorageDirectory=/data/beegfs/storage

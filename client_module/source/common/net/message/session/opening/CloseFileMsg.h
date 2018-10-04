@@ -25,11 +25,6 @@ static inline void CloseFileMsg_initFromSession(CloseFileMsg* this, NumNodeID cl
 // virtual functions
 extern void CloseFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
 
-// getters & setters
-static inline NumNodeID CloseFileMsg_getClientNumID(CloseFileMsg* this);
-static inline const char* CloseFileMsg_getFileHandleID(CloseFileMsg* this);
-static inline int CloseFileMsg_getMaxUsedNodeIndex(CloseFileMsg* this);
-
 
 struct CloseFileMsg
 {
@@ -76,21 +71,5 @@ void CloseFileMsg_initFromSession(CloseFileMsg* this, NumNodeID clientNumID,
    if (fileEvent)
       this->netMessage.msgHeader.msgFeatureFlags |= CLOSEFILEMSG_FLAG_HAS_EVENT;
 }
-
-NumNodeID CloseFileMsg_getClientNumID(CloseFileMsg* this)
-{
-   return this->clientNumID;
-}
-
-const char* CloseFileMsg_getFileHandleID(CloseFileMsg* this)
-{
-   return this->fileHandleID;
-}
-
-int CloseFileMsg_getMaxUsedNodeIndex(CloseFileMsg* this)
-{
-   return this->maxUsedNodeIndex;
-}
-
 
 #endif /*CLOSEFILEMSG_H_*/

@@ -6,22 +6,20 @@
 #include <common/nodes/NumNodeID.h>
 #include <common/storage/StoragePoolId.h>
 
-typedef std::vector<std::pair<uint16_t, StoragePoolId>> TargetPoolPairVec;
-
 class MapTargetsMsg : public AcknowledgeableMsgSerdes<MapTargetsMsg>
 {
    public:
        /**
        * Maps all targetIDs to the same given nodeID.
        *
-       * @param targetVec the targetVec is actually a vector of pair<uint16_t, StoragePoolId>,
-       *        i.e. each target has a corresponding storage pool id to map it to (pool id might
+       * @param targets each target has a corresponding storage pool id to map it to (pool id might
        *        be ignored on the receiving side, if the target is not newly mapped).
        *        note: just a reference => do not free while you're using this object
        * @param nodeID numeric node ID
        */
-      MapTargetsMsg(TargetPoolPairVec* targetVec, NumNodeID nodeID):
-            BaseType(NETMSGTYPE_MapTargets), nodeID(nodeID), targetVec(targetVec)
+      MapTargetsMsg(const std::map<uint16_t, StoragePoolId>& targets, NumNodeID nodeID):
+         BaseType(NETMSGTYPE_MapTargets),
+         nodeID(nodeID), targets(&targets)
       {
       }
 
@@ -33,7 +31,7 @@ class MapTargetsMsg : public AcknowledgeableMsgSerdes<MapTargetsMsg>
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % serdes::backedPtr(obj->targetVec, obj->parsed.targetVec)
+            % serdes::backedPtr(obj->targets, obj->parsed.targets)
             % obj->nodeID;
 
          obj->serializeAckID(ctx);
@@ -44,20 +42,20 @@ class MapTargetsMsg : public AcknowledgeableMsgSerdes<MapTargetsMsg>
          return nodeID;
       }
 
-      const TargetPoolPairVec& getTargetVec() const
+      const std::map<uint16_t, StoragePoolId>& getTargets() const
       {
-         return *targetVec;
+         return *targets;
       }
 
    private:
       NumNodeID nodeID;
 
       // for serialization
-      TargetPoolPairVec* targetVec; // not owned by this object!
+      const std::map<uint16_t, StoragePoolId>* targets; // not owned by this object!
 
       // for deserialization
       struct {
-         TargetPoolPairVec targetVec;
+         std::map<uint16_t, StoragePoolId> targets;
       } parsed;
 };
 

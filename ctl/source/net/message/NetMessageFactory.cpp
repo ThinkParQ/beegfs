@@ -37,7 +37,6 @@
 #include <common/net/message/storage/creating/MkFileWithPatternRespMsg.h>
 #include <common/net/message/storage/creating/MkFileRespMsg.h>
 #include <common/net/message/storage/creating/MkLocalDirRespMsg.h>
-#include <common/net/message/storage/creating/MkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/RmLocalDirRespMsg.h>
 #include <common/net/message/storage/creating/RmDirEntryRespMsg.h>
 #include <common/net/message/storage/creating/RmDirRespMsg.h>
@@ -45,7 +44,6 @@
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
 #include <common/net/message/storage/listing/ListDirFromOffsetRespMsg.h>
 #include <common/net/message/storage/lookup/FindOwnerRespMsg.h>
-#include <common/net/message/storage/lookup/FindEntrynameRespMsg.h>
 #include <common/net/message/storage/lookup/FindLinkOwnerRespMsg.h>
 #include <common/net/message/storage/mirroring/GetMetaResyncStatsRespMsg.h>
 #include <common/net/message/storage/mirroring/GetStorageResyncStatsRespMsg.h>
@@ -82,7 +80,7 @@
  * @return NetMessage that must be deleted by the caller
  * (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
+std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short msgType) const
 {
    NetMessage* msg;
 
@@ -121,7 +119,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_StorageBenchControlMsgResp: { msg = new StorageBenchControlMsgResp(); } break;
 
       // storage messages
-      case NETMSGTYPE_FindEntrynameResp: { msg = new FindEntrynameRespMsg(); } break;
       case NETMSGTYPE_FindLinkOwnerResp: { msg = new FindLinkOwnerRespMsg(); } break;
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;
       case NETMSGTYPE_GetChunkFileAttribsResp: { msg = new GetChunkFileAttribsRespMsg(); } break;
@@ -135,7 +132,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_MkFileWithPatternResp: { msg = new MkFileWithPatternRespMsg(); } break;
       case NETMSGTYPE_MkFileResp: { msg = new MkFileRespMsg(); } break;
       case NETMSGTYPE_MkLocalDirResp: { msg = new MkLocalDirRespMsg(); } break;
-      case NETMSGTYPE_MkLocalFileResp: { msg = new MkLocalFileRespMsg(); } break;
       case NETMSGTYPE_MovingDirInsertResp: { msg = new MovingDirInsertRespMsg(); } break;
       case NETMSGTYPE_MovingFileInsertResp: { msg = new MovingFileInsertRespMsg(); } break;
       case NETMSGTYPE_RefreshEntryInfoResp: { msg = new RefreshEntryInfoRespMsg(); } break;
@@ -171,6 +167,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       } break;
    }
 
-   return msg;
+   return std::unique_ptr<NetMessage>(msg);
 }
 

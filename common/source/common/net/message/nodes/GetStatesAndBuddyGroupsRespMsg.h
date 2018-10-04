@@ -1,8 +1,10 @@
 #ifndef GETSTATESANDBUDDYGROUPSRESPMSG_H_
 #define GETSTATESANDBUDDYGROUPSRESPMSG_H_
 
-#include <common/net/message/NetMessage.h>
 #include <common/Common.h>
+#include <common/net/message/NetMessage.h>
+#include <common/nodes/MirrorBuddyGroup.h>
+#include <common/nodes/TargetStateInfo.h>
 
 
 /**
@@ -13,18 +15,11 @@
 class GetStatesAndBuddyGroupsRespMsg : public NetMessageSerdes<GetStatesAndBuddyGroupsRespMsg>
 {
    public:
-      GetStatesAndBuddyGroupsRespMsg(UInt16List* buddyGroupIDs, UInt16List* primaryTargetIDs,
-            UInt16List* secondaryTargetIDs, UInt16List* targetIDs,
-            UInt8List* targetReachabilityStates, UInt8List* targetConsistencyStates) :
-            BaseType(NETMSGTYPE_GetStatesAndBuddyGroupsResp)
+      GetStatesAndBuddyGroupsRespMsg(const MirrorBuddyGroupMap& groups,
+            const TargetStateMap& states) :
+            BaseType(NETMSGTYPE_GetStatesAndBuddyGroupsResp),
+            groups(&groups), states(&states)
       {
-         this->buddyGroupIDs = buddyGroupIDs;
-         this->primaryTargetIDs = primaryTargetIDs;
-         this->secondaryTargetIDs = secondaryTargetIDs;
-
-         this->targetIDs = targetIDs;
-         this->targetReachabilityStates = targetReachabilityStates;
-         this->targetConsistencyStates = targetConsistencyStates;
       }
 
       /**
@@ -39,62 +34,33 @@ class GetStatesAndBuddyGroupsRespMsg : public NetMessageSerdes<GetStatesAndBuddy
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % serdes::backedPtr(obj->buddyGroupIDs, obj->parsed.buddyGroupIDs)
-            % serdes::backedPtr(obj->primaryTargetIDs, obj->parsed.primaryTargetIDs)
-            % serdes::backedPtr(obj->secondaryTargetIDs, obj->parsed.secondaryTargetIDs)
-            % serdes::backedPtr(obj->targetIDs, obj->parsed.targetIDs)
-            % serdes::backedPtr(obj->targetReachabilityStates, obj->parsed.targetReachabilityStates)
-            % serdes::backedPtr(obj->targetConsistencyStates, obj->parsed.targetConsistencyStates);
+            % serdes::backedPtr(obj->groups, obj->parsed.groups)
+            % serdes::backedPtr(obj->states, obj->parsed.states);
       }
 
    private:
-      UInt16List* buddyGroupIDs; // Not owned by this object!
-      UInt16List* primaryTargetIDs; // Not owned by this object!
-      UInt16List* secondaryTargetIDs; // Not owned by this object!
-
-      UInt16List* targetIDs; // Not owned by this object!
-      UInt8List* targetReachabilityStates; // Not owned by this object!
-      UInt8List* targetConsistencyStates; // Not owned by this object!
+      const MirrorBuddyGroupMap* groups;
+      const TargetStateMap* states;
 
       // for deserialization
       struct {
-         UInt16List buddyGroupIDs;
-         UInt16List primaryTargetIDs;
-         UInt16List secondaryTargetIDs;
-         UInt16List targetIDs;
-         UInt8List targetReachabilityStates;
-         UInt8List targetConsistencyStates;
+         MirrorBuddyGroupMap groups;
+         TargetStateMap states;
       } parsed;
 
    public:
-      UInt16List& getBuddyGroupIDs()
+      const MirrorBuddyGroupMap& getGroups() const { return *groups; }
+
+      MirrorBuddyGroupMap releaseGroups()
       {
-         return *buddyGroupIDs;
+         return groups == &parsed.groups ? std::move(parsed.groups) : *groups;
       }
 
-      UInt16List& getPrimaryTargetIDs()
-      {
-         return *primaryTargetIDs;
-      }
+      const TargetStateMap& getStates() const { return *states; }
 
-      UInt16List& getSecondaryTargetIDs()
+      TargetStateMap releaseStates()
       {
-         return *secondaryTargetIDs;
-      }
-
-      UInt16List& getTargetIDs()
-      {
-         return *targetIDs;
-      }
-
-      UInt8List& getReachabilityStates()
-      {
-         return *targetReachabilityStates;
-      }
-
-      UInt8List& getConsistencyStates()
-      {
-         return *targetConsistencyStates;
+         return states == &parsed.states ? std::move(parsed.states) : *states;
       }
 };
 

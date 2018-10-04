@@ -3,19 +3,20 @@
 #include "AbstractNetMessageFactory.h"
 #include "SimpleMsg.h"
 
-
 /**
  * Create NetMessage object (specific type determined by msg header) from a raw msg buffer.
  *
- * @return NetMessage which must be deleted by the caller
- * (msg->msgType is NETMSGTYPE_Invalid on error)
+ * @return (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* AbstractNetMessageFactory::createFromBuf(char* recvBuf, size_t bufLen)
+std::unique_ptr<NetMessage> AbstractNetMessageFactory::createFromRaw(char* recvBuf,
+      size_t bufLen) const
 {
+   if(unlikely(bufLen < NETMSG_MIN_LENGTH))
+      return boost::make_unique<SimpleMsg>(NETMSGTYPE_Invalid);
+
    NetMessageHeader header;
 
    // decode the message header
-
    NetMessage::deserializeHeader(recvBuf, bufLen, &header);
 
    // delegate the rest of the work to another method...
@@ -30,24 +31,21 @@ NetMessage* AbstractNetMessageFactory::createFromBuf(char* recvBuf, size_t bufLe
  * Create NetMessage object (specific type determined by msg header) from a raw msg payload buffer,
  * for which the msg header has already been deserialized.
  *
- * @return NetMessage which must be deleted by the caller
- * (msg->msgType is NETMSGTYPE_Invalid on error)
+ * @return (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* AbstractNetMessageFactory::createFromPreprocessedBuf(NetMessageHeader* header,
-   char* msgPayloadBuf, size_t msgPayloadBufLen)
+std::unique_ptr<NetMessage> AbstractNetMessageFactory::createFromPreprocessedBuf(
+      NetMessageHeader* header, char* msgPayloadBuf, size_t msgPayloadBufLen) const
 {
    const char* logContext = "NetMsgFactory (create msg from buf)";
 
    // create the message object for the given message type
 
-   NetMessage* msg = createFromMsgType(header->msgType);
+   std::unique_ptr<NetMessage> msg(createFromMsgType(header->msgType));
    if(unlikely(msg->getMsgType() == NETMSGTYPE_Invalid) )
    {
-      NetMsgStrMapping strMapping;
-
       LogContext(logContext).log(Log_NOTICE,
          "Received an invalid or unhandled message. "
-         "Message type (from raw header): " + strMapping.defineToStr(header->msgType) );
+         "Message type (from raw header): " + netMessageTypeToStr(header->msgType));
 
       return msg;
    }
@@ -59,15 +57,12 @@ NetMessage* AbstractNetMessageFactory::createFromPreprocessedBuf(NetMessageHeade
    bool checkCompatRes = msg->checkHeaderFeatureFlagsCompat();
    if(unlikely(!checkCompatRes) )
    { // incompatible feature flag was set => log error with msg type
-      NetMsgStrMapping strMapping;
-
       LogContext(logContext).log(Log_WARNING,
          "Received a message with incompatible feature flags. "
-         "Message type: " + strMapping.defineToStr(header->msgType) + "; "
+         "Message type: " + netMessageTypeToStr(header->msgType) + "; "
          "Flags (hex): " + StringTk::uintToHexStr(msg->getMsgHeaderFeatureFlags() ) );
 
-      msg->setMsgType(NETMSGTYPE_Invalid);
-      return msg;
+      return boost::make_unique<SimpleMsg>(NETMSGTYPE_Invalid);
    }
 
    // check whether the header flags are as we expect them:
@@ -78,8 +73,7 @@ NetMessage* AbstractNetMessageFactory::createFromPreprocessedBuf(NetMessageHeade
       LOG(GENERAL, WARNING, "Received a message with invalid header flags", header->msgType,
             header->msgFlags);
 
-      msg->setMsgType(NETMSGTYPE_Invalid);
-      return msg;
+      return boost::make_unique<SimpleMsg>(NETMSGTYPE_Invalid);
    }
 
    msg->msgHeader = *header;
@@ -89,14 +83,11 @@ NetMessage* AbstractNetMessageFactory::createFromPreprocessedBuf(NetMessageHeade
    bool deserRes = msg->deserializePayload(msgPayloadBuf, msgPayloadBufLen);
    if(unlikely(!deserRes) )
    { // deserialization failed => log error with msg type
-      NetMsgStrMapping strMapping;
-
       LogContext(logContext).log(Log_NOTICE,
          "Failed to decode message. "
-         "Message type: " + strMapping.defineToStr(header->msgType) );
+         "Message type: " + netMessageTypeToStr(header->msgType));
 
-      msg->setMsgType(NETMSGTYPE_Invalid);
-      return msg;
+      return boost::make_unique<SimpleMsg>(NETMSGTYPE_Invalid);
    }
 
    return msg;

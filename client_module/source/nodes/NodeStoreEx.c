@@ -2,7 +2,6 @@
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/NodeListIter.h>
 #include <common/system/System.h>
-#include <common/toolkit/VersionTk.h>
 #include <os/OsCompat.h>
 #include "NodeStoreEx.h"
 
@@ -38,7 +37,6 @@ NodeStoreEx* NodeStoreEx_construct(App* app, NodeType storeType)
 void NodeStoreEx_uninit(NodeStoreEx* this)
 {
    NodeTree_uninit(&this->nodeTree);
-   RWLock_uninit(&this->rwLock);
 }
 
 void NodeStoreEx_destruct(NodeStoreEx* this)
@@ -78,10 +76,6 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
       return false;
    }
 
-   // sanity check: test if bit index 0 (dummy feature flag) is set
-   BEEGFS_BUG_ON_DEBUG(!BitStore_getBit(Node_getNodeFeatures(*node), 0),
-      "dummy feature flag not set");
-
    RWLock_writeLock(&this->rwLock); // L O C K
 
    // is node in any of the stores already?
@@ -99,10 +93,8 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
       else
       { // update heartbeat time of existing node
          Node_updateLastHeartbeatT(active);
-         Node_setFhgfsVersion(active, Node_getFhgfsVersion(*node) );
          Node_updateInterfaces(active, Node_getPortUDP(*node), Node_getPortTCP(*node),
             Node_getNicList(*node) );
-         Node_updateFeatureFlagsThreadSafe(active, Node_getNodeFeatures(*node) );
       }
 
       Node_put(*node);

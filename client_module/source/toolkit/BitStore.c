@@ -78,23 +78,13 @@ void BitStore_clearBits(BitStore* this)
 
 }
 
-/**
- * release the memory of the higher bits and set the size of the bit store to the minimal value
- */
-void __BitStore_freeHigherBits(BitStore* this)
-{
-   SAFE_KFREE(this->higherBits);
-
-   this->numBits = BITSTORE_BLOCK_BIT_COUNT;
-}
-
 
 /**
  * note: serialized format is always one or more full 64bit blocks to keep the format independent
  * of 32bit/64bit archs.
  * note: serialized format is 8 byte aligned.
  */
-void BitStore_serialize(const BitStore* this, SerializeCtx* ctx)
+void BitStore_serialize(SerializeCtx* ctx, const BitStore* this)
 {
    unsigned index;
    unsigned blockCount = BitStore_calculateBitBlockCount(this->numBits);
@@ -227,35 +217,6 @@ void BitStore_deserialize(BitStore* this, DeserializeCtx* ctx)
    // add padding that allows 64bit deserialize from 32bit serialize
    if( (BITSTORE_BLOCK_SIZE == sizeof(uint32_t) ) && (blockCount & 1) )
       Serialization_deserializeUInt(ctx, &padding);
-}
-
-/**
- * compare two BitStores.
- *
- * @return true if both BitStores are equal
- */
-bool BitStore_compare(BitStore* this, BitStore* second)
-{
-   if(this->numBits != second->numBits)
-      return false;
-   else
-   if(this->lowerBits != second->lowerBits)
-      return false;
-   else
-   {
-      unsigned blockCount = BitStore_calculateBitBlockCount(this->numBits);
-      unsigned index;
-
-      for(index = 0; index < (blockCount - 1); index++)
-      {
-         if(this->higherBits[index] != second->higherBits[index])
-         {
-            return false;
-         }
-      }
-   }
-
-   return true;
 }
 
 /**

@@ -7,8 +7,6 @@ bool RefreshCapacityPoolsMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("RefreshCapacityPoolsMsg incoming");
 
-   LOG_DEBUG_CONTEXT(log, 4, "Received a RefreshCapacityPoolsMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
    InternodeSyncer* syncer = app->getInternodeSyncer();
 

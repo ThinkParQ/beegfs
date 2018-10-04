@@ -30,11 +30,8 @@ enum NicAddrType        {NICADDRTYPE_STANDARD=0, NICADDRTYPE_SDP=1, NICADDRTYPE_
 struct NicAddress
 {
    struct in_addr ipAddr;
-   struct in_addr broadcastAddr;
-   int            metric;
    NicAddrType_t  nicType;
    char           name[IFNAMSIZ];
-   char           hwAddr[IFHWADDRLEN];
 };
 
 struct NicListCapabilities

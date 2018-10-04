@@ -15,8 +15,6 @@ bool GenericDebugMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("GenericDebugMsg incoming");
 
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a GenericDebugMsg from: " + ctx.peerName() );
-
    LOG_DEBUG_CONTEXT(log, Log_SPAM, std::string("Command string: ") + getCommandStr() );
 
    std::string cmdRespStr = processCommand();

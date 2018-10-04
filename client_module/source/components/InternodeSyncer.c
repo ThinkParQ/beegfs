@@ -108,9 +108,7 @@ void InternodeSyncer_uninit(InternodeSyncer* this)
    Mutex_uninit(&this->delayedRangeUnlockMutex);
 
    Mutex_uninit(&this->forceTargetStatesUpdateMutex);
-   Time_uninit(&this->lastSuccessfulTargetStatesUpdateT);
 
-   Condition_uninit(&this->mgmtInitDoneCond);
    Mutex_uninit(&this->mgmtInitDoneMutex);
 
    Thread_uninit( (Thread*)this);
@@ -149,7 +147,9 @@ void _InternodeSyncer_requestLoop(InternodeSyncer* this)
    const unsigned sleepTimeMS = 5*1000;
 
    const unsigned mgmtInitIntervalMS = 5000;
-   const unsigned reregisterIntervalMS = 300000;
+   const unsigned reregisterIntervalMS = 60*1000; /* send heartbeats to mgmt in this interval. must
+      be a lot lower than tuneClientAutoRemoveMins of mgmt. the value is capped to at least 5
+      (or disabled) on mgmt. */
    const unsigned downloadNodesIntervalMS = 180000;
    const unsigned updateTargetStatesMS = Config_getSysUpdateTargetStatesSecs(this->cfg) * 1000;
    const unsigned delayedOpsIntervalMS = 60*1000;
@@ -240,14 +240,6 @@ void _InternodeSyncer_requestLoop(InternodeSyncer* this)
          Time_setToNow(&lastIdleDisconnectT);
       }
    }
-
-   Time_uninit(&lastMgmtInitT);
-   Time_uninit(&lastReregisterT);
-   Time_uninit(&lastDownloadNodesT);
-
-   Time_uninit(&lastDelayedOpsT);
-   Time_uninit(&lastIdleDisconnectT);
-   Time_uninit(&lastTargetStatesUpdateT);
 }
 
 void __InternodeSyncer_signalMgmtInitDone(InternodeSyncer* this)
@@ -394,7 +386,6 @@ bool __InternodeSyncer_registerNode(InternodeSyncer* this)
    NumNodeID localNodeNumID = Node_getNumID(localNode);
    NumNodeID newLocalNodeNumID;
    NicAddressList* nicList = Node_getNicList(localNode);
-   const BitStore* nodeFeatureFlags = Node_getNodeFeatures(localNode);
 
    RegisterNodeMsg msg;
    char* respBuf;
@@ -407,7 +398,7 @@ bool __InternodeSyncer_registerNode(InternodeSyncer* this)
       return false;
 
    RegisterNodeMsg_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client,
-      BEEGFS_VERSION_CODE, nicList, nodeFeatureFlags, Config_getConnClientPortUDP(this->cfg));
+      nicList, Config_getConnClientPortUDP(this->cfg));
 
    // connect & communicate
    requestRes = MessagingTk_requestResponse(this->app, mgmtNode,
@@ -467,7 +458,6 @@ void __InternodeSyncer_reregisterNode(InternodeSyncer* this)
    const char* localNodeID = Node_getID(localNode);
    NumNodeID localNodeNumID = Node_getNumID(localNode);
    NicAddressList* nicList = Node_getNicList(localNode);
-   const BitStore* nodeFeatureFlags = Node_getNodeFeatures(localNode);
 
    HeartbeatMsgEx msg;
 
@@ -475,10 +465,8 @@ void __InternodeSyncer_reregisterNode(InternodeSyncer* this)
    if(!mgmtNode)
       return;
 
-   HeartbeatMsgEx_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client, nicList,
-      nodeFeatureFlags);
+   HeartbeatMsgEx_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client, nicList);
    HeartbeatMsgEx_setPorts(&msg, Config_getConnClientPortUDP(this->cfg), 0);
-   HeartbeatMsgEx_setFhgfsVersion(&msg, BEEGFS_VERSION_CODE);
 
    DatagramListener_sendMsgToNode(this->dgramLis, mgmtNode, (NetMessage*)&msg);
 
@@ -646,24 +634,17 @@ void __InternodeSyncer_downloadAndSyncTargetMappings(InternodeSyncer* this)
    Node* mgmtNode;
    bool downloadRes;
 
-   UInt16List targetIDs;
-   NumNodeIDList nodeIDs;
+   LIST_HEAD(mappings);
 
    mgmtNode = NodeStoreEx_referenceFirstNode(this->mgmtNodes);
    if(!mgmtNode)
       return;
 
-   UInt16List_init(&targetIDs);
-   NumNodeIDList_init(&nodeIDs);
-
-   downloadRes = NodesTk_downloadTargetMappings(this->app, mgmtNode, &targetIDs, &nodeIDs);
+   downloadRes = NodesTk_downloadTargetMappings(this->app, mgmtNode, &mappings);
    if(downloadRes)
-      TargetMapper_syncTargetsFromLists(targetMapper, &targetIDs, &nodeIDs);
+      TargetMapper_syncTargets(targetMapper, /*move*/&mappings);
 
    // cleanup
-
-   UInt16List_uninit(&targetIDs);
-   NumNodeIDList_uninit(&nodeIDs);
 
    Node_put(mgmtNode);
 }
@@ -687,13 +668,8 @@ void __InternodeSyncer_updateTargetStatesAndBuddyGroups(InternodeSyncer* this, N
    Node* mgmtdNode;
    bool downloadRes;
 
-   UInt16List buddyGroupIDs;
-   UInt16List primaryTargetIDs;
-   UInt16List secondaryTargetIDs;
-
-   UInt16List targetIDs;
-   UInt8List targetReachabilityStates;
-   UInt8List targetConsistencyStates;
+   LIST_HEAD(buddyGroups); /* struct BuddyGroupMapping */
+   LIST_HEAD(states); /* struct TargetStateMapping */
 
    switch (nodeType)
    {
@@ -715,23 +691,13 @@ void __InternodeSyncer_updateTargetStatesAndBuddyGroups(InternodeSyncer* this, N
    if(!mgmtdNode)
       return;
 
-   UInt16List_init(&buddyGroupIDs);
-   UInt16List_init(&primaryTargetIDs);
-   UInt16List_init(&secondaryTargetIDs);
-
-   UInt16List_init(&targetIDs);
-   UInt8List_init(&targetReachabilityStates);
-   UInt8List_init(&targetConsistencyStates);
-
    downloadRes = NodesTk_downloadStatesAndBuddyGroups(this->app, mgmtdNode, nodeType,
-      &buddyGroupIDs, &primaryTargetIDs, &secondaryTargetIDs,
-      &targetIDs, &targetReachabilityStates, &targetConsistencyStates);
+      &buddyGroups, &states);
 
    if(downloadRes)
    {
       TargetStateStore_syncStatesAndGroupsFromLists(targetStateStore, this->app->cfg,
-         buddyGroupMapper, &targetIDs, &targetReachabilityStates, &targetConsistencyStates,
-         &buddyGroupIDs, &primaryTargetIDs, &secondaryTargetIDs);
+         buddyGroupMapper, &states, &buddyGroups);
 
       Time_setToNow(&this->lastSuccessfulTargetStatesUpdateT);
       Logger_logFormatted(log, Log_DEBUG, logContext, "%s states synced.",
@@ -764,13 +730,8 @@ void __InternodeSyncer_updateTargetStatesAndBuddyGroups(InternodeSyncer* this, N
 
    // cleanup
 
-   UInt16List_uninit(&buddyGroupIDs);
-   UInt16List_uninit(&primaryTargetIDs);
-   UInt16List_uninit(&secondaryTargetIDs);
-
-   UInt16List_uninit(&targetIDs);
-   UInt8List_uninit(&targetReachabilityStates);
-   UInt8List_uninit(&targetConsistencyStates);
+   BEEGFS_KFREE_LIST(&buddyGroups, struct BuddyGroupMapping, _list);
+   BEEGFS_KFREE_LIST(&states, struct TargetStateMapping, _list);
 
    Node_put(mgmtdNode);
 }
@@ -990,8 +951,6 @@ void __InternodeSyncer_delayedCloseFreeEntry(InternodeSyncer* this, DelayedClose
 
    AtomicInt_uninit(&closeEntry->maxUsedTargetIndex);
 
-   Time_uninit(&closeEntry->ageT);
-
    kfree(closeEntry);
 }
 
@@ -1006,8 +965,6 @@ void __InternodeSyncer_delayedEntryUnlockFreeEntry(InternodeSyncer* this,
 
    kfree(unlockEntry->fileHandleID);
 
-   Time_uninit(&unlockEntry->ageT);
-
    kfree(unlockEntry);
 }
 
@@ -1021,8 +978,6 @@ void __InternodeSyncer_delayedRangeUnlockFreeEntry(InternodeSyncer* this,
    EntryInfo_uninit(&unlockEntry->entryInfo);
 
    kfree(unlockEntry->fileHandleID);
-
-   Time_uninit(&unlockEntry->ageT);
 
    kfree(unlockEntry);
 }

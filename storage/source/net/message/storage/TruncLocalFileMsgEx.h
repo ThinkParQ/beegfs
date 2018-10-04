@@ -5,6 +5,8 @@
 #include <common/storage/StorageErrors.h>
 #include <common/storage/Path.h>
 
+class StorageTarget;
+
 class TruncLocalFileMsgEx : public TruncLocalFileMsg
 {
    private:
@@ -26,12 +28,12 @@ class TruncLocalFileMsgEx : public TruncLocalFileMsg
    private:
       FhgfsOpsErr truncFile(uint16_t targetId, int targetFD, const Path* chunkDirPath,
          const std::string& chunkFilePathStr, std::string entryID, bool hasOrigFeature);
-      int getTargetFD(ResponseContext& ctx, uint16_t actualTargetID, bool* outResponseSent);
+      int getTargetFD(const StorageTarget& target, ResponseContext& ctx, bool* outResponseSent);
       bool getDynamicAttribsByPath(const int dirFD, const char* path, uint16_t targetID,
          std::string fileID, DynamicAttribs& outDynAttribs);
       bool getFakeDynAttribs(uint16_t targetID, std::string fileID, DynamicAttribs& outDynAttribs);
-      FhgfsOpsErr forwardToSecondary(ResponseContext& ctx, uint16_t actualTargetID,
-         bool* outChunkLocked);
+      FhgfsOpsErr forwardToSecondary(StorageTarget& target, ResponseContext& ctx,
+            bool* outChunkLocked);
 };
 
 #endif /*TRUNCLOCALFILEMSGEX_H_*/

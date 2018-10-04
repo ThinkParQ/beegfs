@@ -5,7 +5,6 @@
 bool RetrieveInodesMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Incoming RetrieveDirEntriesMsg");
-   LOG_DEBUG_CONTEXT(log, 4, "Received a RetrieveDirEntriesMsg from: " + ctx.peerName() );
 
    MetaStore *metaStore = Program::getApp()->getMetaStore();
 

@@ -45,7 +45,7 @@ class ChunkStore
       }
 
       bool dirInStoreUnlocked(std::string dirID);
-      ChunkDir* referenceDir(std::string dirIDd);
+      ChunkDir* referenceDir(std::string dirID);
       void releaseDir(std::string dirID);
 
       size_t getCacheSize();

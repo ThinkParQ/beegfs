@@ -24,8 +24,6 @@ void Thread_init(Thread* this, const char* threadName, ThreadRoutine threadRouti
 void Thread_uninit(Thread* this)
 {
    Mutex_uninit(&this->selfTerminateMutex);
-   Condition_uninit(&this->shallSelfTerminateCond);
-   Condition_uninit(&this->isSelfTerminatedChangeCond);
 }
 
 bool Thread_start(Thread* this)
@@ -129,17 +127,4 @@ const char* Thread_getName(Thread* this)
 void Thread_getCurrentThreadName(char* outBuf)
 {
    StringTk_strncpyTerminated(outBuf, current->comm, BEEGFS_TASK_COMM_LEN);
-}
-
-/**
- * Get comm name of the thread calling this function.
- */
-const char* Thread_getCurrentThreadNameStr(void)
-{
-   return current->comm;
-}
-
-void Thread_yield(void)
-{
-   yield();
 }

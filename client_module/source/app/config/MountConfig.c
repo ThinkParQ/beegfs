@@ -10,7 +10,6 @@ enum {
    /* Mount options that take string arguments */
    Opt_cfgFile,
    Opt_logStdFile,
-   Opt_logErrFile,
    Opt_sysMgmtdHost,
    Opt_tunePreferredMetaFile,
    Opt_tunePreferredStorageFile,
@@ -31,7 +30,6 @@ static match_table_t fhgfs_mount_option_tokens =
    /* Mount options that take string arguments */
    { Opt_cfgFile, "cfgFile=%s" },
    { Opt_logStdFile, "logStdFile=%s" },
-   { Opt_logErrFile, "logErrFile=%s" },
    { Opt_sysMgmtdHost, "sysMgmtdHost=%s" },
    { Opt_tunePreferredMetaFile, "tunePreferredMetaFile=%s" },
    { Opt_tunePreferredStorageFile, "tunePreferredStorageFile=%s" },
@@ -87,13 +85,6 @@ bool MountConfig_parseFromRawOptions(MountConfig* this, char* mountOptions)
             SAFE_KFREE(this->logStdFile);
 
             this->logStdFile = match_strdup(args); // (string kalloc'ed => needs kfree later)
-         } break;
-
-         case Opt_logErrFile:
-         {
-            SAFE_KFREE(this->logErrFile);
-
-            this->logErrFile = match_strdup(args); // (string kalloc'ed => needs kfree later)
          } break;
 
          case Opt_sysMgmtdHost:
@@ -183,9 +174,6 @@ void MountConfig_showOptions(MountConfig* this, struct seq_file* sf)
 
    if (this->logStdFile)
       seq_printf(sf, ",logStdFile=%s", this->logStdFile);
-
-   if (this->logErrFile)
-      seq_printf(sf, ",logErrFile=%s", this->logErrFile);
 
    if (this->sysMgmtdHost)
       seq_printf(sf, ",sysMgmtdHost=%s", this->sysMgmtdHost);

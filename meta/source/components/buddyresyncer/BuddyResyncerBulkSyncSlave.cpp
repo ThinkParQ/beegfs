@@ -12,10 +12,11 @@
 
 #include <dirent.h>
 
-BuddyResyncerBulkSyncSlave::BuddyResyncerBulkSyncSlave(MetaSyncCandidateStore* syncCandidates,
-      uint8_t slaveID, const NumNodeID& buddyNodeID, BuddyResyncJob& parentJob) :
-   SyncSlaveBase("BuddyResyncerBulkSyncSlave_" + StringTk::uintToStr(slaveID), buddyNodeID),
-   syncCandidates(syncCandidates), parentJob(&parentJob)
+BuddyResyncerBulkSyncSlave::BuddyResyncerBulkSyncSlave(BuddyResyncJob& parentJob,
+      MetaSyncCandidateStore* syncCandidates, uint8_t slaveID, const NumNodeID& buddyNodeID) :
+   SyncSlaveBase("BuddyResyncerBulkSyncSlave_" + StringTk::uintToStr(slaveID), parentJob,
+         buddyNodeID),
+   syncCandidates(syncCandidates)
 {
 }
 
@@ -116,14 +117,14 @@ FhgfsOpsErr BuddyResyncerBulkSyncSlave::streamCandidateDir(Socket& socket,
 
    if (!dir)
    {
-      LOG(MIRRORING, ERR, "Could not open candidate directory.", candidatePath, sysErr());
+      LOG(MIRRORING, ERR, "Could not open candidate directory.", candidatePath, sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
    int dirFD = ::dirfd(dir.get());
    if (dirFD < 0)
    {
-      LOG(MIRRORING, ERR, "Could not open candidate directory.", candidatePath, sysErr());
+      LOG(MIRRORING, ERR, "Could not open candidate directory.", candidatePath, sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
@@ -141,7 +142,7 @@ FhgfsOpsErr BuddyResyncerBulkSyncSlave::streamCandidateDir(Socket& socket,
 #endif
       if (err > 0)
       {
-         LOG(MIRRORING, ERR, "Could not read candidate directory.", candidatePath, sysErr());
+         LOG(MIRRORING, ERR, "Could not read candidate directory.", candidatePath, sysErr);
          numDirErrors.increase();
          break;
       }
@@ -161,7 +162,7 @@ FhgfsOpsErr BuddyResyncerBulkSyncSlave::streamCandidateDir(Socket& socket,
             continue;
 
          LOG(MIRRORING, ERR, "Could not stat resync candidate.",
-             candidatePath, entry->d_name, sysErr());
+             candidatePath, entry->d_name, sysErr);
          numFileErrors.increase();
          continue;
       }

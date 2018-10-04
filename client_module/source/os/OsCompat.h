@@ -16,15 +16,9 @@
 #include <linux/swap.h>
 #include <linux/writeback.h>
 
-#ifdef KERNEL_HAS_TASK_IO_ACCOUNTING
-   #include <linux/task_io_accounting_ops.h>
-#endif
+#include <linux/task_io_accounting_ops.h>
 
-#ifdef KERNEL_HAS_GENERIC_SEMAPHORE
 #include <linux/semaphore.h>
-#else
-#include <asm/semaphore.h>
-#endif
 
 
 #ifndef KERNEL_HAS_MEMDUP_USER
@@ -33,11 +27,6 @@
 
 #ifndef KERNEL_HAS_D_MAKE_ROOT
    extern struct dentry *d_make_root(struct inode *root_inode);
-#endif
-
-#ifndef KERNEL_HAS_TASK_IO_ACCOUNTING
-   static inline void task_io_account_read(size_t bytes);
-   static inline void task_io_account_write(size_t bytes);
 #endif
 
 static inline int os_generic_permission(struct inode *inode, int mask);
@@ -69,25 +58,6 @@ int os_generic_permission(struct inode *inode, int mask)
 }
 
 
-#ifndef KERNEL_HAS_TASK_IO_ACCOUNTING
-
-/**
- * No-op if kernel version does not support this.
- */
-void task_io_account_read(size_t bytes)
-{
-}
-
-/**
- * No-op if kernel version does not support this.
- */
-void task_io_account_write(size_t bytes)
-{
-}
-
-#endif // KERNEL_HAS_TASK_IO_ACCOUNTING
-
-
 #ifndef KERNEL_HAS_D_MATERIALISE_UNIQUE
 extern struct dentry* d_materialise_unique(struct dentry *dentry, struct inode *inode);
 #endif
@@ -115,11 +85,6 @@ static inline int is_32bit_api(void)
    return (BITS_PER_LONG == 32);
 }
 #endif // LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32)
-
-
-#ifndef KERNEL_HAS_GET_UNALIGNED_LE
-#include "AccessOk.h"
-#endif
 
 #ifndef KERNEL_HAS_I_UID_READ
 static inline uid_t i_uid_read(const struct inode *inode)
@@ -168,19 +133,6 @@ struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSiz
    list_entry((pos)->member.next, typeof(*(pos)), member)
 #endif
 
-
-#ifndef KERNEL_HAS_LIST_IS_LAST
-/**
- * list_is_last - tests whether @list is the last entry in list @head
- * @list: the entry to test
- * @head: the head of the list
- */
-static inline int list_is_last(const struct list_head *list,
-            const struct list_head *head)
-{
-   return list->next == head;
-}
-#endif // KERNEL_HAS_LIST_IS_LAST
 
 #ifndef list_first_entry
 /**
@@ -245,40 +197,20 @@ static inline void page_endio(struct page *page, int rw, int err)
 }
 #endif
 
-#ifdef KERNEL_HAS_WRITE_CACHE_PAGES
-static inline int os_write_cache_pages(struct address_space* mapping, struct writeback_control* wbc,
-   writepage_t writepage, void* data)
-{
-   return write_cache_pages(mapping, wbc, writepage, data);
-}
-#else
-/* not adding a writepage_t typedef here because it already exists in older kernels */
-extern int os_write_cache_pages(struct address_space* mapping, struct writeback_control* wbc,
-   int (*writepage)(struct page*, struct writeback_control*, void*), void* data);
-#endif
-
-#ifndef KERNEL_HAS_INIT_WORK_2
-# define BEEGFS_WORK_FUNCTION(name) void name(void* __workData)
-# define BEEGFS_CURRENT_WORK_STRUCT ((struct work_struct*) __workData)
-# define OS_INIT_WORK(work, fn) INIT_WORK((work), (fn), (work))
-#else
-# define BEEGFS_WORK_FUNCTION(name) void name(struct work_struct* __workData)
-# define BEEGFS_CURRENT_WORK_STRUCT __workData
-# define OS_INIT_WORK(work, fn) INIT_WORK((work), (fn))
-#endif
-
 #ifndef KERNEL_HAS_GENERIC_WRITE_CHECKS_ITER
 # define os_generic_write_checks generic_write_checks
 #else
 extern int os_generic_write_checks(struct file* filp, loff_t* offset, size_t* size, int isblk);
 #endif
 
-#ifndef rbtree_postorder_for_each_entry_safe
+#ifndef rb_entry_safe
 #define rb_entry_safe(ptr, type, member) \
    ({ typeof(ptr) ____ptr = (ptr); \
       ____ptr ? rb_entry(____ptr, type, member) : NULL; \
    })
+#endif
 
+#ifndef rbtree_postorder_for_each_entry_safe
 #define rbtree_postorder_for_each_entry_safe(pos, n, root, field) \
    for (pos = rb_entry_safe(rb_first_postorder(root), typeof(*pos), field); \
          pos && ({ n = rb_entry_safe(rb_next_postorder(&pos->field), \
@@ -289,27 +221,6 @@ extern struct rb_node *rb_first_postorder(const struct rb_root *);
 extern struct rb_node *rb_next_postorder(const struct rb_node *);
 #endif
 
-static inline int os_mnt_want_write(struct vfsmount *mnt)
-{
-#ifndef KERNEL_HAS_MNT_WANT_WRITE
-   if (mnt->mnt_sb->s_flags & MS_RDONLY)
-      return -EROFS;
-   else
-      return 0;
-#else
-   return mnt_want_write(mnt);
-#endif
-}
-
-static inline void os_mnt_drop_write(struct vfsmount *mnt)
-{
-#ifdef KERNEL_HAS_MNT_WANT_WRITE
-   /* noop before 2.6.26, as those didn't have mnt_want_write yet and so didn't take a
-    * write ref-counter yet. */
-   mnt_drop_write(mnt);
-#endif
-}
-
 #ifndef KERNEL_HAS_CURRENT_UMASK
 #define current_umask() (current->fs->umask)
 #endif
@@ -319,15 +230,6 @@ static inline void os_mnt_drop_write(struct vfsmount *mnt)
 # define XATTR_NAME_POSIX_ACL_ACCESS XATTR_SYSTEM_PREFIX XATTR_POSIX_ACL_ACCESS
 # define XATTR_POSIX_ACL_DEFAULT  "posix_acl_default"
 # define XATTR_NAME_POSIX_ACL_DEFAULT XATTR_SYSTEM_PREFIX XATTR_POSIX_ACL_DEFAULT
-#endif
-
-#ifndef KERNEL_HAS_IS_VMALLOC_ADDR
-static inline int is_vmalloc_addr(const void *x)
-{
-   unsigned long addr = (unsigned long) x;
-
-   return addr >= VMALLOC_START && addr < VMALLOC_END;
-}
 #endif
 
 #ifndef KERNEL_HAS_I_MMAP_LOCK

@@ -13,6 +13,7 @@
 #include <components/DatagramListener.h>
 #include <program/Program.h>
 
+#include <mutex>
 
 #define MODFLUSHER_MAXSIZE_EVENTLIST        10000
 #define MODFLUSHER_SEND_AT_ONCE             10    // only very few events, because msg is UDP
@@ -99,13 +100,9 @@ class ModificationEventFlusher: public PThread
 
       bool getFsckMissedEvent()
       {
-         SafeMutexLock mutexLock(&fsckMutex);
+         const std::lock_guard<Mutex> lock(fsckMutex);
 
-         bool retVal = this->fsckMissedEvent;
-
-         mutexLock.unlock();
-
-         return retVal;
+         return this->fsckMissedEvent;
       }
 
    private:
@@ -171,14 +168,16 @@ class ModificationEventFlusher: public PThread
             }
             else if (flush)
             {
-               SafeMutexLock safeMutexLock(&mutex);
-               this->eventTypeBufferList.clear();
-               this->entryIDBufferList.clear();
-               safeMutexLock.unlock();
+               {
+                  const std::lock_guard<Mutex> lock(mutex);
+                  this->eventTypeBufferList.clear();
+                  this->entryIDBufferList.clear();
+               }
 
-               SafeMutexLock eventsFlushedSafeLock(&eventsFlushedMutex);
-               eventsFlushedCond.broadcast();
-               eventsFlushedSafeLock.unlock();
+               {
+                  const std::lock_guard<Mutex> lock(eventsFlushedMutex);
+                  eventsFlushedCond.broadcast();
+               }
             }
          }
       }

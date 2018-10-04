@@ -62,7 +62,7 @@ class GetQuotaInfoWork: public Work
       void prepareMessage(int messageNumber, GetQuotaInfoMsg* msg);
       void getIDRangeForMessage(int messageNumber, unsigned &outFirstID, unsigned &outLastID);
       void getIDsFromListForMessage(int messageNumber, UIntList* outList);
-      void mergeOrInsertNewQuotaData(QuotaDataList* inList, QuotaInodeSupport quotaInodeSupport);
+      void mergeOrInsertNewQuotaData(QuotaDataList* inList, QuotaInodeSupport inQuotaInodeSupport);
       void mergeQuotaInodeSupportUnlocked(QuotaInodeSupport inQuotaInodeSupport);
 };
 

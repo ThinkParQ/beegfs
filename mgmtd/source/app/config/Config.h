@@ -44,8 +44,6 @@ class Config : public AbstractConfig
       std::string connInterfacesFile; // implicitly generates connInterfacesList
       std::string connInterfacesList; // comma-separated list
 
-      bool        debugRunComponentThreads;
-
       std::string storeMgmtdDirectory;
       bool        storeAllowFirstRunInit;
 
@@ -87,7 +85,6 @@ class Config : public AbstractConfig
 
       unsigned    tuneProcessFDLimit; // 0 means "don't touch limit"
 
-      bool        sysOverrideStoredRoot;
       bool        sysAllowNewServers;
       bool        sysAllowNewTargets;
       unsigned    sysTargetOfflineTimeoutSecs;
@@ -97,9 +94,6 @@ class Config : public AbstractConfig
       std::string pidFile;
 
       bool                 quotaEnableEnforcement;
-      std::string          quotaNofificationMethod;
-      unsigned             quotaNotfificationIntervalMin;
-      std::string          quotaAdminEmailAddress;
       unsigned             quotaUpdateIntervalMin;
       unsigned             quotaStoreIntervalMin;
       std::string          quotaQueryType;
@@ -130,11 +124,6 @@ class Config : public AbstractConfig
       const std::string& getConnInterfacesList() const
       {
          return connInterfacesList;
-      }
-
-      bool getDebugRunComponentThreads() const
-      {
-         return debugRunComponentThreads;
       }
 
       const std::string& getStoreMgmtdDirectory() const
@@ -297,11 +286,6 @@ class Config : public AbstractConfig
          return tuneProcessFDLimit;
       }
 
-      bool getSysOverrideStoredRoot() const
-      {
-         return sysOverrideStoredRoot;
-      }
-
       bool getSysAllowNewServers() const
       {
          return sysAllowNewServers;
@@ -330,21 +314,6 @@ class Config : public AbstractConfig
       bool getQuotaEnableEnforcement() const
       {
          return quotaEnableEnforcement;
-      }
-
-      const std::string& getQuotaNofificationMethod() const
-      {
-         return quotaNofificationMethod;
-      }
-
-      unsigned getQuotaNotfificationIntervalMin() const
-      {
-         return quotaNotfificationIntervalMin;
-      }
-
-      const std::string& getQuotaAdminEmailAddress() const
-      {
-         return quotaAdminEmailAddress;
       }
 
       unsigned getQuotaUpdateIntervalMin() const

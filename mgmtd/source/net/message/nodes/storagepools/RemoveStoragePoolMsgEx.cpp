@@ -8,8 +8,6 @@
 
 bool RemoveStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STORAGEPOOLS, DEBUG, "Received a RemoveStoragePoolMsg", ctx.peerName());
-
    if (Program::getApp()->isShuttingDown())
    {
       ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));

@@ -64,7 +64,7 @@ bool QuotaData::loadQuotaDataMapForTargetFromFile(QuotaDataMapForTarget& outMap,
       retVal = des.good();
    }
 
-   if (retVal == false)
+   if (!retVal)
       log.logErr("Could not deserialize quota data from file: " + path);
 #ifdef BEEGFS_DEBUG
    else
@@ -94,8 +94,7 @@ err_stat:
 }
 
 /**
- * Stores the quota data into a file. The map is write locked during the save. Marks the store as
- * clean when the limits are successful stored. If an error occurs the store is marked as dirty.
+ * Stores the quota data into a file. The map is write locked during the save.
  *
  * @param map the map with the QuotaData to store
  * @param path the path to the file

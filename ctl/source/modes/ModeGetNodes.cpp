@@ -3,11 +3,12 @@
 #include <common/toolkit/MetadataTk.h>
 #include <common/toolkit/NodesTk.h>
 #include <common/toolkit/UnitTk.h>
-#include <common/toolkit/VersionTk.h>
 #include <program/Program.h>
 #include <modes/modehelpers/ModeHelperGetNodes.h>
 #include "ModeGetNodes.h"
+#include "Common.h"
 
+#include <iostream>
 
 #define NODEINFO_INDENTATION_STR   "   "
 #define NIC_INDENTATION_STR        "+ "
@@ -27,16 +28,8 @@
 
 int ModeGetNodes::execute()
 {
+
    App* app = Program::getApp();
-   DatagramListener* dgramLis = app->getDatagramListener();
-   NodeStoreServers* mgmtNodes = app->getMgmtNodes();
-   std::string mgmtHost = app->getConfig()->getSysMgmtdHost();
-   unsigned short mgmtPortUDP = app->getConfig()->getConnMgmtdPortUDP();
-
-   const int mgmtTimeoutMS = 2500;
-
-   std::vector<std::shared_ptr<Node>> nodes;
-   std::set<NumNodeID> unreachableNodes;
 
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
 
@@ -133,46 +126,43 @@ int ModeGetNodes::execute()
       return APPCODE_INVALID_CONFIG;
    }
 
-   // Download the nodes into a list, not into the nodeStore yet*
-   // The ones that actually reply to our heartbeat request will be sorted into the node store by
-   // checkReachability.
-   if (!NodesTk::waitForMgmtHeartbeat(
-            NULL, dgramLis, mgmtNodes, mgmtHost, mgmtPortUDP, mgmtTimeoutMS))
-   {
-      std::cerr << "Management node communication failed: " << mgmtHost << std::endl;
-      return APPCODE_RUNTIME_ERROR;
+   return ctl::common::downloadNodes(nodeType).reduce(
+
+      [=] (const auto& data) {
+
+         const NumNodeID& rootNodeID = data.first;
+         const std::vector<std::shared_ptr<Node>>& nodes = data.second;
+
+         NodesTk::applyLocalNicCapsToList(app->getLocalNode(), nodes);
+
+         std::set<NumNodeID> unreachableNodes;
+
+         // check reachability
+         if(cfgCheckReachability)
+            ModeHelperGetNodes::checkReachability(nodeType, nodes, unreachableNodes,
+                                                  cfgReachabilityNumRetries,
+                                                  cfgReachabilityRetryTimeoutMS);
+
+         // ping
+         if(cfgPing)
+            ModeHelperGetNodes::pingNodes(nodeType, nodes, cfgPingRetries);
+
+         // conn test
+         if(cfgConnTestNum)
+            ModeHelperGetNodes::connTest(nodeType, nodes, cfgConnTestNum);
+
+         // print nodes
+         this->printNodes(nodes, unreachableNodes, rootNodeID);
+
+         if(cfgNotReachableAsError && !unreachableNodes.empty() )
+            return APPCODE_NODE_NOT_REACHABLE;
+
+         return APPCODE_NO_ERROR;
+   },
+      [] (const auto&) {
+         return APPCODE_RUNTIME_ERROR;
    }
-
-   auto mgmtNode = mgmtNodes->referenceFirstNode();
-
-   if (!NodesTk::downloadNodes(*mgmtNode, nodeType, nodes, false, &rootNodeID))
-   {
-      std::cerr << "Node download failed." << std::endl;
-      return APPCODE_RUNTIME_ERROR;
-   }
-
-   NodesTk::applyLocalNicCapsToList(app->getLocalNode(), nodes);
-
-   // check reachability
-   if(cfgCheckReachability)
-      ModeHelperGetNodes::checkReachability(nodeType, nodes, unreachableNodes,
-         cfgReachabilityNumRetries, cfgReachabilityRetryTimeoutMS);
-
-   // ping
-   if(cfgPing)
-      ModeHelperGetNodes::pingNodes(nodeType, nodes, cfgPingRetries);
-
-   // conn test
-   if(cfgConnTestNum)
-      ModeHelperGetNodes::connTest(nodeType, nodes, cfgConnTestNum);
-
-   // print nodes
-   printNodes(nodes, unreachableNodes, rootNodeID);
-
-   if(cfgNotReachableAsError && !unreachableNodes.empty() )
-      return APPCODE_NODE_NOT_REACHABLE;
-
-   return APPCODE_NO_ERROR;
+   );
 }
 
 void ModeGetNodes::printHelp()
@@ -216,7 +206,7 @@ void ModeGetNodes::printNodes(const std::vector<NodeHandle>& nodes,
       std::cout << node.getTypedNodeID() << std::endl;
 
       if(cfgPrintFhgfsVersion)
-         printFhgfsVersion(node);
+         std::cout << NODEINFO_INDENTATION_STR << "Version code: " BEEGFS_VERSION << std::endl;
 
       if(cfgPrintDetails)
       {
@@ -237,7 +227,7 @@ void ModeGetNodes::printNodes(const std::vector<NodeHandle>& nodes,
 
       std::cout << "Number of nodes: " << nodes.size() << std::endl;
 
-      if(rootNodeID != 0)
+      if (rootNodeID)
          std::cout << "Root: " << rootNodeID << std::endl;
    }
 
@@ -273,7 +263,7 @@ void ModeGetNodes::printNicList(Node& node)
          extendedNicListStr += "\n";
 
       extendedNicListStr += std::string(NODEINFO_INDENTATION_STR) + NIC_INDENTATION_STR;
-      extendedNicListStr += NetworkInterfaceCard::nicAddrToStringLight(&(*nicIter) );
+      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&(*nicIter) );
    }
 
    std::cout << NODEINFO_INDENTATION_STR << "Interfaces: ";
@@ -284,14 +274,6 @@ void ModeGetNodes::printNicList(Node& node)
       std::cout << nicListStr << std::endl;
    else
       std::cout << std::endl << extendedNicListStr << std::endl;
-}
-
-void ModeGetNodes::printFhgfsVersion(Node& node)
-{
-   unsigned fhgfsVersion = node.getFhgfsVersion();
-
-   std::cout << NODEINFO_INDENTATION_STR << "Version code: " <<
-      VersionTk::versionCodeToPseudoVersionStr(fhgfsVersion) << std::endl;
 }
 
 void ModeGetNodes::printPorts(Node& node)

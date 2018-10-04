@@ -164,37 +164,6 @@ uninstall_mgmtd()
    fi
 }
 
-uninstall_opentk()
-{
-   if [ "$1" = "" ]
-   then
-      return 1
-   else
-      host=$1
-   fi
-   if [ "$2" = "" ]
-   then
-      outFile=${logFile}
-   else
-      outFile=$2
-   fi
-   if [ "$3" = "" ]
-   then
-      failedFile="/dev/null"
-   else
-      failedFile=$3
-   fi
-
-   hostline=$(cat ${metaFile} ${storageFile} ${clientFile} ${managementFile} | sort | uniq | grep "$1")
-   uninstall_package "$hostline" "BeeGFS Opentk Library" beegfs-opentk-lib $outFile $failedFile
-   if [ $? -eq 0 ]
-   then
-     return 0
-   else
-     return 1
-   fi
-}
-
 uninstall_client()
 {
    if [ "$1" = "" ]
@@ -271,7 +240,6 @@ if [ "$2" = "" ];then exit 1; fi
 if [ "$1" = "opentk" ]
 then
    uninstall_common $2 $3 $4
-   uninstall_opentk $2 $3 $4
    exit $?
 elif [ "$1" = "meta" ]
 then

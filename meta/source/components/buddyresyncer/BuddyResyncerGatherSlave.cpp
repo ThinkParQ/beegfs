@@ -48,7 +48,7 @@ void BuddyResyncerGatherSlave::crawlDir(const std::string& path, const MetaSyncD
 
    if (!dirHandle)
    {
-      LOG(MIRRORING, ERR, "Unable to open path", path, sysErr());
+      LOG(MIRRORING, ERR, "Unable to open path", path, sysErr);
       numErrors.increase();
       return;
    }
@@ -88,7 +88,7 @@ void BuddyResyncerGatherSlave::crawlDir(const std::string& path, const MetaSyncD
          // it was most likely caused by an rmdir issued by a user.
          if (!(errno == ENOENT && type == MetaSyncDirType::DentriesHashDir && level == 2))
          {
-            LOG(MIRRORING, ERR, "Could not stat dir entry.", candidatePath, sysErr());
+            LOG(MIRRORING, ERR, "Could not stat dir entry.", candidatePath, sysErr);
             numErrors.increase();
          }
 

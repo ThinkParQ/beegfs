@@ -7,8 +7,11 @@
 #include <net/if.h>
 
 
-enum NicAddrType        {NICADDRTYPE_STANDARD=0, NICADDRTYPE_SDP=1, NICADDRTYPE_RDMA=2,
-                         NICADDRTYPE_NAMEDSOCK=3};
+enum NicAddrType {
+   NICADDRTYPE_STANDARD,
+   NICADDRTYPE_SDP,
+   NICADDRTYPE_RDMA
+};
 
 /**
  * Note: Make sure this struct can be copied with the assignment operator.
@@ -16,12 +19,8 @@ enum NicAddrType        {NICADDRTYPE_STANDARD=0, NICADDRTYPE_SDP=1, NICADDRTYPE_
 struct NicAddress
 {
    struct in_addr ipAddr;
-   struct in_addr broadcastAddr;
-   int            bandwidth; // probably not working/supported
-   int            metric;
    NicAddrType    nicType;
    char           name[IFNAMSIZ];
-   char           hwAddr[IFHWADDRLEN];
 
    static void serialize(const NicAddress* obj, Serializer& ser)
    {
@@ -63,16 +62,14 @@ typedef NicAddressList::iterator NicAddressListIter;
 class NetworkInterfaceCard
 {
    public:
-      static bool findAll(StringList* allowedInterfacesList, bool useSDP, bool useRDMA,
+      static bool findAll(StringList* allowedInterfacesList, bool useRDMA,
          NicAddressList* outList);
-      static bool findAllInterfaces(const StringList& allowedInterfacesList, bool useSDP,
+      static bool findAllInterfaces(const StringList& allowedInterfacesList,
          NicAddressList& outList);
       static bool findByName(const char* interfaceName, NicAddress* outAddr);
 
       static const char* nicTypeToString(NicAddrType nicType);
       static std::string nicAddrToString(NicAddress* nicAddr);
-      static std::string nicAddrToStringLight(NicAddress* nicAddr);
-      static std::string hwAddrToString(char* hwAddr);
 
       static bool supportsSDP(NicAddressList* nicList);
       static bool supportsRDMA(NicAddressList* nicList);
@@ -102,12 +99,6 @@ class NetworkInterfaceCard
          // compares the preference of NICs
          // returns true if lhs is preferred compared to rhs
 
-         // prefer lower metric
-         if(lhs.metric < rhs.metric)
-            return true;
-         if(lhs.metric > rhs.metric)
-            return false;
-
          // prefer RDMA NICs
          if( (lhs.nicType == NICADDRTYPE_RDMA) && (rhs.nicType != NICADDRTYPE_RDMA) )
             return true;
@@ -120,33 +111,13 @@ class NetworkInterfaceCard
          if( (rhs.nicType == NICADDRTYPE_SDP) && (lhs.nicType == NICADDRTYPE_STANDARD) )
             return false;
 
-         // prefer higher bandwidth
-         if(lhs.bandwidth > rhs.bandwidth)
-            return true;
-         if(lhs.bandwidth < rhs.bandwidth)
-            return false;
-
          // prefer higher ipAddr
          unsigned lhsHostOrderIP = ntohl(lhs.ipAddr.s_addr);
          unsigned rhsHostOrderIP = ntohl(rhs.ipAddr.s_addr);
 
          // this is the original IP-order version
-         if(lhsHostOrderIP > rhsHostOrderIP)
+         return lhsHostOrderIP > rhsHostOrderIP;
             return true;
-         if(lhsHostOrderIP < rhsHostOrderIP)
-            return false;
-
-
-         /*
-         // debug IP-order alternative
-         if(lhsHostOrderIP < rhsHostOrderIP)
-            return true;
-         if(lhsHostOrderIP > rhsHostOrderIP)
-            return false;
-         */
-
-         // prefer lower hwAddr
-         return(memcmp(lhs.hwAddr, rhs.hwAddr, IFHWADDRLEN) < 0);
       }
 
 };

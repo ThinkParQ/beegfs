@@ -7,6 +7,9 @@ class FSyncLocalFileMsgEx : public FSyncLocalFileMsg
 {
    public:
       virtual bool processIncoming(ResponseContext& ctx);
+
+   private:
+      FhgfsOpsErr fsync();
 };
 
 #endif /*FSYNCLOCALFILEMSGEX_H_*/

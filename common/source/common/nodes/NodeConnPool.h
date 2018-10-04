@@ -2,16 +2,15 @@
 #define NODECONNPOOL_H_
 
 #include <common/app/config/ICommonConfig.h>
-#include <common/net/sock/NamedSocket.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
 #include <common/net/sock/PooledSocket.h>
 #include <common/net/sock/StandardSocket.h>
 #include <common/net/sock/RDMASocket.h>
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 #include <common/Common.h>
 
+#include <mutex>
 
 typedef std::list<PooledSocket*> ConnectionList;
 typedef ConnectionList::iterator ConnListIter;
@@ -28,7 +27,6 @@ struct NodeConnPoolStats
    unsigned numEstablishedStd;
    unsigned numEstablishedSDP;
    unsigned numEstablishedRDMA;
-   unsigned numEstablishedNamed;
 };
 
 /**
@@ -99,7 +97,6 @@ class NodeConnPool
 {
    public:
       NodeConnPool(Node& parentNode, unsigned short streamPort, const NicAddressList& nicList);
-      NodeConnPool(Node& parentNode, std::string namedSocketPath);
       virtual ~NodeConnPool();
 
       NodeConnPool(const NodeConnPool&) = delete;
@@ -127,7 +124,6 @@ class NodeConnPool
       Node& parentNode; // backlink to the node object to which this conn pool belongs
       unsigned short streamPort;
       NicListCapabilities localNicCaps;
-      std::string pathNamedSocket;
 
       unsigned availableConns; // available established conns
       unsigned establishedConns; // not equal to connList.size!!
@@ -146,7 +142,6 @@ class NodeConnPool
       void resetStreamsIdleFlag();
       void applySocketOptionsPreConnect(RDMASocket* sock);
       void applySocketOptionsPreConnect(StandardSocket* sock);
-      void applySocketOptionsPreConnect(NamedSocket* sock);
       void applySocketOptionsConnected(StandardSocket* sock);
       void authenticateChannel(Socket* sock);
       void makeChannelIndirect(Socket* sock);
@@ -159,24 +154,16 @@ class NodeConnPool
 
       virtual NicAddressList getNicList()
       {
-         SafeMutexLock mutexLock(&mutex); // L O C K
+         const std::lock_guard<Mutex> lock(mutex);
 
-         NicAddressList nicListCopy(nicList);
-
-         mutexLock.unlock(); // U N L O C K
-
-         return nicListCopy;
+         return nicList;
       }
 
       unsigned short getStreamPort()
       {
-         SafeMutexLock mutexLock(&mutex); // L O C K
+         const std::lock_guard<Mutex> lock(mutex);
 
-         unsigned short retVal = streamPort;
-
-         mutexLock.unlock(); // U N L O C K
-
-         return retVal;
+         return streamPort;
       }
 
       /**
@@ -198,20 +185,16 @@ class NodeConnPool
        */
       void setMaxConns(unsigned maxConns)
       {
-         SafeMutexLock mutexLock(&mutex); // L O C K
+         const std::lock_guard<Mutex> lock(mutex);
 
          this->maxConns = maxConns;
-
-         mutexLock.unlock(); // U N L O C K
       }
 
       void getStats(NodeConnPoolStats* outStats)
       {
-         SafeMutexLock mutexLock(&mutex); // L O C K
+         const std::lock_guard<Mutex> lock(mutex);
 
          *outStats = this->stats;
-
-         mutexLock.unlock(); // U N L O C K
       }
 
 };

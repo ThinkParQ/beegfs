@@ -43,10 +43,7 @@ bool Time::testClockID(clockid_t clockID)
    while (true)
    {
       int getTimeRes = clock_gettime(clockID, &now);
-      if (getTimeRes)
-         return false;
-
-      return true;
+      return getTimeRes == 0;
    }
 }
 

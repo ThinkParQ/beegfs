@@ -5,8 +5,6 @@ bool GetNodeInfoMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("GetNodeInfoMsg incoming");
 
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a GetNodeInfoMsg" + ctx.peerName() );
-
    GeneralNodeInfo info;
 
    App *app = Program::getApp();

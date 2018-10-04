@@ -9,10 +9,10 @@
 #include <common/nodes/NodeStoreServers.h>
 #include <common/threading/Mutex.h>
 #include <common/threading/PThread.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/toolkit/TimeAbs.h>
 #include <toolkit/stats/StatsAdmon.h>
 
+#include <mutex>
 
 class DataRequestorStats;
 
@@ -95,25 +95,17 @@ class DataRequestorStats : public PThread
 
       void stop()
       {
-         SafeMutexLock lock(&statusMutex);              // L O C K
+         const std::lock_guard<Mutex> lock(statusMutex);
 
          this->status = DataRequestorStatsStatus_STOPPING;
          this->statusChangeCond.broadcast();
-
-         lock.unlock();                                 // U N L O C K
       }
 
       DataRequestorStatsStatus getStatus()
       {
-         DataRequestorStatsStatus retVal;
+         const std::lock_guard<Mutex> lock(statusMutex);
 
-         SafeMutexLock lock(&statusMutex);              // L O C K
-
-         retVal = this->status;
-
-         lock.unlock();                                 // U N L O C K
-
-         return retVal;
+         return this->status;
       }
 
       CfgClientStatsOptions getCfgStatsOptions()
@@ -123,15 +115,9 @@ class DataRequestorStats : public PThread
 
       u_int64_t getDataSequenceID()
       {
-         uint64_t retVal;
+         const std::lock_guard<Mutex> lock(accessDataMutex);
 
-         SafeMutexLock lock(&this->accessDataMutex);        // L O C K
-
-         retVal = this->dataSequenceID;
-
-         lock.unlock();                                     // U N L O C K
-
-         return retVal;
+         return this->dataSequenceID;
       }
 };
 

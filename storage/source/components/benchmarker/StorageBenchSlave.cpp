@@ -5,7 +5,7 @@
 #include <program/Program.h>
 #include "StorageBenchSlave.h"
 
-
+#include <mutex>
 
 #define STORAGEBENCH_STORAGE_SUBDIR_NAME              "benchmark"
 #define STORAGEBENCH_READ_PIPE_TIMEOUT_MS             2000
@@ -32,7 +32,7 @@ int StorageBenchSlave::initAndStartStorageBench(UInt16List* targetIDs, int64_t b
 
    this->resetSelfTerminate();
 
-   SafeMutexLock safeLock(&statusMutex); // L O C K
+   const std::lock_guard<Mutex> lock(statusMutex);
 
    if (STORAGEBENCHSTATUS_IS_ACTIVE(this->status))
    {
@@ -79,8 +79,6 @@ int StorageBenchSlave::initAndStartStorageBench(UInt16List* targetIDs, int64_t b
    {
       retVal = lastError;
    }
-
-   safeLock.unlock(); // U N L O C K
 
    return retVal;
 }
@@ -422,12 +420,14 @@ bool StorageBenchSlave::checkReadData()
    for (StorageBenchThreadDataMapIter iter = threadData.begin();
             iter != threadData.end(); iter++)
    {
-      std::string path;
-      if (!Program::getApp()->getStorageTargets()->getPath(iter->second.targetID, &path))
+      auto* const target = Program::getApp()->getStorageTargets()->getTarget(iter->second.targetID);
+      if (!target)
       {
          LogContext(logContext).logErr(std::string("TargetID unknown."));
          return false;
       }
+
+      std::string path = target->getPath().str();
 
       path = path + "/" + STORAGEBENCH_STORAGE_SUBDIR_NAME + "/" +
          StringTk::uintToStr(iter->second.targetThreadID);
@@ -470,14 +470,14 @@ bool StorageBenchSlave::createBenchmarkFolder()
 
    for(UInt16ListIter iter = this->targetIDs->begin(); iter != this->targetIDs->end(); iter++)
    {
-      std::string path;
-      if (!Program::getApp()->getStorageTargets()->getPath(*iter, &path) )
+      auto* const target = Program::getApp()->getStorageTargets()->getTarget(*iter);
+      if (!target)
       {
          LogContext(logContext).logErr("TargetID unknown: " + StringTk::uintToStr(*iter) );
          return false;
       }
 
-      Path currentPath(path + "/" STORAGEBENCH_STORAGE_SUBDIR_NAME);
+      Path currentPath(target->getPath() / STORAGEBENCH_STORAGE_SUBDIR_NAME);
       if(!StorageTk::createPathOnDisk(currentPath, false))
       {
          LogContext(logContext).logErr(
@@ -497,25 +497,24 @@ bool StorageBenchSlave::createBenchmarkFolder()
  *         false if a error occurred
  *
  */
-bool StorageBenchSlave::openFiles(void)
+bool StorageBenchSlave::openFiles()
 {
    const char* logContext = "Storage Benchmark (open)";
-   StorageTargets* storageTargets = Program::getApp()->getStorageTargets();
    mode_t openMode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
    for(StorageBenchThreadDataMapIter iter = threadData.begin();
       iter != threadData.end();
       iter++)
    {
-      std::string path;
-
-      bool getPathRes = storageTargets->getPath(iter->second.targetID, &path);
-      if(!getPathRes)
+      auto* const target = Program::getApp()->getStorageTargets()->getTarget(iter->second.targetID);
+      if (!target)
       {
          LogContext(logContext).logErr(
             "TargetID unknown: " + StringTk::uintToStr(iter->second.targetID) );
          return false;
       }
+
+      std::string path = target->getPath().str();
 
       path = path + "/" STORAGEBENCH_STORAGE_SUBDIR_NAME "/" +
          StringTk::uintToStr(iter->second.targetThreadID);
@@ -542,10 +541,9 @@ bool StorageBenchSlave::openFiles(void)
    return true;
 }
 
-bool StorageBenchSlave::closeFiles(void)
+bool StorageBenchSlave::closeFiles()
 {
    const char* logContext = "Storage Benchmark (close)";
-   StorageTargets* storageTargets = Program::getApp()->getStorageTargets();
 
    bool retVal = true;
 
@@ -558,15 +556,17 @@ bool StorageBenchSlave::closeFiles(void)
       if (tmpRetVal != 0)
       {
          int closeErrno = errno;
-         std::string path;
 
-         bool getPathRes = storageTargets->getPath(iter->second.targetID, &path);
-         if(!getPathRes)
+         auto* const target = Program::getApp()->getStorageTargets()->getTarget(
+               iter->second.targetID);
+         if (!target)
          {
             LogContext(logContext).logErr(
                "TargetID unknown: " + StringTk::uintToStr(iter->second.targetID) );
             return false;
          }
+
+         std::string path = target->getPath().str();
 
          path = path + "/" + STORAGEBENCH_STORAGE_SUBDIR_NAME + "/" +
                StringTk::uintToStr(iter->second.targetThreadID);
@@ -696,22 +696,18 @@ StorageBenchStatus StorageBenchSlave::getStatusWithResults(UInt16List* targetIDs
  */
 int StorageBenchSlave::stopBenchmark()
 {
-   SafeMutexLock safeLock(&statusMutex); // L O C K
+   const std::lock_guard<Mutex> lock(statusMutex);
 
    if (this->status == StorageBenchStatus_RUNNING)
    {
       this->status = StorageBenchStatus_STOPPING;
-      safeLock.unlock(); // U N L O C K
       return STORAGEBENCH_ERROR_NO_ERROR;
    }
    else
    if(this->status == StorageBenchStatus_FINISHING  || this->status == StorageBenchStatus_STOPPING)
    {
-      safeLock.unlock(); // U N L O C K
       return STORAGEBENCH_ERROR_NO_ERROR;
    }
-
-   safeLock.unlock(); // U N L O C K
 
    return STORAGEBENCH_ERROR_NO_ERROR;
 }
@@ -725,7 +721,7 @@ int StorageBenchSlave::stopBenchmark()
  */
 int StorageBenchSlave::cleanup(UInt16List* targetIDs)
 {
-   SafeMutexLock safeLock(&statusMutex); // L O C K
+   const std::lock_guard<Mutex> lock(statusMutex);
    const char* logContext = "Storage Benchmark (cleanup)";
 
    //cleanup only possible if no benchmark is running
@@ -733,20 +729,19 @@ int StorageBenchSlave::cleanup(UInt16List* targetIDs)
    {
       LogContext(logContext).logErr("Cleanup not possible benchmark is running");
 
-      safeLock.unlock(); // U N L O C K
       return STORAGEBENCH_ERROR_RUNTIME_CLEANUP_JOB_ACTIVE;
    }
 
    for(UInt16ListIter iter = targetIDs->begin(); iter != targetIDs->end(); iter++)
    {
-      std::string path;
-      if (!Program::getApp()->getStorageTargets()->getPath(*iter, &path))
+      auto* const target = Program::getApp()->getStorageTargets()->getTarget(*iter);
+      if (!target)
       {
          LogContext(logContext).logErr(std::string("TargetID unknown."));
-
-         safeLock.unlock(); // U N L O C K
          return STORAGEBENCH_ERROR_RUNTIME_UNKNOWN_TARGET;
       }
+
+      std::string path = target->getPath().str();
 
       path.append("/");
       path.append(STORAGEBENCH_STORAGE_SUBDIR_NAME);
@@ -771,7 +766,6 @@ int StorageBenchSlave::cleanup(UInt16List* targetIDs)
                "; failed with SysErr: " + System::getErrString(errno));
          }
 
-         safeLock.unlock(); // U N L O C K
          return errRetVal;
       }
 
@@ -796,7 +790,6 @@ int StorageBenchSlave::cleanup(UInt16List* targetIDs)
                this->lastRunErrorCode = STORAGEBENCH_ERROR_RUNTIME_DELETE_FOLDER;
 
                closedir(dir);
-               safeLock.unlock(); // U N L O C K
                return STORAGEBENCH_ERROR_RUNTIME_DELETE_FOLDER;
             }
          }
@@ -813,7 +806,6 @@ int StorageBenchSlave::cleanup(UInt16List* targetIDs)
       closedir(dir);
    }
 
-   safeLock.unlock(); // U N L O C K
    return STORAGEBENCH_ERROR_NO_ERROR;
 }
 
@@ -828,12 +820,10 @@ void StorageBenchSlave::shutdownBenchmark()
 
 void StorageBenchSlave::waitForShutdownBenchmark()
 {
-   SafeMutexLock safeLock(&this->statusMutex);
+   const std::lock_guard<Mutex> lock(statusMutex);
 
    while(STORAGEBENCHSTATUS_IS_ACTIVE(this->status))
    {
       this->statusChangeCond.wait(&this->statusMutex);
    }
-
-   safeLock.unlock();
 }

@@ -7,22 +7,20 @@
 class NodeStoreClientsEx : public NodeStoreClients
 {
    public:
-      NodeStoreClientsEx();
-
-      virtual bool addOrUpdateNode(NodeHandle node);
-      virtual bool deleteNode(NumNodeID nodeNumID);
-
-      bool loadFromFile(bool longNodeIDs);
+      bool loadFromFile(bool v6Format);
       bool saveToFile();
 
    private:
+      NumNodeID lastUsedNumID; // Note: is normally set in addOrUpdateNode
+
       Mutex storeMutex; // syncs access to the storePath file
       std::string storePath; // not thread-safe!
-      bool storeDirty; // true if saved store file needs to be updated
 
-
-      bool loadFromBuf(const char* buf, unsigned bufLen, bool longNodeIDs);
+      bool loadFromBuf(const char* buf, unsigned bufLen, bool v6Format);
       ssize_t saveToBuf(boost::scoped_array<char>& buf);
+
+      virtual NumNodeID generateID(Node& node) const override;
+      NumNodeID retrieveNumIDFromStringID(const std::string& nodeID) const;
 
    public:
       // getters & setters   
@@ -30,18 +28,6 @@ class NodeStoreClientsEx : public NodeStoreClients
       {
          this->storePath = storePath;
       }
-      
-      bool isStoreDirty()
-      {
-         SafeMutexLock mutexLock(&storeMutex);
-
-         bool retVal = this->storeDirty;
-
-         mutexLock.unlock();
-         
-         return retVal;
-      }
-
 };
 
 #endif /*NODESTORECLIENTSEX_H_*/

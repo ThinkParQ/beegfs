@@ -45,14 +45,11 @@ class DirEntryStore
       FhgfsOpsErr linkInodeToDir(const std::string& inodePath, const std::string &fileName);
 
       FhgfsOpsErr removeDir(const std::string& entryName, DirEntry** outDirEntry);
-      FhgfsOpsErr unlinkDirEntry(const std::string& entryName, DirEntry* inEntry,
+      FhgfsOpsErr unlinkDirEntry(const std::string& entryName, DirEntry* entry,
          unsigned unlinkTypeFlags);
 
-      FhgfsOpsErr renameEntry(const std::string& entryName, const std::string& newEntryName);
+      FhgfsOpsErr renameEntry(const std::string& fromEntryName, const std::string& toEntryName);
 
-      void list(StringVector* outNames);
-      FhgfsOpsErr listIncremental(int64_t serverOffset,
-         unsigned maxOutNames, StringList* outNames, int64_t* outNewServerOffset);
       FhgfsOpsErr listIncrementalEx(int64_t serverOffset, unsigned maxOutNames, bool filterDots,
          ListIncExOutArgs& outArgs);
       FhgfsOpsErr listIDFilesIncremental(int64_t serverOffset, uint64_t incrementalOffset,

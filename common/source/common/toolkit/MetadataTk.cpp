@@ -6,6 +6,17 @@
 #include <common/threading/PThread.h>
 #include "MetadataTk.h"
 
+static std::shared_ptr<Node> referenceRoot(NodeStoreServers& nodes, const RootInfo& root,
+      MirrorBuddyGroupMapper& bgm)
+{
+   const auto id = root.getID();
+   const auto isMirrored = root.getIsMirrored();
+   if (!isMirrored)
+      return nodes.referenceNode(id);
+
+   return nodes.referenceNode(NumNodeID(bgm.getPrimaryTargetID(id.val())));
+}
+
 /**
  * Find and reference the metadata owner node of a certain entry.
  *
@@ -16,7 +27,7 @@
  */
 FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath, bool referenceParent,
    NodeStoreServers* nodes, NodeHandle& outReferencedNode, EntryInfo* outEntryInfo,
-   MirrorBuddyGroupMapper* metaBuddyGroupMapper)
+   const RootInfo& metaRoot, MirrorBuddyGroupMapper* metaBuddyGroupMapper)
 {
    const char* logContext = "MetadataTk::referenceOwner";
 
@@ -24,11 +35,11 @@ FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath, bool referenceParent,
 
    if(!searchDepth)
    { // looking for the root node (ignore referenceParent)
-      outReferencedNode = nodes->referenceRootNode(metaBuddyGroupMapper);
+      outReferencedNode = referenceRoot(*nodes, metaRoot, *metaBuddyGroupMapper);
       if (likely(outReferencedNode))
       { // got root node
-         if (nodes->getRootIsBuddyMirrored())
-            outEntryInfo->set(nodes->getRootNodeNumID(), "", META_ROOTDIR_ID_STR, "",
+         if (metaRoot.getIsMirrored())
+            outEntryInfo->set(metaRoot.getID(), "", META_ROOTDIR_ID_STR, "",
                DirEntryType_DIRECTORY, ENTRYINFO_FEATURE_BUDDYMIRRORED);
          else
             outEntryInfo->set(outReferencedNode->getNumID(), "", META_ROOTDIR_ID_STR, "",
@@ -44,7 +55,8 @@ FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath, bool referenceParent,
    }
 
    FhgfsOpsErr findRes = findOwner(searchPath,
-      referenceParent ? (searchDepth - 1) : searchDepth, nodes, outEntryInfo, metaBuddyGroupMapper);
+      referenceParent ? (searchDepth - 1) : searchDepth, nodes, outEntryInfo, metaRoot,
+      metaBuddyGroupMapper);
 
    if(findRes == FhgfsOpsErr_SUCCESS)
    { // simple success case => try to reference the node
@@ -77,31 +89,21 @@ FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath, bool referenceParent,
 inline FhgfsOpsErr MetadataTk::findOwnerStep(Node& node,
    NetMessage* requestMsg, EntryInfoWithDepth* outEntryInfoWDepth)
 {
-   char* respBuf;
-   NetMessage* respMsg;
-   bool requestRes;
    FindOwnerRespMsg* findResp;
    FhgfsOpsErr findRes;
 
-   // connect & communicate
-   requestRes = MessagingTk::requestResponse(
-      node, requestMsg, NETMSGTYPE_FindOwnerResp, &respBuf, &respMsg);
-
-   if(unlikely(!requestRes) )
+   const auto respMsg = MessagingTk::requestResponse(node, *requestMsg, NETMSGTYPE_FindOwnerResp);
+   if (!respMsg)
    { // communication error
       return FhgfsOpsErr_INTERNAL;
    }
 
    // handle result
-   findResp = (FindOwnerRespMsg*)respMsg;
+   findResp = (FindOwnerRespMsg*)respMsg.get();
    findRes = (FhgfsOpsErr)findResp->getResult();
 
    if(findRes == FhgfsOpsErr_SUCCESS)
       *outEntryInfoWDepth = findResp->getEntryInfo();
-
-   // clean-up
-   delete(respMsg);
-   free(respBuf);
 
    return findRes;
 }
@@ -114,12 +116,12 @@ inline FhgfsOpsErr MetadataTk::findOwnerStep(Node& node,
  * caller)
  */
 FhgfsOpsErr MetadataTk::findOwner(Path* searchPath, unsigned searchDepth, NodeStoreServers* nodes,
-   EntryInfo* outEntryInfo, MirrorBuddyGroupMapper* metaBuddyGroupMapper)
+   EntryInfo* outEntryInfo, const RootInfo& metaRoot, MirrorBuddyGroupMapper* metaBuddyGroupMapper)
 {
    const char* logContextStr = "MetadataTk::findOwner";
 
    // reference root node
-   auto currentNode = nodes->referenceRootNode(metaBuddyGroupMapper);
+   auto currentNode = referenceRoot(*nodes, metaRoot, *metaBuddyGroupMapper);
    if (unlikely(!currentNode))
    {
       LogContext(logContextStr).logErr("Unable to proceed without a working root metadata server");
@@ -188,7 +190,7 @@ FhgfsOpsErr MetadataTk::findOwner(Path* searchPath, unsigned searchDepth, NodeSt
          goto entryinfo_cleanup;
       }
 
-      lastEntryInfo = entryInfoWDepth;
+      lastEntryInfo = entryInfoWDepth; // NOLINT(cppcoreguidelines-slicing)
       lastEntryDepth = entryInfoWDepth.getEntryDepth();
    }
 

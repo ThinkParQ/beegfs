@@ -10,16 +10,14 @@
 #include <session/EntryLock.h>
 #include "SetAttrMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 bool SetAttrMsgEx::processIncoming(ResponseContext& ctx)
 {
 #ifdef BEEGFS_DEBUG
    const char* logContext = "SetAttrMsg incoming";
-
-   LogContext(logContext).log(Log_DEBUG, "Received a SetAttrMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
-
-   App* app = Program::getApp();
 
    EntryInfo* entryInfo = getEntryInfo();
 
@@ -30,8 +28,7 @@ bool SetAttrMsgEx::processIncoming(ResponseContext& ctx)
    (void) entryInfo;
 
    // update operation counters (here on top because we have an early sock release in this msg)
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_SETATTR,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_SETATTR);
 
    return BaseType::processIncoming(ctx);
 }
@@ -284,7 +281,7 @@ FhgfsOpsErr SetAttrMsgEx::setChunkFileAttribsSequential(FileInode& inode,
          LogContext(logContext).log(Log_WARNING,
             "Communication with storage target failed: " + StringTk::uintToStr(targetID) + "; "
             "fileID: " + inode.getEntryID() + "; "
-            "Error: " + FhgfsOpsErrTk::toErrString(requestRes) );
+            "Error: " + boost::lexical_cast<std::string>(requestRes));
 
          if(retVal == FhgfsOpsErr_SUCCESS)
             retVal = requestRes;
@@ -293,7 +290,7 @@ FhgfsOpsErr SetAttrMsgEx::setChunkFileAttribsSequential(FileInode& inode,
       }
 
       // correct response type received
-      SetLocalAttrRespMsg* setRespMsg = (SetLocalAttrRespMsg*)rrArgs.outRespMsg;
+      const auto setRespMsg = (const SetLocalAttrRespMsg*)rrArgs.outRespMsg.get();
 
       FhgfsOpsErr setRespResult = setRespMsg->getResult();
       if (setRespResult != FhgfsOpsErr_SUCCESS)

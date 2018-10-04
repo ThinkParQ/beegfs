@@ -11,11 +11,10 @@ class GetTargetMappingsRespMsg : public NetMessageSerdes<GetTargetMappingsRespMs
        * @param targetIDs just a reference => do not free while you're using this object
        * @param nodeIDs just a reference => do not free while you're using this object
        */
-      GetTargetMappingsRespMsg(UInt16List* targetIDs, NumNodeIDList* nodeIDs) :
-         BaseType(NETMSGTYPE_GetTargetMappingsResp)
+      GetTargetMappingsRespMsg(const std::map<uint16_t, NumNodeID>& mappings) :
+         BaseType(NETMSGTYPE_GetTargetMappingsResp),
+         mappings(&mappings)
       {
-         this->targetIDs = targetIDs;
-         this->nodeIDs = nodeIDs;
       }
 
       GetTargetMappingsRespMsg() : BaseType(NETMSGTYPE_GetTargetMappingsResp)
@@ -26,33 +25,28 @@ class GetTargetMappingsRespMsg : public NetMessageSerdes<GetTargetMappingsRespMs
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % serdes::backedPtr(obj->targetIDs, obj->parsed.targetIDs)
-            % serdes::backedPtr(obj->nodeIDs, obj->parsed.nodeIDs);
+            % serdes::backedPtr(obj->mappings, obj->parsed.mappings);
       }
 
    private:
       // for serialization
-      UInt16List* targetIDs; // not owned by this object!
-      NumNodeIDList* nodeIDs; // not owned by this object!
+      const std::map<uint16_t, NumNodeID>* mappings;
 
       // for deserialization
       struct {
-         UInt16List targetIDs;
-         NumNodeIDList nodeIDs;
+         std::map<uint16_t, NumNodeID> mappings;
       } parsed;
 
 
    public:
-      UInt16List& getTargetIDs()
-      {
-         return *targetIDs;
-      }
+      const std::map<uint16_t, NumNodeID>& getMappings() const { return *mappings; }
 
-      NumNodeIDList& getNodeIDs()
+      std::map<uint16_t, NumNodeID> releaseMappings()
       {
-         return *nodeIDs;
+         return mappings == &parsed.mappings
+            ? std::move(parsed.mappings)
+            : *mappings;
       }
-
 };
 
 #endif /* GETTARGETMAPPINGSRESPMSG_H_ */

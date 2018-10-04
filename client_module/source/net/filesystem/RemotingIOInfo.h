@@ -21,7 +21,6 @@ static inline void RemotingIOInfo_initSpecialClose(App* app, const char* fileHan
 static inline void RemotingIOInfo_freeVals(RemotingIOInfo* outIOInfo);
 static inline size_t RemotingIOInfo_getNumPagesPerStripe(RemotingIOInfo* ioInfo);
 static inline size_t RemotingIOInfo_getNumPagesPerChunk(RemotingIOInfo* ioInfo);
-static inline size_t RemotingIOInfo_getNumStripes(RemotingIOInfo* ioInfo);
 
 
 
@@ -123,17 +122,6 @@ size_t RemotingIOInfo_getNumPagesPerStripe(RemotingIOInfo* ioInfo)
    size_t numStripeNodes = UInt16Vec_length(targetIDs);
 
    return RemotingIOInfo_getNumPagesPerChunk(ioInfo) * numStripeNodes;
-}
-
-/**
- * Return the number of stripes
- */
-size_t RemotingIOInfo_getNumStripes(RemotingIOInfo* ioInfo)
-{
-   StripePattern* pattern = ioInfo->pattern;
-   UInt16Vec* targetIDs = pattern->getStripeTargetIDs(pattern);
-
-   return UInt16Vec_length(targetIDs);
 }
 
 size_t RemotingIOInfo_getNumPagesPerChunk(RemotingIOInfo* ioInfo)

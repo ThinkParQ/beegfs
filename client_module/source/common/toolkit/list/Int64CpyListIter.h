@@ -8,7 +8,6 @@ struct Int64CpyListIter;
 typedef struct Int64CpyListIter Int64CpyListIter;
 
 static inline void Int64CpyListIter_init(Int64CpyListIter* this, Int64CpyList* list);
-static inline bool Int64CpyListIter_hasNext(Int64CpyListIter* this);
 static inline void Int64CpyListIter_next(Int64CpyListIter* this);
 static inline int64_t Int64CpyListIter_value(Int64CpyListIter* this);
 static inline bool Int64CpyListIter_end(Int64CpyListIter* this);
@@ -23,11 +22,6 @@ struct Int64CpyListIter
 void Int64CpyListIter_init(Int64CpyListIter* this, Int64CpyList* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool Int64CpyListIter_hasNext(Int64CpyListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void Int64CpyListIter_next(Int64CpyListIter* this)

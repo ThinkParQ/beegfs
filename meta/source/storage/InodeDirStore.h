@@ -80,7 +80,7 @@ class InodeDirStore
 
       FhgfsOpsErr isRemovableUnlocked(const std::string& dirID, bool isBuddyMirrored);
 
-      DirectoryMapIter insertDirInodeUnlocked(const std::string& id, bool isBuddyMirrored,
+      DirectoryMapIter insertDirInodeUnlocked(const std::string& dirID, bool isBuddyMirrored,
          bool forceLoad);
 
       FhgfsOpsErr setDirParent(EntryInfo* entryInfo, uint16_t parentNodeID);

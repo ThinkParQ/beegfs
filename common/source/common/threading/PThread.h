@@ -218,6 +218,7 @@ class PThread
          addExePrefix(true)
       {
          this->threadApp = app;
+         setCurrentThreadApp(app);
 
          this->threadName = name;
          this->threadID = 0;

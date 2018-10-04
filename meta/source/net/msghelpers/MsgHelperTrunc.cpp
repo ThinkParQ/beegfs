@@ -4,6 +4,8 @@
 #include <program/Program.h>
 #include "MsgHelperTrunc.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 /**
  * Note: Will also update persistent metadata on disk.
@@ -110,7 +112,7 @@ FhgfsOpsErr MsgHelperTrunc::truncChunkFileSequential(FileInode& inode, EntryInfo
       }
       
       // correct response type received
-      TruncLocalFileRespMsg* truncRespMsg = (TruncLocalFileRespMsg*)rrArgs.outRespMsg;
+      TruncLocalFileRespMsg* truncRespMsg = (TruncLocalFileRespMsg*)rrArgs.outRespMsg.get();
       
       // set current dynamic attribs (even if result not success, because then storageVersion==0)
       DynamicFileAttribs currentDynAttribs(truncRespMsg->getStorageVersion(),
@@ -125,8 +127,8 @@ FhgfsOpsErr MsgHelperTrunc::truncChunkFileSequential(FileInode& inode, EntryInfo
          LogContext(logContext).log(Log_WARNING,
             "Storage target failed to truncate chunk file: " + StringTk::uintToStr(targetID) + "; "
             "fileID: " + inode.getEntryID() + "; "
-            "Error: " + FhgfsOpsErrTk::toErrString(chunkTruncRes) );
-         
+            "Error: " + boost::lexical_cast<std::string>(chunkTruncRes));
+
          if(retVal == FhgfsOpsErr_SUCCESS)
             retVal = truncRespMsg->getResult();
          

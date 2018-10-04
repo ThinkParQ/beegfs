@@ -13,7 +13,6 @@
 
 RetrieveChunksWork::RetrieveChunksWork(FsckDB* db, NodeHandle node, SynchronizedCounter* counter,
       AtomicUInt64* numChunksFound, bool forceRestart) :
-   Work(),
    log("RetrieveChunksWork"), node(std::move(node)), counter(counter),
    numChunksFound(numChunksFound),
    chunks(db->getChunksTable()), chunksHandle(chunks->newBulkHandle()),
@@ -64,20 +63,15 @@ void RetrieveChunksWork::doWork()
 
       do
       {
-         bool commRes;
-         char *respBuf = NULL;
-         NetMessage *respMsg = NULL;
-
          FetchFsckChunkListMsg fetchFsckChunkListMsg(RETRIEVE_CHUNKS_PACKET_SIZE, status,
                forceRestart);
 
-         commRes = MessagingTk::requestResponse(*node, &fetchFsckChunkListMsg,
-            NETMSGTYPE_FetchFsckChunkListResp, &respBuf, &respMsg);
+         const auto respMsg = MessagingTk::requestResponse(*node, fetchFsckChunkListMsg,
+            NETMSGTYPE_FetchFsckChunkListResp);
 
-         if (commRes)
+         if (respMsg)
          {
-            FetchFsckChunkListRespMsg* fetchFsckChunkListRespMsg =
-               (FetchFsckChunkListRespMsg*) respMsg;
+            auto* fetchFsckChunkListRespMsg = (FetchFsckChunkListRespMsg*) respMsg.get();
 
             FsckChunkList& chunks = fetchFsckChunkListRespMsg->getChunkList();
             resultCount = chunks.size();
@@ -124,15 +118,9 @@ void RetrieveChunksWork::doWork()
             this->chunks->insert(chunks, this->chunksHandle);
 
             numChunksFound->increase(resultCount);
-
-            SAFE_FREE(respBuf);
-            SAFE_DELETE(respMsg);
          }
          else
          {
-            SAFE_FREE(respBuf);
-            SAFE_DELETE(respMsg);
-
             throw FsckException("Communication error occured with node; nodeID: " + nodeID);
          }
 

@@ -5,26 +5,17 @@
 
 bool HeartbeatRequestMsgEx::processIncoming(ResponseContext& ctx)
 {
-   //const char* logContext = "HeartbeatRequest incoming";
-
-   //std::string peer = fromAddr ? Socket::ipaddrToStr(&fromAddr->sin_addr) : sock->getPeername(); 
-   //LOG_DEBUG_CONTEXT(log, 5, std::string("Received a HeartbeatRequestMsg from: ") + peer);
-   //IGNORE_UNUSED_VARIABLE(logContext);
-   
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
    
    Node& localNode = app->getLocalNode();
    NumNodeID localNodeNumID = localNode.getNumID();
-   NumNodeID rootNodeID = app->getMetaNodes()->getRootNodeNumID();
+   NumNodeID rootNodeID = app->getMetaRoot().getID();
    NicAddressList nicList(localNode.getNicList());
-   const BitStore* nodeFeatureFlags = localNode.getNodeFeatures();
 
-   HeartbeatMsg hbMsg(localNode.getID(), localNodeNumID, NODETYPE_Meta, &nicList,
-      nodeFeatureFlags);
+   HeartbeatMsg hbMsg(localNode.getID(), localNodeNumID, NODETYPE_Meta, &nicList);
    hbMsg.setRootNumID(rootNodeID);
    hbMsg.setPorts(cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
-   hbMsg.setFhgfsVersion(BEEGFS_VERSION_CODE);
 
    ctx.sendResponse(hbMsg);
 

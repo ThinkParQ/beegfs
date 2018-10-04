@@ -11,7 +11,6 @@
 #include <common/nodes/TargetStateStore.h>
 #include <common/storage/StorageErrors.h>
 #include <common/toolkit/MessagingTk.h>
-#include <common/toolkit/VersionTk.h>
 #include <common/threading/Thread.h>
 #include <fault-inject/fault-inject.h>
 #include <linux/mempool.h>

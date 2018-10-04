@@ -2,11 +2,11 @@
 #include <program/Program.h>
 #include "HeartbeatMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Heartbeat incoming");
-
-   //LOG_DEBUG_CONTEXT(log, Log_DEBUG, std::string("Received a HeartbeatMsg from: ") + peer);
 
    App* app = Program::getApp();
    bool isNodeNew;
@@ -15,13 +15,8 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    NicAddressList& nicList = getNicList();
 
-   auto node = std::make_shared<Node>(getNodeID(), getNodeNumID(), getPortUDP(), getPortTCP(),
-      nicList);
-
-   node->setNodeType(getNodeType() );
-   node->setFhgfsVersion(getFhgfsVersion() );
-
-   node->setFeatureFlags(&getNodeFeatureFlags() );
+   auto node = std::make_shared<Node>(getNodeType(), getNodeID(), getNodeNumID(), getPortUDP(),
+         getPortTCP(), nicList);
 
    // set local nic capabilities
 
@@ -40,7 +35,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    if(!nodes)
    {
       log.logErr("Invalid node type: " + StringTk::intToStr(getNodeType() ) +
-         "(" + Node::nodeTypeToStr(getNodeType() ) + ")");
+         "(" + boost::lexical_cast<std::string>(getNodeType()) + ")");
 
       goto ack_resp;
    }
@@ -87,8 +82,7 @@ void HeartbeatMsgEx::processIncomingRoot()
       return;
 
    // try to apply the contained root info
-   if(Program::getApp()->getMetaNodes()->setRootNodeNumID(getRootNumID(), false,
-      getRootIsBuddyMirrored()) )
+   if(Program::getApp()->getMetaRoot().setIfDefault(getRootNumID(), getRootIsBuddyMirrored()))
    {
       log.log(Log_CRITICAL, "Root (by Heartbeat): " + getRootNumID().str() );
 

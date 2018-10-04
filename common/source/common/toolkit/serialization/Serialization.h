@@ -23,7 +23,6 @@
 
 class EntryInfo;
 class Node;
-class NumNodeID;
 class Path;
 class QuotaData;
 class StorageTargetInfo;

@@ -1,4 +1,3 @@
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/RWLockGuard.h>
 #include <common/threading/UniqueRWLock.h>
 #include <program/Program.h>
@@ -24,10 +23,7 @@ InodeDirStore::InodeDirStore()
 bool InodeDirStore::dirInodeInStoreUnlocked(const std::string& dirID)
 {
    DirectoryMapIter iter = this->dirs.find(dirID);
-   if(iter != this->dirs.end() )
-      return true;
-
-   return false;
+   return iter != this->dirs.end();
 }
 
 
@@ -75,7 +71,7 @@ DirInode* InodeDirStore::referenceDirInode(const std::string& dirID, bool isBudd
          dir = dirRefer->reference();
          LOG_DBG(GENERAL, SPAM,  "referenceDirInode", dir->getID(), dirRefer->getRefCount());
 
-         if (wasReferenced == false)
+         if (!wasReferenced)
             cacheAddUnlocked(dirID, dirRefer);
       }
 
@@ -89,7 +85,7 @@ DirInode* InodeDirStore::referenceDirInode(const std::string& dirID, bool isBudd
    /* Only try to load the DirInode after giving up the lock. DirInodes are usually referenced
     * without being loaded at all from the kernel client, so we can afford the extra lock if loading
     * the DirInode fails. */
-   if (forceLoad && dir && (dir->loadIfNotLoaded() == false) )
+   if (forceLoad && dir && (!dir->loadIfNotLoaded()) )
    { // loading from disk failed, release the dir again
       releaseDir(dirID);
       dir = NULL;

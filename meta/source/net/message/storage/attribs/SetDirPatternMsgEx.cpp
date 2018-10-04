@@ -10,10 +10,6 @@
 
 bool SetDirPatternMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("SetDirPatternMsgEx incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetDirPatternMsg from: " + ctx.peerName() );
-
    EntryInfo* entryInfo = this->getEntryInfo();
 
    LOG_DEBUG("SetDirPatternMsgEx::processIncoming", Log_SPAM,
@@ -25,9 +21,7 @@ bool SetDirPatternMsgEx::processIncoming(ResponseContext& ctx)
 
    BaseType::processIncoming(ctx);
 
-   App* app = Program::getApp();
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_SETDIRPATTERN,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_SETDIRPATTERN);
 
    return true;
 }
@@ -58,7 +52,7 @@ std::unique_ptr<MirroredMessageResponseState> SetDirPatternMsgEx::executeLocally
        !MathTk::isPowerOfTwo(pattern->getChunkSize()))
    { // check of stripe pattern details validity failed
       LOG(GENERAL, ERR, "Received an invalid pattern chunksize",
-          as("chunkSize", pattern->getChunkSize()));
+          ("chunkSize", pattern->getChunkSize()));
       return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
    }
 

@@ -16,7 +16,6 @@ enum cond_wait_res;
 typedef enum cond_wait_res cond_wait_res_t;
 
 static inline void Condition_init(Condition* this);
-static inline void Condition_uninit(Condition* this);
 
 static inline void Condition_wait(Condition* this, Mutex* mutex);
 static inline cond_wait_res_t Condition_timedwait(Condition* this, Mutex* mutex, int timeoutMS);
@@ -43,10 +42,6 @@ enum cond_wait_res
 void Condition_init(Condition* this)
 {
    init_waitqueue_head(&this->queue);
-}
-
-void Condition_uninit(Condition* this)
-{
 }
 
 /**

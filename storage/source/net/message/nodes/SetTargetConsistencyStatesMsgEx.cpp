@@ -7,9 +7,6 @@
 
 bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("Set target states incoming", Log_DEBUG,
-      "Received a SetTargetConsistencyStatesMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
    StorageTargets* storageTargets = app->getStorageTargets();
    FhgfsOpsErr result = FhgfsOpsErr_SUCCESS;
@@ -24,14 +21,16 @@ bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
    for (ZipIterRange<UInt16List, UInt8List> idStateIter(getTargetIDs(), getStates());
         !idStateIter.empty(); ++idStateIter)
    {
-      bool setResp = storageTargets->setState(*(idStateIter()->first),
-            (TargetConsistencyState)*(idStateIter()->second) );
-      if (!setResp)
+      auto* const target = storageTargets->getTarget(*idStateIter()->first);
+      if (!target)
       {
          LogContext(__func__).logErr("Unknown targetID: " +
             StringTk::uintToStr(*(idStateIter()->first) ) );
          result = FhgfsOpsErr_UNKNOWNTARGET;
+         goto send_response;
       }
+
+      target->setState(TargetConsistencyState(*idStateIter()->second));
    }
 
 send_response:

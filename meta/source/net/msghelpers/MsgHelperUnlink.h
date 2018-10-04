@@ -13,13 +13,13 @@ class MsgHelperUnlink
          unsigned msgUserID);
       static FhgfsOpsErr unlinkMetaFile(DirInode& parentDir, const std::string& removeName,
          std::unique_ptr<FileInode>* outUnlinkedFile);
-      static FhgfsOpsErr unlinkChunkFiles(FileInode* inode, unsigned msgUserID);
+      static FhgfsOpsErr unlinkChunkFiles(FileInode* unlinkedInode, unsigned msgUserID);
 
    private:
       MsgHelperUnlink() {}
 
-      static FhgfsOpsErr unlinkChunkFileSequential(FileInode& file, unsigned msgUserID);
-      static FhgfsOpsErr unlinkChunkFileParallel(FileInode& file, unsigned msgUserID);
+      static FhgfsOpsErr unlinkChunkFileSequential(FileInode& inode, unsigned msgUserID);
+      static FhgfsOpsErr unlinkChunkFileParallel(FileInode& inode, unsigned msgUserID);
       static FhgfsOpsErr insertDisposableFile(FileInode& file);
 
 

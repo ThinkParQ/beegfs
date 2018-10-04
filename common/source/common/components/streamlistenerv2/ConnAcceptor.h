@@ -4,7 +4,6 @@
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/queue/MultiWorkQueue.h>
 #include <common/components/ComponentInitException.h>
-#include <common/net/sock/NamedSocket.h>
 #include <common/net/sock/StandardSocket.h>
 #include <common/net/sock/RDMASocket.h>
 #include <common/net/message/NetMessage.h>
@@ -22,7 +21,6 @@ class ConnAcceptor : public PThread
 {
    public:
       ConnAcceptor(AbstractApp* app, NicAddressList& localNicList, unsigned short listenPort);
-      ConnAcceptor(AbstractApp* app, std::string namedSocketPath);
       virtual ~ConnAcceptor();
 
 
@@ -33,19 +31,16 @@ class ConnAcceptor : public PThread
       StandardSocket*   tcpListenSock;
       StandardSocket*   sdpListenSock;
       RDMASocket*       rdmaListenSock;
-      NamedSocket*      namedListenSock;
 
       int               epollFD;
 
       bool initSocks(unsigned short listenPort, NicListCapabilities* localNicCaps);
-      bool initNamedSocket(std::string namedSocketPath);
 
       virtual void run();
       void listenLoop();
 
       void onIncomingStandardConnection(StandardSocket* sock);
       void onIncomingRDMAConnection(RDMASocket* sock);
-      void onIncomingNamedConnection(NamedSocket* sock);
 
       void applySocketOptions(StandardSocket* sock);
 

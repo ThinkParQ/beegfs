@@ -8,6 +8,8 @@
 #include <common/toolkit/StringTk.h>
 #include "BuddyResyncJob.h"
 
+#include <boost/lexical_cast.hpp>
+
 #define BUDDYRESYNCJOB_MAXDIRWALKDEPTH 2
 
 BuddyResyncJob::BuddyResyncJob(uint16_t targetID) :
@@ -84,11 +86,13 @@ void BuddyResyncJob::run()
    std::string targetPath;
    std::string chunksPath;
 
-   bool buddyCommIsOverride;
+   bool buddyCommIsOverride = false; // treat errors during lastbuddycomm read as "0, no override"
    int64_t lastBuddyCommTimeSecs;
    int64_t lastBuddyCommSafetyThresholdSecs;
    bool checkTopLevelDirRes;
    bool walkRes;
+
+   auto& target = *storageTargets->getTargets().at(targetID);
 
    shallAbort.setZero();
    targetWasOffline = false;
@@ -97,7 +101,7 @@ void BuddyResyncJob::run()
    syncCandidates.clear();
    gatherSlavesWorkQueue.clear();
 
-   storageTargets->setResyncInProgress(targetID, true);
+   target.setBuddyResyncInProgress(true);
 
    LogContext(__func__).log(Log_NOTICE,
       "Started resync of targetID " + StringTk::uintToStr(targetID));
@@ -122,18 +126,16 @@ void BuddyResyncJob::run()
    numReadyWorkers.waitForCount(numWorkers);
 
    // notify buddy, that resync started and wait for confirmation
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-
    uint16_t buddyTargetID = buddyGroupMapper->getBuddyTargetID(targetID);
    NumNodeID buddyNodeID = targetMapper->getNodeID(buddyTargetID);
    auto buddyNode = storageNodes->referenceNode(buddyNodeID);
    StorageResyncStartedMsg storageResyncStartedMsg(buddyTargetID);
-   commRes = MessagingTk::requestResponse(*buddyNode, &storageResyncStartedMsg,
-         NETMSGTYPE_StorageResyncStartedResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(*buddyNode, storageResyncStartedMsg,
+         NETMSGTYPE_StorageResyncStartedResp);
 
-   if(!commRes)
+   std::pair<bool, std::chrono::system_clock::time_point> lastBuddyComm;
+
+   if (!respMsg)
    {
       LOG(MIRRORING, ERR, "Unable to notify buddy about resync attempt. Resync will not start.",
             targetID, buddyTargetID);
@@ -141,10 +143,7 @@ void BuddyResyncJob::run()
       goto cleanup;
    }
 
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
-   startGatherSlavesRes = startGatherSlaves();
+   startGatherSlavesRes = startGatherSlaves(target);
    if (!startGatherSlavesRes)
    {
       setStatus(BuddyResyncJobState_FAILURE);
@@ -168,11 +167,13 @@ void BuddyResyncJob::run()
 
    // walk over the directories until we reach a certain level and then pass the direcories to
    // gather slaves to parallelize it
-   app->getStorageTargets()->getPath(targetID, &targetPath);
+   targetPath = target.getPath().str();
    chunksPath = targetPath + "/" + CONFIG_BUDDYMIRROR_SUBDIR_NAME;
 
-   lastBuddyCommTimeSecs =
-      app->getStorageTargets()->readLastBuddyCommTimestamp(targetID, &buddyCommIsOverride);
+   lastBuddyComm = target.getLastBuddyComm();
+   buddyCommIsOverride = lastBuddyComm.first;
+   lastBuddyCommTimeSecs = std::chrono::system_clock::to_time_t(lastBuddyComm.second);
+
    lastBuddyCommSafetyThresholdSecs = app->getConfig()->getSysResyncSafetyThresholdMins()*60;
    if ( (lastBuddyCommSafetyThresholdSecs == 0) && (!buddyCommIsOverride) ) // ignore timestamp file
       lastBuddyCommTimeSecs = 0;
@@ -330,15 +331,15 @@ cleanup:
       else
       {
          setStatus(BuddyResyncJobState_SUCCESS);
-         // delete timestamp override file if it exists
-         storageTargets->rmLastBuddyCommOverride(targetID);
+         // unset timestamp override file if an override was set
+         target.setLastBuddyComm(std::chrono::system_clock::from_time_t(0), true);
          // so the target went offline between the previous check "syncErrors || targetWasOffline".
          // any message that has tried to forward itself in the intervening time will have seen the
          // offline state, but will have been unable to set the buddy to needs-resync because it
          // still *is* needs-resync. the resync itself has been perfectly successful, but we have
          // to start another one anyway once the target comes back to ensure that no information
          // was lost.
-         storageTargets->setBuddyNeedsResync(targetID, targetWasOffline.read(), buddyTargetID);
+         target.setBuddyNeedsResync(targetWasOffline.read());
          informBuddy();
 
          if (targetWasOffline.read())
@@ -348,7 +349,7 @@ cleanup:
       }
    }
 
-   storageTargets->setResyncInProgress(targetID, false);
+   target.setBuddyResyncInProgress(false);
    endTime = time(NULL);
 }
 
@@ -389,13 +390,13 @@ void BuddyResyncJob::abort()
    }
 }
 
-bool BuddyResyncJob::startGatherSlaves()
+bool BuddyResyncJob::startGatherSlaves(const StorageTarget& target)
 {
    // create a gather slaves if they don't exist yet and start them
    for (size_t i = 0; i < gatherSlaveVec.size(); i++)
    {
       if(!gatherSlaveVec[i])
-         gatherSlaveVec[i] = new BuddyResyncerGatherSlave(targetID, &syncCandidates,
+         gatherSlaveVec[i] = new BuddyResyncerGatherSlave(target, &syncCandidates,
             &gatherSlavesWorkQueue, i);
 
       try
@@ -576,9 +577,6 @@ void BuddyResyncJob::informBuddy()
       return;
    }
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    SetTargetConsistencyStatesRespMsg* respMsgCast;
    FhgfsOpsErr result;
    UInt16List targetIDs;
@@ -589,10 +587,9 @@ void BuddyResyncJob::informBuddy()
 
    SetTargetConsistencyStatesMsg msg(NODETYPE_Storage, &targetIDs, &states, false);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(*storageNode, &msg,
-         NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*storageNode, msg,
+         NETMSGTYPE_SetTargetConsistencyStatesResp);
+   if (!respMsg)
    {
       LogContext(__func__).logErr(
          "Unable to inform buddy about finished resync. "
@@ -600,10 +597,10 @@ void BuddyResyncJob::informBuddy()
          "buddyTargetID: " + StringTk::uintToStr(buddyTargetID) + "; "
          "buddyNodeID: " + buddyNodeID.str() + "; "
          "error: Communication error");
-      goto err_cleanup;
+      return;
    }
 
-   respMsgCast = (SetTargetConsistencyStatesRespMsg*) respMsg;
+   respMsgCast = (SetTargetConsistencyStatesRespMsg*) respMsg.get();
    result = respMsgCast->getResult();
 
    if(result != FhgfsOpsErr_SUCCESS)
@@ -613,12 +610,8 @@ void BuddyResyncJob::informBuddy()
          "targetID: " + StringTk::uintToStr(targetID) + "; "
          "buddyTargetID: " + StringTk::uintToStr(buddyTargetID) + "; "
          "buddyNodeID: " + buddyNodeID.str() + "; "
-         "error: " + FhgfsOpsErrTk::toErrString(result) );
+         "error: " + boost::lexical_cast<std::string>(result));
    }
-
-err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 }
 
 /*

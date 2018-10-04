@@ -3,6 +3,7 @@
 
 #include <common/storage/mirroring/BuddyResyncJobStatistics.h>
 #include <common/nodes/Node.h>
+#include <common/nodes/RootInfo.h>
 #include <common/Common.h>
 
 
@@ -42,7 +43,7 @@ class ModeHelper
             MetaBuddyResyncJobStatistics& outStats);
 
       static bool getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
-            bool useParent, NodeStoreServers& metaNodes,
+            bool useParent, NodeStoreServers& metaNodes, const RootInfo& metaRoot,
             MirrorBuddyGroupMapper& metaBuddyGroupMapper,
             EntryInfo& outEntryInfo, NodeHandle& outOwnerHandle);
 

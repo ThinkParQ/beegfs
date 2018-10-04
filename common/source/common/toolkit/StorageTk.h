@@ -12,7 +12,7 @@
 #include <common/storage/StatData.h>
 #include <common/threading/Atomics.h>
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
+#include <common/toolkit/LockFD.h>
 
 #include <dirent.h>
 
@@ -68,27 +68,23 @@ class StorageTk
    public:
       static void initHashPaths(Path& basePath, int maxLevel1, int maxLevel2);
 
-      static bool createPathOnDisk(const Path& path, bool excludeLastElement, mode_t* mode = NULL);
+      static bool createPathOnDisk(const Path& path, bool excludeLastElement, mode_t* inMode = NULL);
       static bool createPathOnDisk(int fd, Path& relativePath, bool excludeLastElement,
-         mode_t* mode = NULL);
+         mode_t* inMode = NULL);
       static bool removePathDirsFromDisk(Path& path, unsigned keepDepth);
 
       static bool statStoragePath(const std::string path, int64_t* outSizeTotal,
          int64_t* outSizeFree, int64_t* outInodesTotal, int64_t* outInodesFree);
       static bool statStoragePath(Path& path, bool excludeLastElement, int64_t* outSizeTotal,
          int64_t* outSizeFree, int64_t* outInodesTotal, int64_t* outInodesFree);
-      static bool statStoragePathOverride(std::string path, int64_t* outSizeFree,
+      static bool statStoragePathOverride(std::string pathStr, int64_t* outSizeFree,
          int64_t* outInodesFree);
 
       static std::string getPathDirname(std::string path);
       static std::string getPathBasename(std::string path);
 
-      static int lockWorkingDirectory(std::string path);
-      static void unlockWorkingDirectory(int fd);
-      static int createAndLockPIDFile(std::string path, bool writePIDToFile);
-      static bool updateLockedPIDFile(int fd);
-      static void unlockPIDFile(int fd);
-      static void unlockAndDeletePIDFile(int fd, const std::string& path);
+      static LockFD lockWorkingDirectory(const std::string& pathStr);
+      static LockFD createAndLockPIDFile(const std::string& pathStr, bool writePIDToFile);
 
       static bool writeFormatFile(const std::string& path, int formatVersion,
          const StringMap* formatProperties = nullptr);
@@ -136,7 +132,7 @@ class StorageTk
          StripePattern* stripePattern, StatData* outStatData);
 
       static void getChunkDirChunkFilePath(const PathInfo* pathInfo, std::string entryID,
-         bool hasOrigFeature, Path& outChunkDirPath, std::string& outCompleteChunkFilePathStr);
+         bool hasOrigFeature, Path& outChunkDirPath, std::string& outChunkFilePathStr);
 
       static bool removeDirRecursive(const std::string& dir);
 

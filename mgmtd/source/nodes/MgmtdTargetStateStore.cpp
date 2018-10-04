@@ -50,8 +50,8 @@ void MgmtdTargetStateStore::setConsistencyStatesFromLists(const UInt16List& targ
             targetState.consistencyState = newConsistencyState;
 
             LOG_DBG(STATES, DEBUG, "Setting new state.", targetID,
-                  as("New state", stateToStr(targetState)),
-                  as("NodeType", Node::nodeTypeToStr(nodeType)), as("Called from", Backtrace<3>()));
+                  ("New state", stateToStr(targetState)),
+                  nodeType, ("Called from", Backtrace<3>()));
             statesChanged = true;
          }
 
@@ -79,7 +79,7 @@ void MgmtdTargetStateStore::setConsistencyStatesFromLists(const UInt16List& targ
  *                    if NULL.
  */
 FhgfsOpsErr MgmtdTargetStateStore::changeConsistencyStatesFromLists(const UInt16List& targetIDs,
-   const UInt8List& oldStates, const UInt8List& newStates, MirrorBuddyGroupMapper* buddyGroups)
+   const UInt8List& oldStates, const UInt8List& newStates, MirrorBuddyGroupMapperEx* buddyGroups)
 {
    HeartbeatManager* heartbeatManager = Program::getApp()->getHeartbeatMgr();
 
@@ -137,9 +137,8 @@ FhgfsOpsErr MgmtdTargetStateStore::changeConsistencyStatesFromLists(const UInt16
                statesChanged = true;
 
                LOG_DBG(STATES, DEBUG, "Changing state.", targetID,
-                     as("New state", stateToStr(targetState)),
-                     as("NodeType", Node::nodeTypeToStr(nodeType)),
-                     as("Called from", Backtrace<3>()));
+                     ("New state", stateToStr(targetState)), nodeType,
+                     ("Called from", Backtrace<3>()));
             }
 
             targetState.lastChangedTime.setToNow();
@@ -210,7 +209,7 @@ bgroups_unlock:
  * @returns whether any reachability state was changed.
  */
 bool MgmtdTargetStateStore::autoOfflineTargets(const unsigned pofflineTimeoutMS,
-   const unsigned offlineTimeoutMS, MirrorBuddyGroupMapper* buddyGroups)
+   const unsigned offlineTimeoutMS, MirrorBuddyGroupMapperEx* buddyGroups)
 {
    const char* logContext = "Auto-offline";
    LogContext(logContext).log(LogTopic_STATES, Log_DEBUG,
@@ -325,7 +324,7 @@ bool MgmtdTargetStateStore::autoOfflineTargets(const unsigned pofflineTimeoutMS,
 bool MgmtdTargetStateStore::resolvePrimaryResync()
 {
    App* app = Program::getApp();
-   MirrorBuddyGroupMapper* mbgm;
+   MirrorBuddyGroupMapperEx* mbgm;
    if (nodeType == NODETYPE_Meta)
       mbgm = app->getMetaBuddyGroupMapper();
    else
@@ -344,8 +343,7 @@ bool MgmtdTargetStateStore::resolvePrimaryResync()
 UInt16Vector MgmtdTargetStateStore::findPrimaryResync()
 {
    const char* logContext = "Resolve primary resync";
-   LOG_CTX(STATES, DEBUG, logContext, "Checking for primary that needs resync.",
-         as("NodeType", Node::nodeTypeToStr(nodeType)));
+   LOG_CTX(STATES, DEBUG, logContext, "Checking for primary that needs resync.", nodeType);
 
    App* app = Program::getApp();
    MirrorBuddyGroupMapper* mbgm;
@@ -430,8 +428,7 @@ void MgmtdTargetStateStore::saveStatesToFile()
    }
 
    if (storeRes != FhgfsOpsErr_SUCCESS)
-      LOG(STATES, ERR, "Could not save target states.",
-          as("NodeType", Node::nodeTypeToStr(nodeType)));
+      LOG(STATES, ERR, "Could not save target states.", nodeType);
 }
 
 bool MgmtdTargetStateStore::loadStatesFromFile()
@@ -445,16 +442,15 @@ bool MgmtdTargetStateStore::loadStatesFromFile()
 
    if (readRes.first != FhgfsOpsErr_SUCCESS)
    {
-      LOG(STATES, ERR, "Could not read states.", as("NodeType", Node::nodeTypeToStr(nodeType)),
-            as("Error", FhgfsOpsErrTk::toErrString(readRes.first)));
+      LOG(STATES, ERR, "Could not read states.", nodeType,
+            ("Error", readRes.first));
       return false;
    }
 
-   if (readRes.second.size() == 0) // file was empty
+   if (readRes.second.empty()) // file was empty
    {
       LOG(STATES, WARNING, "Found empty target states file. "
-          "Proceeding without last known target states.",
-          as("NodeType", Node::nodeTypeToStr(nodeType)));
+          "Proceeding without last known target states.", nodeType);
       return true;
    }
 
@@ -465,13 +461,11 @@ bool MgmtdTargetStateStore::loadStatesFromFile()
 
    if (!des.good())
    {
-      LOG(STATES, ERR, "Could not deserialze states.",
-          as("NodeType", Node::nodeTypeToStr(nodeType)));
+      LOG(STATES, ERR, "Could not deserialze states.", nodeType);
       return false;
    }
 
-   LOG(STATES, NOTICE, "Loaded storage target states.",
-       as("NodeType", Node::nodeTypeToStr(nodeType)));
+   LOG(STATES, NOTICE, "Loaded storage target states.", nodeType);
 
    // Set all targets / nodes to POFFLINE to prevent switchover before we have report from anyone.
    setAllStatesUnlocked(TargetReachabilityState_POFFLINE);
@@ -525,7 +519,7 @@ bool MgmtdTargetStateStore::loadResyncSetFromFile()
       addOrUpdate(*targetIDIter, CombinedTargetState(TargetReachabilityState_POFFLINE,
          TargetConsistencyState_NEEDS_RESYNC) );
       LOG_DBG(STATES, DEBUG, "Setting target/node to needs-resync.",
-            as("ID", *targetIDIter), as("NodeType", Node::nodeTypeToStr(nodeType)));
+            ("ID", *targetIDIter), nodeType);
    }
 
    tempResyncSet.swap(resyncSet);

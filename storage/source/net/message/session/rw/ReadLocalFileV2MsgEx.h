@@ -5,6 +5,8 @@
 #include <common/storage/StorageErrors.h>
 #include <session/SessionLocalFileStore.h>
 
+class StorageTarget;
+
 class ReadLocalFileV2MsgEx : public ReadLocalFileV2Msg
 {
    public:
@@ -12,8 +14,6 @@ class ReadLocalFileV2MsgEx : public ReadLocalFileV2Msg
 
    private:
       SessionLocalFileStore* sessionLocalFiles;
-      SessionLocalFile* sessionLocalFile;
-      bool needFileUnlockAndRelease;
 
 
       int64_t incrementalReadStatefulAndSendV2(ResponseContext& ctx,
@@ -22,7 +22,7 @@ class ReadLocalFileV2MsgEx : public ReadLocalFileV2Msg
       void checkAndStartReadAhead(SessionLocalFile* sessionLocalFile, ssize_t readAheadTriggerSize,
          off_t currentOffset, off_t readAheadSize);
 
-      FhgfsOpsErr openFile(SessionLocalFile* sessionLocalFile);
+      FhgfsOpsErr openFile(const StorageTarget& target, SessionLocalFile* sessionLocalFile);
 
 
       // inliners
@@ -64,17 +64,6 @@ class ReadLocalFileV2MsgEx : public ReadLocalFileV2Msg
          {
             sock->send(buf, sizeof(int64_t) + lengthInfo, 0);
          }
-      }
-
-      /*
-       * Unlock and release the file session.
-       */
-      inline void releaseFile(void)
-      {
-         sessionLocalFiles->releaseSession(sessionLocalFile);
-
-         sessionLocalFile = NULL;
-         this->needFileUnlockAndRelease = false;
       }
 };
 

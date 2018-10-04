@@ -8,12 +8,6 @@
 
 bool RemoveInodesMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "RemoveInodesMsg incoming";
-   LOG_DEBUG(logContext, 4, "Received a RemoveInodesMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
-
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    EntryLockStore* entryLockStore = Program::getApp()->getMirroredSessions()->getEntryLockStore();
 

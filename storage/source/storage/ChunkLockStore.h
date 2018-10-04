@@ -6,7 +6,8 @@
 #include <common/threading/Mutex.h>
 #include <common/threading/UniqueRWLock.h>
 #include <common/threading/RWLock.h>
-#include <common/threading/SafeMutexLock.h>
+
+#include <mutex>
 
 struct ChunkLockStoreContents
 {
@@ -75,7 +76,7 @@ class ChunkLockStore
       {
          auto targetLockStore = getOrInsertTargetLockStore(targetID);
 
-         SafeMutexLock chunksLock(&targetLockStore->lockedChunksMutex);
+         const std::lock_guard<Mutex> chunksLock(targetLockStore->lockedChunksMutex);
 
          // loop until we can insert the chunk lock
          for( ; ; )
@@ -88,8 +89,6 @@ class ChunkLockStore
             // chunk lock already exists => wait
             targetLockStore->chunkUnlockedCondition.wait(&targetLockStore->lockedChunksMutex);
          }
-
-         chunksLock.unlock();
       }
 
       void unlockChunk(uint16_t targetID, std::string chunkID)
@@ -131,11 +130,9 @@ class ChunkLockStore
          auto targetLockStore = findTargetLockStore(targetID);
          if(targetLockStore) // map does exist
          {
-            SafeMutexLock chunksLock(&targetLockStore->lockedChunksMutex);
+            const std::lock_guard<Mutex> chunksLock(targetLockStore->lockedChunksMutex);
 
             retVal = targetLockStore->lockedChunks.size();
-
-            chunksLock.unlock();
          }
 
          return retVal;
@@ -148,11 +145,9 @@ class ChunkLockStore
          auto targetLockStore = findTargetLockStore(targetID);
          if(targetLockStore) // map does exist
          {
-            SafeMutexLock chunksLock(&targetLockStore->lockedChunksMutex);
+            const std::lock_guard<Mutex> chunksLock(targetLockStore->lockedChunksMutex);
 
             outLockStore = targetLockStore->lockedChunks;
-
-            chunksLock.unlock();
          }
 
          return outLockStore;

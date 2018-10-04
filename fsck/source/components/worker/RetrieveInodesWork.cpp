@@ -14,7 +14,6 @@ RetrieveInodesWork::RetrieveInodesWork(FsckDB* db, Node& node, SynchronizedCount
       AtomicUInt64& errors, unsigned hashDirStart, unsigned hashDirEnd,
       AtomicUInt64* numFileInodesFound, AtomicUInt64* numDirInodesFound,
       std::set<FsckTargetID>& usedTargets) :
-   Work(),
    log("RetrieveInodesWork"), node(node), counter(counter), errors(&errors),
    usedTargets(&usedTargets), hashDirStart(hashDirStart), hashDirEnd(hashDirEnd),
    numFileInodesFound(numFileInodesFound), numDirInodesFound(numDirInodesFound),
@@ -53,7 +52,7 @@ void RetrieveInodesWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
 
 void RetrieveInodesWork::doWork(bool isBuddyMirrored)
 {
-   const NumNodeID& metaRootID = Program::getApp()->getMetaNodes()->getRootNodeNumID();
+   const NumNodeID& metaRootID = Program::getApp()->getMetaRoot().getID();
    const NumNodeID& nodeID = node.getNumID();
    const NumNodeID nodeBuddyGroupID = NumNodeID(Program::getApp()->getMetaMirrorBuddyGroupMapper()
          ->getBuddyGroupID(node.getNumID().val()));
@@ -73,18 +72,14 @@ void RetrieveInodesWork::doWork(bool isBuddyMirrored)
 
          do
          {
-            bool commRes;
-            char *respBuf = NULL;
-            NetMessage *respMsg = NULL;
-
             RetrieveInodesMsg retrieveInodesMsg(hashDirNum, lastOffset,
                RETRIEVE_INODES_PACKET_SIZE, isBuddyMirrored);
 
-            commRes = MessagingTk::requestResponse(node, &retrieveInodesMsg,
-               NETMSGTYPE_RetrieveInodesResp, &respBuf, &respMsg);
-            if ( commRes )
+            const auto respMsg = MessagingTk::requestResponse(node, retrieveInodesMsg,
+               NETMSGTYPE_RetrieveInodesResp);
+            if (respMsg)
             {
-               RetrieveInodesRespMsg* retrieveInodesRespMsg = (RetrieveInodesRespMsg*) respMsg;
+               auto* retrieveInodesRespMsg = (RetrieveInodesRespMsg*) respMsg.get();
 
                // set new parameters
                lastOffset = retrieveInodesRespMsg->getLastOffset();
@@ -106,11 +101,11 @@ void RetrieveInodesWork::doWork(bool isBuddyMirrored)
                   }
 
                   LOG(GENERAL, ERR, "Found inode with invalid entry IDs.",
-                        as("node", it->getSaveNodeID()),
-                        as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                        as("entryID", it->getID()),
-                        as("parentEntryID", it->getParentDirID()),
-                        as("origParent", it->getPathInfo()->getOrigParentEntryID()));
+                        ("node", it->getSaveNodeID()),
+                        ("isBuddyMirrored", it->getIsBuddyMirrored()),
+                        ("entryID", it->getID()),
+                        ("parentEntryID", it->getParentDirID()),
+                        ("origParent", it->getPathInfo()->getOrigParentEntryID()));
 
                   ++it;
                   errors->increase();
@@ -145,10 +140,10 @@ void RetrieveInodesWork::doWork(bool isBuddyMirrored)
                         !db::EntryID::tryFromStr(it->getParentDirID()).first)
                   {
                      LOG(GENERAL, ERR, "Found inode with invalid entry IDs.",
-                           as("node", it->getSaveNodeID()),
-                           as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                           as("entryID", it->getID()),
-                           as("parentEntryID", it->getParentDirID()));
+                           ("node", it->getSaveNodeID()),
+                           ("isBuddyMirrored", it->getIsBuddyMirrored()),
+                           ("entryID", it->getID()),
+                           ("parentEntryID", it->getParentDirID()));
 
                      ++it;
                      errors->increase();
@@ -176,14 +171,9 @@ void RetrieveInodesWork::doWork(bool isBuddyMirrored)
 
                numFileInodesFound->increase(fileInodeCount);
                numDirInodesFound->increase(dirInodeCount);
-
-               SAFE_FREE(respBuf);
-               SAFE_DELETE(respMsg);
             }
             else
             {
-               SAFE_FREE(respBuf);
-               SAFE_DELETE(respMsg);
                throw FsckException("Communication error occured with node " + node.getID());
             }
 

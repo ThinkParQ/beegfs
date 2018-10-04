@@ -5,7 +5,7 @@ static void PeerInfoMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    PeerInfoMsg* thisCast = (PeerInfoMsg*)this;
 
    Serialization_serializeUInt(ctx, thisCast->type);
-   NumNodeID_serialize(&thisCast->id, ctx);
+   NumNodeID_serialize(ctx, &thisCast->id);
 }
 
 bool PeerInfoMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx)

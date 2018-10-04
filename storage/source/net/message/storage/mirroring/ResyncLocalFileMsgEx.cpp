@@ -9,14 +9,8 @@
 
 bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 {
-   #ifdef BEEGFS_DEBUG
-      const char* logContext = "ResyncLocalFileMsg incoming";
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a ResyncLocalFileMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
    App* app = Program::getApp();
    ChunkStore* chunkStore = app->getChunkDirStore();
-   StorageTargets* storageTargets = app->getStorageTargets();
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
    const char* dataBuf = getDataBuf();
@@ -31,14 +25,27 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
    SessionQuotaInfo quotaInfo(false, false, 0, 0);
   // mode_t fileMode = STORAGETK_DEFAULTCHUNKFILEMODE;
 
-   int targetFD = app->getTargetFD(targetID, true);
+   int targetFD;
    int fd;
+   FhgfsOpsErr openRes;
+
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+   {
+      LogContext(__func__).logErr(
+         "Error resyncing chunk; Could not open FD; chunkPath: "
+            + relativeChunkPathStr);
+      retVal = FhgfsOpsErr_PATHNOTEXISTS;
+      goto send_response;
+   }
+
+   targetFD = *target->getMirrorFD();
 
    // always truncate when we write the very first block of a file
    if(!offset && !isMsgHeaderFeatureFlagSet (RESYNCLOCALFILEMSG_FLAG_NODATA) )
       openFlags |= O_TRUNC;
 
-   FhgfsOpsErr openRes = chunkStore->openChunkFile(targetFD, NULL, relativeChunkPathStr, true,
+   openRes = chunkStore->openChunkFile(targetFD, NULL, relativeChunkPathStr, true,
       openFlags, &fd, &quotaInfo, {});
 
    if (openRes != FhgfsOpsErr_SUCCESS)
@@ -48,7 +55,7 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
             + relativeChunkPathStr);
       retVal = FhgfsOpsErr_PATHNOTEXISTS;
 
-      storageTargets->setState(targetID, TargetConsistencyState_BAD);
+      target->setState(TargetConsistencyState_BAD);
 
       goto send_response;
    }
@@ -67,7 +74,7 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
          "Error resyncing chunk; chunkPath: " + relativeChunkPathStr + "; error: "
             + System::getErrString(writeErrno));
 
-      storageTargets->setState(targetID, TargetConsistencyState_BAD);
+      target->setState(TargetConsistencyState_BAD);
 
       retVal = FhgfsOpsErrTk::fromSysErr(writeErrno);
    }
@@ -84,7 +91,7 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
             "Error resyncing chunk; chunkPath: " + relativeChunkPathStr + "; error: "
                + System::getErrString(truncErrno));
 
-         storageTargets->setState(targetID, TargetConsistencyState_BAD);
+         target->setState(TargetConsistencyState_BAD);
 
          retVal = FhgfsOpsErrTk::fromSysErr(truncErrno);
       }
@@ -124,7 +131,7 @@ set_attribs:
 
       if((chmodRes == -1) || (chownRes == -1))
       {
-         storageTargets->setState(targetID, TargetConsistencyState_BAD);
+         target->setState(TargetConsistencyState_BAD);
          retVal = FhgfsOpsErr_INTERNAL;
       }
    }

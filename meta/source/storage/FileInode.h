@@ -8,7 +8,6 @@
 #include <common/storage/StatData.h>
 #include <common/storage/striping/ChunkFileInfo.h>
 #include <common/threading/UniqueRWLock.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/SafeRWLock.h>
 #include <common/threading/Condition.h>
 #include <common/threading/PThread.h>
@@ -86,7 +85,7 @@ class FileInode
       /**
        * The preferred inode initializer.
        */
-      FileInode(std::string entryID, FileInodeStoreData* inodeStoreData,
+      FileInode(std::string entryID, FileInodeStoreData* inodeDiskData,
          DirEntryType entryType, unsigned dentryFeatureFlags);
 
 
@@ -221,10 +220,10 @@ class FileInode
       bool incDecNumHardLinks(EntryInfo * entryInfo, int value);
 
       bool storeUpdatedMetaDataBuf(char* buf, unsigned bufLen);
-      bool storeUpdatedMetaDataBufAsXAttr(char* buf, unsigned bufLen, std::string metaFileName);
-      bool storeUpdatedMetaDataBufAsContents(char* buf, unsigned bufLen, std::string metaFileName);
+      bool storeUpdatedMetaDataBufAsXAttr(char* buf, unsigned bufLen, std::string metaFilename);
+      bool storeUpdatedMetaDataBufAsContents(char* buf, unsigned bufLen, std::string metaFilename);
       bool storeUpdatedMetaDataBufAsContentsInPlace(char* buf, unsigned bufLen,
-         std::string metaFileName);
+         std::string metaFilename);
       bool storeUpdatedInodeUnlocked(EntryInfo* entryInfo,
          StripePattern* updatedStripePattern = NULL);
       FhgfsOpsErr storeUpdatedInlinedInodeUnlocked(EntryInfo* entryInfo,
@@ -455,8 +454,7 @@ class FileInode
 
          if(unlikely(newAttribsVec.size() != fileInfoVec.size() ) )
          { // should never happen
-            Logger::getLogger()->logErr("Apply dynamic file attribs",
-               "Vector sizes do not match - This should never happen!");
+            LOG(GENERAL, ERR, "Apply dynamic file attribs - Vector sizes do not match.");
 
             retVal = false;
             goto unlock_and_exit;

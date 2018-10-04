@@ -1,17 +1,12 @@
 #include <common/toolkit/MapTk.h>
 #include "NumericIDMapper.h"
 
-#include <limits.h>
+#include <climits>
 
 
 #define NUMIDMAPPER_MAX_NUMIDS (USHRT_MAX-1) /* maximum number of IDs, -1 for reserved value "0" */
 #define NUMIDMAPPER_MAX_NUMID  (USHRT_MAX)   /* highest valid ID value */
 
-
-NumericIDMapper::NumericIDMapper()
-{
-   mappingsDirty = false;
-}
 
 /**
  * Maps a string ID to a numeric ID and automatically generates a new numeric ID if no such ID was
@@ -27,11 +22,10 @@ NumericIDMapper::NumericIDMapper()
 bool NumericIDMapper::mapStringID(std::string stringID, uint16_t currentNumID,
    uint16_t* outNewNumID)
 {
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    bool retVal = false;
 
-   size_t oldSize = idMap.size();
    NumericIDMapIter iter;
 
    if(currentNumID)
@@ -69,9 +63,6 @@ bool NumericIDMapper::mapStringID(std::string stringID, uint16_t currentNumID,
    }
 
 unlock_and_exit:
-   mappingsDirty = mappingsDirty || (oldSize != idMap.size() );
-
-   safeLock.unlock(); // U N L O C K
 
    return retVal;
 }
@@ -81,13 +72,9 @@ unlock_and_exit:
  */
 bool NumericIDMapper::unmapStringID(std::string stringID)
 {
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    size_t numErased = idMap.erase(stringID);
-
-   mappingsDirty = mappingsDirty || (numErased != 0);
-
-   safeLock.unlock(); // U N L O C K
 
    return (numErased != 0);
 }
@@ -187,7 +174,7 @@ bool NumericIDMapper::loadFromFile()
 
    bool loaded = false;
 
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    if(!storePath.length() )
       goto unlock_and_exit;
@@ -203,8 +190,6 @@ bool NumericIDMapper::loadFromFile()
       idMap.clear();
       importFromStringMap(newIDStrMap);
 
-      mappingsDirty = true;
-
       loaded = true;
    }
    catch(InvalidConfigException& e)
@@ -215,9 +200,6 @@ bool NumericIDMapper::loadFromFile()
    }
 
 unlock_and_exit:
-
-   safeLock.unlock(); // U N L O C K
-
    return loaded;
 }
 
@@ -230,11 +212,10 @@ bool NumericIDMapper::saveToFile()
 
    bool saved = false;
 
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    if(storePath.empty() )
       goto unlock_and_exit;
-
 
    try
    {
@@ -243,8 +224,6 @@ bool NumericIDMapper::saveToFile()
       exportToStringMap(idStrMap);
 
       MapTk::saveStringMapToFile(storePath.c_str(), &idStrMap);
-
-      mappingsDirty = false;
 
       saved = true;
    }
@@ -255,9 +234,6 @@ bool NumericIDMapper::saveToFile()
    }
 
 unlock_and_exit:
-
-   safeLock.unlock(); // U N L O C K
-
    return saved;
 }
 

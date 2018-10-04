@@ -46,8 +46,6 @@ class Config : public AbstractConfig
       std::string connInterfacesFile;
       int         connFsckPortUDP;
 
-      bool        debugRunComponentThreads;
-
       unsigned    tuneNumWorkers;
       std::string tunePreferredNodesFile;
       size_t      tuneDbFragmentSize;
@@ -98,11 +96,6 @@ class Config : public AbstractConfig
       int getConnFsckPortUDP() const
       {
          return connFsckPortUDP;
-      }
-
-      bool getDebugRunComponentThreads() const
-      {
-         return debugRunComponentThreads;
       }
 
       unsigned getTuneNumWorkers() const

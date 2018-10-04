@@ -8,7 +8,6 @@ struct ConnectionListIter;
 typedef struct ConnectionListIter ConnectionListIter;
 
 static inline void ConnectionListIter_init(ConnectionListIter* this, ConnectionList* list);
-static inline bool ConnectionListIter_hasNext(ConnectionListIter* this);
 static inline void ConnectionListIter_next(ConnectionListIter* this);
 static inline struct PooledSocket* ConnectionListIter_value(ConnectionListIter* this);
 static inline bool ConnectionListIter_end(ConnectionListIter* this);
@@ -24,11 +23,6 @@ struct ConnectionListIter
 void ConnectionListIter_init(ConnectionListIter* this, ConnectionList* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool ConnectionListIter_hasNext(ConnectionListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void ConnectionListIter_next(ConnectionListIter* this)

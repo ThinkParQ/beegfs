@@ -37,12 +37,12 @@ class InodeFileStore
       FileInode* referenceFileInode(EntryInfo* entryInfo, bool loadFromDisk);
       FileInode* referenceLoadedFile(const std::string& entryID);
       bool releaseFileInode(FileInode* inode);
-      FhgfsOpsErr unlinkFileInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outFile);
+      FhgfsOpsErr unlinkFileInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode);
       void unlinkAllFiles();
 
       FhgfsOpsErr moveRemoteBegin(EntryInfo* entryInfo, char* buf, size_t bufLen,
          size_t* outUsedBufLen);
-      void moveRemoteComplete(const std::string& fileID);
+      void moveRemoteComplete(const std::string& entryID);
 
       size_t getSize();
 
@@ -69,7 +69,7 @@ class InodeFileStore
       FhgfsOpsErr isUnlinkableUnlocked(EntryInfo* entryInfo);
 
       FhgfsOpsErr unlinkFileInodeUnlocked(EntryInfo* entryInfo,
-            std::unique_ptr<FileInode>* outFile);
+            std::unique_ptr<FileInode>* outInode);
 
       bool loadAndInsertFileInodeUnlocked(EntryInfo* entryInfo, InodeMapIter& newElemIter);
       bool insertReferencer(std::string entryID, FileInodeReferencer* fileRefer);

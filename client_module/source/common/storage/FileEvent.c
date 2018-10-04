@@ -44,7 +44,7 @@ void FileEvent_setTargetDentry(struct FileEvent* event, struct dentry* dentry)
       event->target = NULL;
 }
 
-void FileEvent_serialize(const struct FileEvent* event, SerializeCtx* ctx)
+void FileEvent_serialize(SerializeCtx* ctx, const struct FileEvent* event)
 {
    Serialization_serializeUInt(ctx, event->eventType);
 

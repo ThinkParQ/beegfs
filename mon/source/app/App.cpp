@@ -3,6 +3,8 @@
 #include <app/SignalHandler.h>
 #include <common/components/ComponentInitException.h>
 #include <common/components/worker/DummyWork.h>
+#include <misc/Cassandra.h>
+#include <misc/InfluxDB.h>
 
 
 App::App(int argc, char** argv) :
@@ -54,9 +56,8 @@ void App::printOrLogError(const std::string& text) const
 
 void App::runNormal()
 {
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(),
-         cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-         cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
 
    pidFileLockFD = createAndLockPIDFile(cfg->getPIDFile());
    initDataObjects();
@@ -85,7 +86,6 @@ void App::runNormal()
 
 void App::initLocalNodeInfo()
 {
-   bool useSDP = cfg->getConnUseSDP();
    bool useRDMA = cfg->getConnUseRDMA();
    unsigned portUDP = cfg->getConnAdmonPortUDP();
 
@@ -94,7 +94,7 @@ void App::initLocalNodeInfo()
    if (interfacesFilename.length() )
       cfg->loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
 
-   NetworkInterfaceCard::findAll(&allowedInterfaces, useSDP, useRDMA, &localNicList);
+   NetworkInterfaceCard::findAll(&allowedInterfaces, useRDMA, &localNicList);
 
    if (localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -104,7 +104,8 @@ void App::initLocalNodeInfo()
 
    std::string nodeID = System::getHostname();
 
-   localNode = std::make_shared<LocalNode>(nodeID, NumNodeID(1), portUDP, 0, localNicList);
+   // TODO add a Mon nodetype at some point
+   localNode = std::make_shared<LocalNode>(NODETYPE_Client, nodeID, NumNodeID(1), portUDP, 0, localNicList);
 }
 
 void App::initDataObjects()
@@ -112,7 +113,6 @@ void App::initDataObjects()
    netFilter = boost::make_unique<NetFilter>(cfg->getConnNetFilterFile());
    tcpOnlyFilter = boost::make_unique<NetFilter>(cfg->getConnTcpOnlyFilterFile());
    netMessageFactory = boost::make_unique<NetMessageFactory>();
-   tsdb = boost::make_unique<TSDatabase>(cfg.get());
    workQueue = boost::make_unique<MultiWorkQueue>();
 
    targetMapper = boost::make_unique<TargetMapper>();
@@ -123,6 +123,32 @@ void App::initDataObjects()
 
    metaBuddyGroupMapper = boost::make_unique<MirrorBuddyGroupMapper>();
    storageBuddyGroupMapper = boost::make_unique<MirrorBuddyGroupMapper>();
+
+
+   if (cfg->getDbType() == Config::DbTypes::CASSANDRA)
+   {
+      Cassandra::Config cassandraConfig;
+      cassandraConfig.host = cfg->getDbHostName();
+      cassandraConfig.port = cfg->getDbHostPort();
+      cassandraConfig.database = cfg->getDbDatabase();
+      cassandraConfig.maxInsertsPerBatch = cfg->getCassandraMaxInsertsPerBatch();
+      cassandraConfig.TTLSecs = cfg->getCassandraTTLSecs();
+
+      tsdb = boost::make_unique<Cassandra>(std::move(cassandraConfig));
+   }
+   else // Config::DbTypes::INFLUXDB
+   {
+      InfluxDB::Config influxdbConfig;
+      influxdbConfig.host = cfg->getDbHostName();
+      influxdbConfig.port = cfg->getDbHostPort();
+      influxdbConfig.database = cfg->getDbDatabase();
+      influxdbConfig.maxPointsPerRequest = cfg->getInfluxdbMaxPointsPerRequest();
+      influxdbConfig.setRetentionPolicy = cfg->getInfluxDbSetRetentionPolicy();
+      influxdbConfig.retentionDuration = cfg->getInfluxDbRetentionDuration();
+      influxdbConfig.httpTimeout = cfg->getHttpTimeout();
+
+      tsdb = boost::make_unique<InfluxDB>(std::move(influxdbConfig));
+   }
 }
 
 void App::initComponents()
@@ -284,8 +310,8 @@ void App::daemonize()
 
 void App::handleComponentException(std::exception& e)
 {
-   LOG(GENERAL, CRITICAL, "This component encountered an unrecoverable error.", sysErr(),
-         as("Exception", e.what()));
+   LOG(GENERAL, CRITICAL, "This component encountered an unrecoverable error.", sysErr,
+         ("Exception", e.what()));
 
    LOG(GENERAL, WARNING, "Shutting down...");
    stopComponents();

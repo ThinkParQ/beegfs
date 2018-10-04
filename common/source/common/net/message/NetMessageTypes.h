@@ -29,10 +29,7 @@
 #define NETMSGTYPE_GenericDebugResp                  1030
 #define NETMSGTYPE_GetClientStats                    1031
 #define NETMSGTYPE_GetClientStatsResp                1032
-#define NETMSGTYPE_RefresherControl                  1033 // no longer used
-#define NETMSGTYPE_RefresherControlResp              1034 // no longer used
 #define NETMSGTYPE_RefreshCapacityPools              1035
-#define NETMSGTYPE_RefreshCapacityPoolsResp          1036 // this msg only has an ack response
 #define NETMSGTYPE_StorageBenchControlMsg            1037
 #define NETMSGTYPE_StorageBenchControlMsgResp        1038
 #define NETMSGTYPE_RegisterNode                      1039
@@ -46,7 +43,6 @@
 #define NETMSGTYPE_GetTargetStates                   1049
 #define NETMSGTYPE_GetTargetStatesResp               1050
 #define NETMSGTYPE_RefreshTargetStates               1051
-#define NETMSGTYPE_RefreshTargetStatesResp           1052 // this msg only has an ack response
 #define NETMSGTYPE_GetStatesAndBuddyGroups           1053
 #define NETMSGTYPE_GetStatesAndBuddyGroupsResp       1054
 #define NETMSGTYPE_SetTargetConsistencyStates        1055
@@ -77,8 +73,6 @@
 #define NETMSGTYPE_MkFileResp                      2006
 #define NETMSGTYPE_UnlinkFile                      2007
 #define NETMSGTYPE_UnlinkFileResp                  2008
-#define NETMSGTYPE_MkLocalFile                     2009
-#define NETMSGTYPE_MkLocalFileResp                 2010
 #define NETMSGTYPE_UnlinkLocalFile                 2011
 #define NETMSGTYPE_UnlinkLocalFileResp             2012
 #define NETMSGTYPE_Stat                            2015
@@ -123,20 +117,14 @@
 #define NETMSGTYPE_RmDirEntryResp                  2058
 #define NETMSGTYPE_LookupIntent                    2059
 #define NETMSGTYPE_LookupIntentResp                2060
-#define NETMSGTYPE_FindEntryname                   2061
-#define NETMSGTYPE_FindEntrynameResp               2062
 #define NETMSGTYPE_FindLinkOwner                   2063
 #define NETMSGTYPE_FindLinkOwnerResp               2064
-#define NETMSGTYPE_UpdateBacklink                  2065
-#define NETMSGTYPE_UpdateBacklinkResp              2066
 #define NETMSGTYPE_MirrorMetadata                  2067
 #define NETMSGTYPE_MirrorMetadataResp              2068
 #define NETMSGTYPE_SetMetadataMirroring            2069
 #define NETMSGTYPE_SetMetadataMirroringResp        2070
 #define NETMSGTYPE_Hardlink                        2071
 #define NETMSGTYPE_HardlinkResp                    2072
-#define NETMSGTYPE_GetStorageTargetInfo            2073
-#define NETMSGTYPE_GetStorageTargetInfoResp        2074
 #define NETMSGTYPE_SetQuota                        2075
 #define NETMSGTYPE_SetQuotaResp                    2076
 #define NETMSGTYPE_SetExceededQuota                2077
@@ -195,16 +183,10 @@
 #define NETMSGTYPE_WriteLocalFileResp              3010
 #define NETMSGTYPE_FSyncLocalFile                  3013
 #define NETMSGTYPE_FSyncLocalFileResp              3014
-#define NETMSGTYPE_AcquireAppendLock               3015 // no longer exists (was never used)
-#define NETMSGTYPE_AcquireAppendLockResp           3016 // no longer exists (was never used)
-#define NETMSGTYPE_ReleaseAppendLock               3017 // no longer exists (was never used)
-#define NETMSGTYPE_ReleaseAppendLockResp           3018 // no longer exists (was never used)
 #define NETMSGTYPE_ReadLocalFileV2                 3019
-#define NETMSGTYPE_ReadLocalFileV2RespDummy        3020 // this msg requires no such response
 #define NETMSGTYPE_RefreshSession                  3021
 #define NETMSGTYPE_RefreshSessionResp              3022
 #define NETMSGTYPE_LockGranted                     3023
-#define NETMSGTYPE_LockGrantedResp                 3024 // this msg only has an ack response
 #define NETMSGTYPE_FLockEntry                      3025
 #define NETMSGTYPE_FLockEntryResp                  3026
 #define NETMSGTYPE_FLockRange                      3027
@@ -220,15 +202,10 @@
 
 // control messages
 #define NETMSGTYPE_SetChannelDirect                4001
-#define NETMSGTYPE_SetChannelDirectRespDummy       4002 // this msg requires no response
 #define NETMSGTYPE_Ack                             4003
-#define NETMSGTYPE_AckRespDummy                    4004 // this msg requires no response
 #define NETMSGTYPE_Dummy                           4005
-#define NETMSGTYPE_DummyRespDummy                  4006 // this msg requires no response
 #define NETMSGTYPE_AuthenticateChannel             4007
-#define NETMSGTYPE_AuthenticateChannelRespDummy    4008 // this msg requires no response
 #define NETMSGTYPE_GenericResponse                 4009
-#define NETMSGTYPE_GenericResponseRespDummy        4010 // this msg only exists as response
 #define NETMSGTYPE_PeerInfo                        4011
 
 // helperd messages
@@ -276,8 +253,6 @@
 #define NETMSGTYPE_UpdateDirAttribsResp            7026
 #define NETMSGTYPE_RemoveInodes                    7027
 #define NETMSGTYPE_RemoveInodesResp                7028
-#define NETMSGTYPE_ChangeStripeTarget              7029 // no longer exists
-#define NETMSGTYPE_ChangeStripeTargetResp          7030 // no longer exists
 #define NETMSGTYPE_RecreateFsIDs                   7031
 #define NETMSGTYPE_RecreateFsIDsResp               7032
 #define NETMSGTYPE_RecreateDentries                7033
@@ -291,39 +266,5 @@
 #define NETMSGTYPE_AdjustChunkPermissionsResp      7041
 #define NETMSGTYPE_MoveChunkFile                   7042
 #define NETMSGTYPE_MoveChunkFileResp               7043
-
-#define NETMSGTYPE_SetRootNodeID                   7117
-#define NETMSGTYPE_SetRootNodeIDResp               7118
-
-// messages for DEEP-ER cache
-#define NETMSGTYPE_CachePrefetch                   9001 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchResp               9002 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchRange              9003 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchRangeResp          9004 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchWait               9005 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchWaitResp           9006 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchCrc                9007 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchCrcResp            9008 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchCrcWait            9009 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchCrcWaitResp        9010 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchIsFinished         9011 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchIsFinishedResp     9012 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchStop               9013 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CachePrefetchStopResp           9014 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlush                      9015 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushResp                  9016 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushRange                 9017 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushRangeResp             9018 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushWait                  9019 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushWaitResp              9020 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushCrc                   9021 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushCrcResp               9022 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushCrcWait               9023 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushCrcWaitResp           9024 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushIsFinished            9025 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushIsFinishedResp        9026 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushStop                  9027 // MSG is implemented in deeper_common
-#define NETMSGTYPE_CacheFlushStopResp              9028 // MSG is implemented in deeper_common
-
 
 #endif /*NETMESSAGETYPES_H_*/

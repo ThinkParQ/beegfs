@@ -1,8 +1,8 @@
 #include "Auth.h"
 #include <program/Program.h>
 
-std::string Auth::informationPW = "";
-std::string Auth::adminPW = "";
+std::string Auth::informationPW;
+std::string Auth::adminPW;
 
 void Auth::init()
 {

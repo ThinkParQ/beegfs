@@ -1,7 +1,7 @@
-#include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include "App.h"
 
+#include <syslog.h>
 
 #define APP_WORKERS_DIRECT_NUM   1
 #define APP_WORKERS_BUF_SIZE     (1024*1024)
@@ -14,7 +14,6 @@ App::App(int argc, char** argv)
    this->argv = argv;
 
    this->appResult = APPCODE_NO_ERROR;
-   this->pidFileLockFD = -1;
 
    this->cfg = NULL;
    this->netFilter = NULL;
@@ -72,19 +71,17 @@ App::~App()
    SAFE_DELETE(this->tcpOnlyFilter);
    SAFE_DELETE(this->netFilter);
 
-   unlockAndDeletePIDFile(pidFileLockFD, cfg->getPIDFile()); // ignored if fd is -1
-
    SAFE_DELETE(this->cfg);
 
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 void App::run()
 {
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -196,9 +193,8 @@ void App::initDataObjects(int argc, char** argv)
    this->netFilter = new NetFilter(cfg->getConnNetFilterFile() );
    this->tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
 
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(), 
-      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-      cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
    this->log = new LogContext("App");
    this->runtimeCfg = new RuntimeConfig(cfg);
    this->db = new Database();
@@ -208,7 +204,7 @@ void App::initDataObjects(int argc, char** argv)
    this->metaNodes = new NodeStoreMetaEx();
    this->storageNodes = new NodeStoreStorageEx();
    this->mgmtNodes = new NodeStoreMgmtEx();
-   this->clientNodes = new NodeStoreClients(false);
+   this->clientNodes = new NodeStoreClients();
    this->ackStore = new AcknowledgmentStore();
 
    this->targetMapper = new TargetMapper();
@@ -226,15 +222,14 @@ void App::initDataObjects(int argc, char** argv)
 
 void App::initLocalNodeInfo()
 {
-   bool useSDP = this->cfg->getConnUseSDP();
    unsigned portUDP = cfg->getConnAdmonPortUDP();
 
    StringList allowedInterfaces;
    std::string interfacesFilename = cfg->getConnInterfacesFile();
    if(interfacesFilename.length() )
-      cfg->loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
+      Config::loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
 
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, useSDP, localNicList);
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
 
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -243,9 +238,8 @@ void App::initLocalNodeInfo()
 
    std::string nodeID = System::getHostname();
 
-   localNode = std::make_shared<LocalNode>(nodeID, NumNodeID(1), portUDP, 0, localNicList);
-
-   localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
+   localNode = std::make_shared<LocalNode>(NODETYPE_Admon, nodeID, NumNodeID(1), portUDP, 0,
+         localNicList);
 }
 
 void App::initComponents()
@@ -551,48 +545,36 @@ void App::signalHandler(int sig)
 
 void App::getStorageNodesAsStringList(StringList *outList)
 {
-   auto node = storageNodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : storageNodes->referenceAllNodes())
    {
       std::string nodeID = node->getID();
       outList->push_back(nodeID);
-
-      node = storageNodes->referenceNextNode(node);
    }
 }
 
 void App::getMetaNodesAsStringList(StringList *outList)
 {
-   auto node = metaNodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : metaNodes->referenceAllNodes())
    {
       std::string nodeID = node->getID();
       outList->push_back(nodeID);
-
-      node = metaNodes->referenceNextNode(node);
    }
 }
 
 void App::getStorageNodeNumIDs(NumNodeIDList *outList)
 {
-   auto node = storageNodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : storageNodes->referenceAllNodes())
    {
       NumNodeID nodeID = node->getNumID();
       outList->push_back(nodeID);
-
-      node = storageNodes->referenceNextNode(node);
    }
 }
 
 void App::getMetaNodeNumIDs(NumNodeIDList *outList)
 {
-   auto node = metaNodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : metaNodes->referenceAllNodes())
    {
       NumNodeID nodeID = node->getNumID();
       outList->push_back(nodeID);
-
-      node = metaNodes->referenceNextNode(node);
    }
 }

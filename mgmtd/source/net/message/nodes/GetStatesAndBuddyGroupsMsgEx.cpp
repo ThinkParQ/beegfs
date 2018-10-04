@@ -6,8 +6,6 @@
 
 bool GetStatesAndBuddyGroupsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STATES, DEBUG, "Received a GetStatesAndBuddyGroupsMsg.", ctx.peerName() );
-
    App* app = Program::getApp();
    TargetStateStore* targetStateStore;
    MirrorBuddyGroupMapper* buddyGroupMapper;
@@ -26,28 +24,16 @@ bool GetStatesAndBuddyGroupsMsgEx::processIncoming(ResponseContext& ctx)
          break;
 
       default:
-         LOG(STATES, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(nodeType)),
-               as("Sender", ctx.peerName())
-            );
+         LOG(STATES, ERR, "Invalid node type.", nodeType, ("Sender", ctx.peerName()));
          return false;
    }
 
-   UInt16List targetIDs;
-   UInt8List targetReachabilityStates;
-   UInt8List targetConsistencyStates;
+   MirrorBuddyGroupMap groups;
+   TargetStateMap states;
 
-   UInt16List buddyGroupIDs;
-   UInt16List primaryTargetIDs;
-   UInt16List secondaryTargetIDs;
+   targetStateStore->getStatesAndGroups(buddyGroupMapper, states, groups);
 
-   targetStateStore->getStatesAndGroupsAsLists(buddyGroupMapper,
-      targetIDs, targetReachabilityStates, targetConsistencyStates,
-      buddyGroupIDs, primaryTargetIDs, secondaryTargetIDs);
-
-   ctx.sendResponse(
-         GetStatesAndBuddyGroupsRespMsg(&buddyGroupIDs, &primaryTargetIDs,
-            &secondaryTargetIDs, &targetIDs, &targetReachabilityStates, &targetConsistencyStates) );
+   ctx.sendResponse(GetStatesAndBuddyGroupsRespMsg(groups, states));
 
    return true;
 }

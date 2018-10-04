@@ -5,8 +5,6 @@ bool AckMsgEx::processIncoming(ResponseContext& ctx)
 {
    #ifdef BEEGFS_DEBUG
       const char* logContext = "Ack incoming";
-
-      LOG_DEBUG(logContext, 4, "Received a AckMsg from: " + ctx.peerName() );
    #endif //BEEGFS_DEBUG
    
    LOG_DEBUG(logContext, 5, std::string("Value: ") + getValue() );

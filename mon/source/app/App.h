@@ -43,7 +43,7 @@ class App : public AbstractApp
       int appResult;
       int argc;
       char** argv;
-      int pidFileLockFD;
+      LockFD pidFileLockFD;
 
       std::unique_ptr<TargetMapper> targetMapper;
 
@@ -103,22 +103,22 @@ class App : public AbstractApp
          }
       }
 
-      virtual ICommonConfig* getCommonConfig() override
+      virtual ICommonConfig* getCommonConfig() const override
       {
          return cfg.get();
       }
 
-      virtual NetFilter* getNetFilter() override
+      virtual NetFilter* getNetFilter() const override
       {
          return netFilter.get();
       }
 
-      virtual NetFilter* getTcpOnlyFilter() override
+      virtual NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter.get();
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory() override
+      virtual AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory.get();
       }

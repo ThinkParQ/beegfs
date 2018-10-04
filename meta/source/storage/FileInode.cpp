@@ -9,6 +9,8 @@
 
 #include <attr/xattr.h>
 
+#include <boost/lexical_cast.hpp>
+
 
 // shorthand for the long init line of AppendLockQueuesContainer to create on stack
 #define FILEINODE_APPEND_LOCK_QUEUES_CONTAINER(varName) \
@@ -176,7 +178,7 @@ void FileInode::decNumSessionsAndStore(EntryInfo* entryInfo, unsigned accessFlag
 /**
  * Note: This version is compatible with sparse files.
  */
-void FileInode::updateDynamicAttribs(void)
+void FileInode::updateDynamicAttribs()
 {
    this->inodeDiskData.inodeStatData.updateDynamicFileAttribs(this->fileInfoVec,
       this->inodeDiskData.getPattern() );
@@ -504,7 +506,7 @@ bool FileInode::storeUpdatedInodeUnlocked(EntryInfo* entryInfo, StripePattern* u
       {
          LogContext(logContext).log(Log_WARNING, std::string("Failed to write inlined inode: ") +
             "parentID: "+ parentID +  " entryID: " + entryID + " fileName: " + fileName +
-            " Error: " + FhgfsOpsErrTk::toErrString(dentrySaveRes) );
+            " Error: " + boost::lexical_cast<std::string>(dentrySaveRes));
          #ifdef BEEGFS_DEBUG
             LogContext(logContext).logBacktrace();
          #endif
@@ -536,7 +538,7 @@ bool FileInode::storeUpdatedInodeUnlocked(EntryInfo* entryInfo, StripePattern* u
    else
       saveRes = false;
 
-   if (saveRes == false && isInlined)
+   if (!saveRes && isInlined)
    {
       LogContext(logContext).log(Log_WARNING, std::string("Trying to write as non-inlined inode "
          "also failed.") );

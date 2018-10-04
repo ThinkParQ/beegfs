@@ -18,14 +18,9 @@ static inline void PointerList_removeHead(PointerList* this);
 static inline void PointerList_removeTail(PointerList* this);
 static inline void PointerList_removeElem(PointerList* this, PointerListElem* elem);
 static inline size_t PointerList_length(const PointerList* this);
-static inline void* PointerList_getHeadValue(PointerList* this);
-static inline void* PointerList_getTailValue(PointerList* this);
 static inline void PointerList_clear(PointerList* this);
 
-static inline PointerListElem* PointerList_getHead(PointerList* this);
 static inline PointerListElem* PointerList_getTail(PointerList* this);
-static inline PointerListElem* PointerList_getNext(PointerListElem* elem);
-static inline PointerListElem* PointerList_getPrev(PointerListElem* elem);
 
 
 struct PointerListElem
@@ -199,17 +194,6 @@ size_t PointerList_length(const PointerList* this)
    return this->length;
 }
 
-
-void* PointerList_getHeadValue(PointerList* this)
-{
-   return this->head ? this->head->valuePointer : NULL;
-}
-
-void* PointerList_getTailValue(PointerList* this)
-{
-   return this->tail ? this->tail->valuePointer : NULL;
-}
-
 void PointerList_clear(PointerList* this)
 {
    // free all elems
@@ -228,25 +212,9 @@ void PointerList_clear(PointerList* this)
    this->length = 0;
 }
 
-PointerListElem* PointerList_getHead(PointerList* this)
-{
-   return this->head;
-}
-
 PointerListElem* PointerList_getTail(PointerList* this)
 {
    return this->tail;
 }
-
-PointerListElem* PointerList_getNext(PointerListElem* elem)
-{
-   return elem->next;
-}
-
-PointerListElem* PointerList_getPrev(PointerListElem* elem)
-{
-   return elem->prev;
-}
-
 
 #endif /*POINTERLIST_H_*/

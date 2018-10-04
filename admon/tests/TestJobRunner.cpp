@@ -31,14 +31,15 @@ TEST(JobRunner, DISABLED_touch)
    }
 
    ExternalJobRunner* jobRunner = Program::getApp()->getJobRunner();
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob("/usr/bin/touch "+ testFile, &mutex);
-   // we wait a maximum time of 5 seconds here, if a simple touch takes that long something went wrong
-   job->jobFinishedCond.timedwait(&mutex, 5000);
-
-   mutexLock.unlock();
+      job = jobRunner->addJob("/usr/bin/touch "+ testFile, &mutex);
+      // we wait a maximum time of 5 seconds here, if a simple touch takes that long something went wrong
+      job->jobFinishedCond.timedwait(&mutex, 5000);
+   }
 
    int jobRetVal = job->returnCode;
    std::string jobID = job->id;
@@ -79,12 +80,13 @@ TEST(JobRunner, DISABLED_unknownCmd)
 
    ExternalJobRunner* jobRunner = Program::getApp()->getJobRunner();
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   Job* job = nullptr;
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(exePath, &mutex);
-   job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      job = jobRunner->addJob(exePath, &mutex);
+      job->jobFinishedCond.wait(&mutex);
+   }
 
    int jobRetVal = job->returnCode;
    std::string jobID = job->id;

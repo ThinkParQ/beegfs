@@ -16,10 +16,8 @@ class ICommonConfig
 
       LogType     logType; 
       int         logLevel;
-      bool        logErrsToStdlog;
       bool        logNoDate;
       std::string logStdFile;
-      std::string logErrFile;
       unsigned    logNumLines;
       unsigned    logNumRotatedFiles;
 
@@ -33,7 +31,6 @@ class ICommonConfig
       int         connMetaPortTCP;
       int         connHelperdPortTCP;
       int         connMgmtdPortTCP;
-      bool        connUseSDP;
       bool        connUseRDMA;
       unsigned    connBacklogTCP;
       unsigned    connMaxInternodeNum;
@@ -45,8 +42,6 @@ class ICommonConfig
       std::string connAuthFile;
       uint64_t    connAuthHash; // implicitly set based on hash of connAuthFile contents
       std::string connTcpOnlyFilterFile; // for IPs that only allow plain TCP (no RDMA etc)
-
-      bool        debugFindOtherNodes;
 
       std::string sysMgmtdHost;
       unsigned    sysUpdateTargetStatesSecs;
@@ -63,11 +58,6 @@ class ICommonConfig
          return logLevel;
       }
 
-      bool getLogErrsToStdlog() const
-      {
-         return logErrsToStdlog;
-      }
-
       bool getLogNoDate() const
       {
          return logNoDate;
@@ -76,11 +66,6 @@ class ICommonConfig
       const std::string& getLogStdFile() const
       {
          return logStdFile;
-      }
-
-      const std::string& getLogErrFile() const
-      {
-         return logErrFile;
       }
 
       unsigned getLogNumLines() const
@@ -138,11 +123,6 @@ class ICommonConfig
          return connMgmtdPortTCP ? (connMgmtdPortTCP + connPortShift) : 0;
       }
 
-      bool getConnUseSDP() const
-      {
-         return connUseSDP;
-      }
-
       bool getConnUseRDMA() const
       {
          return connUseRDMA;
@@ -196,11 +176,6 @@ class ICommonConfig
       const std::string& getConnTcpOnlyFilterFile() const
       {
          return connTcpOnlyFilterFile;
-      }
-
-      bool getDebugFindOtherNodes() const
-      {
-         return debugFindOtherNodes;
       }
 
       const std::string& getSysMgmtdHost() const

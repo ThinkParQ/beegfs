@@ -40,8 +40,6 @@ bool UnlinkFileMsgEx::processIncoming(ResponseContext& ctx)
 #ifdef BEEGFS_DEBUG
    const char* logContext = "UnlinkFileMsg incoming";
 
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a UnlinkFileMsg from: " + ctx.peerName() );
-
    const std::string& removeName = getDelFileName();
 
    EntryInfo* parentInfo = getParentInfo();
@@ -51,8 +49,7 @@ bool UnlinkFileMsgEx::processIncoming(ResponseContext& ctx)
 #endif // BEEGFS_DEBUG
 
    // update operation counters (here on top because we have an early sock release in this msg)
-   Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
-      MetaOpCounter_UNLINK, getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_UNLINK);
 
    return BaseType::processIncoming(ctx);
 }

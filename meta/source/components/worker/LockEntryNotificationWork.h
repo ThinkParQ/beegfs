@@ -5,7 +5,6 @@
 #include <common/components/worker/Work.h>
 #include <common/components/AbstractDatagramListener.h>
 #include <common/storage/StorageErrors.h>
-#include <common/threading/SafeMutexLock.h>
 #include <storage/Locking.h>
 
 

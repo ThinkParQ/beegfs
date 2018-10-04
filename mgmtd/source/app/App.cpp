@@ -4,28 +4,20 @@
 #include <common/components/ComponentInitException.h>
 #include <common/net/sock/RDMASocket.h>
 #include <common/nodes/LocalNode.h>
-#include <common/nodes/NodeFeatureFlags.h>
 #include <common/nodes/DynamicPoolLimits.h>
 #include <common/toolkit/StorageTk.h>
 #include <common/toolkit/SynchronizedCounter.h>
-#include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include <toolkit/StorageTkEx.h>
 #include "App.h"
 
-#include <signal.h>
+#include <csignal>
+#include <syslog.h>
+
+#include <boost/lexical_cast.hpp>
 
 #define APP_WORKERS_DIRECT_NUM   1
 #define APP_SYSLOG_IDENTIFIER    "beegfs-mgmtd"
-
-/**
- * Array of the feature bit numbers that are supported by this node/service.
- */
-unsigned const APP_FEATURES[] =
-{
-   MGMT_FEATURE_DUMMY,
-};
-
 
 App::App(int argc, char** argv) :
    shuttingDown(App_RUNNING)
@@ -34,8 +26,6 @@ App::App(int argc, char** argv) :
    this->argv = argv;
 
    this->appResult = APPCODE_NO_ERROR;
-   this->pidFileLockFD = -1;
-   this->workingDirLockFD = -1;
 
    this->cfg = NULL;
    this->netFilter = NULL;
@@ -102,22 +92,17 @@ App::~App()
    SAFE_DELETE(this->netFilter);
    SAFE_DELETE(this->quotaManager);
 
-   if(workingDirLockFD != -1)
-      StorageTk::unlockWorkingDirectory(workingDirLockFD);
-
-   unlockAndDeletePIDFile(pidFileLockFD, cfg->getPIDFile()); // ignored if fd is -1
-
    SAFE_DELETE(this->cfg);
 
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 void App::run()
 {
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -229,14 +214,11 @@ void App::initDataObjects(int argc, char** argv)
 
    // (check absolute log path to avoid chdir() problems)
    Path logStdPath(cfg->getLogStdFile() );
-   Path logErrPath(cfg->getLogErrFile() );
-   if( (!logStdPath.empty() && !logStdPath.absolute() ) ||
-       (!logErrPath.empty() && !logErrPath.absolute() ) )
+   if(!logStdPath.empty() && !logStdPath.absolute())
       throw InvalidConfigException("Path to log file must be absolute");
 
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(),
-      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-      cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
    this->log = new LogContext("App");
 
    DynamicPoolLimits poolLimitsMetaSpace(cfg->getTuneMetaSpaceLowLimit(),
@@ -257,8 +239,9 @@ void App::initDataObjects(int argc, char** argv)
       false, DynamicPoolLimits(0, 0, 0, 0, 0, 0), DynamicPoolLimits(0, 0, 0, 0, 0, 0) );
 
    this->targetNumIDMapper = new NumericIDMapper();
-   this->targetMapper = new TargetMapper();
-   this->storageBuddyGroupMapper = new MirrorBuddyGroupMapper(this->targetMapper);
+   this->targetMapper = new TargetMapperEx();
+   this->storageBuddyGroupMapper = new MirrorBuddyGroupMapperEx(
+         CONFIG_STORAGEBUDDYGROUPMAPPINGS_FILENAME, this->targetMapper);
 
    this->storagePoolStore = boost::make_unique<StoragePoolStoreEx>(storageBuddyGroupMapper,
                                                                    targetMapper);
@@ -268,7 +251,8 @@ void App::initDataObjects(int argc, char** argv)
    // contained depends on each other (in both directions)
    this->storageBuddyGroupMapper->attachStoragePoolStore(storagePoolStore.get());
 
-   this->metaBuddyGroupMapper = new MirrorBuddyGroupMapper();
+   this->metaBuddyGroupMapper = new MirrorBuddyGroupMapperEx(
+         CONFIG_METABUDDYGROUPMAPPINGS_FILENAME);
 
    this->mgmtNodes = new NodeStoreServersEx(NODETYPE_Mgmt);
    this->metaNodes = new NodeStoreServersEx(NODETYPE_Meta);
@@ -307,7 +291,6 @@ void App::initDataObjects(int argc, char** argv)
 
 void App::initLocalNodeInfo()
 {
-   bool useSDP = cfg->getConnUseSDP();
    unsigned portUDP = cfg->getConnMgmtdPortUDP();
    unsigned portTCP = cfg->getConnMgmtdPortTCP();
 
@@ -321,9 +304,9 @@ void App::initLocalNodeInfo()
       StringTk::explodeEx(interfacesList, ',', true, &allowedInterfaces);
    }
 
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, useSDP, localNicList);
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
 
-   if(!localNicList.size() )
+   if (localNicList.empty())
       throw InvalidConfigException("Couldn't find any usable NIC");
 
    localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
@@ -353,17 +336,8 @@ void App::initLocalNodeInfo()
 
    // create the local node
 
-   localNode = std::make_shared<LocalNode>(localNodeID, NumNodeID(localNodeNumID), portUDP, portTCP,
-      localNicList);
-
-   localNode->setNodeType(NODETYPE_Mgmt);
-   localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
-
-   // nodeFeatureFlags
-   BitStore nodeFeatureFlags;
-
-   featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);
-   localNode->setFeatureFlags(&nodeFeatureFlags);
+   localNode = std::make_shared<LocalNode>(NODETYPE_Mgmt, localNodeID, NumNodeID(localNodeNumID),
+         portUDP, portTCP, localNicList);
 }
 
 /**
@@ -400,29 +374,10 @@ bool App::preinitStorage()
    // lock storage directory
 
    this->workingDirLockFD = StorageTk::lockWorkingDirectory(cfg->getStoreMgmtdDirectory() );
-   if(workingDirLockFD == -1)
+   if (!workingDirLockFD.valid())
       throw InvalidConfigException("Invalid working directory: locking failed");
 
    return initialized;
-}
-
-template<typename StoreT>
-void App::loadStoreFromFile(int format, LogContext& log,
-      StoreT& store, char storeFlag, const std::string& path, const std::string& description)
-{
-   Path storePath(path);
-   store.setStorePath(storePath.str() );
-
-   const bool nodeIDsAreShort = format < STORAGETK_FORMAT_LONG_NODE_IDS;
-
-   if(store.loadFromFile(!nodeIDsAreShort))
-      log.log(Log_NOTICE, "Loaded " + description + ": " + StringTk::intToStr(store.getSize()));
-
-   if (nodeIDsAreShort)
-   {
-      if (!store.saveToFile())
-         throw InvalidConfigException("Could not update " + description + " file.");
-   }
 }
 
 void App::initStorage(const bool firstRun)
@@ -447,11 +402,7 @@ void App::initStorage(const bool firstRun)
          cfg->getStoreMgmtdDirectory() );
 
    StorageTk::loadStorageFormatFile(mgmtdPathStr, STORAGETK_FORMAT_MIN_VERSION,
-         STORAGETK_FORMAT_LONG_NODE_IDS, formatVersion, formatProperties);
-
-   if (formatVersion < STORAGETK_FORMAT_LONG_NODE_IDS
-         && formatProperties["longNodeIDs"].find_first_not_of("msc") != std::string::npos)
-      throw InvalidConfigException("Bad longNodeIDs value");
+         STORAGETK_FORMAT_7_1, formatVersion, formatProperties);
 
    // check for nodeID changes
 
@@ -459,17 +410,31 @@ void App::initStorage(const bool firstRun)
 
    // load stored nodes
 
-   loadStoreFromFile(formatVersion, *log, *metaNodes,
-         'm', CONFIG_METANODES_FILENAME, "metadata nodes");
+   metaNodes->setStorePath(CONFIG_METANODES_FILENAME);
+   storageNodes->setStorePath(CONFIG_STORAGENODES_FILENAME);
+   clientNodes->setStorePath(CONFIG_CLIENTNODES_FILENAME);
+
+   if (metaNodes->loadFromFile(&metaRoot, formatVersion < STORAGETK_FORMAT_7_1))
+      LOG(GENERAL, NOTICE, "Loaded meta nodes.", ("node count", metaNodes->getSize()));
 
    // Fill the meta nodes' target state store (Note: The storage target state store is filled by
    // the TargetMapper, since it contains target IDs, not node IDs).
    metaNodes->fillStateStore();
 
-   loadStoreFromFile(formatVersion, *log, *storageNodes,
-         's', CONFIG_STORAGENODES_FILENAME, "storage nodes");
-   loadStoreFromFile(formatVersion, *log, *clientNodes,
-         'c', CONFIG_CLIENTNODES_FILENAME, "client nodes");
+   if (storageNodes->loadFromFile(nullptr, formatVersion < STORAGETK_FORMAT_7_1))
+      LOG(GENERAL, NOTICE, "Loaded storage nodes.", ("node count", storageNodes->getSize()));
+
+   if (clientNodes->loadFromFile(formatVersion < STORAGETK_FORMAT_7_1))
+      LOG(GENERAL, NOTICE, "Loaded client nodes.", ("node count", clientNodes->getSize()));
+
+   if (formatVersion < STORAGETK_FORMAT_7_1) {
+      if (!metaNodes->saveToFile(&metaRoot))
+         throw InvalidConfigException("Failed to write upgraded meta node store");
+      if (!storageNodes->saveToFile(nullptr))
+         throw InvalidConfigException("Failed to write upgraded storage node store");
+      if (!clientNodes->saveToFile())
+         throw InvalidConfigException("Failed to write upgraded client node store");
+   }
 
    // load mapped targetNumIDs
 
@@ -520,8 +485,6 @@ void App::initStorage(const bool firstRun)
    // location and try to load again.
    for (int i = 0; i < 2; i++)
    {
-      Path storageBuddyGroupsPath(CONFIG_STORAGEBUDDYGROUPMAPPINGS_FILENAME);
-      storageBuddyGroupMapper->setStorePath(storageBuddyGroupsPath.str() );
       if (storageBuddyGroupMapper->loadFromFile() )
       {
          this->log->log(Log_NOTICE, "Loaded storage target mirror buddy group mappings: " +
@@ -536,15 +499,13 @@ void App::initStorage(const bool firstRun)
    }
 
    // load meta node mirror buddy group mappings
-   Path metaBuddyGroupPath(CONFIG_METABUDDYGROUPMAPPINGS_FILENAME);
-   metaBuddyGroupMapper->setStorePath(metaBuddyGroupPath.str() );
    if (metaBuddyGroupMapper->loadFromFile() )
       this->log->log(Log_NOTICE, "Loaded metadata node mirror buddy group mappings: " +
          StringTk::intToStr(metaBuddyGroupMapper->getSize() ) );
 
    // save config, just to be sure that the format is correct and up to date
    formatProperties.erase("longNodeIDs");
-   if (!StorageTk::writeFormatFile(mgmtdPathStr, STORAGETK_FORMAT_LONG_NODE_IDS, &formatProperties))
+   if (!StorageTk::writeFormatFile(mgmtdPathStr, STORAGETK_FORMAT_7_1, &formatProperties))
       throw InvalidConfigException("Could not write format.conf");
 
    // raise file descriptor limit
@@ -587,8 +548,8 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
          propertiesKey = STORAGETK_FORMAT_STATES_STORAGE;
          break;
       default:
-         throw ComponentInitException("Invalid node type for state store initialization: "
-               + Node::nodeTypeToStr(stateStore->getNodeType()));
+         throw ComponentInitException("Invalid node type: "
+               + boost::lexical_cast<std::string>(stateStore->getNodeType()));
    }
 
    if (firstRun)
@@ -613,7 +574,7 @@ void App::readTargetStates(const bool firstRun, StringMap& formatProperties,
    // The first run after an update - read the old file, and set the flag.
    if (targetStateStore->loadResyncSetFromFile())
    {
-      LOG(STATES, NOTICE, "Restored resync set.", as("NodeType", stateStore->nodeTypeStr(true)));
+      LOG(STATES, NOTICE, "Restored resync set.", ("NodeType", stateStore->nodeTypeStr(true)));
 
       // Make an effort to unlink the resync set file
       ::unlink(stateStore->getResyncSetStorePath().c_str());
@@ -880,7 +841,7 @@ void App::shutDown (bool clean)
       int toWaitSecs = cfg->getSysTargetOfflineTimeoutSecs();
       LOG(GENERAL, NOTICE,
           "Shutdown in progress: Buddy groups frozen - waiting for clients to acknowledge.",
-          as("Timeout (sec)", toWaitSecs));
+          ("Timeout (sec)", toWaitSecs));
 
       // POffline-Timeout = 0.5*OfflineTimeout; therefore clientTiemout here is 2*POfflineTimeout
       const int sleepTimeoutSecs = 1;
@@ -960,7 +921,7 @@ void App::signalHandler(int sig)
          break;
       case App_SHUTDOWN_CLEAN:
          LOG(GENERAL, CRITICAL, "Received a second signal. Forcing immediate shutdown.",
-               as("Signal", signalStr));
+               ("Signal", signalStr));
          app->shuttingDown.set(App_SHUTDOWN_IMMEDIATE);
          break;
       default:

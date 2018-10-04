@@ -5,6 +5,8 @@
 
 #include <program/Program.h>
 
+#include <mutex>
+
 ModificationEventHandler::ModificationEventHandler(FsckDBModificationEventsTable& table)
    : PThread("ModificationEventHandler"),
      table(&table)
@@ -16,16 +18,16 @@ void ModificationEventHandler::run()
    FsckDBModificationEventsTable::BulkHandle bulkHandle(table->newBulkHandle() );
    while ( !getSelfTerminate() )
    {
-      SafeMutexLock bufferListSafeLock(&bufferListMutex); // LOCK BUFFER
+      std::unique_lock<Mutex> bufferListSafeLock(bufferListMutex); // LOCK BUFFER
 
       // make sure to group at least MODHANDLER_MINSIZE_FLUSH flush elements (to not bother the DB
       // with every single event)
       if (bufferList.size() < MODHANDLER_MINSIZE_FLUSH)
       {
          bufferListSafeLock.unlock(); // UNLOCK BUFFER
-         SafeMutexLock lock(&eventsAddedMutex);
+         const std::lock_guard<Mutex> lock(eventsAddedMutex);
          eventsAddedCond.timedwait(&eventsAddedMutex, 2000);
-         lock.unlock();
+         continue;
       }
       else
       {
@@ -44,9 +46,10 @@ void ModificationEventHandler::run()
    // a last flush after component stopped
    FsckModificationEventList bufferListCopy;
 
-   SafeMutexLock bufferListSafeLock(&bufferListMutex); // LOCK BUFFER
-   bufferListCopy.splice(bufferListCopy.begin(), bufferList);
-   bufferListSafeLock.unlock(); // UNLOCK BUFFER
+   {
+      const std::lock_guard<Mutex> bufferListLock(bufferListMutex);
+      bufferListCopy.splice(bufferListCopy.begin(), bufferList);
+   }
 
    table->insert(bufferListCopy, bulkHandle);
 }
@@ -63,33 +66,31 @@ bool ModificationEventHandler::add(UInt8List& eventTypeList, StringList& entryID
 
    while ( true )
    {
-      SafeMutexLock bufferListSafeLock(&bufferListMutex);
-      if (this->bufferList.size() < MODHANDLER_MAXSIZE_EVENTLIST)
       {
-         bufferListSafeLock.unlock();
-         break;
+         const std::lock_guard<Mutex> lock(bufferListMutex);
+         if (this->bufferList.size() < MODHANDLER_MAXSIZE_EVENTLIST)
+         {
+            break;
+         }
       }
-      else
       {
-         bufferListSafeLock.unlock();
-         SafeMutexLock eventsFlushedSafeLock(&eventsFlushedMutex);
+         const std::lock_guard<Mutex> lock(eventsFlushedMutex);
          this->eventsFlushedCond.timedwait(&eventsFlushedMutex, 2000);
-         eventsFlushedSafeLock.unlock();
       }
    }
 
    ZipIterRange<UInt8List, StringList> eventTypeEntryIDIter(eventTypeList, entryIDList);
 
-   SafeMutexLock bufferListSafeLock(&bufferListMutex);
-
-   for ( ; !eventTypeEntryIDIter.empty(); ++eventTypeEntryIDIter)
    {
-      FsckModificationEvent event((ModificationEventType)*(eventTypeEntryIDIter()->first),
-         *(eventTypeEntryIDIter()->second) );
-      this->bufferList.push_back(event);
-   }
+      const std::lock_guard<Mutex> bufferListLock(bufferListMutex);
 
-   bufferListSafeLock.unlock();
+      for ( ; !eventTypeEntryIDIter.empty(); ++eventTypeEntryIDIter)
+      {
+         FsckModificationEvent event((ModificationEventType)*(eventTypeEntryIDIter()->first),
+            *(eventTypeEntryIDIter()->second) );
+         this->bufferList.push_back(event);
+      }
+   }
 
    this->eventsAddedCond.signal();
 

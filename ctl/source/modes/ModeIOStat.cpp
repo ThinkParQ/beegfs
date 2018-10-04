@@ -249,8 +249,7 @@ bool ModeIOStat::nodesTotalStats(NodeStoreServers* nodes, NodeType nodeType)
 
    unsigned numStatNodes = 0;
 
-   auto node = nodes->referenceFirstNode();
-   while (node)
+   for (const auto& node : nodes->referenceAllNodes())
    {
       HighResStatsList stats;
 
@@ -260,8 +259,6 @@ bool ModeIOStat::nodesTotalStats(NodeStoreServers* nodes, NodeType nodeType)
          addStatsToTotal(statsTotal, stats);
          numStatNodes++;
       }
-
-      node = nodes->referenceNextNode(node);
    }
 
    std::cout << "Total results for " << numStatNodes << " nodes:" << std::endl;
@@ -309,8 +306,7 @@ bool ModeIOStat::perNodeStats(NodeStoreServers* nodes, NodeType nodeType)
 
    // get stats of each node and print the corresponding row of values
 
-   auto node = nodes->referenceFirstNode();
-   while (node)
+   for (const auto& node : nodes->referenceAllNodes())
    {
       NumNodeID nodeID = node->getNumID();
       HighResStatsList stats;
@@ -327,8 +323,6 @@ bool ModeIOStat::perNodeStats(NodeStoreServers* nodes, NodeType nodeType)
 
          printf("\n");
       }
-
-      node = nodes->referenceNextNode(node);
    }
 
    printf("\n");
@@ -343,29 +337,22 @@ bool ModeIOStat::getIOStats(Node& node, HighResStatsList* outStats)
 {
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetHighResStatsRespMsg* respMsgCast;
 
    GetHighResStatsMsg getStatsMsg(0);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      node, &getStatsMsg, NETMSGTYPE_GetHighResStatsResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(node, getStatsMsg,
+         NETMSGTYPE_GetHighResStatsResp);
+   if (!respMsg)
       goto err_cleanup;
 
-   respMsgCast = (GetHighResStatsRespMsg*)respMsg;
+   respMsgCast = (GetHighResStatsRespMsg*)respMsg.get();
 
    respMsgCast->getStatsList().swap(*outStats);
 
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 

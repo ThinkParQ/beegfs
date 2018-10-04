@@ -12,7 +12,6 @@ static inline void SimplePattern_init(SimplePattern* this,
 static inline SimplePattern* SimplePattern_construct(
    unsigned patternType, unsigned chunkSize);
 static inline void SimplePattern_uninit(StripePattern* this);
-static inline void SimplePattern_destruct(StripePattern* this);
 
 // virtual functions
 extern bool SimplePattern_deserializePattern(StripePattern* this, DeserializeCtx* ctx);
@@ -61,14 +60,6 @@ SimplePattern* SimplePattern_construct(unsigned patternType, unsigned chunkSize)
 
 void SimplePattern_uninit(StripePattern* this)
 {
-   StripePattern_uninit( (StripePattern*)this);
-}
-
-void SimplePattern_destruct(StripePattern* this)
-{
-   SimplePattern_uninit( (StripePattern*)this);
-
-   kfree(this);
 }
 
 #endif /*SIMPLEPATTERN_H_*/

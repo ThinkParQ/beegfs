@@ -20,7 +20,7 @@ std::string MsgHelperGenericDebug::processOpVarLogKernLog(std::istringstream& co
 
 std::string MsgHelperGenericDebug::processOpFhgfsLog(std::istringstream& commandStream)
 {
-   ICommonConfig* cfg = PThread::getCurrentThreadApp()->getCommonConfig();
+   auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
 
    if(cfg->getLogStdFile().empty() )
       return "No log file defined.";
@@ -125,7 +125,8 @@ std::string MsgHelperGenericDebug::processOpCfgFile(std::istringstream& commandS
  * the output of the "fhgfs-net" tool.
  */
 std::string MsgHelperGenericDebug::processOpNetOut(std::istringstream& commandStream,
-   NodeStoreServers* mgmtNodes, NodeStoreServers* metaNodes, NodeStoreServers* storageNodes)
+   const NodeStoreServers* mgmtNodes, const NodeStoreServers* metaNodes,
+   const NodeStoreServers* storageNodes)
 {
    std::ostringstream responseStream;
 
@@ -226,7 +227,7 @@ std::string MsgHelperGenericDebug::writeTextFile(std::string path, std::string w
  * Print node name and currently established connections for each node in given store, similar to
  * the "fhgfs-net" tool.
  */
-std::string MsgHelperGenericDebug::printNodeStoreConns(NodeStoreServers* nodes,
+std::string MsgHelperGenericDebug::printNodeStoreConns(const NodeStoreServers* nodes,
    std::string headline)
 {
    std::ostringstream returnStream;
@@ -235,14 +236,11 @@ std::string MsgHelperGenericDebug::printNodeStoreConns(NodeStoreServers* nodes,
 
    returnStream << std::string(headline.length(), '=') << std::endl;
 
-   auto node = nodes->referenceFirstNode();
-   while (node)
+   for (const auto& node : nodes->referenceAllNodes())
    {
       returnStream << node->getID() << " [ID: " << node->getNumID() << "]" << std::endl;
 
       returnStream << printNodeConns(*node);
-
-      node = nodes->referenceNextNode(node);
    }
 
    return returnStream.str();
@@ -390,7 +388,7 @@ std::string MsgHelperGenericDebug::processOpQuotaExceeded(std::istringstream& co
  * Print contents of given TargetStateStorage.
  */
 std::string MsgHelperGenericDebug::processOpListTargetStates(std::istringstream& commandStream,
-   TargetStateStore* targetStateStore)
+   const TargetStateStore* targetStateStore)
 {
    // protocol: no arguments
 

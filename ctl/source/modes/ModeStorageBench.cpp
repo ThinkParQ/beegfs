@@ -257,20 +257,16 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
       StringList targetIDs;
       StringTk::explode(iter->second, ',', &targetIDs);
 
-      UInt16List mappedTargetIDs;
-      NumNodeIDList mappedNodeIDs;
-      NodesTk::downloadTargetMappings(mgmtNode, &mappedTargetIDs, &mappedNodeIDs, false);
+      auto mappings = NodesTk::downloadTargetMappings(mgmtNode, false);
 
-      NumNodeIDListIter nodeIdIter = mappedNodeIDs.begin();
-      for(UInt16ListIter targetIdIter = mappedTargetIDs.begin();
-         targetIdIter != mappedTargetIDs.end();)
+      for (auto it = mappings.second.begin(); it != mappings.second.end(); ++it)
       {
          bool targetFound = false;
 
          for(StringListIter inputTargetIdIter = targetIDs.begin();
             inputTargetIdIter != targetIDs.end(); inputTargetIdIter++)
          {
-            if (StringTk::strToUInt(*inputTargetIdIter) == *targetIdIter)
+            if (StringTk::strToUInt(*inputTargetIdIter) == it->first)
             {
                targetFound = true;
                targetIDs.erase(inputTargetIdIter);
@@ -279,15 +275,9 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
          }
 
          if (targetFound)
-         {
-            nodeIdIter++;
-            targetIdIter++;
-         }
+            it++;
          else
-         { // given target does not exist
-            nodeIdIter = mappedNodeIDs.erase(nodeIdIter);
-            targetIdIter = mappedTargetIDs.erase(targetIdIter);
-         }
+            it = mappings.second.erase(it);
       }
 
       if (!targetIDs.empty() )
@@ -299,7 +289,7 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
          return APPCODE_INVALID_CONFIG;
       }
 
-      this->cfgTargetIDs.syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
+      this->cfgTargetIDs.syncTargets(std::move(mappings.second));
       cfg->erase(iter);
    }
 
@@ -309,10 +299,7 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
    {
       this->cfgAllTargets = true;
 
-      UInt16List mappedTargetIDs;
-      NumNodeIDList mappedNodeIDs;
-      NodesTk::downloadTargetMappings(mgmtNode, &mappedTargetIDs, &mappedNodeIDs, false);
-      this->cfgTargetIDs.syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
+      cfgTargetIDs.syncTargets(NodesTk::downloadTargetMappings(mgmtNode, false).second);
 
       cfg->erase(iter);
    }
@@ -341,12 +328,9 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
          return APPCODE_INVALID_CONFIG;
       }
 
-      UInt16List mappedTargetIDs;
-      NumNodeIDList mappedNodeIDs;
-      NodesTk::downloadTargetMappings(mgmtNode, &mappedTargetIDs, &mappedNodeIDs, false);
+      auto mappings = NodesTk::downloadTargetMappings(mgmtNode, false);
 
-      UInt16ListIter targetIdIter = mappedTargetIDs.begin();
-      for(NumNodeIDListIter nodeIdIter = mappedNodeIDs.begin(); nodeIdIter != mappedNodeIDs.end(); )
+      for (auto it = mappings.second.begin(); it != mappings.second.end(); ++it)
       {
          bool targetFound = false;
 
@@ -354,7 +338,7 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
             inputNodeIter != this->cfgStorageServer.end();
             inputNodeIter++)
          {
-            if(*nodeIdIter == NumNodeID(StringTk::strToUInt(*inputNodeIter) ) )
+            if (it->second == NumNodeID(StringTk::strToUInt(*inputNodeIter)))
             {
                targetFound = true;
                break;
@@ -362,18 +346,12 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
          }
 
          if (targetFound)
-         {
-            nodeIdIter++;
-            targetIdIter++;
-         }
+            it++;
          else
-         { // given target does not exist
-            nodeIdIter = mappedNodeIDs.erase(nodeIdIter);
-            targetIdIter = mappedTargetIDs.erase(targetIdIter);
-         }
+            it = mappings.second.erase(it);
       }
 
-      this->cfgTargetIDs.syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
+      this->cfgTargetIDs.syncTargets(std::move(mappings.second));
       cfg->erase(iter);
    }
 
@@ -928,9 +906,6 @@ bool ModeStorageBench::sendCmdAndCollectResult(NumNodeID nodeID,
    bool retVal = false;
    NodeStoreServers* nodes = Program::getApp()->getStorageNodes();
 
-   bool commRes = false;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    StorageBenchControlMsgResp* respMsgCast = NULL;
 
    UInt16List targets;
@@ -943,21 +918,19 @@ bool ModeStorageBench::sendCmdAndCollectResult(NumNodeID nodeID,
    if(!node)
    {
       std::cerr << "Unknown nodeID: " << nodeID << std::endl;
-      retVal = false;
-      goto err_cleanup;
+      return false;
    }
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *node, &msg, NETMSGTYPE_StorageBenchControlMsgResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg,
+         NETMSGTYPE_StorageBenchControlMsgResp);
+   if (!respMsg)
    {
       std::cerr << "Failed to communicate with node: " << node->getTypedNodeID() << std::endl;
       retVal = false;
       goto err_cleanup;
    }
 
-   respMsgCast = (StorageBenchControlMsgResp*)respMsg;
+   respMsgCast = (StorageBenchControlMsgResp*)respMsg.get();
    respMsgCast->parseResults(&response.results);
 
    response.nodeID = nodeID;
@@ -970,8 +943,5 @@ bool ModeStorageBench::sendCmdAndCollectResult(NumNodeID nodeID,
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }

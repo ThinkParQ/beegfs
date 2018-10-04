@@ -1,13 +1,7 @@
-#include <net/message/storage/GetStorageTargetInfoMsgEx.h>
 #include "RequestStorageDataMsgEx.h"
 
 bool RequestStorageDataMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "RequestStorageDataMsg incoming";
-   
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a RequestDataMsg from: " + ctx.peerName() );
-   IGNORE_UNUSED_VARIABLE(logContext);
-
    App* app = Program::getApp();
    Node& node = app->getLocalNode();
    MultiWorkQueueMap* workQueueMap = app->getWorkQueueMap();
@@ -15,12 +9,9 @@ bool RequestStorageDataMsgEx::processIncoming(ResponseContext& ctx)
 
    // get disk space of each target
 
-   UInt16List targetIDs;
    StorageTargetInfoList storageTargetInfoList;
 
-   storageTargets->getAllTargetIDs(&targetIDs);
-
-   storageTargets->generateTargetInfoList(targetIDs, storageTargetInfoList);
+   storageTargets->generateTargetInfoList(storageTargetInfoList);
 
    // compute total disk space and total free space
 
@@ -66,7 +57,7 @@ bool RequestStorageDataMsgEx::processIncoming(ResponseContext& ctx)
       sessionCount, &statsHistory, &storageTargetInfoList);
    ctx.sendResponse(requestStorageDataRespMsg);
 
-   LOG_DEBUG(logContext, Log_SPAM, std::string("Sent a message with type: " ) +
+   LOG_DEBUG(__func__, Log_SPAM, std::string("Sent a message with type: " ) +
       StringTk::uintToStr(requestStorageDataRespMsg.getMsgType() ) + std::string(" to admon") );
 
    app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),

@@ -9,15 +9,9 @@
 
 extern bool NodesTk_downloadNodes(App* app, Node* sourceNode, NodeType nodeType,
    NodeList* outNodeList, NumNodeID* outRootNodeID, bool* outRootIsBuddyMirrored);
-extern bool NodesTk_downloadTargetMappings(App* app, Node* sourceNode,
-   UInt16List* outTargetIDs, NumNodeIDList* outNodeIDs);
-extern bool NodesTk_downloadMirrorBuddyGroups(App* app, Node* sourceNode, NodeType nodeType,
-   UInt16List* outBuddyGroupIDs, UInt16List* outPrimaryTargetIDs,
-   UInt16List* outSecondaryTargetIDs);
+extern bool NodesTk_downloadTargetMappings(App* app, Node* sourceNode, struct list_head* mappings);
 extern bool NodesTk_downloadStatesAndBuddyGroups(App* app, Node* sourceNode,
-   NodeType nodeType, UInt16List* outBuddyGroupIDs, UInt16List* outPrimaryTargetIDs,
-   UInt16List* outSecondaryTargetIDs, UInt16List* outTargetIDs,
-   UInt8List* outTargetReachabilityStates, UInt8List* outTargetConsistencyStates);
+   NodeType nodeType, struct list_head* groups, struct list_head* states);
 extern unsigned NodesTk_dropAllConnsByStore(NodeStoreEx* nodes);
 
 

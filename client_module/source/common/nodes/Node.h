@@ -7,7 +7,6 @@
 #include <common/threading/Mutex.h>
 #include <common/toolkit/StringTk.h>
 #include <common/toolkit/Time.h>
-#include <toolkit/BitStore.h>
 #include <linux/kref.h>
 #include "NodeConnPool.h"
 
@@ -30,8 +29,6 @@ extern void Node_uninit(Node* this);
 extern void __Node_destruct(Node* this);
 
 extern void Node_updateLastHeartbeatT(Node* this);
-extern void Node_getLastHeartbeatT(Node* this, Time* outT);
-extern bool Node_waitForNewHeartbeatT(Node* this, Time* oldT, int timeoutMS);
 extern bool Node_updateInterfaces(Node* this, unsigned short portUDP, unsigned short portTCP,
    NicAddressList* nicList);
 
@@ -53,23 +50,10 @@ static inline unsigned short Node_getPortTCP(Node* this);
 static inline NodeType Node_getNodeType(Node* this);
 static inline void Node_setNodeType(Node* this, NodeType nodeType);
 static inline const char* Node_getNodeTypeStr(Node* this);
-static inline unsigned Node_getFhgfsVersion(Node* this);
-static inline void Node_setFhgfsVersion(Node* this, unsigned fhgfsVersion);
-static inline bool Node_hasFeature(Node* this, unsigned featureBitIndex);
-static inline void Node_addFeature(Node* this, unsigned featureBitIndex);
-static inline const BitStore* Node_getNodeFeatures(Node* this);
-static inline void Node_setFeatureFlags(Node* this, BitStore* featureFlags);
-static inline void Node_updateFeatureFlagsThreadSafe(Node* this, const BitStore* featureFlags);
-
-// protected inliners
-static inline void _Node_setConnPool(Node* this, NodeConnPool* connPool);
-
-
 
 enum NodeType
    {NODETYPE_Invalid = 0, NODETYPE_Meta = 1, NODETYPE_Storage = 2, NODETYPE_Client = 3,
-   NODETYPE_Mgmt = 4, NODETYPE_Helperd = 5, NODETYPE_Admon = 6, NODETYPE_CacheDaemon = 7,
-   NODETYPE_CacheLib = 8};
+   NODETYPE_Mgmt = 4, NODETYPE_Helperd = 5, NODETYPE_Admon = 6};
 
 
 struct Node
@@ -79,10 +63,6 @@ struct Node
 
    NodeType nodeType; // set by NodeStore::addOrUpdate()
    char* nodeIDWithTypeStr; // for log messages (initially NULL, alloc'ed when needed)
-
-   unsigned fhgfsVersion; // fhgfs version code of this node
-   BitStore nodeFeatureFlags; /* supported features of this node (access not protected by mutex,
-                                 so be careful with updates) */
 
    NodeConnPool* connPool;
    unsigned short portUDP;
@@ -142,11 +122,6 @@ NicAddressList* Node_getNicList(Node* this)
 NodeConnPool* Node_getConnPool(Node* this)
 {
    return this->connPool;
-}
-
-void _Node_setConnPool(Node* this, NodeConnPool* connPool)
-{
-   this->connPool = connPool;
 }
 
 /**
@@ -218,70 +193,5 @@ const char* Node_getNodeTypeStr(Node* this)
 {
    return Node_nodeTypeToStr(this->nodeType);
 }
-
-unsigned Node_getFhgfsVersion(Node* this)
-{
-   return this->fhgfsVersion;
-}
-
-/**
- * Note: Not thread-safe to avoid unnecessary overhead. We assume this is called only in situations
- * where the object is not used by multiple threads, such as NodeStore::addOrUpdate() or
- * Serialization_deserializeNodeList().
- */
-void Node_setFhgfsVersion(Node* this, unsigned fhgfsVersion)
-{
-   this->fhgfsVersion = fhgfsVersion;
-}
-
-/**
- * Check if this node supports a certain feature.
- */
-bool Node_hasFeature(Node* this, unsigned featureBitIndex)
-{
-   return BitStore_getBitNonAtomic(&this->nodeFeatureFlags, featureBitIndex);
-}
-
-/**
- * Add a feature flag to this node.
- */
-void Node_addFeature(Node* this, unsigned featureBitIndex)
-{
-   BitStore_setBit(&this->nodeFeatureFlags, featureBitIndex, true);
-}
-
-/**
- * note: returns a reference to internal flags, so this is only valid while you hold a
- * reference to this node.
- */
-const BitStore* Node_getNodeFeatures(Node* this)
-{
-   return &this->nodeFeatureFlags;
-}
-
-
-/**
- * Note: not thread-safe, so use this only when there are no other threads accessing this node
- * object.
- *
- * @param featureFlags will be copied.
- */
-void Node_setFeatureFlags(Node* this, BitStore* featureFlags)
-{
-   BitStore_copy(&this->nodeFeatureFlags, featureFlags);
-}
-
-/**
- * Update internal flags from given featureFlags.
- *
- * Access to the internal feature flags store is not protected by a mutex for performance reasons,
- * so this thread-safe method cannot allow any reallocations of the internal buffers of the store.
- * Thus, we only copy feature bits that fit in the existing buffers here.
- */
-void Node_updateFeatureFlagsThreadSafe(Node* this, const BitStore* featureFlags)
-{
-   BitStore_copyThreadSafe(&this->nodeFeatureFlags, featureFlags);
-}
-
 
 #endif /*NODE_H_*/

@@ -5,7 +5,6 @@
 #include <common/storage/StorageDefinitions.h>
 #include <common/storage/StorageErrors.h>
 #include <common/toolkit/MessagingTk.h>
-#include <common/toolkit/VersionTk.h>
 #include <nodes/NodeStoreEx.h>
 #include <toolkit/NoAllocBufferStore.h>
 

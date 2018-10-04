@@ -7,9 +7,6 @@
 
 bool RecreateDentriesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("RecreateDentriesMsg incoming", 4,
-      "Received a RecreateDentriesMsg from: " + ctx.peerName() );
-
    LogContext log("RecreateDentriesMsgEx");
 
    App* app = Program::getApp();

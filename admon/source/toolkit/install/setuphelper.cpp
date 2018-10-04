@@ -3,7 +3,7 @@
 #include <toolkit/webtk.h>
 #include "setuphelper.h"
 
-
+#include <mutex>
 
 /**
  * @return 0 on success (or if file didn't exist), !=0 otherwise
@@ -211,7 +211,7 @@ int setuphelper::readRolesFile(RoleType roleType, StringList *outNodeNames)
       if (!splitLine.empty())
       {
          std::string node = StringTk::trim(splitLine.front());
-         if (node != "")
+         if (!node.empty())
          {
             outNodeNames->push_back(node);
          }
@@ -388,7 +388,7 @@ int setuphelper::getInstallNodeInfo(RoleType roleType, InstallNodeInfoList *info
       std::string line;
       getline(rolesFile, line);
 
-      if (StringTk::trim(line) != "")
+      if (!StringTk::trim(line).empty())
       {
          StringList splitLine;
          StringTk::explode(line, ',', &splitLine);
@@ -440,16 +440,16 @@ int setuphelper::createRepos(StringList *failedNodes)
 
    saveRemoveFile(FAILED_NODES_PATH);
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_REPO_PARALLEL + " " + FAILED_NODES_PATH,
-      &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_REPO_PARALLEL + " " + FAILED_NODES_PATH, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {
@@ -545,15 +545,16 @@ int setuphelper::installSinglePackage(std::string package, std::string host)
 {
    ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_INSTALL + " " + package + " " + host, &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_INSTALL + " " + package + " " + host, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if(job->returnCode != 0)
    {
@@ -571,16 +572,17 @@ int setuphelper::installPackage(std::string package, StringList *failedNodes)
 
    saveRemoveFile(FAILED_NODES_PATH);
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_INSTALL_PARALLEL + " " + package + " " +
-      FAILED_NODES_PATH, &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_INSTALL_PARALLEL + " " + package + " " +
+         FAILED_NODES_PATH, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {
@@ -600,15 +602,16 @@ int setuphelper::uninstallSinglePackage(std::string package, std::string host)
 {
    ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_UNINSTALL + " " + package + " " + host, &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_UNINSTALL + " " + package + " " + host, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {
@@ -626,16 +629,17 @@ int setuphelper::uninstallPackage(std::string package, StringList *failedNodes)
 
    saveRemoveFile(FAILED_NODES_PATH);
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_UNINSTALL_PARALLEL + " " + package + " " +
-      FAILED_NODES_PATH, &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_UNINSTALL_PARALLEL + " " + package + " " +
+         FAILED_NODES_PATH, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {
@@ -655,15 +659,16 @@ int setuphelper::checkDistriArch()
 {
    ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_SYSTEM_INFO_PARALLEL + " ", &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_SYSTEM_INFO_PARALLEL + " ", &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {
@@ -686,15 +691,16 @@ int setuphelper::checkSSH(StringList *hosts, StringList *failedNodes)
       hostList = *iter + "," + hostList;
    }
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock (mutex);
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_CHECK_SSH_PARALLEL + " " + hostList, &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_CHECK_SSH_PARALLEL + " " + hostList, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {
@@ -712,7 +718,7 @@ int setuphelper::checkSSH(StringList *hosts, StringList *failedNodes)
    {
       std::string line;
       getline(failedNodesFile, line);
-      if (StringTk::trim(line) != "")
+      if (!StringTk::trim(line).empty())
       {
          failedNodes->push_back(line);
       }
@@ -735,18 +741,19 @@ int setuphelper::updateAdmonConfig()
 {
    ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+   Job* job = nullptr;
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   std::string cfgFile = Program::getApp()->getConfig()->getCfgFile();
+      std::string cfgFile = Program::getApp()->getConfig()->getCfgFile();
 
-   Job *job = jobRunner->addJob(BASH + " " + SCRIPT_WRITE_CONFIG + " localhost " + cfgFile + " " +
-      SETUP_LOG_PATH, &mutex);
+      job = jobRunner->addJob(BASH + " " + SCRIPT_WRITE_CONFIG + " localhost " + cfgFile + " " +
+         SETUP_LOG_PATH, &mutex);
 
-   while(!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while(!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    Program::getApp()->getConfig()->resetMgmtdDaemon();
 
@@ -780,7 +787,7 @@ int setuphelper::checkFailedNodesFile(StringList *failedNodes)
       std::string line;
       getline(failedNodesFile, line);
 
-      if (StringTk::trim(line) != "")
+      if (!StringTk::trim(line).empty())
       {
          failedNodes->push_back(line);
       }

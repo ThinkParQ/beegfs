@@ -6,10 +6,6 @@
 
 bool GetHighResStatsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("GetHighResStatsMsgEx incoming");
-
-   LOG_DEBUG_CONTEXT(log, 4, "Received a GetHighResStatsMsg from: " + ctx.peerName() );
-
    HighResStatsList statsHistory;
    uint64_t lastStatsMS = getValue();
 

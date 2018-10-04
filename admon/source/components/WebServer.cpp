@@ -55,7 +55,7 @@ static void downloadGuiPage(struct mg_connection *conn,
 WebServer::WebServer(int port) : PThread("WebSrv"),
    log("WebSrv")
 {
-   strcpy(this->port, StringTk::intToStr(port).c_str() );
+   strncpy(this->port, StringTk::intToStr(port).c_str(), sizeof(this->port));
    memset(&callbacks, 0, sizeof(callbacks));
 
    this->callbacks.begin_request = requestHandler;
@@ -120,7 +120,7 @@ int WebServer::requestHandler(struct mg_connection *conn)
       const char* contenLengthChar = mg_get_header(conn, "Content-Length");
       if (contenLengthChar != NULL)
       {
-         postDataLen = atoi(contenLengthChar);
+         postDataLen = atoi(contenLengthChar); // NOLINT short reads are not a problem
          postData = (char*) malloc(postDataLen + 1); // +1 for "/0" termination
 
          int dataReadLen = mg_read(conn, postData, postDataLen);

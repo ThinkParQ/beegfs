@@ -163,9 +163,7 @@ bool DataFetcher::retrieveChunks()
    NodeStore* storageNodes = app->getStorageNodes();
 
    // for each server create a work package to retrieve chunks
-   auto node = storageNodes->referenceFirstNode();
-
-   while (node)
+   for (const auto& node : storageNodes->referenceAllNodes())
    {
       // before we create a package we increment the generated packages counter
       this->generatedPackages++;
@@ -180,8 +178,6 @@ bool DataFetcher::retrieveChunks()
       retrieveWork->waitForStarted(&started);
       if (!started)
          return false;
-
-      node = storageNodes->referenceNextNode(node);
    }
 
    return true;

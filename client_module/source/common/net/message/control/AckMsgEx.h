@@ -11,10 +11,6 @@ static inline void AckMsgEx_init(AckMsgEx* this);
 static inline void AckMsgEx_initFromValue(AckMsgEx* this,
    const char* value);
 
-// virtual functions
-extern bool __AckMsgEx_processIncoming(NetMessage* this, struct App* app,
-   fhgfs_sockaddr_in* fromAddr, struct Socket* sock, char* respBuf, size_t bufLen);
-
 // getters & setters
 static inline const char* AckMsgEx_getValue(AckMsgEx* this);
 

@@ -5,7 +5,6 @@
 #include <common/storage/Metadata.h>
 #include <common/storage/StorageDefinitions.h>
 #include <common/storage/StorageErrors.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/UniqueRWLock.h>
 #include <common/storage/StatData.h>
 #include <common/Common.h>
@@ -84,7 +83,7 @@ class DirInode
       FhgfsOpsErr linkFileInodeToDir(const std::string& inodePath, const std::string& fileName);
 
       FhgfsOpsErr removeDir(const std::string& entryName, DirEntry** outDirEntry);
-      FhgfsOpsErr unlinkDirEntry(const std::string& entryName, DirEntry* inEntry,
+      FhgfsOpsErr unlinkDirEntry(const std::string& entryName, DirEntry* entry,
          unsigned unlinkTypeFlags);
 
       bool loadIfNotLoaded(void);
@@ -167,7 +166,7 @@ class DirInode
       FhgfsOpsErr refreshMetaInfoUnlocked();
 
 
-      FhgfsOpsErr makeDirEntryUnlocked(DirEntry* entry, bool deleteEntry);
+      FhgfsOpsErr makeDirEntryUnlocked(DirEntry* entry);
       FhgfsOpsErr linkFileInodeToDirUnlocked(const std::string& inodePath,
          const std::string &fileName);
 

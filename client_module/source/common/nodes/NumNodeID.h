@@ -35,7 +35,7 @@ static inline char* NumNodeID_str(const NumNodeID* this)
    return StringTk_uintToStr(this->value);
 }
 
-extern void NumNodeID_serialize(const NumNodeID* this, SerializeCtx* ctx);
+extern void NumNodeID_serialize(SerializeCtx* ctx, const NumNodeID* this);
 extern bool NumNodeID_deserialize(DeserializeCtx* ctx, NumNodeID* outThis);
 
 #endif /* NUMNODEID_H */

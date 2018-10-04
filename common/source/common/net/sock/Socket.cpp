@@ -96,7 +96,7 @@ void Socket::bind(unsigned short port)
 }
 
 
-std::string Socket::ipaddrToStr(struct in_addr* ipaddress)
+std::string Socket::ipaddrToStr(const struct in_addr* ipaddress)
 {
    unsigned char* cIP = (unsigned char*)&ipaddress->s_addr;
 

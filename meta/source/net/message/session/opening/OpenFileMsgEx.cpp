@@ -19,8 +19,6 @@ bool OpenFileMsgEx::processIncoming(ResponseContext& ctx)
 #ifdef BEEGFS_DEBUG
    const char* logContext = "OpenFileMsg incoming";
 
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a OpenFileMsg from: " + ctx.peerName() );
-
    EntryInfo* entryInfo = getEntryInfo();
 
    LOG_DEBUG(logContext, Log_SPAM, "ParentInfo: " + entryInfo->getParentEntryID() +
@@ -58,8 +56,7 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
       fixInodeTimestamp(*inode, fileTimestamps, entryInfo);
 
    // update operation counters
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_OPEN,
-      getMsgHeaderUserID());
+   updateNodeOp(ctx, MetaOpCounter_OPEN);
 
    if (openRes != FhgfsOpsErr_SUCCESS)
    { // error occurred

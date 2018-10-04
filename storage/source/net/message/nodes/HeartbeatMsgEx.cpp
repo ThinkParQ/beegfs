@@ -2,11 +2,11 @@
 #include <program/Program.h>
 #include "HeartbeatMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Heartbeat incoming");
-
-   //LOG_DEBUG_CONTEXT(log, 4, std::string("Received a HeartbeatMsg from: ") + peer);
 
    App* app = Program::getApp();
    bool isNodeNew;
@@ -15,13 +15,8 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    NicAddressList& nicList = getNicList();
 
-   auto node = std::make_shared<Node>(getNodeID(), getNodeNumID(), getPortUDP(), getPortTCP(),
-      nicList);
-
-   node->setNodeType(getNodeType() );
-   node->setFhgfsVersion(getFhgfsVersion() );
-
-   node->setFeatureFlags(&getNodeFeatureFlags() );
+   auto node = std::make_shared<Node>(getNodeType(), getNodeID(), getNodeNumID(), getPortUDP(),
+         getPortTCP(), nicList);
 
    // set local nic capabilities
 
@@ -51,8 +46,9 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       default:
       {
-         log.logErr("Invalid/unexpected node type: " + Node::nodeTypeToStr(getNodeType() ) );
-         
+         log.logErr("Invalid/unexpected node type: "
+               + boost::lexical_cast<std::string>(getNodeType()));
+
          goto ack_resp;
       } break;
    }

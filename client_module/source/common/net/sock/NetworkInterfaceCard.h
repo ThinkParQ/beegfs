@@ -8,15 +8,11 @@
 #include <common/net/sock/NicAddressListIter.h>
 
 
-extern void NIC_findAll(StrCpyList* allowedInterfaces, bool useSDP, bool useRDMA,
+extern void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA,
    NicAddressList* outList);
-extern bool NIC_findAllV2(StrCpyList* allowedInterfaces, bool useSDP,
-   bool useRDMA, NicAddressList* outList);
 
 extern const char* NIC_nicTypeToString(NicAddrType_t nicType);
 extern char* NIC_nicAddrToString(NicAddress* nicAddr);
-extern char* NIC_nicAddrToStringLight(NicAddress* nicAddr);
-extern char* NIC_hwAddrToString(char* hwAddr);
 
 extern bool NIC_supportsSDP(NicAddressList* nicList);
 extern bool NIC_supportsRDMA(NicAddressList* nicList);

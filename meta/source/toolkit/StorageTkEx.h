@@ -5,7 +5,6 @@
 #include <common/Common.h>
 #include <common/storage/Path.h>
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/toolkit/MetaStorageTk.h>
 #include <common/toolkit/StorageTk.h>
 
@@ -39,7 +38,7 @@ class StorageTkEx
       StorageTkEx()
       {
       }
-      
+
 
    public:
 

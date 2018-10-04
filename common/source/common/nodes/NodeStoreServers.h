@@ -12,7 +12,6 @@
 #include <common/Common.h>
 #include "AbstractNodeStore.h"
 
-
 class NodeStoreServers : public AbstractNodeStore
 {
    public:
@@ -20,32 +19,23 @@ class NodeStoreServers : public AbstractNodeStore
 
       virtual bool addOrUpdateNode(NodeHandle node) override;
       virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) override;
-      bool updateLastHeartbeatT(NumNodeID id);
       virtual bool deleteNode(NumNodeID id);
 
       NodeHandle referenceNode(NumNodeID id) const;
-      NodeHandle referenceRootNode(MirrorBuddyGroupMapper* metaBuddyGroupMapper) const;
       NodeHandle referenceNodeByTargetID(uint16_t targetID, TargetMapper* targetMapper,
          FhgfsOpsErr* outErr=NULL) const;
-      NodeHandle referenceNodeByStringID(std::string nodeStrID) const;
 
       virtual NodeHandle referenceFirstNode() const override;
-      virtual NodeHandle referenceNextNode(const NodeHandle& oldNode) const override;
 
       virtual std::vector<NodeHandle> referenceAllNodes() const override;
 
       bool isNodeActive(NumNodeID id) const;
       virtual size_t getSize() const override;
 
-      NumNodeID getRootNodeNumID() const;
-      bool getRootIsBuddyMirrored() const;
-      virtual bool setRootNodeNumID(NumNodeID id, bool ignoreExistingRoot,
-            bool isBuddyMirrored);
-
       bool waitForFirstNode(int waitTimeoutMS) const;
 
-      void syncNodes(const std::vector<NodeHandle>& masterList, NumNodeIDList* outAddedIDs,
-         NumNodeIDList* outRemovedIDs, bool updateExisting, Node* appLocalNode=NULL);
+      void syncNodes(const std::vector<NodeHandle>& masterList, NumNodeIDList* outAddedNumIDs,
+         NumNodeIDList* outRemovedNumIDs, Node* appLocalNode=NULL);
 
       void attachCapacityPools(NodeCapacityPools* capacityPools);
       void attachTargetMapper(TargetMapper* targetMapper);
@@ -58,9 +48,6 @@ class NodeStoreServers : public AbstractNodeStore
       mutable Mutex mutex;
       mutable Condition newNodeCond; // set when a new node is added to the store (or undeleted)
       std::shared_ptr<Node> localNode;
-      NumNodeID rootNodeID;
-      bool rootIsBuddyMirrored;
-      Random randGen; // must also be synchronized by mutex
 
       bool channelsDirectDefault; // for connpools, false to make all channels indirect by default
 
@@ -72,12 +59,13 @@ class NodeStoreServers : public AbstractNodeStore
 
 
       bool addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNodeNumID);
-      bool addOrUpdateNodePrecheck(Node& node);
 
-   private:
-      NumNodeID generateNodeNumID(Node& node) const;
+      virtual NumNodeID generateID(Node& node) const
+      {
+         return {};
+      }
+
       NumNodeID retrieveNumIDFromStringID(std::string nodeID) const;
-      bool checkNodeNumIDCollision(NumNodeID numID) const;
 
    public:
       // getters & setters
@@ -93,6 +81,9 @@ class NodeStoreServers : public AbstractNodeStore
 
          if(capacityPools && localNode)
             capacityPools->addIfNotExists(localNode->getNumID().val(), CapacityPool_LOW);
+
+         if (localNode)
+            activeNodes.insert({localNode->getNumID(), localNode});
       }
 };
 

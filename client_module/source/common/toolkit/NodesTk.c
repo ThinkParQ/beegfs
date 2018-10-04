@@ -1,13 +1,11 @@
 #include <toolkit/NoAllocBufferStore.h>
 #include <common/net/message/nodes/GetMirrorBuddyGroupsMsg.h>
-#include <common/net/message/nodes/GetMirrorBuddyGroupsRespMsg.h>
 #include <common/net/message/nodes/GetNodesMsg.h>
 #include <common/net/message/nodes/GetNodesRespMsg.h>
 #include <common/net/message/nodes/GetStatesAndBuddyGroupsMsg.h>
 #include <common/net/message/nodes/GetStatesAndBuddyGroupsRespMsg.h>
 #include <common/net/message/nodes/GetTargetMappingsMsg.h>
 #include <common/net/message/nodes/GetTargetMappingsRespMsg.h>
-#include <common/net/message/nodes/GetTargetStatesRespMsg.h>
 #include <common/threading/Thread.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/Random.h>
@@ -77,11 +75,8 @@ cleanup_request:
  *
  * @return true if download successful
  */
-bool NodesTk_downloadTargetMappings(App* app, Node* sourceNode, UInt16List* outTargetIDs,
-   NumNodeIDList* outNodeIDs)
+bool NodesTk_downloadTargetMappings(App* app, Node* sourceNode, struct list_head* mappings)
 {
-   bool retVal = false;
-
    GetTargetMappingsMsg msg;
 
    FhgfsOpsErr commRes;
@@ -104,97 +99,25 @@ bool NodesTk_downloadTargetMappings(App* app, Node* sourceNode, UInt16List* outT
    commRes = MessagingTk_requestResponseWithRRArgs(app, &rrArgs);
 
    if(unlikely(commRes != FhgfsOpsErr_SUCCESS) )
-      goto cleanup_request;
+      return false;
 
    // handle result
 
    respMsgCast = (GetTargetMappingsRespMsg*)rrArgs.outRespMsg;
 
-   GetTargetMappingsRespMsg_parseTargetIDs(respMsgCast, outTargetIDs);
-   GetTargetMappingsRespMsg_parseNodeIDs(respMsgCast, outNodeIDs);
-
-   if(unlikely(
-      UInt16List_length(outTargetIDs) != NumNodeIDList_length(outNodeIDs) ) )
-   { // list sizes do not match
-      printk_fhgfs(KERN_WARNING, "%s:%d: List sizes do not match. Out of memory?\n",
-         __func__, __LINE__);
-
-      // (note: caller has to cleanup lists anyways, so we don't do it here)
-      retVal = false;
-   }
-   else
-      retVal = true;
+   list_splice_tail_init(&respMsgCast->mappings, mappings);
 
    // cleanup
 
    RequestResponseArgs_freeRespBuffers(&rrArgs, app);
-
-cleanup_request:
-   return retVal;
-}
-
-bool NodesTk_downloadMirrorBuddyGroups(App* app, Node* sourceNode, NodeType nodeType,
-   UInt16List* outBuddyGroupIDs, UInt16List* outPrimaryTargetIDs, UInt16List* outSecondaryTargetIDs)
-{
-   bool retVal = false;
-
-   NoAllocBufferStore* bufStore = App_getMsgBufStore(app);
-
-   GetMirrorBuddyGroupsMsg msg;
-
-   FhgfsOpsErr commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-   GetMirrorBuddyGroupsRespMsg* respMsgCast;
-
-   // prepare request
-   GetMirrorBuddyGroupsMsg_init(&msg, nodeType);
-
-   // communicate
-
-   commRes = MessagingTk_requestResponse(app,
-      sourceNode, (NetMessage*)&msg, NETMSGTYPE_GetMirrorBuddyGroupsResp, &respBuf, &respMsg);
-
-   if(unlikely(commRes != FhgfsOpsErr_SUCCESS) )
-      goto cleanup_request;
-
-   // handle result
-
-   respMsgCast = (GetMirrorBuddyGroupsRespMsg*)respMsg;
-
-   GetMirrorBuddyGroupsRespMsg_parseBuddyGroupIDs(respMsgCast, outBuddyGroupIDs);
-   GetMirrorBuddyGroupsRespMsg_parsePrimaryTargetIDs(respMsgCast, outPrimaryTargetIDs);
-   GetMirrorBuddyGroupsRespMsg_parseSecondaryTargetIDs(respMsgCast, outSecondaryTargetIDs);
-
-   if(unlikely(
-      (UInt16List_length(outBuddyGroupIDs) != UInt16List_length(outPrimaryTargetIDs) ) ||
-      (UInt16List_length(outBuddyGroupIDs) != UInt16List_length(outSecondaryTargetIDs) ) ) )
-   { // list sizes do not match
-      printk_fhgfs(KERN_WARNING, "%s:%d: List sizes do not match. Out of memory?\n",
-         __func__, __LINE__);
-
-      // (note: caller has to cleanup lists anyways, so we don't do it here)
-      retVal = false;
-   }
-   else
-      retVal = true;
-
-   // cleanup
-
-   NETMESSAGE_FREE(respMsg);
-   NoAllocBufferStore_addBuf(bufStore, respBuf);
-
-cleanup_request:
-   return retVal;
+   return true;
 }
 
 /**
  * Download target states and buddy groups combined in a single message.
  */
 bool NodesTk_downloadStatesAndBuddyGroups(App* app, Node* sourceNode, NodeType nodeType,
-   UInt16List* outBuddyGroupIDs, UInt16List* outPrimaryTargetIDs, UInt16List* outSecondaryTargetIDs,
-   UInt16List* outTargetIDs, UInt8List* outTargetReachabilityStates,
-   UInt8List* outTargetConsistencyStates)
+   struct list_head* groups, struct list_head* states)
 {
    bool retVal = false;
 
@@ -226,28 +149,9 @@ bool NodesTk_downloadStatesAndBuddyGroups(App* app, Node* sourceNode, NodeType n
 
    respMsgCast = (GetStatesAndBuddyGroupsRespMsg*)rrArgs.outRespMsg;
 
-   GetStatesAndBuddyGroupsRespMsg_parseBuddyGroupIDs(respMsgCast, outBuddyGroupIDs);
-   GetStatesAndBuddyGroupsRespMsg_parsePrimaryTargetIDs(respMsgCast, outPrimaryTargetIDs);
-   GetStatesAndBuddyGroupsRespMsg_parseSecondaryTargetIDs(respMsgCast, outSecondaryTargetIDs);
-
-   GetStatesAndBuddyGroupsRespMsg_parseTargetIDs(respMsgCast, outTargetIDs);
-   GetStatesAndBuddyGroupsRespMsg_parseReachabilityStates(respMsgCast, outTargetReachabilityStates);
-   GetStatesAndBuddyGroupsRespMsg_parseConsistencyStates(respMsgCast, outTargetConsistencyStates);
-
-   if(unlikely(
-      (UInt16List_length(outBuddyGroupIDs) != UInt16List_length(outPrimaryTargetIDs) ) ||
-      (UInt16List_length(outBuddyGroupIDs) != UInt16List_length(outSecondaryTargetIDs) ) ||
-      (UInt16List_length(outTargetIDs) != UInt8List_length(outTargetReachabilityStates) ) ||
-      (UInt16List_length(outTargetIDs) != UInt8List_length(outTargetConsistencyStates) ) ) )
-   { // list sizes do not match
-      printk_fhgfs(KERN_WARNING, "%s:%d: List sizes do not match. Out of memory?\n",
-         __func__, __LINE__);
-
-      // (note: caller has to cleanup lists anyways, so we don't do it here)
-      retVal = false;
-   }
-   else
-      retVal = true;
+   list_splice_tail_init(&respMsgCast->groups, groups);
+   list_splice_tail_init(&respMsgCast->states, states);
+   retVal = true;
 
    // cleanup
 

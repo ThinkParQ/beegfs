@@ -64,7 +64,7 @@ FhgfsOpsErr GetChunkFileAttribsWork::communicate()
    }
 
    // correct response type received
-   GetChunkFileAttribsRespMsg* getSizeRespMsg = (GetChunkFileAttribsRespMsg*)rrArgs.outRespMsg;
+   auto* getSizeRespMsg = (GetChunkFileAttribsRespMsg*)rrArgs.outRespMsg.get();
 
    FhgfsOpsErr getSizeResult = getSizeRespMsg->getResult();
    if(getSizeResult != FhgfsOpsErr_SUCCESS)

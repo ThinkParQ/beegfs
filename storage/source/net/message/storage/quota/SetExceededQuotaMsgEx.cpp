@@ -7,10 +7,6 @@
 
 bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("SetExceededQuotaMsgEx incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetExceededQuotaMsgEx from: " + ctx.peerName() );
-
    bool retVal = true;
    FhgfsOpsErr errorCode = FhgfsOpsErr_SUCCESS;
 
@@ -24,7 +20,7 @@ bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
       {
          LOG(QUOTA, WARNING, "Couldn't set exceeded quota, "
                       "because requested storage pool doesn't exist on storage server.",
-                      as("storagePoolId", getStoragePoolId()));
+                      ("storagePoolId", getStoragePoolId()));
 
          errorCode = FhgfsOpsErr_UNKNOWNPOOL;
 
@@ -32,15 +28,12 @@ bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
       }
 
       // see if any of our targets belong to this pool and, if yes, set exceeded quota info
-      UInt16List targetIdList;
-      Program::getApp()->getStorageTargets()->getAllTargetIDs(&targetIdList);
-
-      for (auto iter = targetIdList.begin(); iter != targetIdList.end(); iter++)
+      for (const auto& mapping : Program::getApp()->getStorageTargets()->getTargets())
       {
-         if (storagePool->hasTarget(*iter))
+         if (storagePool->hasTarget(mapping.first))
          {
             // update exceeded quota
-            Program::getApp()->getExceededQuotaStores()->get(*iter)->
+            Program::getApp()->getExceededQuotaStores()->get(mapping.first)->
                updateExceededQuota(getExceededQuotaIDs(), getQuotaDataType(), getExceededType() );
          }
       }

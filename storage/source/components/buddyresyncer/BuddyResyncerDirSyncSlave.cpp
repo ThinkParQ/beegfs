@@ -8,6 +8,8 @@
 
 #include "BuddyResyncerDirSyncSlave.h"
 
+#include <boost/lexical_cast.hpp>
+
 #define CHECK_AT_ONCE 50
 
 BuddyResyncerDirSyncSlave::BuddyResyncerDirSyncSlave(uint16_t targetID,
@@ -177,21 +179,18 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::getBuddyDirContents(Node& node, const std
    ListChunkDirIncrementalMsg listMsg(targetID, true, dirPath, offset, CHECK_AT_ONCE, false, true);
    listMsg.setMsgHeaderTargetID(targetID);
 
-   bool commRes = false;
    CombinedTargetState state;
    bool getStateRes = Program::getApp()->getTargetStateStore()->getState(targetID, state);
 
    // send request to node and receive response
-   char* respBuf;
-   NetMessage* respMsg;
+   std::unique_ptr<NetMessage> respMsg;
 
-   while ( (!commRes) && (getStateRes)
+   while ( (!respMsg) && (getStateRes)
       && (state.reachabilityState != TargetReachabilityState_OFFLINE) )
    {
-      commRes = MessagingTk::requestResponse(node, &listMsg,
-            NETMSGTYPE_ListChunkDirIncrementalResp, &respBuf, &respMsg);
+      respMsg = MessagingTk::requestResponse(node, listMsg, NETMSGTYPE_ListChunkDirIncrementalResp);
 
-      if(!commRes)
+      if (!respMsg)
       {
          LOG_DEBUG(__func__, Log_NOTICE,
             "Unable to communicate, but target is not offline; sleeping "
@@ -208,7 +207,7 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::getBuddyDirContents(Node& node, const std
       }
    }
 
-   if(!commRes)
+   if (!respMsg)
    { // communication error
       LogContext(__func__).logErr(
          "Communication with storage node failed: " + node.getTypedNodeID());
@@ -225,7 +224,7 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::getBuddyDirContents(Node& node, const std
    else
    {
       // correct response type received
-      ListChunkDirIncrementalRespMsg* respMsgCast = (ListChunkDirIncrementalRespMsg*) respMsg;
+      ListChunkDirIncrementalRespMsg* respMsgCast = (ListChunkDirIncrementalRespMsg*) respMsg.get();
 
       FhgfsOpsErr listRes = respMsgCast->getResult();
 
@@ -242,13 +241,10 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::getBuddyDirContents(Node& node, const std
             "dirPath: " + dirPath + "; "
             "targetID: " + StringTk::uintToStr(targetID) + "; "
             "node: " + node.getTypedNodeID() + "; "
-            "Error: " + FhgfsOpsErrTk::toErrString(listRes));
+            "Error: " + boost::lexical_cast<std::string>(listRes));
 
          retVal = listRes;
       }
-
-      delete (respMsg);
-      free(respBuf);
    }
 
    return retVal;
@@ -260,7 +256,9 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::findChunks(uint16_t targetID, const std::
    App* app = Program::getApp();
    ChunkLockStore* chunkLockStore = app->getChunkLockStore();
 
-   int targetFD = app->getTargetFD(targetID, true);
+   const auto& target = app->getStorageTargets()->getTargets().at(targetID);
+
+   const int targetFD = *target->getMirrorFD();
 
    StringListIter namesIter = inOutNames.begin();
    IntListIter typesIter = inOutEntryTypes.begin();
@@ -330,21 +328,18 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::removeBuddyChunkPaths(Node& node, uint16_
    rmMsg.addMsgHeaderFeatureFlag(RMCHUNKPATHSMSG_FLAG_BUDDYMIRROR);
    rmMsg.setMsgHeaderTargetID(buddyTargetID);
 
-   bool commRes = false;
    CombinedTargetState state;
    bool getStateRes = Program::getApp()->getTargetStateStore()->getState(buddyTargetID, state);
 
    // send request to node and receive response
-   char* respBuf;
-   NetMessage* respMsg;
+   std::unique_ptr<NetMessage> respMsg;
 
-   while ((!commRes) && (getStateRes)
+   while ((!respMsg) && (getStateRes)
       && (state.reachabilityState != TargetReachabilityState_OFFLINE))
    {
-      commRes = MessagingTk::requestResponse(node, &rmMsg, NETMSGTYPE_RmChunkPathsResp,
-         &respBuf, &respMsg);
+      respMsg = MessagingTk::requestResponse(node, rmMsg, NETMSGTYPE_RmChunkPathsResp);
 
-      if(!commRes)
+      if (!respMsg)
       {
          LOG_DEBUG(__func__, Log_NOTICE,
             "Unable to communicate, but target is not offline; sleeping "
@@ -367,7 +362,7 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::removeBuddyChunkPaths(Node& node, uint16_
       chunkLockStore->unlockChunk(localTargetID, entryID);
    }
 
-   if(!commRes)
+   if (!respMsg)
    { // communication error
       LogContext(__func__).logErr(
          "Communication with storage node failed: " + node.getTypedNodeID());
@@ -384,7 +379,7 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::removeBuddyChunkPaths(Node& node, uint16_
    else
    {
       // correct response type received
-      RmChunkPathsRespMsg* respMsgCast = (RmChunkPathsRespMsg*) respMsg;
+      RmChunkPathsRespMsg* respMsgCast = (RmChunkPathsRespMsg*) respMsg.get();
       StringList& failedPaths = respMsgCast->getFailedPaths();
 
       for(StringListIter iter = failedPaths.begin(); iter != failedPaths.end(); iter++)
@@ -394,9 +389,6 @@ FhgfsOpsErr BuddyResyncerDirSyncSlave::removeBuddyChunkPaths(Node& node, uint16_
             "buddyTargetID: " + StringTk::uintToStr(buddyTargetID) + "; "
             "node: " + node.getTypedNodeID());
       }
-
-      delete (respMsg);
-      free(respBuf);
    }
 
    return FhgfsOpsErr_SUCCESS;

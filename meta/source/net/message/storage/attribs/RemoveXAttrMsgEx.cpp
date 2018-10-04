@@ -7,15 +7,12 @@
 
 bool RemoveXAttrMsgEx::processIncoming(ResponseContext& ctx)
 {
-   App* app = Program::getApp();
-
 #ifdef BEEGFS_DEBUG
    const char* logContext = "RemoveXAttrMsg incoming";
    EntryInfo* entryInfo = this->getEntryInfo();
    const std::string& name = this->getName();
 
-   LOG_DEBUG(logContext, Log_DEBUG,
-      "Received a RemoveXAttrMsg from: " + ctx.peerName() + "; name: " + name + ";");
+   LOG_DEBUG(logContext, Log_DEBUG, "name: " + name + ";");
 
    LOG_DEBUG("RemoveXAttrMsgEx::processIncoming", Log_DEBUG,
       "ParentID: " + entryInfo->getParentEntryID() + " EntryID: " +
@@ -26,8 +23,7 @@ bool RemoveXAttrMsgEx::processIncoming(ResponseContext& ctx)
 
    BaseType::processIncoming(ctx);
 
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_REMOVEXATTR,
-         getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_REMOVEXATTR);
 
    return true;
 }

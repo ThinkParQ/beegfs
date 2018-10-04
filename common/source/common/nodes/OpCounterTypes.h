@@ -20,7 +20,6 @@ enum MetaOpCounterTypes
    MetaOpCounter_GETENTRYINFO,
    MetaOpCounter_GETNODEINFO,
    MetaOpCounter_FINDOWNER,
-   MetaOpCounter_LINK,
    MetaOpCounter_MKDIR,
    MetaOpCounter_MKFILE,
    MetaOpCounter_READDIR,
@@ -45,7 +44,6 @@ enum MetaOpCounterTypes
    MetaOpCounter_LOOKUPINTENT_REVALIDATE, // LookupIntentMsg with revalidate flag (overrides stat)
    MetaOpCounter_LOOKUPINTENT_OPEN,   // LookupIntentMsg with open flag (overrides reval and stat)
    MetaOpCounter_LOOKUPINTENT_CREATE, // LookupIntentMsg with create flag (overrides other flags)
-   MetaOpCounter_MIRRORMETADATA,
    MetaOpCounter_HARDLINK,
    MetaOpCounter_FLOCKAPPEND,
    MetaOpCounter_FLOCKENTRY,
@@ -55,6 +53,8 @@ enum MetaOpCounterTypes
    MetaOpCounter_GETXATTR,
    MetaOpCounter_REMOVEXATTR,
    MetaOpCounter_SETXATTR,
+
+   MetaOpCounter_MIRROR, // any mirrored message. lump them all together
 
    // For compatibility new fields MUST be added directly above _OpCounterLastEnum
    // NOTE: New types must also be added to admon/gui/common/enums/MetaOpsEnum.java
@@ -81,7 +81,6 @@ enum StorageOpCounterTypes
 
    StorageOpCounter_CLOSELOCAL,
    StorageOpCounter_FSYNCLOCAL,
-   StorageOpCounter_OPENLOCAL,
    StorageOpCounter_READOPS,
    StorageOpCounter_READBYTES,  // NOTE: Do NOT use directly for counting, but use READOPS
 
@@ -122,7 +121,6 @@ class OpToStringMapping
             case MetaOpCounter_GETENTRYINFO: return "entInf";
             case MetaOpCounter_GETNODEINFO: return "nodeInf";
             case MetaOpCounter_FINDOWNER: return "fndOwn";
-            case MetaOpCounter_LINK: return "lnk";
             case MetaOpCounter_MKDIR: return "mkdir";
             case MetaOpCounter_MKFILE: return "create";
             case MetaOpCounter_READDIR: return "rddir";
@@ -147,7 +145,6 @@ class OpToStringMapping
             case MetaOpCounter_LOOKUPINTENT_REVALIDATE: return "revalLI";
             case MetaOpCounter_LOOKUPINTENT_OPEN: return "openLI";
             case MetaOpCounter_LOOKUPINTENT_CREATE: return "createLI";
-            case MetaOpCounter_MIRRORMETADATA: return "mirrorMD";
             case MetaOpCounter_HARDLINK: return "hardlnk";
             case MetaOpCounter_FLOCKAPPEND: return "flckAp";
             case MetaOpCounter_FLOCKENTRY: return "flckEn";
@@ -157,6 +154,7 @@ class OpToStringMapping
             case MetaOpCounter_GETXATTR: return "getXA";
             case MetaOpCounter_REMOVEXATTR: return "rmXA";
             case MetaOpCounter_SETXATTR: return "setXA";
+            case MetaOpCounter_MIRROR: return "mirror";
          }
          return StringTk::intToStr(opNum);
       }
@@ -173,7 +171,6 @@ class OpToStringMapping
             case StorageOpCounter_TRUNCLOCALFILE: return "trunc";
             case StorageOpCounter_CLOSELOCAL: return "close";
             case StorageOpCounter_FSYNCLOCAL: return "fsync";
-            case StorageOpCounter_OPENLOCAL: return "open";
             case StorageOpCounter_READOPS: return "ops-rd";
             case StorageOpCounter_READBYTES: return "B-rd";
             case StorageOpCounter_WRITEOPS: return "ops-wr";

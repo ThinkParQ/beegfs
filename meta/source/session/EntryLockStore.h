@@ -223,10 +223,10 @@ class EntryLockStore
       DirIDLockData* lock(const std::string& dirID, const bool writeLock);
       HashDirLockData* lock(std::pair<unsigned, unsigned> hashDir);
 
-      void unlock(ParentNameLockData* parentNameLock);
-      void unlock(FileIDLockData* fileIDLock);
-      void unlock(DirIDLockData* dirIDLock);
-      void unlock(HashDirLockData* hashDirLock);
+      void unlock(ParentNameLockData* parentNameLockData);
+      void unlock(FileIDLockData* fileIDLockData);
+      void unlock(DirIDLockData* dirIDLockData);
+      void unlock(HashDirLockData* hashDirLockData);
 
    private:
       ParentNameLockStore parentNameLocks;

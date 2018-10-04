@@ -1,7 +1,7 @@
 #ifndef MGMTDTARGETSTATESTORE_H_
 #define MGMTDTARGETSTATESTORE_H_
 
-#include <common/nodes/MirrorBuddyGroupMapper.h>
+#include <nodes/MirrorBuddyGroupMapperEx.h>
 #include <common/nodes/TargetStateStore.h>
 
 class MgmtdTargetStateStore : public TargetStateStore
@@ -12,10 +12,10 @@ class MgmtdTargetStateStore : public TargetStateStore
          const UInt8List& consistencyStates, bool setOnline);
       FhgfsOpsErr changeConsistencyStatesFromLists(const UInt16List& targetIDs,
          const UInt8List& oldStates, const UInt8List& newStates,
-         MirrorBuddyGroupMapper* buddyGroups);
+         MirrorBuddyGroupMapperEx* buddyGroups);
 
-      bool autoOfflineTargets(const unsigned pofflineTimeout, const unsigned offlineTimeout,
-         MirrorBuddyGroupMapper* buddyGroups);
+      bool autoOfflineTargets(const unsigned pofflineTimeoutMS, const unsigned offlineTimeoutMS,
+         MirrorBuddyGroupMapperEx* buddyGroups);
       bool resolvePrimaryResync();
 
       bool loadResyncSetFromFile();

@@ -10,8 +10,7 @@ typedef struct RegisterNodeMsg RegisterNodeMsg;
 
 static inline void RegisterNodeMsg_init(RegisterNodeMsg* this);
 static inline void RegisterNodeMsg_initFromNodeData(RegisterNodeMsg* this, const char* nodeID,
-   const NumNodeID nodeNumID, const int nodeType, const unsigned fhgfsVersion,
-   NicAddressList* nicList, const BitStore* nodeFeatureFlags, const uint16_t portUDP);
+   const NumNodeID nodeNumID, const int nodeType, NicAddressList* nicList, const uint16_t portUDP);
 
 // virtual functions
 extern void RegisterNodeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
@@ -27,13 +26,9 @@ struct RegisterNodeMsg
    NumNodeID rootNumID;
    bool rootIsBuddyMirrored;
 
-   unsigned fhgfsVersion;
-
    int nodeType;
 
    NicAddressList* nicList; // not owned by this object
-
-   const BitStore* nodeFeatureFlags; // not owned by this object
 
    uint16_t portUDP;
    uint16_t portTCP;
@@ -52,11 +47,10 @@ void RegisterNodeMsg_init(RegisterNodeMsg* this)
 /**
  * @param nodeID just a reference, so do not free it as long as you use this object
  * @param nicList just a reference, so do not free it as long as you use this object
- * @param nodeFeatureFlags just a reference, so do not free it as long as you use this object
  */
 void RegisterNodeMsg_initFromNodeData(RegisterNodeMsg* this, const char* nodeID,
-   const NumNodeID nodeNumID, const int nodeType, const unsigned fhgfsVersion,
-   NicAddressList* nicList, const BitStore* nodeFeatureFlags, const uint16_t portUDP)
+   const NumNodeID nodeNumID, const int nodeType,
+   NicAddressList* nicList, const uint16_t portUDP)
 {
    RegisterNodeMsg_init(this);
 
@@ -64,9 +58,7 @@ void RegisterNodeMsg_initFromNodeData(RegisterNodeMsg* this, const char* nodeID,
    this->nodeIDLen = strlen(nodeID);
    this->nodeNumID = nodeNumID;
    this->nodeType = nodeType;
-   this->fhgfsVersion = fhgfsVersion;
    this->nicList = nicList;
-   this->nodeFeatureFlags = nodeFeatureFlags;
    this->portUDP = portUDP;
 
    // not used in client, but general RegisterNodeMsg has it and expects it to be serialized

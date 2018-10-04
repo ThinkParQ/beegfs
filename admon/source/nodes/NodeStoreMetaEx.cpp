@@ -1,10 +1,9 @@
-#include <common/threading/SafeMutexLock.h>
-#include <common/toolkit/Random.h>
 #include <components/Database.h>
 #include <program/Program.h>
 #include <toolkit/stats/statshelper.h>
 #include "NodeStoreMetaEx.h"
 
+#include <mutex>
 
 NodeStoreMetaEx::NodeStoreMetaEx():
    NodeStoreServers(NODETYPE_Meta, false)
@@ -18,11 +17,10 @@ bool NodeStoreMetaEx::addOrUpdateNode(std::shared_ptr<MetaNodeEx> node)
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
-   bool precheckRes = addOrUpdateNodePrecheck(*node);
-   if(!precheckRes)
+   if (!node->getNumID())
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    // check if this is a new node or an update of an existing node
 
@@ -37,11 +35,7 @@ bool NodeStoreMetaEx::addOrUpdateNode(std::shared_ptr<MetaNodeEx> node)
       node->initializeDBData();
    }
 
-   bool retVal = addOrUpdateNodeUnlocked(std::move(node), NULL);
-
-   mutexLock.unlock(); // U N L O C K
-
-   return retVal;
+   return addOrUpdateNodeUnlocked(std::move(node), NULL);
 }
 
 /**
@@ -65,11 +59,10 @@ bool NodeStoreMetaEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* o
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
-   bool precheckRes = addOrUpdateNodePrecheck(*node);
-   if(!precheckRes)
+   if (!node->getNumID())
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    // check if this is a new node
 
@@ -85,52 +78,7 @@ bool NodeStoreMetaEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* o
       static_cast<MetaNodeEx&>(*node).initializeDBData();
    }
 
-   bool retVal = addOrUpdateNodeUnlocked(std::move(node), NULL);
-
-   mutexLock.unlock(); // U N L O C K
-
-   return retVal;
-}
-
-std::string NodeStoreMetaEx::isRootMetaNode(NumNodeID nodeID)
-{
-   if(getRootNodeNumID() == nodeID)
-      return "Yes";
-   else
-      return "No";
-}
-
-std::string NodeStoreMetaEx::getRootMetaNode()
-{
-   auto node = referenceNode(getRootNodeNumID() );
-   std::string retval;
-
-   if (node != NULL)
-      retval = node->getID();
-
-   return retval;
-}
-
-std::string NodeStoreMetaEx::getRootMetaNodeIDWithTypeStr()
-{
-   auto node = referenceNode(getRootNodeNumID() );
-   std::string retval;
-
-   if (node != NULL)
-      retval = node->getNodeIDWithTypeStr();
-
-   return retval;
-}
-
-std::string NodeStoreMetaEx::getRootMetaNodeAsTypedNodeID()
-{
-   auto node = referenceNode(getRootNodeNumID() );
-   std::string retval;
-
-   if (node != NULL)
-      retval = node->getTypedNodeID();
-
-   return retval;
+   return addOrUpdateNodeUnlocked(std::move(node), NULL);
 }
 
 bool NodeStoreMetaEx::statusMeta(NumNodeID nodeNumID, std::string *outInfo)
@@ -245,13 +193,12 @@ void NodeStoreMetaEx::metaDataRequestsSum(uint timespanM, StringList *outListTim
    {
       valueTimeRange = 500; // 500 ms before and after the time value
 
-      auto node = std::static_pointer_cast<MetaNodeEx>(referenceFirstNode());
-      while (node != NULL)
+      for (const auto& nodeBase : referenceAllNodes())
       {
+         auto node = std::static_pointer_cast<MetaNodeEx>(nodeBase);
          HighResStatsList data = node->getHighResData();
 
          dataSets.push_back(data);
-         node = std::static_pointer_cast<MetaNodeEx>(referenceNextNode(node));
       }
    }
    else

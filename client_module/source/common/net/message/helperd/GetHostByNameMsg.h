@@ -15,10 +15,6 @@ static inline void GetHostByNameMsg_initFromHostname(GetHostByNameMsg* this,
 extern void GetHostByNameMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
 extern bool GetHostByNameMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx);
 
-// getters & setters
-static inline const char* GetHostByNameMsg_getHostname(GetHostByNameMsg* this);
-
-
 struct GetHostByNameMsg
 {
    NetMessage netMessage;
@@ -44,11 +40,6 @@ void GetHostByNameMsg_initFromHostname(GetHostByNameMsg* this,
 
    this->hostname = hostname;
    this->hostnameLen = strlen(hostname);
-}
-
-const char* GetHostByNameMsg_getHostname(GetHostByNameMsg* this)
-{
-   return this->hostname;
 }
 
 #endif /*GETHOSTBYNAMEMSG_H_*/

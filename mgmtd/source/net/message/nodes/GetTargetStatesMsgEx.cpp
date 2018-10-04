@@ -7,8 +7,6 @@
 
 bool GetTargetStatesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STATES, DEBUG, "Received a GetTargetStatesMsg.", ctx.peerName() );
-
    App* app = Program::getApp();
 
    NodeType nodeType = getNodeType();
@@ -29,10 +27,7 @@ bool GetTargetStatesMsgEx::processIncoming(ResponseContext& ctx)
 
       default:
       {
-         LOG(GENERAL, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(nodeType)),
-               as("Sender", ctx.peerName())
-            );
+         LOG(GENERAL, ERR, "Invalid node type.", nodeType, ("Sender", ctx.peerName()));
 
          return false;
       } break;

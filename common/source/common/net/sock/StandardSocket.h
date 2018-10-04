@@ -48,6 +48,7 @@ class StandardSocket : public PooledSocket
    protected:
       int sock;
       unsigned short sockDomain; // socket domain (aka protocol family) e.g. PF_INET
+      const bool isDgramSocket;
 
       StandardSocket(int fd, unsigned short sockDomain, struct in_addr peerIP,
          std::string peername);

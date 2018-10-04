@@ -1,48 +1,21 @@
-#include <common/threading/SafeMutexLock.h>
-#include <common/toolkit/Random.h>
 #include <common/toolkit/serialization/Serialization.h>
 #include <program/Program.h>
 #include "NodeStoreServersEx.h"
 
+#include <mutex>
 
 #define NODESTOREEX_TMPFILE_EXT  ".tmp" /* temporary extension for saved files until we rename */
 
+ /*
+  * maximum ID for server nodes, 0 is reserved.
+  * note: at the moment we restrict server node IDs to 16 bit to be compatible with targetIDs
+  */
+#define NODESTORESERVERS_MAX_ID (USHRT_MAX)
+
 
 NodeStoreServersEx::NodeStoreServersEx(NodeType storeType) :
-   NodeStoreServers(storeType, false), storeDirty(false)
+   NodeStoreServers(storeType, false)
 { }
-
-bool NodeStoreServersEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* outNodeNumID)
-{
-   bool nodeAdded = NodeStore::addOrUpdateNodeEx(std::move(node), outNodeNumID);
-
-   // Note: NodeStore might be dirty even if nodeAdded==false
-   //    (e.g. because the ports might have changed)
-   setStoreDirty();
-
-   return nodeAdded;
-}
-
-bool NodeStoreServersEx::deleteNode(NumNodeID nodeID)
-{
-   bool delRes = NodeStore::deleteNode(nodeID);
-
-   if(delRes)
-      setStoreDirty();
-
-   return delRes;
-}
-
-bool NodeStoreServersEx::setRootNodeNumID(NumNodeID nodeID, bool ignoreExistingRoot,
-   bool isBuddyMirrored)
-{
-   bool setRes = NodeStore::setRootNodeNumID(nodeID, ignoreExistingRoot, isBuddyMirrored);
-
-   if(setRes)
-      setStoreDirty();
-
-   return setRes;
-}
 
 /**
  * @return 0 as invalid ID if store is empty
@@ -51,12 +24,10 @@ NumNodeID NodeStoreServersEx::getLowestNodeID()
 {
    NumNodeID lowestID;
 
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    if(!activeNodes.empty() )
       lowestID = activeNodes.begin()->first;
-
-   mutexLock.unlock();
 
    return lowestID;
 }
@@ -64,7 +35,7 @@ NumNodeID NodeStoreServersEx::getLowestNodeID()
 /**
  * Note: setStorePath must be called before using this.
  */
-bool NodeStoreServersEx::loadFromFile(bool longNodeIDs)
+bool NodeStoreServersEx::loadFromFile(RootInfo* root, bool v6Format)
 {
    /* note: we use a separate storeMutex here because we don't want to keep the standard mutex
       locked during disk access. */
@@ -78,7 +49,7 @@ bool NodeStoreServersEx::loadFromFile(bool longNodeIDs)
    if(!this->storePath.length() )
       return false;
 
-   SafeMutexLock mutexLock(&storeMutex);
+   const std::lock_guard<Mutex> lock(storeMutex);
 
    int fd = open(storePath.c_str(), O_RDONLY, 0);
    if(fd == -1)
@@ -86,13 +57,13 @@ bool NodeStoreServersEx::loadFromFile(bool longNodeIDs)
       LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Unable to open nodes file: " + storePath + ". " +
          "SysErr: " + System::getErrString() );
 
-      goto err_unlock;
+      return false;
    }
 
    struct stat stat;
    if (fstat(fd, &stat) != 0)
    {
-      LOG(GENERAL, ERR, "Could not stat nodes file", storePath, sysErr());
+      LOG(GENERAL, ERR, "Could not stat nodes file", storePath, sysErr);
       goto err_close;
    }
 
@@ -105,14 +76,11 @@ bool NodeStoreServersEx::loadFromFile(bool longNodeIDs)
    }
    else
    { // parse contents
-      retVal = loadFromBuf(buf.get(), readRes, longNodeIDs);
+      retVal = loadFromBuf(buf.get(), readRes, root, v6Format);
    }
 
 err_close:
    close(fd);
-
-err_unlock:
-   mutexLock.unlock();
 
    return retVal;
 }
@@ -121,7 +89,7 @@ err_unlock:
 /**
  * Note: setStorePath must be called before using this.
  */
-bool NodeStoreServersEx::saveToFile()
+bool NodeStoreServersEx::saveToFile(const RootInfo* root)
 {
    /* note: we use a separate storeMutex here because we don't want to keep the standard mutex
       locked during disk access. */
@@ -140,7 +108,7 @@ bool NodeStoreServersEx::saveToFile()
 
    std::string storePathTmp(storePath + NODESTOREEX_TMPFILE_EXT);
 
-   SafeMutexLock mutexLock(&storeMutex); // L O C K
+   const std::lock_guard<Mutex> lock(storeMutex);
 
    // create/trunc file
    int openFlags = O_CREAT|O_TRUNC|O_WRONLY;
@@ -151,11 +119,11 @@ bool NodeStoreServersEx::saveToFile()
       log.logErr("Unable to create nodes file: " + storePathTmp + ". " +
          "SysErr: " + System::getErrString() );
 
-      goto err_unlock;
+      return false;
    }
 
    // file created => store data
-   bufLen = saveToBuf(buf);
+   bufLen = saveToBuf(buf, root);
    if (!buf)
    {
       log.logErr("Unable to store nodes file: " + storePathTmp + ".");
@@ -183,12 +151,9 @@ bool NodeStoreServersEx::saveToFile()
       goto err_unlink;
    }
 
-   storeDirty = false;
    retVal = true;
 
    LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Nodes file stored: " + storePath);
-
-   mutexLock.unlock(); // U N L O C K
 
    return retVal;
 
@@ -199,9 +164,6 @@ err_closefile:
 
 err_unlink:
    unlink(storePathTmp.c_str() );
-
-err_unlock:
-   mutexLock.unlock(); // U N L O C K
 
    return retVal;
 }
@@ -223,16 +185,16 @@ void NodeStoreServersEx::fillStateStore()
    UInt8List reachabilityStates;
    UInt8List consistencyStates;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
-
-   for (auto it = activeNodes.begin(); it != activeNodes.end(); ++it)
    {
-      ids.push_back(it->first.val());
-      reachabilityStates.push_back(TargetReachabilityState_POFFLINE);
-      consistencyStates.push_back(TargetConsistencyState_GOOD);
-   }
+      const std::lock_guard<Mutex> lock(mutex);
 
-   mutexLock.unlock(); // U N L O C K
+      for (auto it = activeNodes.begin(); it != activeNodes.end(); ++it)
+      {
+         ids.push_back(it->first.val());
+         reachabilityStates.push_back(TargetReachabilityState_POFFLINE);
+         consistencyStates.push_back(TargetConsistencyState_GOOD);
+      }
+   }
 
    stateStore->syncStatesFromLists(ids, reachabilityStates, consistencyStates);
 }
@@ -240,25 +202,32 @@ void NodeStoreServersEx::fillStateStore()
 /**
  * Note: Does not require locking (uses the locked addOrUpdate() method).
  */
-bool NodeStoreServersEx::loadFromBuf(const char* buf, unsigned bufLen, bool longNodeIDs)
+bool NodeStoreServersEx::loadFromBuf(const char* buf, unsigned bufLen, RootInfo* root,
+      bool v6Format)
 {
    LogContext log("NodeStoreServersEx (load)");
 
    Deserializer des(buf, bufLen);
 
+   if (!v6Format) {
+      uint32_t version;
+
+      des % version;
+      if (!des.good()) {
+         LOG(GENERAL, ERR, "Unable to deserialize version from buffer.");
+         return false;
+      }
+
+      if (version > BEEGFS_DATA_VERSION) {
+         LOG(GENERAL, ERR, "Failed to load node store: version mismatch.");
+         return false;
+      }
+   }
+
    NumNodeID rootID;
    bool rootIsBuddyMirrored;
 
-   if (longNodeIDs)
-   {
-      des % rootID;
-   }
-   else
-   {
-      uint16_t id;
-      des % id;
-      rootID = NumNodeID(id);
-   }
+   des % rootID;
 
    if (!des.good())
    {
@@ -266,30 +235,23 @@ bool NodeStoreServersEx::loadFromBuf(const char* buf, unsigned bufLen, bool long
       return false;
    }
 
-   if (longNodeIDs)
+   des % rootIsBuddyMirrored;
+   if (!des.good())
    {
-      des % rootIsBuddyMirrored;
-      if (!des.good())
-      {
-         log.logErr("Unable to deserialize rootIsBuddyMirrored from buffer");
-         return false;
-      }
-   }
-   else
-   {
-      rootIsBuddyMirrored = false;
+      log.logErr("Unable to deserialize rootIsBuddyMirrored from buffer");
+      return false;
    }
 
-   NodeStore::setRootNodeNumID(rootID, false, rootIsBuddyMirrored); /* be careful not to call the
-      virtual method of this object, because that would try to save the updated file (=> deadlock)*/
+   if (root)
+      root->set(rootID, rootIsBuddyMirrored);
 
    // nodeList
    std::vector<NodeHandle> nodeList;
 
-   if (longNodeIDs)
-      des % nodeList;
+   if (v6Format)
+      des % Node::inV6Format(nodeList);
    else
-      des % Node::vectorWithShortIDs(nodeList);
+      des % nodeList;
 
    if(!des.good())
    {
@@ -337,6 +299,7 @@ struct NodeStoreData
    static void serialize(const NodeStoreData* obj, Serializer& ser)
    {
       ser
+         % uint32_t(BEEGFS_DATA_VERSION)
          % obj->rootNodeID
          % obj->rootIsBuddyMirrored
          % obj->nodeList;
@@ -348,9 +311,10 @@ struct NodeStoreData
  * Note: The NodeStore mutex may not be acquired when this is called (because this uses the locked
  * referenceAllNodes() method).
  */
-ssize_t NodeStoreServersEx::saveToBuf(boost::scoped_array<char>& buf)
+ssize_t NodeStoreServersEx::saveToBuf(boost::scoped_array<char>& buf, const RootInfo* root)
 {
-   NumNodeID rootNodeID = getRootNodeNumID();
+   NumNodeID rootNodeID = root ? root->getID() : NumNodeID();
+   bool rootIsBuddyMirrored = root ? root->getIsMirrored() : false;
 
    auto nodeList = referenceAllNodes();
 
@@ -358,4 +322,47 @@ ssize_t NodeStoreServersEx::saveToBuf(boost::scoped_array<char>& buf)
    ssize_t result = serializeIntoNewBuffer(data, buf);
 
    return result;
+}
+
+
+/**
+ * Generate a new numeric node ID and assign it to the node.
+ * This method will also first check whether this node already has a numeric ID assigned and just
+ * didn't know of it yet (e.g. because of thread races.)
+ *
+ * Note: Caller must hold lock.
+ * Note: Caller is expected to add the node to the activeNodes map and assign the numeric ID
+ *       (because new IDs are picked based on assigned IDs in the activeNodes map).
+ *
+ * @return 0 if all available numIDs are currently assigned, so none are left
+ */
+NumNodeID NodeStoreServersEx::generateID(Node& node) const
+{
+   // check whether this node's stringID is already associated with an active or deleted numID
+
+   NumNodeID previousNumID = retrieveNumIDFromStringID(node.getID());
+   if (previousNumID)
+      return previousNumID;
+
+   if (activeNodes.empty())
+      return NumNodeID(1);
+
+   if (activeNodes.rbegin()->first.val() < NODESTORESERVERS_MAX_ID)
+      return NumNodeID(activeNodes.rbegin()->first.val() + 1);
+
+   if (activeNodes.begin()->first.val() > 1)
+      return NumNodeID(1);
+
+   const auto gap = std::adjacent_find(
+         activeNodes.begin(), activeNodes.end(),
+         [] (const auto& a, const auto& b) {
+            return a.first.val() + 1 < b.first.val();
+         });
+
+   if (gap != activeNodes.end())
+      return NumNodeID(gap->first.val() + 1);
+
+   // still no new ID => all IDs used!
+   LOG(GENERAL, ERR, "Ran out of server node IDs!");
+   return {};
 }

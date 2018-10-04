@@ -34,7 +34,6 @@
 
 // storage messages
 #include <common/net/message/storage/attribs/SetLocalAttrRespMsg.h>
-#include <common/net/message/storage/creating/MkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/RmChunkPathsRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
 #include <common/net/message/storage/listing/ListChunkDirIncrementalRespMsg.h>
@@ -44,11 +43,9 @@
 #include <common/net/message/storage/quota/GetQuotaInfoMsg.h>
 #include <common/net/message/storage/quota/RequestExceededQuotaRespMsg.h>
 #include <common/net/message/storage/TruncLocalFileRespMsg.h>
-#include <common/net/message/storage/GetStorageTargetInfoRespMsg.h>
 #include <common/net/message/storage/SetStorageTargetInfoRespMsg.h>
 #include <net/message/storage/attribs/GetChunkFileAttribsMsgEx.h>
 #include <net/message/storage/attribs/SetLocalAttrMsgEx.h>
-#include <net/message/storage/attribs/UpdateBacklinkMsgEx.h>
 #include <net/message/storage/creating/RmChunkPathsMsgEx.h>
 #include <net/message/storage/creating/UnlinkLocalFileMsgEx.h>
 #include <net/message/storage/listing/ListChunkDirIncrementalMsgEx.h>
@@ -59,7 +56,6 @@
 #include <net/message/storage/quota/GetQuotaInfoMsgEx.h>
 #include <net/message/storage/quota/SetExceededQuotaMsgEx.h>
 #include <net/message/storage/GetHighResStatsMsgEx.h>
-#include <net/message/storage/GetStorageTargetInfoMsgEx.h>
 #include <net/message/storage/StatStoragePathMsgEx.h>
 #include <net/message/storage/TruncLocalFileMsgEx.h>
 
@@ -92,7 +88,7 @@
  * @return NetMessage that must be deleted by the caller
  * (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
+std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short msgType) const
 {
    NetMessage* msg;
 
@@ -144,8 +140,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_GetHighResStats: { msg = new GetHighResStatsMsgEx(); } break;
       case NETMSGTYPE_GetQuotaInfo: {msg = new GetQuotaInfoMsgEx(); } break;
       case NETMSGTYPE_GetStorageResyncStats: { msg = new GetStorageResyncStatsMsgEx(); } break;
-      case NETMSGTYPE_GetStorageTargetInfo: { msg = new GetStorageTargetInfoMsgEx(); } break;
-      case NETMSGTYPE_GetStorageTargetInfoResp: { msg = new GetStorageTargetInfoRespMsg(); } break;
       case NETMSGTYPE_ListChunkDirIncremental: { msg = new ListChunkDirIncrementalMsgEx(); } break;
       case NETMSGTYPE_ListChunkDirIncrementalResp: { msg = new ListChunkDirIncrementalRespMsg(); } break;
       case NETMSGTYPE_RequestExceededQuotaResp: {msg = new RequestExceededQuotaRespMsg(); } break;
@@ -165,7 +159,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_TruncLocalFileResp: { msg = new TruncLocalFileRespMsg(); } break;
       case NETMSGTYPE_UnlinkLocalFile: { msg = new UnlinkLocalFileMsgEx(); } break;
       case NETMSGTYPE_UnlinkLocalFileResp: { msg = new UnlinkLocalFileRespMsg(); } break;
-      case NETMSGTYPE_UpdateBacklink: { msg = new UpdateBacklinkMsgEx(); } break;
 
       // session messages
       case NETMSGTYPE_CloseChunkFile: { msg = new CloseChunkFileMsgEx(); } break;
@@ -190,6 +183,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       } break;
    }
 
-   return msg;
+   return std::unique_ptr<NetMessage>(msg);
 }
 

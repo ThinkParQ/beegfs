@@ -7,7 +7,6 @@ struct StrCpyMapIter;
 typedef struct StrCpyMapIter StrCpyMapIter;
 
 static inline void StrCpyMapIter_init(StrCpyMapIter* this, StrCpyMap* map, RBTreeElem* treeElem);
-static inline bool StrCpyMapIter_hasNext(StrCpyMapIter* this);
 static inline char* StrCpyMapIter_next(StrCpyMapIter* this);
 static inline char* StrCpyMapIter_key(StrCpyMapIter* this);
 static inline char* StrCpyMapIter_value(StrCpyMapIter* this);
@@ -21,11 +20,6 @@ struct StrCpyMapIter
 void StrCpyMapIter_init(StrCpyMapIter* this, StrCpyMap* map, RBTreeElem* treeElem)
 {
    PointerRBTreeIter_init( (RBTreeIter*)this, (RBTree*)map, (RBTreeElem*)treeElem);
-}
-
-bool StrCpyMapIter_hasNext(StrCpyMapIter* this)
-{
-   return PointerRBTreeIter_hasNext( (RBTreeIter*)this);
 }
 
 char* StrCpyMapIter_next(StrCpyMapIter* this)

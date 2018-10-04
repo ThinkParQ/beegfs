@@ -9,8 +9,6 @@ bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("SetExceededQuotaMsgEx incoming");
 
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetExceededQuotaMsgEx from: " + ctx.peerName() );
-
    bool retVal = true;
    FhgfsOpsErr errorCode = FhgfsOpsErr_SUCCESS;
 
@@ -24,7 +22,7 @@ bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
       {
          LOG(QUOTA, WARNING, "Couldn't set exceeded quota, "
                       "because requested storage pool doesn't exist on metadata server.",
-                      as("storagePoolId", getStoragePoolId()));
+                      ("storagePoolId", getStoragePoolId()));
 
          errorCode = FhgfsOpsErr_UNKNOWNPOOL;
 

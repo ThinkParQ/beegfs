@@ -5,7 +5,8 @@
 #include <common/components/ComponentInitException.h>
 #include <common/fsck/FsckChunk.h>
 #include <common/threading/PThread.h>
-#include <common/threading/SafeMutexLock.h>
+
+#include <mutex>
 
 class ChunkFetcher; //forward decl.
 
@@ -39,13 +40,9 @@ class ChunkFetcherSlave : public PThread
       // getters & setters
       bool getIsRunning(bool isRunning)
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
-         bool retVal = this->isRunning;
-
-         safeLock.unlock();
-
-         return retVal;
+         return this->isRunning;
       }
 
    private:
@@ -57,12 +54,10 @@ class ChunkFetcherSlave : public PThread
 
       void setIsRunning(bool isRunning)
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
          this->isRunning = isRunning;
          isRunningChangeCond.broadcast();
-
-         safeLock.unlock();
       }
 };
 

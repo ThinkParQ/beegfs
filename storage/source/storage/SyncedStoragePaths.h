@@ -3,11 +3,10 @@
 
 #include <common/app/log/LogContext.h>
 #include <common/system/System.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 #include <common/Common.h>
 
-
+#include <mutex>
 
 class SyncedStoragePaths
 {
@@ -71,16 +70,12 @@ class SyncedStoragePaths
 
          std::string targetPath(path + "@" + StringTk::uint64ToHexStr(targetID) );
 
-         SafeMutexLock lock(&mutex); // L O C K
+         const std::lock_guard<Mutex> lock(mutex);
 
          while(!paths.insert(targetPath).second)
             eraseCond.wait(&mutex);
 
-         uint64_t newStorageVersion = incStorageVersion();
-
-         lock.unlock(); // U N L O C K
-
-         return newStorageVersion;
+         return incStorageVersion();
       }
 
       void unlockPath(const std::string path, uint16_t targetID)
@@ -89,7 +84,7 @@ class SyncedStoragePaths
 
          std::string targetPath(path + "@" + StringTk::uintToHexStr(targetID) );
 
-         SafeMutexLock lock(&mutex); // L O C K
+         const std::lock_guard<Mutex> lock(mutex);
 
          size_t numErased = paths.erase(targetPath);
          if(unlikely(!numErased) )
@@ -99,8 +94,6 @@ class SyncedStoragePaths
          }
 
          eraseCond.broadcast();
-
-         lock.unlock(); // U N L O C K
       }
 
 };

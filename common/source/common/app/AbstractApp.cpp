@@ -7,12 +7,12 @@ bool AbstractApp::didRunTimeInit = false;
  * Note: Will do nothing if pidFile string is empty.
  *
  * @pidFile will not be accepted if path is not absolute (=> throws exception).
- * @return file descriptor for locked pid file or -1 iff pidFile string was empty.
+ * @return LockFD for locked pid file or invalid if pidFile string was empty.
  */
-int AbstractApp::createAndLockPIDFile(std::string pidFile)
+LockFD AbstractApp::createAndLockPIDFile(const std::string& pidFile)
 {
-   if(pidFile.empty() )
-      return -1;
+   if (pidFile.empty())
+      return {};
 
    // PID file defined
 
@@ -20,8 +20,8 @@ int AbstractApp::createAndLockPIDFile(std::string pidFile)
    if(!pidPath.absolute() ) /* (check to avoid problems after chdir) */
       throw InvalidConfigException("Path to PID file must be absolute: " + pidFile);
 
-   int pidFileLockFD = StorageTk::createAndLockPIDFile(pidFile, true);
-   if(pidFileLockFD == -1)
+   auto pidFileLockFD = StorageTk::createAndLockPIDFile(pidFile, true);
+   if (!pidFileLockFD.valid())
       throw InvalidConfigException("Unable to create/lock PID file: " + pidFile);
 
    return pidFileLockFD;
@@ -30,28 +30,15 @@ int AbstractApp::createAndLockPIDFile(std::string pidFile)
 /**
  * Updates a locked pid file, which is typically required after calling daemon().
  *
- * Note: Make sure the file is already locked by calling createAndLockPIDFile().
- * Note: Will do nothing if pidfileFD is -1.
+ * Note: Will do nothing if pidfileFD is invalid.
  */
-void AbstractApp::updateLockedPIDFile(int pidFileFD)
+void AbstractApp::updateLockedPIDFile(LockFD& pidFileFD)
 {
-   if(pidFileFD == -1)
+   if (!pidFileFD.valid())
       return;
 
-   bool updateRes = StorageTk::updateLockedPIDFile(pidFileFD);
-   if(!updateRes)
-      throw InvalidConfigException("Unable to update PID file");
-}
-
-/**
- * Note: Will do nothing if pidFileFD is -1.
- */
-void AbstractApp::unlockAndDeletePIDFile(int pidFileFD, const std::string& pidFile)
-{
-   if(pidFileFD == -1)
-      return;
-
-   StorageTk::unlockAndDeletePIDFile(pidFileFD, pidFile);
+   if (auto err = pidFileFD.updateWithPID())
+      throw InvalidConfigException("Unable to update PID file: " + err.message());
 }
 
 
@@ -117,65 +104,21 @@ void AbstractApp::handleOutOfMemFromNew()
 bool AbstractApp::performBasicInitialRunTimeChecks()
 {
    bool timeTest = Time::testClock();
-   if (timeTest == false)
+   if (!timeTest)
       return false;
 
    bool conditionTimeTest = Condition::testClockID();
-   if (conditionTimeTest == false)
-      return false;
-
-   return true;
+   return conditionTimeTest;
 }
 
 bool AbstractApp::basicInitializations()
 {
    bool condAttrRes = Condition::initStaticCondAttr();
-   if (condAttrRes == false)
-      return false;
-
-   return true;
+   return condAttrRes;
 }
 
 bool AbstractApp::basicDestructions()
 {
    bool condAttrRes = Condition::destroyStaticCondAttr();
-   if (condAttrRes == false)
-      return false;
-
-   return true;
-}
-
-/**
- * Returns highest feature bit number found in array.
- *
- * @param numArrayElems must be larger than zero.
- */
-unsigned AbstractApp::featuresGetHighestNum(const unsigned* featuresArray, unsigned numArrayElems)
-{
-   unsigned maxBit = 0;
-
-   for(unsigned i=0; i < numArrayElems; i++)
-   {
-      if(featuresArray[i] > maxBit)
-         maxBit = featuresArray[i];
-   }
-
-   return maxBit;
-}
-
-/**
- * Walk over featuresArray and add found feature bits to outBitStore.
- *
- * @param outBitStore will be resized and cleared before bits are set.
- */
-void AbstractApp::featuresToBitStore(const unsigned* featuresArray, unsigned numArrayElems,
-   BitStore* outBitStore)
-{
-   unsigned maxFeatureBit = featuresGetHighestNum(featuresArray, numArrayElems);
-
-   outBitStore->setSize(maxFeatureBit);
-   outBitStore->clearBits();
-
-   for(unsigned i=0; i < numArrayElems; i++)
-      outBitStore->setBit(featuresArray[i], true);
+   return condAttrRes;
 }

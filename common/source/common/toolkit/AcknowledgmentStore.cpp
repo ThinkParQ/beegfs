@@ -10,7 +10,7 @@
 void AcknowledgmentStore::registerWaitAcks(WaitAckMap* waitAcks, WaitAckMap* receivedAcks,
    WaitAckNotification* notifier)
 {
-   SafeMutexLock storeMutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    AckStoreEntry newStoreEntry;
 
@@ -25,70 +25,58 @@ void AcknowledgmentStore::registerWaitAcks(WaitAckMap* waitAcks, WaitAckMap* rec
 
       storeMap.insert(AckStoreMapVal(currentWaitAck->ackID, newStoreEntry) );
    }
-
-   storeMutexLock.unlock();
 }
 
 void AcknowledgmentStore::unregisterWaitAcks(WaitAckMap* waitAcks)
 {
-   SafeMutexLock storeMutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    for(WaitAckMapIter iter = waitAcks->begin(); iter != waitAcks->end(); iter++)
    {
       storeMap.erase(iter->first);
    }
-
-   storeMutexLock.unlock();
 }
 
 void AcknowledgmentStore::receivedAck(std::string ackID)
 {
-   SafeMutexLock storeMutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    AckStoreMapIter storeIter = storeMap.find(ackID);
    if(storeIter != storeMap.end() )
    { // ack entry exists in store
       AckStoreEntry* storeEntry = &storeIter->second;
 
-      SafeMutexLock waitMutexLock(&storeEntry->notifier->waitAcksMutex);
+      {
+         const std::lock_guard<Mutex> waitMutexLock(storeEntry->notifier->waitAcksMutex);
 
-      WaitAckMapIter waitIter = storeEntry->waitMap->find(ackID);
-      if(waitIter != storeEntry->waitMap->end() )
-      { // entry exists in waitMap => move to receivedMap
+         WaitAckMapIter waitIter = storeEntry->waitMap->find(ackID);
+         if(waitIter != storeEntry->waitMap->end() )
+         { // entry exists in waitMap => move to receivedMap
 
-         storeEntry->receivedMap->insert(WaitAckMapVal(ackID, waitIter->second) );
-         storeEntry->waitMap->erase(waitIter);
+            storeEntry->receivedMap->insert(WaitAckMapVal(ackID, waitIter->second) );
+            storeEntry->waitMap->erase(waitIter);
 
-         if(storeEntry->waitMap->empty() )
-         { // all acks received => notify
-            WaitAckNotification* notifier = storeEntry->notifier;
+            if(storeEntry->waitMap->empty() )
+            { // all acks received => notify
+               WaitAckNotification* notifier = storeEntry->notifier;
 
-            notifier->waitAcksCompleteCond.broadcast();
+               notifier->waitAcksCompleteCond.broadcast();
+            }
          }
       }
 
-      waitMutexLock.unlock();
-
       storeMap.erase(storeIter);
    }
-
-   storeMutexLock.unlock();
 }
 
 
 bool AcknowledgmentStore::waitForAckCompletion(WaitAckMap* waitAcks, WaitAckNotification* notifier,
    int timeoutMS)
 {
-   bool retVal;
-
-   SafeMutexLock waitMutexLock(&notifier->waitAcksMutex);
+   const std::lock_guard<Mutex> waitMutexLoc(notifier->waitAcksMutex);
 
    if(!waitAcks->empty() )
       notifier->waitAcksCompleteCond.timedwait(&notifier->waitAcksMutex, timeoutMS);
 
-   retVal = waitAcks->empty();
-
-   waitMutexLock.unlock();
-
-   return retVal;
+   return waitAcks->empty();
 }

@@ -207,8 +207,5 @@ void ExceededQuotaStore::getExceededQuotaUnlocked(UIntList* outIDList, UIntSet* 
  */
 bool ExceededQuotaStore::someQuotaExceeded()
 {
-   if(this->exceededCounter.read() == 0)
-      return false;
-   else
-      return true;
+   return this->exceededCounter.read() != 0;
 }

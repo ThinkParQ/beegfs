@@ -148,34 +148,25 @@ int ModeSetState::doSet(uint16_t targetID, TargetConsistencyState state)
 
    SetTargetConsistencyStatesMsg msg(nodeType, &targetIDs, &states, false);
 
-   std::unique_ptr<char> respBuf;
-   std::unique_ptr<NetMessage> respMsg;
-
    {
-      char* respBufRaw = nullptr;
-      NetMessage* respMsgRaw = nullptr;
+      const auto respMsgRaw = MessagingTk::requestResponse(*node, msg,
+            NETMSGTYPE_SetTargetConsistencyStatesResp);
 
-      bool commRes = MessagingTk::requestResponse(
-            *node, &msg, NETMSGTYPE_SetTargetConsistencyStatesResp, &respBufRaw, &respMsgRaw);
-
-      respBuf.reset(respBufRaw);
-      respMsg.reset(respMsgRaw);
-
-      if (!commRes)
+      if (!respMsgRaw)
       {
          std::cerr << "Communication with node not successful." << std::endl;
          return APPCODE_RUNTIME_ERROR;
       }
-   }
 
-   SetTargetConsistencyStatesRespMsg* respMsgCast =
-      reinterpret_cast<SetTargetConsistencyStatesRespMsg*>(respMsg.get());
+      SetTargetConsistencyStatesRespMsg* respMsgCast =
+         reinterpret_cast<SetTargetConsistencyStatesRespMsg*>(respMsgRaw.get());
 
-   if (respMsgCast->getResult() != FhgfsOpsErr_SUCCESS)
-   {
-      std::cerr << "Management host did not accept state change. Error: "
-         << FhgfsOpsErrTk::toErrString(respMsgCast->getResult()) << std::endl;
-      return APPCODE_RUNTIME_ERROR;
+      if (respMsgCast->getResult() != FhgfsOpsErr_SUCCESS)
+      {
+         std::cerr << "Management host did not accept state change. Error: "
+            << respMsgCast->getResult() << std::endl;
+         return APPCODE_RUNTIME_ERROR;
+      }
    }
 
    // Send message to node
@@ -190,7 +181,7 @@ int ModeSetState::doSet(uint16_t targetID, TargetConsistencyState state)
       if (!node)
       {
          std::cerr << "Unable to resolve node for target ID " << targetID <<
-            ". Error: " << FhgfsOpsErrTk::toErrString(err) << std::endl;
+            ". Error: " << err << std::endl;
          return APPCODE_RUNTIME_ERROR;
       }
    }
@@ -207,29 +198,23 @@ int ModeSetState::doSet(uint16_t targetID, TargetConsistencyState state)
    }
 
    {
-      char* respBufRaw = nullptr;
-      NetMessage* respMsgRaw = nullptr;
+      const auto respMsgRaw = MessagingTk::requestResponse(*node, msg,
+            NETMSGTYPE_SetTargetConsistencyStatesResp);
 
-      bool commRes = MessagingTk::requestResponse(
-            *node, &msg, NETMSGTYPE_SetTargetConsistencyStatesResp, &respBufRaw, &respMsgRaw);
-
-      respBuf.reset(respBufRaw);
-      respMsg.reset(respMsgRaw);
-
-      if (!commRes)
+      if (!respMsgRaw)
       {
          std::cerr << "Communication with node not successful." << std::endl;
          return APPCODE_RUNTIME_ERROR;
       }
-   }
 
-   respMsgCast = reinterpret_cast<SetTargetConsistencyStatesRespMsg*>(respMsg.get());
+      auto respMsgCast = reinterpret_cast<SetTargetConsistencyStatesRespMsg*>(respMsgRaw.get());
 
-   if (respMsgCast->getResult() != FhgfsOpsErr_SUCCESS)
-   {
-      std::cerr << "Node did not accept state change. Error: "
-         << FhgfsOpsErrTk::toErrString(respMsgCast->getResult()) << std::endl;
-      return APPCODE_RUNTIME_ERROR;
+      if (respMsgCast->getResult() != FhgfsOpsErr_SUCCESS)
+      {
+         std::cerr << "Node did not accept state change. Error: "
+            << respMsgCast->getResult() << std::endl;
+         return APPCODE_RUNTIME_ERROR;
+      }
    }
 
    std::cout << "Successfully set state." << std::endl;

@@ -25,7 +25,7 @@ TEST_F(TestSetFragment, open)
          }
 
          FAIL();
-      } while (0);
+      } while (false);
       ASSERT_EQ(::chmod(this->dirName.c_str(), 0770), 0);
    }
 
@@ -40,7 +40,7 @@ TEST_F(TestSetFragment, open)
       }
 
       FAIL();
-   } while (0);
+   } while (false);
    ASSERT_EQ(::unlink(this->fileName.c_str()), 0);
 
    // corrupted config area
@@ -55,7 +55,7 @@ TEST_F(TestSetFragment, open)
       }
 
       FAIL();
-   } while (0);
+   } while (false);
    ASSERT_EQ(::unlink(this->fileName.c_str()), 0);
 
    // corrupted data
@@ -71,7 +71,7 @@ TEST_F(TestSetFragment, open)
       }
 
       FAIL();
-   } while (0);
+   } while (false);
    ASSERT_EQ(::unlink(this->fileName.c_str()), 0);
 
    // should work

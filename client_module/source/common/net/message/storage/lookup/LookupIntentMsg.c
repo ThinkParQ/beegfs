@@ -17,7 +17,7 @@ void LookupIntentMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeInt(ctx, thisCast->intentFlags);
 
    // parentInfo
-   EntryInfo_serialize(thisCast->parentInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->parentInfoPtr);
 
    // entryName
    Serialization_serializeStrAlign4(ctx, thisCast->entryNameLen, thisCast->entryName);
@@ -25,7 +25,7 @@ void LookupIntentMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    if (thisCast->intentFlags & LOOKUPINTENTMSG_FLAG_REVALIDATE)
    {
       // entryInfo
-      EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+      EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
    }
 
    if(thisCast->intentFlags & LOOKUPINTENTMSG_FLAG_OPEN)
@@ -34,7 +34,7 @@ void LookupIntentMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
       Serialization_serializeUInt(ctx, thisCast->accessFlags);
 
       // clientNumID
-      NumNodeID_serialize(&thisCast->clientNumID, ctx);
+      NumNodeID_serialize(ctx, &thisCast->clientNumID);
    }
 
    if(thisCast->intentFlags & LOOKUPINTENTMSG_FLAG_CREATE)
@@ -55,6 +55,6 @@ void LookupIntentMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
       Serialization_serializeUInt16List(ctx, thisCast->preferredTargets);
 
       if (this->msgHeader.msgFeatureFlags & LOOKUPINTENTMSG_FLAG_HAS_EVENT)
-         FileEvent_serialize(thisCast->fileEvent, ctx);
+         FileEvent_serialize(ctx, thisCast->fileEvent);
    }
 }

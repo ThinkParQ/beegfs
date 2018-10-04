@@ -8,7 +8,7 @@
 #include <memory>
 
 #include <attr/xattr.h>
-#include <errno.h>
+#include <cerrno>
 
 namespace XAttrTk
 {
@@ -22,7 +22,7 @@ std::pair<FhgfsOpsErr, std::vector<std::string>> listXAttrs(const std::string& p
 
    if(size < 0)
    {
-      LOG(GENERAL, ERR, "listxattr failed", path, sysErr());
+      LOG(GENERAL, ERR, "listxattr failed", path, sysErr);
       return {FhgfsOpsErr_INTERNAL, {}};
    }
 
@@ -53,7 +53,7 @@ std::pair<FhgfsOpsErr, std::vector<std::string>> listXAttrs(const std::string& p
          return {FhgfsOpsErr_PATHNOTEXISTS, {}};
 
       default: // don't forward other errors to the client, but log them on the server
-         LOG(GENERAL, ERR, "listxattr failed", path, sysErr());
+         LOG(GENERAL, ERR, "listxattr failed", path, sysErr);
          return {FhgfsOpsErr_INTERNAL, {}};
    }
 }
@@ -84,7 +84,7 @@ std::tuple<FhgfsOpsErr, std::vector<char>, ssize_t> getXAttr(const std::string& 
          return std::make_tuple(FhgfsOpsErr_PATHNOTEXISTS, std::vector<char>(), ssize_t(0));
 
       default: // don't forward other errors to the client, but log them on the server
-         LOG(GENERAL, ERR, "getxattr failed", path, name, sysErr());
+         LOG(GENERAL, ERR, "getxattr failed", path, name, sysErr);
          return std::make_tuple(FhgfsOpsErr_INTERNAL, std::vector<char>(), ssize_t(0));
    }
 }
@@ -165,7 +165,7 @@ FhgfsOpsErr setUserXAttr(const std::string& path, const std::string& name, const
          return FhgfsOpsErr_NOSPACE;
 
       default: // don't forward other errors to the client, but log them on the server
-         LOG(GENERAL, ERR, "failed to set xattr", path, name, sysErr());
+         LOG(GENERAL, ERR, "failed to set xattr", path, name, sysErr);
          return FhgfsOpsErr_INTERNAL;
    }
 }
@@ -190,7 +190,7 @@ FhgfsOpsErr removeUserXAttr(const std::string& path, const std::string& name)
          return FhgfsOpsErr_PATHNOTEXISTS;
 
       default: // don't forward other errors to the client, but log them on the server
-         LOG(GENERAL, ERR, "failed to remove xattr", path, name, sysErr());
+         LOG(GENERAL, ERR, "failed to remove xattr", path, name, sysErr);
          return FhgfsOpsErr_INTERNAL;
    }
 }

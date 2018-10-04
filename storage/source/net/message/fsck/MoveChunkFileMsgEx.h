@@ -9,6 +9,9 @@ class MoveChunkFileMsgEx : public MoveChunkFileMsg
 {
    public:
       virtual bool processIncoming(ResponseContext& ctx);
+
+   private:
+      unsigned moveChunk();
 };
 
 #endif /*MOVECHUNKFILEMSGEX_H*/

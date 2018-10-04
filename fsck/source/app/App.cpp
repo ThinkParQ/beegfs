@@ -2,9 +2,9 @@
 #include <program/Program.h>
 
 #include <toolkit/FsckTkEx.h>
-#include <opentk/logging/SyslogLogger.h>
 
-#include <signal.h>
+#include <csignal>
+#include <syslog.h>
 
 #define APP_WORKERS_DIRECT_NUM   1
 #define APP_SYSLOG_IDENTIFIER    "beegfs-fsck"
@@ -66,14 +66,14 @@ App::~App()
    SAFE_DELETE(this->runMode);
 
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 void App::run()
 {
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -181,16 +181,7 @@ void App::runNormal()
 
    try
    {
-      if ( FsckTkEx::testVersions(this->metaNodes, this->storageNodes) )
-         appResult = runMode->execute();
-      else
-      {
-         FsckTkEx::printVersionHeader(true);
-         FsckTkEx::fsckOutput(
-                  "Fsck cannot run if one of the BeeGFS servers is newer than beegfs-fsck",
-                  OutputOptions_ADDLINEBREAKBEFORE | OutputOptions_DOUBLELINEBREAK |
-                  OutputOptions_STDERR);
-      }
+      appResult = runMode->execute();
    }
    catch (InvalidConfigException& e)
    {
@@ -219,16 +210,15 @@ void App::initDataObjects(int argc, char** argv)
    this->netFilter = new NetFilter(cfg->getConnNetFilterFile() );
    this->tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
 
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(), 
-      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-      cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
 
    this->log = new LogContext("App");
 
    this->allowedInterfaces = new StringList();
    std::string interfacesFilename = this->cfg->getConnInterfacesFile();
    if ( interfacesFilename.length() )
-      this->cfg->loadStringListFile(interfacesFilename.c_str(), *this->allowedInterfaces);
+      Config::loadStringListFile(interfacesFilename.c_str(), *this->allowedInterfaces);
 
    RDMASocket::rdmaForkInitOnce();
 
@@ -253,10 +243,9 @@ void App::initDataObjects(int argc, char** argv)
 
 void App::initLocalNodeInfo()
 {
-   bool useSDP = this->cfg->getConnUseSDP();
    bool useRDMA = this->cfg->getConnUseRDMA();
 
-   NetworkInterfaceCard::findAll(this->allowedInterfaces, useSDP, useRDMA, &(this->localNicList));
+   NetworkInterfaceCard::findAll(this->allowedInterfaces, useRDMA, &(this->localNicList));
 
    if ( this->localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -265,10 +254,8 @@ void App::initLocalNodeInfo()
 
    std::string nodeID = System::getHostname();
 
-   this->localNode = std::make_shared<LocalNode>(nodeID, NumNodeID(), 0, 0, this->localNicList);
-
-   this->localNode->setNodeType(NODETYPE_Client);
-   this->localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
+   this->localNode = std::make_shared<LocalNode>(NODETYPE_Client, nodeID, NumNodeID(), 0, 0,
+         this->localNicList);
 }
 
 void App::initComponents()
@@ -460,7 +447,8 @@ void App::logInfos()
  */
 bool App::waitForMgmtNode()
 {
-   int waitTimeoutMS = 0; // infinite wait
+   const unsigned waitTimeoutMS = 0; // infinite wait
+   const unsigned nameResolutionRetries = 3;
 
    // choose a random udp port here
    unsigned udpListenPort = 0;
@@ -476,7 +464,8 @@ bool App::waitForMgmtNode()
       mgmtdHost + ":" + StringTk::uintToStr(udpMgmtdPort) + "...");
 
    bool gotMgmtd = NodesTk::waitForMgmtHeartbeat(
-      this, &regDGramLis, this->mgmtNodes, mgmtdHost, udpMgmtdPort, waitTimeoutMS);
+         this, &regDGramLis, this->mgmtNodes, mgmtdHost, udpMgmtdPort, waitTimeoutMS,
+         nameResolutionRetries);
 
    regDGramLis.selfTerminate();
    regDGramLis.sendDummyToSelfUDP(); // for faster termination

@@ -47,5 +47,4 @@ export clientPort=8004
 export admonPort=8007
 export httpPort=8000
 
-export OPENTK_IB_SCRIPT=/usr/sbin/beegfs-setup-rdma
 export AUTOBUILD_CONFIG=/etc/beegfs/beegfs-client-autobuild.conf

@@ -1,7 +1,7 @@
 #include <common/toolkit/StringTk.h>
 #include "UnitTk.h"
 
-#include <math.h>
+#include <cmath>
 
 
 const int64_t UNITTK_SIZE_CONVERT_FACTOR = 1024;
@@ -304,13 +304,10 @@ bool UnitTk::isValidHumanString(std::string humanString)
 
    char unit = humanString.at(humanStringLen-1);
    std::string value = humanString.substr(0, humanStringLen-1);
-   if( StringTk::isNumeric(value) && ( (unit == 'E') || (unit == 'e') ||
+   return StringTk::isNumeric(value) && ( (unit == 'E') || (unit == 'e') ||
       (unit == 'P') || (unit == 'p') || (unit == 'T') || (unit == 't') ||
       (unit == 'G') || (unit == 'g') || (unit == 'M') || (unit == 'm') ||
-      (unit == 'K') || (unit == 'k') ) )
-         return true;
-
-   return false;
+      (unit == 'K') || (unit == 'k') );
 }
 
 /**
@@ -369,11 +366,8 @@ bool UnitTk::isValidHumanTimeString(std::string humanString)
 
    char unit = humanString.at(humanStringLen-1);
    std::string value = humanString.substr(0, humanStringLen-1);
-   if( StringTk::isNumeric(value) && ( (unit == 'd') || (unit == 'D') || (unit == 'H') ||
-      (unit == 'h') || (unit == 'M') || (unit == 'm') || (unit == 'S') || (unit == 's') ) )
-         return true;
-
-   return false;
+   return StringTk::isNumeric(value) && ( (unit == 'd') || (unit == 'D') || (unit == 'H') ||
+      (unit == 'h') || (unit == 'M') || (unit == 'm') || (unit == 'S') || (unit == 's') );
 }
 
 uint64_t UnitTk::quotaBlockCountToByte(uint64_t quotaBlockCount, QuotaBlockDeviceFsType type)

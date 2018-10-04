@@ -7,14 +7,6 @@
 #include <common/Common.h>
 #include "Session.h"
 
-typedef ObjectReferencer<Session*> SessionReferencer;
-typedef std::map<NumNodeID, SessionReferencer*> SessionMap;
-typedef SessionMap::iterator SessionMapIter;
-typedef SessionMap::value_type SessionMapVal;
-
-typedef std::list<Session*> SessionList;
-typedef SessionList::iterator SessionListIter;
-
 /*
  * A session always belongs to a client ID, therefore the session ID is always the nodeID of the
  * corresponding client
@@ -24,28 +16,23 @@ class SessionStore
    public:
       SessionStore() {}
 
-      Session* referenceSession(NumNodeID sessionID, bool addIfNotExists=true);
-      void releaseSession(Session* session);
-      void syncSessions(const std::vector<NodeHandle>& masterList, SessionList* outRemovedSessions,
-         NumNodeIDList* outUnremovableSesssions);
+      std::shared_ptr<Session> referenceSession(NumNodeID sessionID) const;
+      std::shared_ptr<Session> referenceOrAddSession(NumNodeID sessionID);
+      std::list<std::shared_ptr<Session>> syncSessions(const std::vector<NodeHandle>& masterList);
 
-      size_t getAllSessionIDs(NumNodeIDList* outSessionIDs);
-      size_t getSize();
+      size_t getAllSessionIDs(NumNodeIDList* outSessionIDs) const;
+      size_t getSize() const;
 
-      void serializeForTarget(Serializer& ser, uint16_t targetID);
+      void serializeForTarget(Serializer& ser, uint16_t targetID) const;
       void deserializeForTarget(Deserializer& des, uint16_t targetID);
 
       bool loadFromFile(std::string filePath, uint16_t targetID);
-      bool saveToFile(std::string filePath, uint16_t targetID);
+      bool saveToFile(std::string filePath, uint16_t targetID) const;
 
    private:
-      SessionMap sessions;
+      std::map<NumNodeID, std::shared_ptr<Session>> sessions;
 
-      Mutex mutex;
-
-      void addSession(Session* session); // actually not needed (maybe later one day...)
-      bool removeSession(NumNodeID sessionID); // actually not needed (maybe later one day...)
-      Session* removeSessionUnlocked(NumNodeID sessionID);
+      mutable Mutex mutex;
 };
 
 #endif /*SESSIONSTORE_H_*/

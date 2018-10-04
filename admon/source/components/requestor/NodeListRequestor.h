@@ -12,7 +12,6 @@
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NodeStore.h>
 #include <common/threading/PThread.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 #include <common/Common.h>
 #include <components/DatagramListener.h>
@@ -36,6 +35,7 @@
 
 #define MGMT_HEARTBEAT_NUM_RETRIES 2
 #define MGMT_HEARTBEAT_TIMEOUT_MS 1000
+#define MGMT_NAME_RESOLUTION_RETRIES 3
 #define REQUEST_LOOP_INTERVAL_MS 30000
 
 

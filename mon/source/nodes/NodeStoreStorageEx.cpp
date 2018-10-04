@@ -22,7 +22,7 @@ bool NodeStoreStorageEx::addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
       // new node, create StorageNodeEx object with the parameters of the received node info
       newNode = std::make_shared<StorageNodeEx>(receivedNode);
       LOG(GENERAL, DEBUG, "Received new storage node.",
-            as("nodeNumID", receivedNode->getNumID().val()));
+            ("nodeNumID", receivedNode->getNumID().val()));
    }
    else
    {
@@ -30,7 +30,7 @@ bool NodeStoreStorageEx::addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
       // received node info and keep the internal data
       newNode = std::make_shared<StorageNodeEx>(receivedNode, storedNode);
       LOG(GENERAL, DEBUG, "Received update for storage node.",
-            as("nodeNumID", receivedNode->getNumID().val()));
+            ("nodeNumID", receivedNode->getNumID().val()));
    }
 
    const std::lock_guard<Mutex> lock(mutex);

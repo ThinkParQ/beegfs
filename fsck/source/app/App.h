@@ -14,6 +14,7 @@
 #include <common/components/worker/DummyWork.h>
 #include <common/components/ComponentInitException.h>
 #include <common/net/sock/RDMASocket.h>
+#include <common/nodes/RootInfo.h>
 #include <common/nodes/TargetMapper.h>
 #include <common/nodes/LocalNode.h>
 #include <components/DatagramListener.h>
@@ -28,11 +29,6 @@
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
 #endif
-
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
-#endif
-
 
 // program return codes
 #define APPCODE_NO_ERROR               0
@@ -55,10 +51,10 @@ class App : public AbstractApp
       App(int argc, char** argv);
       virtual ~App();
 
-      virtual void run();
+      virtual void run() override;
 
       void abort();
-      void handleComponentException(std::exception& e);
+      virtual void handleComponentException(std::exception& e) override;
 
       bool getShallAbort()
       {
@@ -84,6 +80,7 @@ class App : public AbstractApp
       NodeStore* mgmtNodes;
       NodeStore* metaNodes;
       NodeStore* storageNodes;
+      RootInfo metaRoot;
       InternodeSyncer* internodeSyncer;
       TargetMapper* targetMapper;
       TargetStateStore* targetStateStore;
@@ -113,29 +110,29 @@ class App : public AbstractApp
       bool initRunMode();
       void startComponents();
       void joinComponents();
-      void stopComponents();
+      virtual void stopComponents() override;
       void logInfos();
       bool waitForMgmtNode();
       void registerSignalHandler();
       static void signalHandler(int sig);
 
    public:
-      virtual ICommonConfig* getCommonConfig()
+      virtual const ICommonConfig* getCommonConfig() const override
       {
          return cfg;
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory()
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory;
       }
 
-      virtual NetFilter* getNetFilter()
+      virtual const NetFilter* getNetFilter() const override
       {
          return netFilter;
       }
 
-      virtual NetFilter* getTcpOnlyFilter()
+      virtual const NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter;
       }
@@ -214,6 +211,9 @@ class App : public AbstractApp
       {
          modificationEventHandler = handler;
       }
+
+      const RootInfo& getMetaRoot() const { return metaRoot; }
+      RootInfo& getMetaRoot() { return metaRoot; }
 };
 
 #endif // APP_H_

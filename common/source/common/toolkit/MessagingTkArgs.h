@@ -138,17 +138,11 @@ struct RequestResponseArgs
     */
    RequestResponseArgs(const Node* node, NetMessage* requestMsg, unsigned respMsgType,
          FhgfsOpsErr (*sendExtraData)(Socket*, void*) = NULL, void* extraDataContext = NULL)
-      : node(node), requestMsg(requestMsg), respMsgType(respMsgType), outRespBuf(NULL),
-        outRespMsg(NULL), logFlags(0), minTimeoutMS(0), sendExtraData(sendExtraData),
+      : node(node), requestMsg(requestMsg), respMsgType(respMsgType),
+        logFlags(0), minTimeoutMS(0), sendExtraData(sendExtraData),
         extraDataContext(extraDataContext)
    {
       // see initializer list
-   }
-
-   ~RequestResponseArgs()
-   {
-      SAFE_DELETE_NOSET(outRespMsg);
-      SAFE_FREE_NOSET(outRespBuf);
    }
 
    const Node* node; // receiver
@@ -156,8 +150,7 @@ struct RequestResponseArgs
    NetMessage* requestMsg;
    unsigned respMsgType; // expected type of response message (NETMSGTYPE_...)
 
-   char* outRespBuf; // the buffer from which the outRespMsg was deserialized (only set on success)
-   NetMessage* outRespMsg; // received response message (only set on success)
+   std::unique_ptr<NetMessage> outRespMsg; // received response message
 
    // internal (initialized by MessagingTk_requestResponseWithRRArgs() )
    unsigned char logFlags; // REQUESTRESPONSEARGS_LOGFLAG_... combination to avoid double-logging

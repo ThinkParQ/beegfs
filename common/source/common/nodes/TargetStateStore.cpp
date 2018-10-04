@@ -20,13 +20,13 @@ void TargetStateStore::addIfNotExists(uint16_t targetID, CombinedTargetState sta
    {
       statesMap[targetID] = state;
       LOG_DBG(STATES, DEBUG, "Adding new item to state store.", targetID,
-            as("New state", stateToStr(state)), nodeType, as("Called from", Backtrace<3>()));
+            ("New state", stateToStr(state)), nodeType, ("Called from", Backtrace<3>()));
    }
    else
    {
       LOG_DBG(STATES, DEBUG,
             "Adding new item to state store failed because it already exists.", targetID,
-            as("Called from", Backtrace<3>()));
+            ("Called from", Backtrace<3>()));
    }
 }
 
@@ -44,38 +44,27 @@ void TargetStateStore::removeTarget(uint16_t targetID)
  * Of course, this implies that states and groups also have to be read atomically together via
  * getStatesAndGroupsAsLists() through GetStatesAndBuddyGroupsMsg.
  */
-void TargetStateStore::syncStatesAndGroupsFromLists(MirrorBuddyGroupMapper* buddyGroups,
-   const UInt16List& targetIDs, const UInt8List& reachabilityStates,
-   const UInt8List& consistencyStates, const UInt16List& buddyGroupIDs,
-   const UInt16List& primaryTargets, const UInt16List& secondaryTargets,
-   const NumNodeID localNodeID)
+void TargetStateStore::syncStatesAndGroups(MirrorBuddyGroupMapper* buddyGroups,
+   const TargetStateMap& states, MirrorBuddyGroupMap newGroups, const NumNodeID localNodeID)
 {
    // create temporary states map first without lock, then swap with lock (to keep lock time short)
 
    TargetStateInfoMap statesMapNewTmp;
-   for (ZipConstIterRange<UInt16List, UInt8List, UInt8List>
-        iter(targetIDs, reachabilityStates, consistencyStates);
-        !iter.empty(); ++iter)
+   for (const auto& state : states)
    {
-      TargetStateInfo stateInfo(
-         static_cast<TargetReachabilityState>(*iter()->second),
-         static_cast<TargetConsistencyState>(*iter()->third) );
-      statesMapNewTmp[*iter()->first] = stateInfo;
-      LOG_DBG(STATES, DEBUG, "Syncing state.", as("targetID", *iter()->first),
-            as("New state", stateToStr(stateInfo)), as("Called from", Backtrace<3>()));
+      TargetStateInfo stateInfo(state.second.reachabilityState, state.second.consistencyState);
+      statesMapNewTmp[state.first] = stateInfo;
+      LOG_DBG(STATES, DEBUG, "Syncing state.", ("targetID", state.first),
+            ("New state", stateToStr(stateInfo)), ("Called from", Backtrace<3>()));
    }
 
    // pre-create a new buddy map and then swap elements (to keep lock time short)
    uint16_t localGroupID = 0;
-   MirrorBuddyGroupMap newGroups;
-   for ( ZipConstIterRange<UInt16List, UInt16List, UInt16List> iter(buddyGroupIDs, primaryTargets,
-      secondaryTargets); !iter.empty(); ++iter )
+   for (const auto& mapping : newGroups)
    {
-      newGroups[*iter()->first] = MirrorBuddyGroup(*iter()->second, *iter()->third);
-
-      if (localNodeID == NumNodeID(*iter()->second)
-         || localNodeID == NumNodeID(*iter()->third) )
-         localGroupID = *iter()->first;
+      if (mapping.second.firstTargetID == localNodeID.val() ||
+            mapping.second.secondTargetID == localNodeID.val())
+         localGroupID = mapping.first;
    }
 
    // now do the actual updates...
@@ -89,8 +78,6 @@ void TargetStateStore::syncStatesAndGroupsFromLists(MirrorBuddyGroupMapper* budd
       buddyGroups->setLocalGroupIDUnlocked(localGroupID);
 
    buddyGroups->mirrorBuddyGroups.swap(newGroups);
-
-   buddyGroups->mappingsDirty = true;
 }
 
 /**
@@ -111,8 +98,8 @@ void TargetStateStore::syncStatesFromLists(const UInt16List& targetIDs,
          static_cast<TargetReachabilityState>(*iter()->second),
          static_cast<TargetConsistencyState>(*iter()->third) );
       statesMapNewTmp[*iter()->first] = stateInfo;
-      LOG_DBG(STATES, DEBUG, "Assigning new state.", as("targetID", *iter()->first),
-            as("New state", stateToStr(stateInfo)), as("Called from", Backtrace<3>()));
+      LOG_DBG(STATES, DEBUG, "Assigning new state.", ("targetID", *iter()->first),
+            ("New state", stateToStr(stateInfo)), ("Called from", Backtrace<3>()));
    }
 
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
@@ -127,15 +114,14 @@ void TargetStateStore::syncStatesFromLists(const UInt16List& targetIDs,
  * Of course, this implies that states and groups are also updated atomically together via
  * syncStatesAndGroupsFromLists() on the other side.
  */
-void TargetStateStore::getStatesAndGroupsAsLists(MirrorBuddyGroupMapper* buddyGroups,
-   UInt16List& outTargetIDs, UInt8List& outReachabilityStates, UInt8List& outConsistencyStates,
-   UInt16List& outBuddyGroupIDs, UInt16List& outPrimaryTargets, UInt16List& outSecondaryTargets)
+void TargetStateStore::getStatesAndGroups(const MirrorBuddyGroupMapper* buddyGroups,
+   TargetStateMap& states, MirrorBuddyGroupMap& outGroups) const
 {
    RWLockGuard lock(rwlock, SafeRWLock_READ);
    RWLockGuard buddyGroupsLock(buddyGroups->rwlock, SafeRWLock_READ);
 
-   getStatesAsListsUnlocked(outTargetIDs, outReachabilityStates, outConsistencyStates);
-   buddyGroups->getMappingAsListsUnlocked(outBuddyGroupIDs, outPrimaryTargets, outSecondaryTargets);
+   states = {statesMap.begin(), statesMap.end()};
+   outGroups = buddyGroups->getMapping();
 }
 
 
@@ -144,7 +130,7 @@ void TargetStateStore::getStatesAndGroupsAsLists(MirrorBuddyGroupMapper* buddyGr
  * getStatesAndGroupsAsLists() instead of this.
  */
 void TargetStateStore::getStatesAsLists(UInt16List& outTargetIDs,
-   UInt8List& outReachabilityStates, UInt8List& outConsistencyStates)
+   UInt8List& outReachabilityStates, UInt8List& outConsistencyStates) const
 {
    RWLockGuard lock(rwlock, SafeRWLock_READ);
 
@@ -155,9 +141,9 @@ void TargetStateStore::getStatesAsLists(UInt16List& outTargetIDs,
  * Note: Caller must hold readlock.
  */
 void TargetStateStore::getStatesAsListsUnlocked(UInt16List& outTargetIDs,
-   UInt8List& outReachabilityStates, UInt8List& outConsistencyStates)
+   UInt8List& outReachabilityStates, UInt8List& outConsistencyStates) const
 {
-   for (TargetStateInfoMapIter iter = statesMap.begin(); iter != statesMap.end(); iter++)
+   for (auto iter = statesMap.begin(); iter != statesMap.end(); iter++)
    {
       outTargetIDs.push_back(iter->first);
       outReachabilityStates.push_back((uint8_t)(iter->second).reachabilityState);

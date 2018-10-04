@@ -6,31 +6,52 @@
 #include <toolkit/StorageTkEx.h>
 #include "CloseChunkFileMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "CloseChunkFileMsg incoming";
+   App* app = Program::getApp();
 
-   #ifdef BEEGFS_DEBUG
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a CloseChunkFileMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
+   FhgfsOpsErr closeMsgRes;
+   DynamicAttribs dynAttribs;
+
+   std::tie(closeMsgRes, dynAttribs) = close(ctx);
+   // if closeMsgRes == FhgfsOpsErr_COMMUNICATION, a GenericResponseMsg has been sent already
+   if (closeMsgRes != FhgfsOpsErr_COMMUNICATION)
+      ctx.sendResponse(
+            CloseChunkFileRespMsg(closeMsgRes, dynAttribs.filesize, dynAttribs.allocedBlocks,
+               dynAttribs.modificationTimeSecs, dynAttribs.lastAccessTimeSecs,
+               dynAttribs.storageVersion) );
+
+   // update op counters
+
+   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), StorageOpCounter_CLOSELOCAL,
+      getMsgHeaderUserID() );
+
+   return true;
+}
+
+std::pair<FhgfsOpsErr, CloseChunkFileMsgEx::DynamicAttribs> CloseChunkFileMsgEx::close(
+   ResponseContext& ctx)
+{
+   const char* logContext = "CloseChunkFileMsg incoming";
 
    App* app = Program::getApp();
    Config* config = app->getConfig();
    SessionStore* sessions = app->getSessions();
 
    uint16_t targetID;
-   bool removeRes;
 
    FhgfsOpsErr closeMsgRes = FhgfsOpsErr_SUCCESS; // the result that will be sent to requestor
-   DynamicAttribs dynAttribs;
-   dynAttribs.storageVersion = 0; // 0 means undefined/invalid
-   
+   DynamicAttribs dynAttribs = {0, 0, 0, 0, 0};
+
    std::string fileHandleID(getFileHandleID() );
    bool isMirrorSession = isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_BUDDYMIRROR);
 
-   Session* session;
    SessionLocalFileStore* sessionLocalFiles;
-   SessionLocalFile* sessionLocalFile = NULL;
+
+   bool sessionRemoved;
+   std::shared_ptr<SessionLocalFile::Handle> fsState;
 
    // select the right targetID
 
@@ -48,28 +69,22 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
       { // unknown target
          LogContext(logContext).logErr("Invalid mirror buddy group ID: " +
             StringTk::uintToStr(getTargetID() ) );
-         closeMsgRes = FhgfsOpsErr_UNKNOWNTARGET;
-         goto send_response;
+         return {FhgfsOpsErr_UNKNOWNTARGET, {}};
       }
    }
 
    // forward to secondary (if appropriate)
 
    closeMsgRes = forwardToSecondary(ctx);
-   if(unlikely(closeMsgRes != FhgfsOpsErr_SUCCESS) )
-   {
-      if(closeMsgRes == FhgfsOpsErr_COMMUNICATION)
-         goto skip_response; // GenericResponseMsg sent
+   if (unlikely(closeMsgRes != FhgfsOpsErr_SUCCESS))
+      return {closeMsgRes, dynAttribs};
 
-      goto send_response;
-   }
-
-   session = sessions->referenceSession(getSessionID(), true);
+   auto session = sessions->referenceOrAddSession(getSessionID());
    sessionLocalFiles = session->getLocalFiles();
 
-   removeRes = sessionLocalFiles->removeSession(
-      fileHandleID, targetID, isMirrorSession, &sessionLocalFile);
-   if(!removeRes)
+   std::tie(sessionRemoved, fsState) = sessionLocalFiles->removeSession(fileHandleID, targetID,
+         isMirrorSession);
+   if (!sessionRemoved)
    { // error
       LogContext(logContext).log(Log_DEBUG,
          "Cannot close chunk file (still in use, marked for delayed close). "
@@ -81,9 +96,9 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
 
    // get current dynamic file attribs
 
-   if(sessionLocalFile && (sessionLocalFile->getFD() != -1) )
+   if (fsState)
    { // file open => refresh filesize and close file fd
-      int fd = sessionLocalFile->getFD();
+      auto& fd = fsState->getFD();
 
       /* get dynamic attribs, here before closing the file.
        * Note: Depending on the underlying file system the returned st_blocks might be too large
@@ -91,39 +106,12 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
        *       that we already have the file descriptor. */
       if( (config->getTuneEarlyStat() ) &&
           (!isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_NODYNAMICATTRIBS) ) )
-         getDynamicAttribsByFD(fd, fileHandleID, targetID, dynAttribs);
-
-      // set EntryInfo if requested
-      if(isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_WRITEENTRYINFO) )
-      {
-         if (! StorageTkEx::attachEntryInfoToChunk(fd, getEntryInfoBuf(), getEntryInfoBufLen()) )
-         {
-            LogContext(logContext).logErr(std::string(
-               "Cannot write entryinfo xattr for FileHandleID: " + fileHandleID));
-         }
-      }
+         getDynamicAttribsByFD(*fd, fileHandleID, targetID, dynAttribs);
 
       // close fd
-      
-      int closeRes = MsgHelperIO::close(fd);
 
-      if(unlikely(closeRes) )
-      { // error
-         int sysErr = errno;
-
-         LogContext(logContext).logErr("Unable to close chunk file. "
-            "FD: " + StringTk::intToStr(fd) + "; "
-            "HandleID: " + fileHandleID + "; "
-            "SysErr: " + System::getErrString(sysErr) );
-
+      if (!fsState->close())
          closeMsgRes = FhgfsOpsErr_INTERNAL;
-      }
-      else
-      { // success
-         LogContext(logContext).log(Log_DEBUG, "Chunk file closed. "
-            "FD: " + StringTk::intToStr(fd) + "; "
-            "HandleID: " + fileHandleID);
-      }
 
       // only get the attributes here, in order to make xfs to release pre-allocated blocks
       if( (!config->getTuneEarlyStat() ) &&
@@ -141,37 +129,12 @@ bool CloseChunkFileMsgEx::processIncoming(ResponseContext& ctx)
          // LogContext(logContext).log(Log_DEBUG, "Chunk file virtually closed. "
          //   "HandleID: " + fileHandleID);
       }
-      else
-      {  // failed
-         memset(&dynAttribs, 0, sizeof(dynAttribs) ); // avoid clang warning
-         // LogContext(logContext).log(Log_DEBUG, "Getting dynAttribByPath failed");
-      }
    }
 
 
    // note: "file not exists" is not an error. we just have nothing to do in that case.
 
-   // cleanup
-
-   SAFE_DELETE(sessionLocalFile);
-   sessions->releaseSession(session);
-   
-   // send response
-
-send_response:
-   ctx.sendResponse(
-         CloseChunkFileRespMsg(closeMsgRes, dynAttribs.filesize, dynAttribs.allocedBlocks,
-            dynAttribs.modificationTimeSecs, dynAttribs.lastAccessTimeSecs,
-            dynAttribs.storageVersion) );
-
-skip_response:
-
-   // update op counters
-
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), StorageOpCounter_CLOSELOCAL,
-      getMsgHeaderUserID() );
-
-   return true;
+   return {closeMsgRes, dynAttribs};
 }
 
 /**
@@ -216,23 +179,23 @@ FhgfsOpsErr CloseChunkFileMsgEx::forwardToSecondary(ResponseContext& ctx)
    {
       LogContext(logContext).log(Log_DEBUG, "Forwarding failed. "
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) + "; "
-         "error: " + FhgfsOpsErrTk::toErrString(commRes) );
+         "error: " + boost::lexical_cast<std::string>(commRes));
 
       std::string genericRespStr = "Communication with secondary failed. "
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() );
 
       ctx.sendResponse(
-            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, genericRespStr.c_str() ) );
+            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, std::move(genericRespStr)));
 
       return FhgfsOpsErr_COMMUNICATION;
    }
 
-   CloseChunkFileRespMsg* respMsg = (CloseChunkFileRespMsg*)rrArgs.outRespMsg;
+   CloseChunkFileRespMsg* respMsg = (CloseChunkFileRespMsg*)rrArgs.outRespMsg.get();
    FhgfsOpsErr secondaryRes = respMsg->getResult();
    if(unlikely(secondaryRes != FhgfsOpsErr_SUCCESS) )
    {
       LogContext(logContext).log(Log_NOTICE, std::string("Secondary reported error: ") +
-         FhgfsOpsErrTk::toErrString(secondaryRes) + "; "
+         boost::lexical_cast<std::string>(secondaryRes) + "; "
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
       return secondaryRes;
@@ -250,17 +213,17 @@ bool CloseChunkFileMsgEx::getDynamicAttribsByFD(const int fd, std::string fileHa
    std::string fileID(SessionTk::fileIDFromHandleID(fileHandleID) );
 
    uint64_t storageVersion = syncedPaths->lockPath(fileID, targetID); // LOCK
-   
+
    // note: this is locked because we need to get the filesize together with the storageVersion
    bool getDynAttribsRes = StorageTkEx::getDynamicFileAttribs(fd, &outDynAttribs.filesize,
       &outDynAttribs.allocedBlocks, &outDynAttribs.modificationTimeSecs,
       &outDynAttribs.lastAccessTimeSecs);
-   
+
    if(getDynAttribsRes)
       outDynAttribs.storageVersion = storageVersion;
-   
+
    syncedPaths->unlockPath(fileID, targetID); // UNLOCK
-   
+
    return getDynAttribsRes;
 }
 
@@ -272,28 +235,31 @@ bool CloseChunkFileMsgEx::getDynamicAttribsByPath(std::string fileHandleID, uint
    App* app = Program::getApp();
    SyncedStoragePaths* syncedPaths = app->getSyncedStoragePaths();
 
-   int targetFD = app->getTargetFD(targetID,
-      isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_BUDDYMIRROR) );
-   if(unlikely(targetFD == -1) )
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
    { // unknown targetID
       LogContext(logContext).logErr("Unknown targetID: " + StringTk::uintToStr(targetID) );
       return false;
    }
 
+   const int targetFD = isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_BUDDYMIRROR)
+      ? *target->getMirrorFD()
+      : *target->getChunkFD();
+
    std::string fileID = SessionTk::fileIDFromHandleID(fileHandleID);
    std::string pathStr = StorageTk::getFileChunkPath(getPathInfo(), fileID);
 
    uint64_t storageVersion = syncedPaths->lockPath(fileID, targetID); // L O C K path
-   
+
    // note: this is locked because we need to get the filesize together with the storageVersion
    bool getDynAttribsRes = StorageTkEx::getDynamicFileAttribs(targetFD, pathStr.c_str(),
       &outDynAttribs.filesize, &outDynAttribs.allocedBlocks, &outDynAttribs.modificationTimeSecs,
       &outDynAttribs.lastAccessTimeSecs);
-   
+
    if(getDynAttribsRes)
       outDynAttribs.storageVersion = storageVersion;
-   
+
    syncedPaths->unlockPath(fileID, targetID); // U N L O C K path
-   
+
    return getDynAttribsRes;
 }

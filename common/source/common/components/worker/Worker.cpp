@@ -50,7 +50,7 @@ void Worker::run()
 
 void Worker::workLoop(QueueWorkType workType)
 {
-   LOG(WORKQUEUES, DEBUG, "Ready", as("TID", System::getTID()), workType);
+   LOG(WORKQUEUES, DEBUG, "Ready", ("TID", System::getTID()), workType);
 
    workQueue->incNumWorkers(); // add this worker to queue stats
 
@@ -80,25 +80,25 @@ void Worker::workLoop(QueueWorkType workType)
       {
          if (workLatencyMS >= 10)
             LOG(WORKQUEUES, DEBUG, "Work processed.",
-                  as("Elapsed ms", workElapsedMS), as("Total latency (ms)", workLatencyMS));
+                  ("Elapsed ms", workElapsedMS), ("Total latency (ms)", workLatencyMS));
          else
-            LOG(WORKQUEUES, DEBUG, "Work processed.", as("Elapsed ms", workElapsedMS),
-                  as("Total latency (us)", workEndTime.elapsedSinceMicro(work->getAgeTime())));
+            LOG(WORKQUEUES, DEBUG, "Work processed.", ("Elapsed ms", workElapsedMS),
+                  ("Total latency (us)", workEndTime.elapsedSinceMicro(work->getAgeTime())));
       }
       else
       {
          if (workLatencyMS >= 10)
          {
             LOG(WORKQUEUES, DEBUG, "Work processed.",
-                  as("Elapsed us", workEndTime.elapsedSinceMicro(&workStartTime)),
-                  as("Total latency (ms)", workEndTime.elapsedSinceMS(work->getAgeTime())));
+                  ("Elapsed us", workEndTime.elapsedSinceMicro(&workStartTime)),
+                  ("Total latency (ms)", workEndTime.elapsedSinceMS(work->getAgeTime())));
 
          }
          else
          {
             LOG(WORKQUEUES, DEBUG, "Work processed.",
-                  as("Elapsed us", workEndTime.elapsedSinceMicro(&workStartTime)),
-                  as("Total latency (us)", workEndTime.elapsedSinceMicro(work->getAgeTime())));
+                  ("Elapsed us", workEndTime.elapsedSinceMicro(&workStartTime)),
+                  ("Total latency (us)", workEndTime.elapsedSinceMicro(work->getAgeTime())));
          }
       }
 #endif

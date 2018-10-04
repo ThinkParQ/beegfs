@@ -60,10 +60,8 @@ void AbstractConfig::loadDefaults(bool addDashes)
 
    configMapRedefine("logType",                  "logfile", addDashes);
    configMapRedefine("logLevel",                 "3", addDashes);
-   configMapRedefine("logErrsToStdlog",          "true", addDashes);
    configMapRedefine("logNoDate",                "true", addDashes);
    configMapRedefine("logStdFile",               "", addDashes);
-   configMapRedefine("logErrFile",               "", addDashes);
    configMapRedefine("logNumLines",              "50000", addDashes);
    configMapRedefine("logNumRotatedFiles",       "2", addDashes);
 
@@ -77,7 +75,6 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connMetaPortTCP",            "8005", addDashes);
    configMapRedefine("connHelperdPortTCP",         "8006", addDashes);
    configMapRedefine("connMgmtdPortTCP",           "8008", addDashes);
-   configMapRedefine("connUseSDP",                 "false", addDashes);
    configMapRedefine("connUseRDMA",                "true", addDashes);
    configMapRedefine("connBacklogTCP",             "64", addDashes);
    configMapRedefine("connMaxInternodeNum",        "6", addDashes);
@@ -88,8 +85,6 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connNetFilterFile",          "", addDashes);
    configMapRedefine("connAuthFile",               "", addDashes);
    configMapRedefine("connTcpOnlyFilterFile",      "", addDashes);
-
-   configMapRedefine("debugFindOtherNodes",      "true", addDashes);
 
    configMapRedefine("sysMgmtdHost",               "",    addDashes);
    configMapRedefine("sysUpdateTargetStatesSecs",  "0", addDashes);
@@ -110,14 +105,10 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          cfgFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "logLevel", addDashes))
          logLevel = StringTk::strToInt(iter->second);
-      else if (testConfigMapKeyMatch(iter, "logErrsToStdlog", addDashes))
-         logErrsToStdlog = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "logNoDate", addDashes))
          logNoDate = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "logStdFile", addDashes))
          logStdFile = iter->second;
-      else if (testConfigMapKeyMatch(iter, "logErrFile", addDashes))
-         logErrFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "logNumLines", addDashes))
          logNumLines = StringTk::strToInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "logNumRotatedFiles", addDashes))
@@ -142,8 +133,6 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          connHelperdPortTCP = StringTk::strToInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "connMgmtdPortTCP", addDashes))
          connMgmtdPortTCP = StringTk::strToInt(iter->second);
-      else if (testConfigMapKeyMatch(iter, "connUseSDP", addDashes))
-         connUseSDP = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connUseRDMA", addDashes))
          connUseRDMA = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connBacklogTCP", addDashes))
@@ -168,8 +157,6 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          connAuthFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "connTcpOnlyFilterFile", addDashes))
          connTcpOnlyFilterFile = iter->second;
-      else if (testConfigMapKeyMatch(iter, "debugFindOtherNodes", addDashes))
-         debugFindOtherNodes = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "sysMgmtdHost", addDashes))
          sysMgmtdHost = iter->second;
       else if (testConfigMapKeyMatch(iter, "sysUpdateTargetStatesSecs", addDashes))

@@ -12,9 +12,6 @@ bool RequestExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("RequestExceededQuotaMsgEx incoming");
 
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a RequestExceededQuotaMsgEx from: " +
-      ctx.peerName() );
-
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
 

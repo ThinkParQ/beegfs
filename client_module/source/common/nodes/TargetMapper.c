@@ -1,10 +1,15 @@
 #include "TargetMapper.h"
 
+BEEGFS_RBTREE_FUNCTIONS(static, _TargetMapper, struct TargetMapper, _entries,
+      uint16_t,
+      struct TargetMapping, targetID, _node,
+      BEEGFS_RB_KEYCMP_LT_INTEGRAL)
+
 
 void TargetMapper_init(TargetMapper* this)
 {
    RWLock_init(&this->rwlock);
-   TargetNodeMap_init(&this->targets);
+   this->_entries = RB_ROOT;
 }
 
 TargetMapper* TargetMapper_construct(void)
@@ -18,8 +23,7 @@ TargetMapper* TargetMapper_construct(void)
 
 void TargetMapper_uninit(TargetMapper* this)
 {
-   TargetNodeMap_uninit(&this->targets);
-   RWLock_uninit(&this->rwlock);
+   BEEGFS_KFREE_RBTREE(&this->_entries, struct TargetMapping, _node);
 }
 
 void TargetMapper_destruct(TargetMapper* this)
@@ -37,70 +41,43 @@ void TargetMapper_destruct(TargetMapper* this)
 bool TargetMapper_mapTarget(TargetMapper* this, uint16_t targetID,
    NumNodeID nodeID)
 {
-   size_t oldSize;
-   size_t newSize;
-   bool inserted;
+   struct TargetMapping* entry = kmalloc(sizeof(*entry), GFP_NOFS | __GFP_NOFAIL);
+   struct TargetMapping* replaced;
 
-   RWLock_writeLock(&this->rwlock); // L O C K
+   entry->targetID = targetID;
+   entry->nodeID = nodeID;
 
-   oldSize = TargetNodeMap_length(&this->targets);
+   RWLock_writeLock(&this->rwlock);
 
-   inserted = TargetNodeMap_insert(&this->targets, targetID, nodeID);
-   if(!inserted)
-   { // remove old key and re-insert
-      TargetNodeMap_erase(&this->targets, targetID);
-      TargetNodeMap_insert(&this->targets, targetID, nodeID);
-   }
+   replaced = _TargetMapper_insertOrReplace(this, entry);
 
-   newSize = TargetNodeMap_length(&this->targets);
+   RWLock_writeUnlock(&this->rwlock);
 
-   RWLock_writeUnlock(&this->rwlock); // U N L O C K
-
-   return (oldSize != newSize);
-}
-
-/**
- * @return true if the targetID was mapped
- */
-bool TargetMapper_unmapTarget(TargetMapper* this, uint16_t targetID)
-{
-   bool keyExisted;
-
-   RWLock_writeLock(&this->rwlock); // L O C K
-
-   keyExisted = TargetNodeMap_erase(&this->targets, targetID);
-
-   RWLock_writeUnlock(&this->rwlock); // U N L O C K
-
-   return keyExisted;
+   kfree(replaced);
+   return replaced == NULL;
 }
 
 /**
  * Applies the mapping from two separate lists (keys and values).
  *
+ * @mappings list of TargetMapping objects. the list is consumed.
+ *
  * Note: Does not add/remove targets from attached capacity pools.
  */
-void TargetMapper_syncTargetsFromLists(TargetMapper* this, UInt16List* targetIDs,
-   NumNodeIDList* nodeIDs)
+void TargetMapper_syncTargets(TargetMapper* this, struct list_head* mappings)
 {
-   UInt16ListIter targetIDsIter;
-   NumNodeIDListIter nodeIDsIter;
-
-   UInt16ListIter_init(&targetIDsIter, targetIDs);
-   NumNodeIDListIter_init(&nodeIDsIter, nodeIDs);
+   struct TargetMapping* elem;
+   struct TargetMapping* n;
 
    RWLock_writeLock(&this->rwlock); // L O C K
 
-   TargetNodeMap_clear(&this->targets);
+   BEEGFS_KFREE_RBTREE(&this->_entries, struct TargetMapping, _node);
+   this->_entries = RB_ROOT;
 
-   for(/* iters init'ed above */;
-       !UInt16ListIter_end(&targetIDsIter);
-       UInt16ListIter_next(&targetIDsIter), NumNodeIDListIter_next(&nodeIDsIter) )
+   list_for_each_entry_safe(elem, n, mappings, _list)
    {
-      uint16_t currentTargetID = UInt16ListIter_value(&targetIDsIter);
-      NumNodeID currentNodeID = NumNodeIDListIter_value(&nodeIDsIter);
-
-      TargetNodeMap_insert(&this->targets, currentTargetID, currentNodeID);
+      list_del(&elem->_list);
+      kfree(_TargetMapper_insertOrReplace(this, elem));
    }
 
    RWLock_writeUnlock(&this->rwlock); // U N L O C K
@@ -108,18 +85,38 @@ void TargetMapper_syncTargetsFromLists(TargetMapper* this, UInt16List* targetIDs
 
 void TargetMapper_getTargetIDs(TargetMapper* this, UInt16List* outTargetIDs)
 {
-   TargetNodeMapIter targetsIter;
+   struct rb_node* pos;
 
    RWLock_readLock(&this->rwlock); // L O C K
 
-   for(targetsIter = TargetNodeMap_begin(&this->targets);
-       !TargetNodeMapIter_end(&targetsIter);
-       TargetNodeMapIter_next(&targetsIter) )
+   for (pos = rb_first(&this->_entries); pos; pos = rb_next(pos))
    {
-      uint16_t currentTargetID = TargetNodeMapIter_key(&targetsIter);
-
-      UInt16List_append(outTargetIDs, currentTargetID);
+      UInt16List_append(outTargetIDs,
+            rb_entry(pos, struct TargetMapping, _node)->targetID);
    }
 
    RWLock_readUnlock(&this->rwlock); // U N L O C K
+}
+
+/**
+ * Get nodeID for a certain targetID
+ *
+ * @return 0 if targetID was not mapped
+ */
+NumNodeID TargetMapper_getNodeID(TargetMapper* this, uint16_t targetID)
+{
+   const struct TargetMapping* elem;
+   NumNodeID nodeID;
+
+   RWLock_readLock(&this->rwlock); // L O C K
+
+   elem = _TargetMapper_find(this, targetID);
+   if (elem)
+      nodeID = elem->nodeID;
+   else
+      nodeID.value = 0;
+
+   RWLock_readUnlock(&this->rwlock); // U N L O C K
+
+   return nodeID;
 }

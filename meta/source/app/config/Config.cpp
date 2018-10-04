@@ -43,8 +43,6 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("connInterfacesFile",         "");
    configMapRedefine("connInterfacesList",         "");
 
-   configMapRedefine("debugRunComponentThreads",   "true");
-
    configMapRedefine("storeMetaDirectory",         "");
    configMapRedefine("storeAllowFirstRunInit",     "true");
    configMapRedefine("storeUseExtendedAttribs",    "true");
@@ -53,7 +51,6 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("storeClientXAttrs",          "false");
    configMapRedefine("storeClientACLs",            "false");
 
-   configMapRedefine("storeBacklinksEnabled",      "false");
    configMapRedefine("sysTargetAttachmentFile",    "");
    configMapRedefine("tuneNumStreamListeners",     "1");
    configMapRedefine("tuneNumWorkers",             "0");
@@ -81,7 +78,6 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("quotaEarlyChownResponse",    "true");
    configMapRedefine("quotaEnableEnforcement",     "false");
 
-   configMapRedefine("sysResyncSafetyThresholMins","10");
    configMapRedefine("sysTargetOfflineTimeoutSecs","180");
    configMapRedefine("sysAllowUserSetPattern",     "false");
    configMapRedefine("sysFileEventLogTarget",      "");
@@ -121,8 +117,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          connInterfacesFile = iter->second;
       else if (iter->first == std::string("connInterfacesList"))
          connInterfacesList = iter->second;
-      else if (iter->first == std::string("debugRunComponentThreads"))
-         debugRunComponentThreads = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("storeMetaDirectory"))
          storeMetaDirectory = iter->second;
       else if (iter->first == std::string("storeAllowFirstRunInit"))
@@ -135,8 +129,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          storeClientXAttrs = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("storeClientACLs"))
          storeClientACLs = StringTk::strToBool(iter->second);
-      else if (iter->first == std::string("storeBacklinksEnabled"))
-         storeBacklinksEnabled = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("sysTargetAttachmentFile"))
          sysTargetAttachmentFile = iter->second;
       else if (iter->first == std::string("tuneNumStreamListeners"))
@@ -200,8 +192,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
                   + iter->second + " (must be at least 30)");
          }
       }
-      else if (iter->first == std::string("sysResyncSafetyThresholMins"))
-         sysResyncSafetyThresholdMins = StringTk::strToInt64(iter->second.c_str());
       else if (iter->first == std::string("sysAllowUserSetPattern"))
          sysAllowUserSetPattern = StringTk::strToBool(iter->second.c_str());
       else if (iter->first == std::string("tuneUsePerUserMsgQueues"))

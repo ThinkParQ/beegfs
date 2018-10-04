@@ -9,7 +9,7 @@
 #include "ModeMigrateException.h"
 
 #include <utility>
-#include <string.h>   // memset
+#include <cstring>   // memset
 #include <features.h> // _POSIX_C_SOURCE
 
 #define BUFFER_SIZE (32 * 1024 * 1024)
@@ -22,7 +22,7 @@ RandomReentrant MigrateFile::randomGen;
 /**
  * Start the migration of the MigrateFile object here.
  */
-bool MigrateFile::doMigrate(void)
+bool MigrateFile::doMigrate()
 {
    if (this->dirFD < 0)
    {
@@ -54,7 +54,7 @@ bool MigrateFile::migrateRegularFile()
    struct stat fromStatData;
 
    bool fromMeta = getFromFileMeta(&fromFD, &fromStatData);
-   if (fromMeta == false)
+   if (!fromMeta)
    {
       std::cerr << "Failed to get origin meta data" << std::endl;
       return false;
@@ -83,7 +83,7 @@ bool MigrateFile::migrateRegularFile()
    bool fileWasModified;
 
    metaRes = copyData(fromFD, tmpFD, &fromStatData); // copy file data (content)
-   if (metaRes == false)
+   if (!metaRes)
    {
       removeTmpOnErr();
       goto out;
@@ -93,7 +93,7 @@ bool MigrateFile::migrateRegularFile()
    if (fromStatData.st_mode & (S_ISVTX | S_ISUID | S_ISGID) )
    {
       metaRes = copyOwnerAndMode(tmpFD, &fromStatData); // mode and owner
-      if (metaRes == false)
+      if (!metaRes)
       {
          removeTmpOnErr();
          goto out;
@@ -121,7 +121,7 @@ bool MigrateFile::migrateRegularFile()
 
    // now copy over the time stamps, NOTE: although we renamed the file, tmpFD is still valid.
    metaRes = copyTimes(tmpFD, &fromStatData);
-   if (metaRes == false)
+   if (!metaRes)
    {
       removeTmpOnErr();
       goto out;
@@ -199,7 +199,7 @@ bool MigrateFile::migrateSymLink()
    if (fromStatData.st_mode & (S_ISVTX | S_ISUID | S_ISGID) )
    {
       metaRes = copyOwnerAndModeLink(&fromStatData); // mode and owner
-      if (metaRes == false)
+      if (!static_cast<bool>(metaRes))
       {
          removeTmpOnErr();
          goto out;
@@ -297,7 +297,7 @@ bool MigrateFile::fileWasModified(struct stat* fromStatData)
 /**
  * Remove the tmp file if any kind of critical error came up
  */
-void MigrateFile::removeTmpOnErr(void)
+void MigrateFile::removeTmpOnErr()
 {
    int unlinkRes = unlinkat(this->dirFD, this->tmpName.c_str(), 0);
    if (unlinkRes)

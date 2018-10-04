@@ -11,6 +11,6 @@ void ListXAttrMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 {
    ListXAttrMsg* thisCast = (ListXAttrMsg*)this;
 
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
    Serialization_serializeInt(ctx, thisCast->size);
 }

@@ -68,7 +68,7 @@ class DirEntry
 
       std::string name; // the user-friendly name, note: not set on reading entries anymore
 
-      FhgfsOpsErr storeInitialDirEntryID(const char* logContext, const std::string& path);
+      FhgfsOpsErr storeInitialDirEntryID(const char* logContext, const std::string& idPath);
       static FhgfsOpsErr storeInitialDirEntryName(const char* logContext, const std::string& idPath,
          const std::string& namePath, bool isDir);
       bool storeUpdatedDirEntryBuf(const std::string& idStorePath, char* buf, unsigned bufLen);
@@ -86,7 +86,7 @@ class DirEntry
 
       FileInode* createInodeByID(const std::string& dirEntryPath, EntryInfo* entryInfo);
 
-      bool loadFromFileName(const std::string& path, const std::string& entryName);
+      bool loadFromFileName(const std::string& dirEntryPath, const std::string& entryName);
       bool loadFromFile(const std::string& path);
       bool loadFromFileXAttr(const std::string& path);
       bool loadFromFileContents(const std::string& path);

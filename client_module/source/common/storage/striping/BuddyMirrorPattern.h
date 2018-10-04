@@ -16,7 +16,6 @@ static inline BuddyMirrorPattern* BuddyMirrorPattern_construct(
    unsigned chunkSize, UInt16Vec* mirrorBuddyGroupIDs, unsigned defaultNumTargets);
 static inline BuddyMirrorPattern* BuddyMirrorPattern_constructFromChunkSize(unsigned chunkSize);
 static inline void BuddyMirrorPattern_uninit(StripePattern* this);
-static inline void BuddyMirrorPattern_destruct(StripePattern* this);
 
 static inline void __BuddyMirrorPattern_assignVirtualFunctions(BuddyMirrorPattern* this);
 
@@ -109,15 +108,6 @@ void BuddyMirrorPattern_uninit(StripePattern* this)
    BuddyMirrorPattern* thisCast = (BuddyMirrorPattern*)this;
 
    UInt16Vec_uninit(&thisCast->mirrorBuddyGroupIDs);
-
-   StripePattern_uninit( (StripePattern*)this);
-}
-
-void BuddyMirrorPattern_destruct(StripePattern* this)
-{
-   BuddyMirrorPattern_uninit( (StripePattern*)this);
-
-   kfree(this);
 }
 
 void __BuddyMirrorPattern_assignVirtualFunctions(BuddyMirrorPattern* this)

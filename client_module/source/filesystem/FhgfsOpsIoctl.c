@@ -651,7 +651,7 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
 
    // check and reference mnt write counter
 
-   retVal = os_mnt_want_write(mnt);
+   retVal = mnt_want_write(mnt);
    if(retVal)
       return retVal;
 
@@ -701,7 +701,7 @@ err_cleanup_filename:
 
 err_cleanup_lock:
 
-   os_mnt_drop_write(mnt); // release mnt write reference counter
+   mnt_drop_write(mnt); // release mnt write reference counter
 
    return retVal;
 }
@@ -748,7 +748,7 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
    if (retVal)
       return retVal;
 
-   retVal = os_mnt_want_write(mnt); // check and rw-reference counter
+   retVal = mnt_want_write(mnt); // check and rw-reference counter
    if (retVal)
       return retVal;
 
@@ -893,7 +893,7 @@ cleanup:
       SAFE_KFREE(createInfo.preferredMetaTargets);
    }
 
-   os_mnt_drop_write(mnt); // release the rw-reference counter
+   mnt_drop_write(mnt); // release the rw-reference counter
 
    return retVal;
 }

@@ -92,7 +92,7 @@ class ModeMigrate : public Mode
 
          public:
 
-            void addUserIdFilter(const std::vector<unsigned> uid);
+            void addUserIdFilter(const std::vector<unsigned> uids);
             bool addUserNameFilter(const std::vector<std::string>& userNames);
 
             void addGroupIdFilter(const std::vector<unsigned> gids);
@@ -129,15 +129,15 @@ class ModeMigrate : public Mode
       int rootFD; // file descriptor of the search path given by the user
 
       int getTargets(const Node& mgmtNode, const StoragePoolPtr& destStoragePool);
-      int getDestTargets(const StoragePoolPtr& destStoragePool, const UInt16List& targetIDs,
-         const NumNodeIDList& nodeIDs);
-      int getFromTargets(UInt16List& targetIDs, NumNodeIDList& nodeIDs);
+      int getDestTargets(const StoragePoolPtr& destStoragePool,
+         const std::map<uint16_t, NumNodeID>& mappings);
+      int getFromTargets(const std::map<uint16_t, NumNodeID>& mappings);
       int getFromAndDestMirrorBuddyGroups(UInt16List& mirrorBuddyGroupIDs,
          UInt16List& buddyGroupPrimaryTargetIDs, UInt16List& buddyGroupSecondaryTargetIDs);
       bool getAndCheckEntryInfo(Node& ownerNode, std::string entryID);
       int getParams();
       int findFiles(std::string fileName, std::string dirName, int fileType);
-      bool processDir(std::string& path);
+      bool processDir(std::string& dirPath);
       bool startFileMigration(std::string fileName, int fileType, std::string path,
          int dirFD, int numTargets, EntryInfo **inOutEntryInfo, bool isBuddyMirrored);
       int testFile(std::string& path, bool isDir, unsigned* outNumTargets,

@@ -193,14 +193,9 @@ void _Config_loadDefaults(Config* this)
 
    _Config_configMapRedefine(this, "connPortShift",                    "0");
    _Config_configMapRedefine(this, "connClientPortUDP",                "8004");
-   _Config_configMapRedefine(this, "connMetaPortUDP",                  "8005");
-   _Config_configMapRedefine(this, "connStoragePortUDP",               "8003");
    _Config_configMapRedefine(this, "connMgmtdPortUDP",                 "8008");
-   _Config_configMapRedefine(this, "connMetaPortTCP",                  "8005");
-   _Config_configMapRedefine(this, "connStoragePortTCP",               "8003");
    _Config_configMapRedefine(this, "connHelperdPortTCP",               "8006");
    _Config_configMapRedefine(this, "connMgmtdPortTCP",                 "8008");
-   _Config_configMapRedefine(this, "connUseSDP",                       "false");
    _Config_configMapRedefine(this, "connUseRDMA",                      "true");
    _Config_configMapRedefine(this, "connMaxInternodeNum",              "8");
    _Config_configMapRedefine(this, "connInterfacesFile",               "");
@@ -221,7 +216,6 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "tuneFileCacheBufSize",             "524288");
    _Config_configMapRedefine(this, "tuneFileCacheBufNum",              "0");
    _Config_configMapRedefine(this, "tunePageCacheValidityMS",          "2000000000");
-   _Config_configMapRedefine(this, "tuneAttribCacheValidityMS",        "1000");
    _Config_configMapRedefine(this, "tuneDirSubentryCacheValidityMS",   "1000");
    _Config_configMapRedefine(this, "tuneFileSubentryCacheValidityMS",  "0");
    _Config_configMapRedefine(this, "tunePathBufSize",                  "4096");
@@ -285,7 +279,6 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "logLevel") )
          this->logLevel = StringTk_strToInt(valueStr);
       else
-      IGNORE_CONFIG_VALUE("logErrsToStdlog")
       IGNORE_CONFIG_VALUE("logNoDate")
       if(!strcmp(keyStr, "logClientID") )
          this->logClientID = StringTk_strToBool(valueStr);
@@ -297,7 +290,6 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       }
       else
       IGNORE_CONFIG_VALUE("logStdFile")
-      IGNORE_CONFIG_VALUE("logErrFile")
       IGNORE_CONFIG_VALUE("logNumLines")
       IGNORE_CONFIG_VALUE("logNumRotatedFiles")
       if(!strcmp(keyStr, "logType") )
@@ -312,29 +304,14 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "connClientPortUDP") )
          this->connClientPortUDP = StringTk_strToInt(valueStr);
       else
-      if(!strcmp(keyStr, "connMetaPortUDP") )
-         this->connMetaPortUDP = StringTk_strToInt(valueStr);
-      else
-      if(!strcmp(keyStr, "connStoragePortUDP") )
-         this->connStoragePortUDP = StringTk_strToInt(valueStr);
-      else
       if(!strcmp(keyStr, "connMgmtdPortUDP") )
          this->connMgmtdPortUDP = StringTk_strToInt(valueStr);
-      else
-      if(!strcmp(keyStr, "connMetaPortTCP") )
-         this->connMetaPortTCP = StringTk_strToInt(valueStr);
-      else
-      if(!strcmp(keyStr, "connStoragePortTCP") )
-         this->connStoragePortTCP = StringTk_strToInt(valueStr);
       else
       if(!strcmp(keyStr, "connHelperdPortTCP") )
          this->connHelperdPortTCP = StringTk_strToInt(valueStr);
       else
       if(!strcmp(keyStr, "connMgmtdPortTCP") )
          this->connMgmtdPortTCP = StringTk_strToInt(valueStr);
-      else
-      if(!strcmp(keyStr, "connUseSDP") )
-         this->connUseSDP = StringTk_strToBool(valueStr);
       else
       if(!strcmp(keyStr, "connUseRDMA") )
          this->connUseRDMA = StringTk_strToBool(valueStr);
@@ -391,7 +368,6 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          this->connTcpOnlyFilterFile = StringTk_strDup(valueStr);
       }
       else
-      IGNORE_CONFIG_VALUE("debugRunComponentThreads")
       IGNORE_CONFIG_VALUE("debugFindOtherNodes")
       IGNORE_CONFIG_VALUE("tuneNumWorkers")
       IGNORE_CONFIG_VALUE("tuneNumRetryWorkers")
@@ -424,9 +400,7 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "tunePageCacheValidityMS") )
          this->tunePageCacheValidityMS= StringTk_strToUInt(valueStr);
       else
-      if(!strcmp(keyStr, "tuneAttribCacheValidityMS") )
-         this->tuneAttribCacheValidityMS = StringTk_strToUInt(valueStr);
-      else
+      IGNORE_CONFIG_VALUE("tuneAttribCacheValidityMS")
       if(!strcmp(keyStr, "tuneDirSubentryCacheValidityMS") )
          this->tuneDirSubentryCacheValidityMS = StringTk_strToUInt(valueStr);
       else
@@ -655,9 +629,6 @@ void __Config_loadFromMountConfig(Config* this, MountConfig* mountConfig)
    if(mountConfig->logStdFile)
       _Config_configMapRedefine(this, "logStdFile", mountConfig->logStdFile);
 
-   if(mountConfig->logErrFile)
-      _Config_configMapRedefine(this, "logErrFile", mountConfig->logErrFile);
-
    if(mountConfig->sysMgmtdHost)
       _Config_configMapRedefine(this, "sysMgmtdHost", mountConfig->sysMgmtdHost);
 
@@ -861,31 +832,6 @@ cleanup_and_exit:
    StrCpyList_uninit(&strList);
 
    return loadRes;
-}
-
-/**
- * @return the string is not alloc'ed and does not need to be freed
- */
-const char* __Config_createDefaultCfgFilename(void)
-{
-   const char* retVal = "";
-
-   struct file* cfgFile;
-
-   mm_segment_t oldfs;
-
-   // try to open the default config file
-   cfgFile = filp_open(CONFIG_DEFAULT_CFGFILENAME, (O_RDONLY), 0);
-   if(!IS_ERR(cfgFile) )
-   { // this is something that we can open, so it's probably the config file ;)
-      retVal = CONFIG_DEFAULT_CFGFILENAME;
-
-      ACQUIRE_PROCESS_CONTEXT(oldfs);
-      filp_close(cfgFile, NULL);
-      RELEASE_PROCESS_CONTEXT(oldfs);
-   }
-
-   return retVal;
 }
 
 /**

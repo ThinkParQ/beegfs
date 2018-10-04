@@ -26,7 +26,6 @@ extern void FsFileInfo_init(FsFileInfo* this, App* app, unsigned accessFlags,
    FileHandleType handleType);
 extern FsFileInfo* FsFileInfo_construct(App* app, unsigned accessFlags, FileHandleType handleType);
 extern void FsFileInfo_uninit(FsObjectInfo* this);
-extern void FsFileInfo_destruct(FsObjectInfo* this);
 
 extern void FsFileInfo_incCacheHits(FsFileInfo* this);
 extern void FsFileInfo_decCacheHits(FsFileInfo* this);

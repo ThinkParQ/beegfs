@@ -1,13 +1,14 @@
 #ifndef INTERNODESYNCER_H_
 #define INTERNODESYNCER_H_
 
-#include <nodes/NodeStoreServersEx.h>
 #include <common/app/log/LogContext.h>
 #include <common/components/AbstractDatagramListener.h>
 #include <common/components/ComponentInitException.h>
+#include <common/nodes/NodeStoreServers.h>
 #include <common/threading/PThread.h>
 #include <common/Common.h>
 
+class StorageTarget;
 
 class InternodeSyncer : public PThread
 {
@@ -22,7 +23,8 @@ class InternodeSyncer : public PThread
       static bool downloadAndSyncMirrorBuddyGroups();
       static bool downloadAndSyncStoragePools();
 
-      static bool downloadAllExceededQuotaLists(const UInt16List& targetIdList);
+      static bool downloadAllExceededQuotaLists(
+            const std::map<uint16_t, std::unique_ptr<StorageTarget>>& targets);
       static bool downloadExceededQuotaList(uint16_t targetId, QuotaDataType idType,
          QuotaLimitType exType, UIntList* outIDList, FhgfsOpsErr& error);
 
@@ -30,8 +32,8 @@ class InternodeSyncer : public PThread
 
       void publishTargetState(uint16_t targetID, TargetConsistencyState targetState);
 
-      bool publishLocalTargetStateChanges(UInt16List& targetIDs, UInt8List& oldStates,
-         UInt8List& newStates);
+      bool publishLocalTargetStateChanges(const TargetStateMap& oldStates,
+         const TargetStateMap& changes);
 
       static bool registerNode(AbstractDatagramListener* dgramLis);
       static bool registerTargetMappings();
@@ -51,7 +53,7 @@ class InternodeSyncer : public PThread
       void syncLoop();
 
       void dropIdleConns();
-      unsigned dropIdleConnsByStore(NodeStoreServersEx* nodes);
+      unsigned dropIdleConnsByStore(NodeStoreServers* nodes);
 
       void updateTargetStatesAndBuddyGroups();
       void publishTargetCapacities();

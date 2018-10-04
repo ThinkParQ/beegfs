@@ -8,10 +8,6 @@
 
 bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("Heartbeat incoming");
-
-   //LOG_DEBUG_CONTEXT(log, Log_DEBUG, std::string("Received a HeartbeatMsg from: ") + peer);
-
    App* app = Program::getApp();
 
    if (app->isShuttingDown())
@@ -44,12 +40,8 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       // construct node
 
-      auto node = RegisterNodeMsgEx::constructNode(
-         nodeID, getNodeNumID(), getPortUDP(), getPortTCP(), nicList);
-
-      node->setNodeType(getNodeType() );
-      node->setFhgfsVersion(getFhgfsVersion() );
-      node->setFeatureFlags(&getNodeFeatureFlags() );
+      auto node = RegisterNodeMsgEx::constructNode(nodeType, nodeID, getNodeNumID(), getPortUDP(),
+            getPortTCP(), nicList);
 
       // add node to store (or update it)
 
@@ -64,8 +56,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       if(!getNodeNumID() )
       { /* shouldn't happen: this server would need to register first to get a nodeNumID assigned */
 
-         LOG(GENERAL, WARNING, "Rejecting heartbeat of node without numeric ID.", nodeID,
-               as("type", Node::nodeTypeToStr(nodeType)));
+         LOG(GENERAL, WARNING, "Rejecting heartbeat of node without numeric ID.", nodeID, nodeType);
 
          return false;
       }
@@ -76,11 +67,11 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       if(unlikely(!servers) )
       {
          LOG(GENERAL, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(getNodeType())),
-               as("Sender", ctx.peerName()),
-               as("NodeID", getNodeNumID()),
-               as("Port (UDP)", getPortUDP()),
-               as("Port (TCP)", getPortTCP())
+               ("Node Type", getNodeType()),
+               ("Sender", ctx.peerName()),
+               ("NodeID", getNodeNumID()),
+               ("Port (UDP)", getPortUDP()),
+               ("Port (TCP)", getPortTCP())
             );
 
          return false;
@@ -91,18 +82,14 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       if(!RegisterNodeMsgEx::checkNewServerAllowed(servers, getNodeNumID(), nodeType) )
       { // this is a new server and adding was disabled
          LOG(GENERAL, WARNING, "Registration of new servers disabled, rejecting.", nodeID,
-               as("type", Node::nodeTypeToStr(nodeType)));
+               nodeType);
          return true;
       }
 
       // construct node
 
-      auto node = RegisterNodeMsgEx::constructNode(
-         nodeID, getNodeNumID(), getPortUDP(), getPortTCP(), nicList);
-
-      node->setNodeType(nodeType);
-      node->setFhgfsVersion(getFhgfsVersion() );
-      node->setFeatureFlags(&getNodeFeatureFlags() );
+      auto node = RegisterNodeMsgEx::constructNode(nodeType, nodeID, getNodeNumID(), getPortUDP(),
+            getPortTCP(), nicList);
 
       std::string typedNodeID = node->getTypedNodeID();
 
@@ -115,7 +102,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       if(confirmationNodeNumID != getNodeNumID() )
       { // unable to add node to store
          LOG(GENERAL, WARNING, "Node rejected because of ID conflict.", getNodeNumID(), getNodeID(),
-               as("type", Node::nodeTypeToStr(nodeType)));
+               nodeType);
          return true;
       }
 
@@ -143,8 +130,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    if(isNodeNew)
    { // this node is new
-      RegisterNodeMsgEx::processNewNode(nodeID, getNodeNumID(), nodeType, getFhgfsVersion(),
-         &nicList, ctx.peerName() );
+      RegisterNodeMsgEx::processNewNode(nodeID, getNodeNumID(), nodeType, &nicList, ctx.peerName());
    }
 
    // send response

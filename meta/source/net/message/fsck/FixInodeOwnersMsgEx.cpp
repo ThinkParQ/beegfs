@@ -7,7 +7,6 @@
 bool FixInodeOwnersMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "FixInodeOwnersMsgEx incoming";
-   LOG_DEBUG(logContext, 4, "Received a FixInodeOwnersMsg from: " + ctx.peerName() );
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    EntryLockStore* entryLockStore = Program::getApp()->getMirroredSessions()->getEntryLockStore();

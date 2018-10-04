@@ -28,8 +28,6 @@ class Config : public AbstractConfig
       std::string       connInterfacesFile; // implicitly generates connInterfacesList
       std::string       connInterfacesList; // comma-separated list
 
-      bool              debugRunComponentThreads;
-
       std::string       storeMetaDirectory;
       bool              storeAllowFirstRunInit;
       bool              storeUseExtendedAttribs;
@@ -37,8 +35,6 @@ class Config : public AbstractConfig
 
       bool              storeClientXAttrs;
       bool              storeClientACLs;
-
-      bool              storeBacklinksEnabled;
 
       std::string       sysTargetAttachmentFile; // used by randominternode target chooser
       TargetMap*        sysTargetAttachmentMap; /* implicitly by sysTargetAttachmentFile, NULL if
@@ -71,7 +67,6 @@ class Config : public AbstractConfig
       bool              quotaEarlyChownResponse; // true to send response before chunk files chown
       bool              quotaEnableEnforcement;
 
-      int64_t           sysResyncSafetyThresholdMins;
       unsigned          sysTargetOfflineTimeoutSecs;
       bool              sysAllowUserSetPattern;
 
@@ -99,11 +94,6 @@ class Config : public AbstractConfig
          return connInterfacesList;
       }
 
-      bool getDebugRunComponentThreads() const
-      {
-         return debugRunComponentThreads;
-      }
-
       const std::string& getStoreMetaDirectory() const
       {
          return storeMetaDirectory;
@@ -122,11 +112,6 @@ class Config : public AbstractConfig
       bool getStoreSelfHealEmptyFiles() const
       {
          return storeSelfHealEmptyFiles;
-      }
-
-      bool getStoreBacklinksEnabled() const
-      {
-         return storeBacklinksEnabled;
       }
 
       bool getStoreClientXAttrs() const
@@ -267,11 +252,6 @@ class Config : public AbstractConfig
       void setQuotaEnableEnforcement(bool doQuotaEnforcement)
       {
          quotaEnableEnforcement = doQuotaEnforcement;
-      }
-
-      int64_t getSysResyncSafetyThresholMins() const
-      {
-         return sysResyncSafetyThresholdMins;
       }
 
       unsigned getSysTargetOfflineTimeoutSecs() const

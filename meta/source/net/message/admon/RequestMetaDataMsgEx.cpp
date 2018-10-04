@@ -7,11 +7,8 @@ bool RequestMetaDataMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("RequestMetaDataMsg incoming");
 
-   LOG_DEBUG_CONTEXT(log, 4, "Received a RequestDataMsg from: " + ctx.peerName() );
-
    App *app = Program::getApp();
    Node& node = app->getLocalNode();
-   NodeStoreEx *metaNodeStore = app->getMetaNodes();
    MultiWorkQueue *workQueue = app->getWorkQueue();
 
    unsigned sessionCount = app->getSessions()->getSize() + app->getMirroredSessions()->getSize();
@@ -27,7 +24,7 @@ bool RequestMetaDataMsgEx::processIncoming(ResponseContext& ctx)
    statsCollector->getStatsSince(lastStatsMS, statsHistory);
 
    RequestMetaDataRespMsg requestMetaDataRespMsg(node.getID(), node.getNumID(), &nicList,
-      metaNodeStore->gotRoot(), workQueue->getIndirectWorkListSize(),
+      app->getMetaRoot().getID() == node.getNumID(), workQueue->getIndirectWorkListSize(),
       workQueue->getDirectWorkListSize(), sessionCount, &statsHistory);
    ctx.sendResponse(requestMetaDataRespMsg);
 

@@ -1,6 +1,9 @@
 #include <common/net/sock/Socket.h>
-#include <common/threading/SafeMutexLock.h>
 #include "Node.h"
+
+#include <mutex>
+
+#include <boost/format.hpp>
 
 /**
  * @param nodeNumID value 0 if not yet assigned
@@ -8,14 +11,11 @@
  * @param portTCP value 0 if undefined
  * @param nicList will be forwarded to the NodeConnPool which creates its own internal copy
  */
-Node::Node(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP, unsigned short portTCP,
-   const NicAddressList& nicList)
-   : id(nodeID), nodeFeatureFlags(NODE_FEATURES_MAX_INDEX)
+Node::Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
+      unsigned short portTCP, const NicAddressList& nicList) :
+   nodeType(nodeType), id(nodeID)
 {
-   //this->id = nodeID; // set in constructor list
    this->numID = nodeNumID;
-   this->nodeType = NODETYPE_Invalid; // typically initialized by NodeStore::addOrUpdate()
-   this->fhgfsVersion = 0;
    this->portUDP = portUDP;
 
    this->connPool = new NodeConnPool(*this, portTCP, nicList);
@@ -28,13 +28,10 @@ Node::Node(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP, unsi
  *
  * @param portUDP value 0 if undefined
  */
-Node::Node(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP)
-   : id(nodeID), nodeFeatureFlags(NODE_FEATURES_MAX_INDEX)
+Node::Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP):
+   nodeType(nodeType), id(std::move(nodeID))
 {
-   //this->id = nodeID; // set in constructor list
    this->numID = nodeNumID;
-   this->nodeType = NODETYPE_Invalid; // typically initialized by NodeStore::addOrUpdate()
-   this->fhgfsVersion = 0;
    this->portUDP = portUDP;
 
    // derived classes: do not forget to set the connPool!
@@ -52,11 +49,9 @@ Node::~Node()
  */
 void Node::updateLastHeartbeatT()
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    updateLastHeartbeatTUnlocked();
-
-   mutexLock.unlock();
 }
 
 /**
@@ -68,8 +63,6 @@ void Node::updateLastHeartbeatT()
 void Node::updateLastHeartbeatTUnlocked()
 {
    lastHeartbeatT.setToNow();
-
-   changeCond.broadcast();
 }
 
 /**
@@ -77,13 +70,9 @@ void Node::updateLastHeartbeatTUnlocked()
  */
 Time Node::getLastHeartbeatT()
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
-   Time t(lastHeartbeatT);
-
-   mutexLock.unlock();
-
-   return t;
+   return lastHeartbeatT;
 }
 
 /**
@@ -99,50 +88,15 @@ Time Node::getLastHeartbeatTUnlocked()
 }
 
 /**
- * Waits for a heartbeat time update.
- *
- * @return true if the lastHeartbeatTime changed, false on timeout
- */
-bool Node::waitForNewHeartbeatT(Time* oldT, int timeoutMS)
-{
-   bool heartbeatChanged;
-   int remainingTimeoutMS = timeoutMS;
-
-   Time startT;
-
-   SafeMutexLock mutexLock(&mutex);
-
-
-   while( (remainingTimeoutMS > 0) && (*oldT == lastHeartbeatT) )
-   {
-      if(!changeCond.timedwait(&mutex, remainingTimeoutMS) )
-         break; // timeout
-
-      remainingTimeoutMS = timeoutMS - startT.elapsedMS();
-   }
-
-   heartbeatChanged = (*oldT != lastHeartbeatT);
-
-
-   mutexLock.unlock();
-
-
-   return heartbeatChanged;
-
-}
-
-/**
  * @param portUDP value 0 if undefined
  * @param portTCP value 0 if undefined
  * @param nicList will be copied
  */
 void Node::updateInterfaces(unsigned short portUDP, unsigned short portTCP, NicAddressList& nicList)
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    updateInterfacesUnlocked(portUDP, portTCP, nicList);
-
-   mutexLock.unlock();
 }
 
 /**
@@ -187,87 +141,6 @@ std::string Node::getNodeIDWithTypeStr() const
  */
 std::string Node::getNodeIDWithTypeStr(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType)
 {
-   return nodeTypeToStr(nodeType) + " " + getTypedNodeID(nodeID, nodeNumID, nodeType);
-}
-
-/**
- * Convenience-wrapper for the static version of this method.
- */
-std::string Node::getNodeTypeStr() const
-{
-   return nodeTypeToStr(nodeType);
-}
-
-/**
- * Returns human-readable node type.
- */
-std::string Node::nodeTypeToStr(NodeType nodeType)
-{
-   switch(nodeType)
-   {
-      case NODETYPE_Invalid:
-      {
-         return "<undefined/invalid>";
-      } break;
-
-      case NODETYPE_Meta:
-      {
-         return "beegfs-meta";
-      } break;
-
-      case NODETYPE_Storage:
-      {
-         return "beegfs-storage";
-      } break;
-
-      case NODETYPE_Client:
-      {
-         return "beegfs-client";
-      } break;
-
-      case NODETYPE_Mgmt:
-      {
-         return "beegfs-mgmtd";
-      } break;
-
-      case NODETYPE_Helperd:
-      {
-         return "beegfs-helperd";
-      } break;
-
-      case NODETYPE_Admon:
-      {
-         return "beegfs-admon";
-      } break;
-
-      case NODETYPE_CacheDaemon:
-      {
-         return "beegfs-cached";
-      } break;
-
-      case NODETYPE_CacheLib:
-      {
-         return "beegfs-cache-lib";
-      } break;
-
-      default:
-      {
-         return "<unknown(" + StringTk::intToStr(nodeType) + ")>";
-      } break;
-   }
-}
-
-/**
- * Note: not thread-safe, so use this only when there are no other threads accessing this node
- * object.
- *
- * @param featureFlags will be copied.
- */
-void Node::setFeatureFlags(const BitStore* featureFlags)
-{
-   SafeMutexLock lock(&mutex);
-
-   this->nodeFeatureFlags = *featureFlags;
-
-   lock.unlock();
+   return str(boost::format("%1% %2%") % nodeType
+            % getTypedNodeID(std::move(nodeID), nodeNumID, nodeType));
 }

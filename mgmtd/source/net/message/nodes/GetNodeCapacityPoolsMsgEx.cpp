@@ -7,9 +7,6 @@
 bool GetNodeCapacityPoolsMsgEx::processIncoming(ResponseContext& ctx)
 {
    CapacityPoolQueryType poolType = getCapacityPoolQueryType();
- 
-   LOG_DBG(STATES, DEBUG, "Received a GetNodeCapacityPoolsMsg.", ctx.peerName(),
-           poolType);
 
    const App* app = Program::getApp();
 

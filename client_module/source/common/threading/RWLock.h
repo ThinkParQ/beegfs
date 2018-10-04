@@ -11,7 +11,6 @@ typedef struct RWLock RWLock;
 
 
 static inline void RWLock_init(RWLock* this);
-static inline void RWLock_uninit(RWLock* this);
 static inline void RWLock_writeLock(RWLock* this);
 static inline int RWLock_writeTryLock(RWLock* this);
 static inline void RWLock_readLock(RWLock* this);
@@ -28,11 +27,6 @@ struct RWLock
 void RWLock_init(RWLock* this)
 {
    init_rwsem(&this->rwSem);
-}
-
-void RWLock_uninit(RWLock* this)
-{
-   // rw_semaphores don't need any kind of uninit
 }
 
 void RWLock_writeLock(RWLock* this)

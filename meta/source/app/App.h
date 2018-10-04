@@ -13,6 +13,9 @@
 #include <common/components/TimerQueue.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/NodeCapacityPools.h>
+#include <common/nodes/NodeStoreClients.h>
+#include <common/nodes/NodeStoreServers.h>
+#include <common/nodes/RootInfo.h>
 #include <common/nodes/TargetCapacityPools.h>
 #include <common/nodes/TargetMapper.h>
 #include <common/nodes/TargetStateStore.h>
@@ -24,9 +27,6 @@
 #include <components/buddyresyncer/BuddyResyncer.h>
 #include <net/message/NetMessageFactory.h>
 #include <nodes/MetaNodeOpStats.h>
-#include <nodes/NodeStoreEx.h>
-#include <nodes/NodeStoreClientsEx.h>
-#include <nodes/NodeStoreServersEx.h>
 #include <session/SessionStore.h>
 #include <storage/DirInode.h>
 #include <storage/MetaStore.h>
@@ -37,11 +37,6 @@
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
 #endif
-
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
-#endif
-
 
 // program return codes
 #define APPCODE_NO_ERROR               0
@@ -69,10 +64,10 @@ class App : public AbstractApp
       App(int argc, char** argv);
       virtual ~App();
 
-      virtual void run();
+      virtual void run() override;
 
-      void stopComponents();
-      void handleComponentException(std::exception& e);
+      virtual void stopComponents() override;
+      virtual void handleComponentException(std::exception& e) override;
 
    private:
       int appResult;
@@ -82,18 +77,20 @@ class App : public AbstractApp
       Config*  cfg;
       LogContext* log;
 
-      int pidFileLockFD; // -1 if unlocked, >=0 otherwise
-      int workingDirLockFD; // -1 if unlocked, >=0 otherwise
+      LockFD pidFileLockFD;
+      LockFD workingDirLockFD;
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
       NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       std::shared_ptr<Node> localNode;
 
-      NodeStoreServersEx* mgmtNodes;
-      NodeStoreServersEx* metaNodes;
-      NodeStoreServersEx* storageNodes;
-      NodeStoreClientsEx* clientNodes;
+      NodeStoreServers* mgmtNodes;
+      NodeStoreServers* metaNodes;
+      NodeStoreServers* storageNodes;
+      NodeStoreClients* clientNodes;
+
+      RootInfo metaRoot;
 
       NodeCapacityPools* metaCapacityPools;
       NodeCapacityPools* metaBuddyCapacityPools;
@@ -205,7 +202,7 @@ class App : public AbstractApp
       /**
        * @return NULL for invalid node types
        */
-      NodeStoreServersEx* getServerStoreFromType(NodeType nodeType) const
+      NodeStoreServers* getServerStoreFromType(NodeType nodeType) const
       {
          switch(nodeType)
          {
@@ -255,7 +252,7 @@ class App : public AbstractApp
        * Note that IB connections eat two fd numbers, so 2 and multiples of 2 might not be a good
        * value for number of stream listeners.
        */
-      virtual StreamListenerV2* getStreamListenerByFD(int fd)
+      virtual StreamListenerV2* getStreamListenerByFD(int fd) override
       {
          return streamLisVec[fd % numStreamListeners];
       }
@@ -263,22 +260,22 @@ class App : public AbstractApp
 
       // getters & setters
 
-      virtual ICommonConfig* getCommonConfig()
+      virtual const ICommonConfig* getCommonConfig() const override
       {
          return cfg;
       }
 
-      virtual NetFilter* getNetFilter()
+      virtual const NetFilter* getNetFilter() const override
       {
          return netFilter;
       }
 
-      virtual NetFilter* getTcpOnlyFilter()
+      virtual const NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter;
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory()
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory;
       }
@@ -312,22 +309,22 @@ class App : public AbstractApp
          return *localNode;
       }
 
-      NodeStoreServersEx* getMgmtNodes() const
+      NodeStoreServers* getMgmtNodes() const
       {
          return mgmtNodes;
       }
 
-      NodeStoreServersEx* getMetaNodes() const
+      NodeStoreServers* getMetaNodes() const
       {
          return metaNodes;
       }
 
-      NodeStoreServersEx* getStorageNodes() const
+      NodeStoreServers* getStorageNodes() const
       {
          return storageNodes;
       }
 
-      NodeStoreClientsEx* getClientNodes() const
+      NodeStoreClients* getClientNodes() const
       {
          return clientNodes;
       }
@@ -496,6 +493,9 @@ class App : public AbstractApp
       {
          return fileEventLogger.get();
       }
+
+      const RootInfo& getMetaRoot() const { return metaRoot; }
+      RootInfo& getMetaRoot() { return metaRoot; }
 };
 
 

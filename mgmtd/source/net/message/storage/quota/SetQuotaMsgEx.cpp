@@ -10,10 +10,6 @@
 
 bool SetQuotaMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("SetQuotaMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, 4, "Received a SetQuotaMsg from: " + ctx.peerName() );
-
    if (Program::getApp()->isShuttingDown())
    {
       ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));

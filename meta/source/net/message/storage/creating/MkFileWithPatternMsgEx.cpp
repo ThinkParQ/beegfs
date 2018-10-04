@@ -1,8 +1,6 @@
 #include <common/net/message/storage/creating/MkFileMsg.h>
 #include <common/net/message/storage/creating/MkFileRespMsg.h>
 #include <program/Program.h>
-#include <common/net/message/storage/creating/MkLocalFileMsg.h>
-#include <common/net/message/storage/creating/MkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
 #include <common/storage/striping/StripePattern.h>
@@ -31,12 +29,6 @@ std::tuple<DirIDLock, ParentNameLock, FileIDLock> MkFileWithPatternMsgEx::lock(
 
 bool MkFileWithPatternMsgEx::processIncoming(ResponseContext& ctx)
 {
-   #ifdef BEEGFS_DEBUG
-      const char* logContext = "MkFileWithPatternMsg incoming";
-
-      LOG_DEBUG(logContext, 4, "Received a MkFileWithPatternMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
    const EntryInfo* parentInfo = getParentInfo();
    std::string newFileName = getNewFileName();
    EntryInfo newEntryInfo;
@@ -64,9 +56,7 @@ std::unique_ptr<MirroredMessageResponseState> MkFileWithPatternMsgEx::executeLoc
 
    FhgfsOpsErr mkRes = mkFile(getParentInfo(), mkDetails, &newEntryInfo, inodeDiskData);
 
-   App* app = Program::getApp();
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_MKFILE,
-      getMsgHeaderUserID());
+   updateNodeOp(ctx, MetaOpCounter_MKFILE);
 
    return boost::make_unique<ResponseState>(mkRes, std::move(newEntryInfo));
 }
@@ -147,8 +137,8 @@ FhgfsOpsErr MkFileWithPatternMsgEx::mkMetaFile(DirInode& dir, MkFileDetails& mkD
    if(stripeTargets->empty() || (stripeTargets->size() < stripePattern->getMinNumTargets() ) )
    {
       LOG(GENERAL, ERR, "No (or not enough) storage targets defined.",
-               as("numTargets", stripeTargets->size()),
-               as("expectedMinNumTargets", stripePattern->getMinNumTargets()));
+               ("numTargets", stripeTargets->size()),
+               ("expectedMinNumTargets", stripePattern->getMinNumTargets()));
       return FhgfsOpsErr_INTERNAL;
    }
 
@@ -159,7 +149,7 @@ FhgfsOpsErr MkFileWithPatternMsgEx::mkMetaFile(DirInode& dir, MkFileDetails& mkD
          if (!Program::getApp()->getStorageBuddyGroupMapper()->getPrimaryTargetID(*iter))
          {
             LOG(GENERAL, ERR, "Unknown buddy group targets defined.",
-                     as("targetId", *iter));
+                     ("targetId", *iter));
             return FhgfsOpsErr_UNKNOWNTARGET;
          }
       }
@@ -168,7 +158,7 @@ FhgfsOpsErr MkFileWithPatternMsgEx::mkMetaFile(DirInode& dir, MkFileDetails& mkD
          if (!Program::getApp()->getTargetMapper()->targetExists(*iter))
          {
             LOG(GENERAL, ERR, "Unknown storage targets defined.",
-                     as("targetId", *iter));
+                     ("targetId", *iter));
             return FhgfsOpsErr_UNKNOWNTARGET;
          }
       }
@@ -185,7 +175,7 @@ FhgfsOpsErr MkFileWithPatternMsgEx::mkMetaFile(DirInode& dir, MkFileDetails& mkD
    {
       LOG(GENERAL, DEBUG, "Invalid chunk size: Below minimum size.",
                stripePattern->getChunkSize(),
-               as("minChunkSize", STRIPEPATTERN_MIN_CHUNKSIZE));
+               ("minChunkSize", STRIPEPATTERN_MIN_CHUNKSIZE));
       return FhgfsOpsErr_INTERNAL;
    }
 

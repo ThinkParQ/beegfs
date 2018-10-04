@@ -11,6 +11,7 @@
 #include <common/components/worker/Worker.h>
 #include <common/components/TimerQueue.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
+#include <common/nodes/NodeStoreServers.h>
 #include <common/nodes/TargetStateStore.h>
 #include <common/storage/Path.h>
 #include <common/storage/Storagedata.h>
@@ -25,8 +26,6 @@
 #include <components/InternodeSyncer.h>
 #include <components/StorageStatsCollector.h>
 #include <net/message/NetMessageFactory.h>
-#include <nodes/NodeStoreEx.h>
-#include <nodes/NodeStoreServersEx.h>
 #include <nodes/StorageNodeOpStats.h>
 #include <session/SessionStore.h>
 #include <storage/ChunkLockStore.h>
@@ -39,11 +38,6 @@
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
 #endif
-
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
-#endif
-
 
 // program return codes
 #define APPCODE_NO_ERROR               0
@@ -68,10 +62,10 @@ class App : public AbstractApp
       App(int argc, char** argv);
       virtual ~App();
 
-      virtual void run();
+      virtual void run() override;
 
-      void stopComponents();
-      void handleComponentException(std::exception& e);
+      virtual void stopComponents() override;
+      virtual void handleComponentException(std::exception& e) override;
 
 
    private:
@@ -82,7 +76,8 @@ class App : public AbstractApp
       Config* cfg;
       LogContext* log;
 
-      int pidFileLockFD; // -1 if unlocked, >=0 otherwise
+      LockFD pidFileLockFD;
+      std::vector<LockFD> storageTargetLocks;
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
@@ -90,9 +85,9 @@ class App : public AbstractApp
       NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       std::shared_ptr<Node> localNode;
 
-      NodeStoreServersEx* mgmtNodes;
-      NodeStoreServersEx* metaNodes; // needed for backward communication introduced with GAM integration
-      NodeStoreServersEx* storageNodes;
+      NodeStoreServers* mgmtNodes;
+      NodeStoreServers* metaNodes; // needed for backward communication introduced with GAM integration
+      NodeStoreServers* storageNodes;
 
       TargetMapper* targetMapper;
       MirrorBuddyGroupMapper* mirrorBuddyGroupMapper; // maps targets to mirrorBuddyGroups
@@ -167,7 +162,8 @@ class App : public AbstractApp
 
       bool waitForMgmtNode();
       bool preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID);
-      bool preregisterTargets(const NumNodeID localNodeNumID);
+      boost::optional<std::map<uint16_t, std::unique_ptr<StorageTarget>>> preregisterTargets(
+            const NumNodeID localNodeNumID);
       bool preregisterTarget(Node& mgmtNode, std::string targetID, uint16_t targetNumID,
          uint16_t* outNewTargetNumID);
       bool registerAndDownloadMgmtInfo();
@@ -198,28 +194,28 @@ class App : public AbstractApp
        * Note that IB connections eat two fd numbers, so 2 and multiples of 2 might not be a good
        * value for number of stream listeners.
        */
-      virtual StreamListenerV2* getStreamListenerByFD(int fd)
+      virtual StreamListenerV2* getStreamListenerByFD(int fd) override
       {
          return streamLisVec[fd % numStreamListeners];
       }
 
       // getters & setters
-      virtual ICommonConfig* getCommonConfig()
+      virtual const ICommonConfig* getCommonConfig() const override
       {
          return cfg;
       }
 
-      virtual NetFilter* getNetFilter()
+      virtual const NetFilter* getNetFilter() const override
       {
          return netFilter;
       }
 
-      virtual NetFilter* getTcpOnlyFilter()
+      virtual const NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter;
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory()
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory;
       }
@@ -244,17 +240,17 @@ class App : public AbstractApp
          return *localNode;
       }
 
-      NodeStoreServersEx* getMgmtNodes() const
+      NodeStoreServers* getMgmtNodes() const
       {
          return mgmtNodes;
       }
 
-      NodeStoreEx* getMetaNodes() const
+      NodeStoreServers* getMetaNodes() const
       {
          return metaNodes;
       }
 
-      NodeStoreServersEx* getStorageNodes() const
+      NodeStoreServers* getStorageNodes() const
       {
          return storageNodes;
       }
@@ -319,34 +315,6 @@ class App : public AbstractApp
          return this->storageBenchOperator;
       }
 
-      /**
-       * @param isMirrorFD true to get the fd for the mirror subdir, false to get the fd for the
-       *    general chunks subdir.
-       * @return -1 if no such target exists, otherwise the file descriptor to target/chunks dir or
-       *    target/mirror dir.
-       */
-      int getTargetFD(const uint16_t targetID, const bool isMirrorFD) const
-      {
-         if (isMirrorFD)
-            return storageTargets->getMirrorFD(targetID);
-         else
-            return storageTargets->getChunkFD(targetID);
-      }
-
-      /**
-       * @param isMirrorFD true to get the fd for the mirror subdir, false to get the fd for the
-       *    general chunks subdir.
-       * @param outConsistencyState only valid if return is not -1.
-       * @return -1 if no such target exists, otherwise the file descriptor to target/chunks dir or
-       *    target/mirror dir.
-       */
-      int getTargetFDAndConsistencyState(const uint16_t targetID, const bool isMirrorFD,
-         TargetConsistencyState* outConsistencyState) const
-      {
-            return storageTargets->getChunkFDAndConsistencyState(
-               targetID, isMirrorFD, outConsistencyState);
-      }
-
       DatagramListener* getDatagramListener() const
       {
          return dgramListener;
@@ -379,13 +347,8 @@ class App : public AbstractApp
 
       bool getWorkersRunning()
       {
-         bool retVal;
-
-         SafeMutexLock lock(&this->mutexWorkersRunning); // L O C K
-         retVal = this->workersRunning;
-         lock.unlock(); // U N L O C K
-
-         return retVal;
+         const std::lock_guard<Mutex> lock(mutexWorkersRunning);
+         return this->workersRunning;
       }
 
       ChunkStore* getChunkDirStore() const
@@ -437,7 +400,7 @@ class App : public AbstractApp
          {
             if(!libZfsErrorReported)
             {
-               Logger::getLogger()->logErr("ZfsSupport", "Quota support for ZFS is disabled.");
+               LOG(QUOTA, ERR,  "Quota support for ZFS is disabled.");
                libZfsErrorReported = true;
             }
          }

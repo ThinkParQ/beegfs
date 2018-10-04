@@ -6,8 +6,6 @@
 
 bool GetMirrorBuddyGroupsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STATES, DEBUG, "Received a GetMirrorBuddyGroupsMsg." + ctx.peerName() );
-
    App* app = Program::getApp();
 
    MirrorBuddyGroupMapper* buddyGroupMapper;
@@ -25,10 +23,7 @@ bool GetMirrorBuddyGroupsMsgEx::processIncoming(ResponseContext& ctx)
          break;
 
       default:
-         LOG(MIRRORING, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(nodeType)),
-               as("Sender", ctx.peerName())
-            );
+         LOG(MIRRORING, ERR, "Invalid node type.", nodeType, ("Sender", ctx.peerName()));
          return false;
    }
 

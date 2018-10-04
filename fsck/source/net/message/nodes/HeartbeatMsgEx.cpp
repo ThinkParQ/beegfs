@@ -2,10 +2,11 @@
 #include <program/Program.h>
 #include "HeartbeatMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Heartbeat incoming");
-   LOG_DEBUG_CONTEXT(log, 4, "Received a HeartbeatMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
 
@@ -14,13 +15,8 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    // construct node
    NicAddressList& nicList = getNicList();
 
-   auto node = std::make_shared<Node>(getNodeID(), getNodeNumID(), getPortUDP(), getPortTCP(),
-         nicList);
-
-   node->setNodeType(getNodeType() );
-   node->setFhgfsVersion(getFhgfsVersion() );
-
-   node->setFeatureFlags(&getNodeFeatureFlags() );
+   auto node = std::make_shared<Node>(getNodeType(), getNodeID(), getNodeNumID(), getPortUDP(),
+         getPortTCP(), nicList);
 
    // set local nic capabilities
    Node& localNode = app->getLocalNode();
@@ -51,11 +47,11 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       default:
       {
          LOG(GENERAL, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(getNodeType())),
-               as("Sender", ctx.peerName()),
-               as("NodeID", getNodeNumID()),
-               as("Port (UDP)", getPortUDP()),
-               as("Port (TCP)", getPortTCP())
+               ("Node Type", getNodeType()),
+               ("Sender", ctx.peerName()),
+               ("NodeID", getNodeNumID()),
+               ("Port (UDP)", getPortUDP()),
+               ("Port (TCP)", getPortTCP())
             );
 
          goto ack_resp;
@@ -77,7 +73,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       log.log(Log_DEBUG, std::string("Number of nodes in the system: ") +
          StringTk::intToStr(nodes->getSize() ) +
-         std::string(" (Type: ") + Node::nodeTypeToStr(getNodeType() ) + ")" );
+         std::string(" (Type: ") + boost::lexical_cast<std::string>(getNodeType()) + ")");
    }
 
 
@@ -101,8 +97,7 @@ void HeartbeatMsgEx::processIncomingRoot()
       return;
 
    // try to apply the contained root info
-   if(Program::getApp()->getMetaNodes()->setRootNodeNumID(getRootNumID(), false,
-      getRootIsBuddyMirrored()) )
+   if(Program::getApp()->getMetaRoot().setIfDefault(getRootNumID(), getRootIsBuddyMirrored()))
    {
       log.log(Log_CRITICAL, "Root (by Heartbeat): " + getRootNumID().str() );
    }

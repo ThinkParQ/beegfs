@@ -41,11 +41,19 @@ class StoragePoolStoreEx: public StoragePoolStore
       // note: only implemented for StoragePoolStoreEx, because only needed in mgmtd
       FhgfsOpsErr removePool(StoragePoolId poolId);
 
+      bool loadFromFile();
+      bool saveToFile();
+
+      void setStorePath(const std::string& storePath);
+
    private:
       HeartbeatManager* heartbeatManager; // used to send notifications to servers
 
       StoragePoolPtr makePool(StoragePoolId id, const std::string& description) const override;
       StoragePoolPtr makePool() const override;
+
+      std::string storePath; // set to enable load/save methods (setting is not thread-safe)
 };
+
 
 #endif /* MGMTD_STORAGEPOOLSTOREEX_H_ */

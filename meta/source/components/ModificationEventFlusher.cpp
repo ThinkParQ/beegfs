@@ -6,6 +6,8 @@
 
 #include <program/Program.h>
 
+#include <mutex>
+
 ModificationEventFlusher::ModificationEventFlusher()
  : PThread("ModificationEventFlusher"),
    log("ModificationEventFlusher"),
@@ -14,7 +16,7 @@ ModificationEventFlusher::ModificationEventFlusher()
    fsckMissedEvent(false)
 {
    NicAddressList nicList;
-   this->fsckNode = std::make_shared<Node>("fsck", NumNodeID(), 0, 0, nicList);
+   this->fsckNode = std::make_shared<Node>(NODETYPE_Invalid, "fsck", NumNodeID(), 0, 0, nicList);
 }
 
 void ModificationEventFlusher::run()
@@ -27,9 +29,10 @@ void ModificationEventFlusher::run()
       {
          while ( this->eventTypeBufferList.empty() )
          {
-            SafeMutexLock eventsAddedSafeLock(&eventsAddedMutex);
-            this->eventsAddedCond.timedwait(&eventsAddedMutex, 2000);
-            eventsAddedSafeLock.unlock();
+            {
+               const std::lock_guard<Mutex> lock(eventsAddedMutex);
+               this->eventsAddedCond.timedwait(&eventsAddedMutex, 2000);
+            }
 
             if ( this->getSelfTerminate() )
                goto stop_component;
@@ -52,28 +55,31 @@ bool ModificationEventFlusher::add(ModificationEventType eventType, const std::s
 {
    while (true)
    {
-      SafeMutexLock safeMutexLock(&mutex);
-      size_t eventTypeListSize = this->eventTypeBufferList.size();
-      safeMutexLock.unlock();
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      if (eventTypeListSize < MODFLUSHER_MAXSIZE_EVENTLIST)
-         break;
+         if (this->eventTypeBufferList.size() < MODFLUSHER_MAXSIZE_EVENTLIST)
+            break;
+      }
 
       // queue too long
       // wait if something is flushed
-      SafeMutexLock eventsFlushedSafeLock(&eventsFlushedMutex);
-      this->eventsFlushedCond.timedwait(&eventsFlushedMutex, 5000);
-      eventsFlushedSafeLock.unlock();
+      {
+         const std::lock_guard<Mutex> lock(eventsFlushedMutex);
+         this->eventsFlushedCond.timedwait(&eventsFlushedMutex, 5000);
+      }
    }
 
-   SafeMutexLock safeMutexLock(&mutex);
-   this->eventTypeBufferList.push_back((uint8_t)eventType);
-   this->entryIDBufferList.push_back(entryID);
-   safeMutexLock.unlock();
+   {
+      const std::lock_guard<Mutex> lock(mutex);
+      this->eventTypeBufferList.push_back((uint8_t)eventType);
+      this->entryIDBufferList.push_back(entryID);
+   }
 
-   SafeMutexLock eventsAddedSafeLock(&eventsAddedMutex);
-   this->eventsAddedCond.broadcast();
-   eventsAddedSafeLock.unlock();
+   {
+      const std::lock_guard<Mutex> lock(eventsAddedMutex);
+      this->eventsAddedCond.broadcast();
+   }
 
    return true;
 }
@@ -94,25 +100,25 @@ void ModificationEventFlusher::sendToFsck()
    // get the first MODFLUSHER_SEND_AT_ONCE entries from each list and send them to fsck
 
    // only have the mutex on the lists as long as we really need it
-   SafeMutexLock bufferListSafeLock(&mutex);
-
    UInt8List eventTypeListCopy;
    StringList entryIDListCopy;
 
-   UInt8ListIter eventTypeStart = this->eventTypeBufferList.begin();
-   UInt8ListIter eventTypeEnd = this->eventTypeBufferList.begin();
-   ListTk::advance(eventTypeBufferList, eventTypeEnd, MODFLUSHER_SEND_AT_ONCE);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   StringListIter entryIDStart = this->entryIDBufferList.begin();
-   StringListIter entryIDEnd = this->entryIDBufferList.begin();
-   ListTk::advance(entryIDBufferList, entryIDEnd, MODFLUSHER_SEND_AT_ONCE);
+      UInt8ListIter eventTypeStart = this->eventTypeBufferList.begin();
+      UInt8ListIter eventTypeEnd = this->eventTypeBufferList.begin();
+      ListTk::advance(eventTypeBufferList, eventTypeEnd, MODFLUSHER_SEND_AT_ONCE);
 
-   eventTypeListCopy.splice(eventTypeListCopy.begin(), this->eventTypeBufferList, eventTypeStart,
-      eventTypeEnd);
-   entryIDListCopy.splice(entryIDListCopy.begin(), this->entryIDBufferList, entryIDStart,
-      entryIDEnd);
+      StringListIter entryIDStart = this->entryIDBufferList.begin();
+      StringListIter entryIDEnd = this->entryIDBufferList.begin();
+      ListTk::advance(entryIDBufferList, entryIDEnd, MODFLUSHER_SEND_AT_ONCE);
 
-   bufferListSafeLock.unlock();
+      eventTypeListCopy.splice(eventTypeListCopy.begin(), this->eventTypeBufferList, eventTypeStart,
+         eventTypeEnd);
+      entryIDListCopy.splice(entryIDListCopy.begin(), this->entryIDBufferList, entryIDStart,
+         entryIDEnd);
+   }
 
    FsckModificationEventMsg fsckModificationEventMsg(&eventTypeListCopy, &entryIDListCopy,
       this->fsckMissedEvent);
@@ -130,7 +136,6 @@ void ModificationEventFlusher::sendToFsck()
       this->disableLoggingLocally(false);
    }
 
-   SafeMutexLock eventsFlushedSafeLock(&eventsFlushedMutex);
+   const std::lock_guard<Mutex> lock(eventsFlushedMutex);
    eventsFlushedCond.broadcast();
-   eventsFlushedSafeLock.unlock();
 }

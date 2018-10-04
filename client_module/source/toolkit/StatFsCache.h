@@ -15,7 +15,6 @@ typedef struct StatFsCache StatFsCache;
 
 static inline void StatFsCache_init(StatFsCache* this, App* app);
 static inline StatFsCache* StatFsCache_construct(App* app);
-static inline void StatFsCache_uninit(StatFsCache* this);
 static inline void StatFsCache_destruct(StatFsCache* this);
 
 FhgfsOpsErr StatFsCache_getFreeSpace(StatFsCache* this, int64_t* outSizeTotal,
@@ -58,17 +57,8 @@ struct StatFsCache* StatFsCache_construct(App* app)
    return this;
 }
 
-void StatFsCache_uninit(StatFsCache* this)
-{
-   Time_uninit(&this->lastUpdateTime);
-
-   RWLock_uninit(&this->rwlock);
-}
-
 void StatFsCache_destruct(StatFsCache* this)
 {
-   StatFsCache_uninit(this);
-
    kfree(this);
 }
 

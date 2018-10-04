@@ -14,11 +14,11 @@ void RmDirMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    RmDirMsg* thisCast = (RmDirMsg*)this;
 
    // parentInfo
-   EntryInfo_serialize(thisCast->parentInfo, ctx);
+   EntryInfo_serialize(ctx, thisCast->parentInfo);
 
    // delDirName
    Serialization_serializeStrAlign4(ctx, thisCast->delDirNameLen, thisCast->delDirName);
 
    if (this->msgHeader.msgFeatureFlags & RMDIRMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

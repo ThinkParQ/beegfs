@@ -1,5 +1,3 @@
-#include <common/threading/SafeMutexLock.h>
-#include <common/toolkit/Random.h>
 #include <common/toolkit/UnitTk.h>
 #include <components/Database.h>
 #include <program/Program.h>
@@ -20,11 +18,10 @@ bool NodeStoreStorageEx::addOrUpdateNode(std::shared_ptr<StorageNodeEx> node)
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
-   bool precheckRes = addOrUpdateNodePrecheck(*node);
-   if(!precheckRes)
+   if (!node->getNumID())
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    // check if this is a new node or an update of an existing node
 
@@ -39,11 +36,7 @@ bool NodeStoreStorageEx::addOrUpdateNode(std::shared_ptr<StorageNodeEx> node)
       node->initializeDBData();
    }
 
-   bool retVal = addOrUpdateNodeUnlocked(std::move(node), NULL);
-
-   mutexLock.unlock(); // U N L O C K
-
-   return retVal;
+   return addOrUpdateNodeUnlocked(std::move(node), NULL);
 }
 
 /**
@@ -67,11 +60,10 @@ bool NodeStoreStorageEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
-   bool precheckRes = addOrUpdateNodePrecheck(*node);
-   if(!precheckRes)
+   if (!node->getNumID())
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    // check if this is a new node
 
@@ -87,11 +79,7 @@ bool NodeStoreStorageEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID
       static_cast<StorageNodeEx&>(*node).initializeDBData();
    }
 
-   bool retVal = addOrUpdateNodeUnlocked(std::move(node), outNodeNumID);
-
-   mutexLock.unlock(); // U N L O C K
-
-   return retVal;
+   return addOrUpdateNodeUnlocked(std::move(node), outNodeNumID);
 }
 
 bool NodeStoreStorageEx::statusStorage(NumNodeID nodeID, std::string *outInfo)
@@ -120,13 +108,11 @@ bool NodeStoreStorageEx::statusStorage(NumNodeID nodeID, std::string *outInfo)
 std::string NodeStoreStorageEx::diskSpaceTotalSum(std::string *outUnit)
 {
    int64_t space = 0;
-   auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
 
-   while (node != NULL)
+   for (const auto& nodeBase : referenceAllNodes())
    {
+      auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
       space += node->getContent().diskSpaceTotal;
-
-      node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
    }
 
    return StringTk::doubleToStr(UnitTk::mebibyteToXbyte(space, outUnit));
@@ -135,13 +121,11 @@ std::string NodeStoreStorageEx::diskSpaceTotalSum(std::string *outUnit)
 std::string NodeStoreStorageEx::diskSpaceFreeSum(std::string *outUnit)
 {
    int64_t space = 0;
-   auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
 
-   while (node != NULL)
+   for (const auto& nodeBase : referenceAllNodes())
    {
+      auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
       space += node->getContent().diskSpaceFree;
-
-      node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
    }
 
    return StringTk::doubleToStr(UnitTk::mebibyteToXbyte(space, outUnit));
@@ -152,14 +136,11 @@ std::string NodeStoreStorageEx::diskSpaceUsedSum(std::string *outUnit)
    int64_t totalSpace = 0;
    int64_t freeSpace = 0;
 
-   auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
-
-   while (node != NULL)
+   for (const auto& nodeBase : referenceAllNodes())
    {
+      auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
       totalSpace += node->getContent().diskSpaceTotal;
       freeSpace += node->getContent().diskSpaceFree;
-
-      node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
    }
 
    int64_t space = totalSpace - freeSpace;
@@ -354,10 +335,9 @@ std::string NodeStoreStorageEx::diskReadSum(uint timespanM, std::string *outUnit
    double sum = 0; // sum in MiB
    if (timespanM <= 10)
    {
-      auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
-
-      while (node != NULL)
+      for (const auto& nodeBase : referenceAllNodes())
       {
+         auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
          std::vector<HighResStatsList> dataSets;
          HighResStatsList data = node->getHighResData();
 
@@ -366,7 +346,6 @@ std::string NodeStoreStorageEx::diskReadSum(uint timespanM, std::string *outUnit
             HighResolutionStats s = *iter;
             sum += UnitTk::byteToMebibyte(s.incVals.diskReadBytes);
          }
-         node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
       }
    }
    else
@@ -405,10 +384,9 @@ std::string NodeStoreStorageEx::diskWriteSum(uint timespanM, std::string *outUni
    double sum = 0; // sum in MiB
    if (timespanM <= 10)
    {
-      auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
-
-      while (node != NULL)
+      for (const auto& nodeBase : referenceAllNodes())
       {
+         auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
          std::vector<HighResStatsList> dataSets;
          HighResStatsList data = node->getHighResData();
 
@@ -417,7 +395,6 @@ std::string NodeStoreStorageEx::diskWriteSum(uint timespanM, std::string *outUni
             HighResolutionStats s = *iter;
             sum += UnitTk::byteToMebibyte(s.incVals.diskWriteBytes);
          }
-         node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
       }
    }
    else
@@ -465,14 +442,12 @@ void NodeStoreStorageEx::diskPerfWriteSum(uint timespanM, UInt64List *outListTim
    {
       valueTimeRange = 500; // 500 ms before and after the time value
 
-      auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
-
-      while (node != NULL)
+      for (const auto& nodeBase : referenceAllNodes())
       {
+         auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
          HighResStatsList data = node->getHighResData();
 
          dataSets.push_back(data);
-         node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
       }
    }
    else
@@ -590,14 +565,12 @@ void NodeStoreStorageEx::diskPerfReadSum(uint timespanM, UInt64List *outListTime
    {
       valueTimeRange = 500; // 500 ms before and after the time value
 
-      auto node = std::static_pointer_cast<StorageNodeEx>(referenceFirstNode());
-
-      while (node != NULL)
+      for (const auto& nodeBase : referenceAllNodes())
       {
+         auto node = std::static_pointer_cast<StorageNodeEx>(nodeBase);
          HighResStatsList data = node->getHighResData();
 
          dataSets.push_back(data);
-         node = std::static_pointer_cast<StorageNodeEx>(referenceNextNode(node));
       }
    }
    else

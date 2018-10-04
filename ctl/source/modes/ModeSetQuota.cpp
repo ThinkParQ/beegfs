@@ -28,7 +28,7 @@
 #define MODESETQUOTA_ARGVALUE_SIZE_INODE_RESET          "reset"
 #define MODESETQUOTA_ARGVALUE_SIZE_INODE_UNLIMITED      "unlimited"
 
-#define MODESETQUOTA_ERR_OPEN_FILE_FAILED   -1
+#define MODESETQUOTA_ERR_OPEN_FILE_FAILED   (-1)
 #define MODESETQUOTA_ERR_NONE                0
 #define MODESETQUOTA_ERR_FAILD_LINES         1 // positive values are the number of failed lines
 
@@ -95,7 +95,7 @@ int ModeSetQuota::execute()
    }
 
    //remove all duplicated IDs, the list::unique() needs a sorted list and convert to quota data map
-   if(this->cfg.cfgIDList.size() > 0)
+   if (!this->cfg.cfgIDList.empty())
    {
       this->cfg.cfgIDList.sort();
       this->cfg.cfgIDList.unique();
@@ -645,19 +645,13 @@ bool ModeSetQuota::uploadQuotaLimitsAndCollectResponses(Node& mgmtNode)
    // request all subranges (=> msg size limitation) from current server
    for(int messageNumber = 0; messageNumber < getMaxMessageCount(); messageNumber++)
    {
-      bool commRes = false;
-      char* respBuf = NULL;
-
       SetQuotaMsg msg(cfg.cfgStoragePoolId);
       prepareMessage(messageNumber, &msg);
 
-      NetMessage* respMsg = NULL;
       SetQuotaRespMsg* respMsgCast;
 
-      // request/response
-      commRes = MessagingTk::requestResponse(mgmtNode, &msg, NETMSGTYPE_SetQuotaResp,
-         &respBuf, &respMsg);
-      if(!commRes)
+      const auto respMsg = MessagingTk::requestResponse(mgmtNode, msg, NETMSGTYPE_SetQuotaResp);
+      if (!respMsg)
       {
          std::cerr << "Failed to communicate with node: " << mgmtNode.getTypedNodeID()
             << std::endl;
@@ -665,7 +659,7 @@ bool ModeSetQuota::uploadQuotaLimitsAndCollectResponses(Node& mgmtNode)
          goto err_cleanup;
       }
 
-      respMsgCast = (SetQuotaRespMsg*)respMsg;
+      respMsgCast = (SetQuotaRespMsg*)respMsg.get();
       if (!respMsgCast->getValue() )
       {
          std::cerr << "Failed to set quota limits. Check management server logfile of node: "
@@ -675,9 +669,6 @@ bool ModeSetQuota::uploadQuotaLimitsAndCollectResponses(Node& mgmtNode)
       }
 
 err_cleanup:
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
-
       if(!retVal)
          break;
    }
@@ -694,25 +685,19 @@ bool ModeSetQuota::uploadDefaultQuotaLimitsAndCollectResponses(Node& mgmtNode)
    if(this->cfg.cfgType == QuotaDataType_GROUP)
       typeString = "groups";
 
-   bool commRes = false;
-   char* respBuf = NULL;
-
    SetDefaultQuotaMsg msg(cfg.cfgStoragePoolId, cfg.cfgType, cfg.cfgSizeLimit, cfg.cfgInodeLimit);
 
-   NetMessage* respMsg = NULL;
    SetDefaultQuotaRespMsg* respMsgCast;
 
-   // request/response
-   commRes = MessagingTk::requestResponse(mgmtNode, &msg, NETMSGTYPE_SetDefaultQuotaResp,
-      &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(mgmtNode, msg, NETMSGTYPE_SetDefaultQuotaResp);
+   if (!respMsg)
    {
       std::cerr << "Failed to communicate with node: " << mgmtNode.getTypedNodeID() << std::endl;
       retVal = false;
       goto err_cleanup;
    }
 
-   respMsgCast = (SetDefaultQuotaRespMsg*)respMsg;
+   respMsgCast = (SetDefaultQuotaRespMsg*)respMsg.get();
    if (!respMsgCast->getValue() )
    {
       std::cerr << "Failed to set default quota limits. Check management server logfile of node: "
@@ -721,8 +706,6 @@ bool ModeSetQuota::uploadDefaultQuotaLimitsAndCollectResponses(Node& mgmtNode)
    }
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return retVal;
 }

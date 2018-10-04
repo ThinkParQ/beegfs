@@ -47,7 +47,7 @@ class BuddyResyncJob : public PThread
       bool walkDirs(std::string chunksPath, std::string relPath, int level,
          int64_t lastBuddyCommTimeSecs);
 
-      bool startGatherSlaves();
+      bool startGatherSlaves(const StorageTarget& target);
       bool startSyncSlaves();
       void joinGatherSlaves();
       void joinSyncSlaves();

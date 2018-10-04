@@ -9,10 +9,10 @@ class MapTargetsRespMsg : public NetMessageSerdes<MapTargetsRespMsg>
 {
    public:
       /**
-       * @param resultVec vector<FhgfsOpsErr> indicating the map result of each target sent
+       * @param results indicates the map result of each target sent
        */
-      MapTargetsRespMsg(FhgfsOpsErrVec* resultVec):
-            BaseType(NETMSGTYPE_MapTargetsResp), resultVec(resultVec)
+      MapTargetsRespMsg(const std::map<uint16_t, FhgfsOpsErr>& results):
+            BaseType(NETMSGTYPE_MapTargetsResp), results(&results)
       {
       }
 
@@ -28,22 +28,19 @@ class MapTargetsRespMsg : public NetMessageSerdes<MapTargetsRespMsg>
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % serdes::backedPtr(obj->resultVec, obj->parsed.resultVec);
+            % serdes::backedPtr(obj->results, obj->parsed.results);
       }
 
-      const FhgfsOpsErrVec& getResultVec() const
-      {
-         return *resultVec;
-      }
+      const std::map<uint16_t, FhgfsOpsErr>& getResults() const { return *results; }
 
    private:
       // for serialization
-      FhgfsOpsErrVec* resultVec;
+      const std::map<uint16_t, FhgfsOpsErr>* results;
 
       // for deserialization
       struct
       {
-         FhgfsOpsErrVec resultVec;
+         std::map<uint16_t, FhgfsOpsErr> results;
       } parsed;
 };
 

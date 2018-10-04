@@ -49,24 +49,8 @@ extern void FhgfsOps_initInodeOnce(void* inode);
 extern loff_t generic_file_llseek_unlocked(struct file *file, loff_t offset, int origin);
 #endif // LINUX_VERSION_CODE
 
-#ifndef KERNEL_HAS_DROP_NLINK
-extern void drop_nlink(struct inode *inode);
-#endif // KERNEL_HAS_DROP_NLINK
-
-#ifndef KERNEL_HAS_CLEAR_NLINK
-extern void clear_nlink(struct inode *inode);
-#endif // KERNEL_HAS_CLEAR_NLINK
-
-#ifndef KERNEL_HAS_INC_NLINK
-extern void inc_nlink(struct inode *inode);
-#endif // KERNEL_HAS_INC_NLINK
-
 #ifndef KERNEL_HAS_SET_NLINK
 static inline void set_nlink(struct inode *inode, unsigned int nlink);
-#endif // LINUX_VERSION_CODE
-
-#ifndef KERNEL_HAS_MAPPING_SET_ERROR
-static inline void mapping_set_error(struct address_space *mapping, int error);
 #endif // LINUX_VERSION_CODE
 
 #ifndef KERNEL_HAS_DENTRY_PATH_RAW
@@ -87,24 +71,6 @@ void set_nlink(struct inode *inode, unsigned int nlink)
 {
    inode->i_nlink = nlink;
 }
-#endif // LINUX_VERSION_CODE
-
-#ifndef KERNEL_HAS_MAPPING_SET_ERROR
-
-/**
- * Note: This is just an emulator that does the job for old kernels.
- */
-void mapping_set_error(struct address_space *mapping, int error)
-{
-   if(unlikely(error) )
-   {
-      if(error == -ENOSPC)
-         set_bit(AS_ENOSPC, &mapping->flags);
-      else
-         set_bit(AS_EIO, &mapping->flags);
-   }
-}
-
 #endif // LINUX_VERSION_CODE
 
 #ifndef KERNEL_HAS_IHOLD

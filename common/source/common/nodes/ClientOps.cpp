@@ -126,22 +126,16 @@ ClientOpsRequestor::IdOpsUnorderedMap ClientOpsRequestor::request(Node& node, bo
       if (perUser)
          getClientStatsMsg.addMsgHeaderFeatureFlag(GETCLIENTSTATSMSG_FLAG_PERUSERSTATS);
 
-      char* respBuf = NULL;
-      NetMessage* respMsg = NULL;
+      const auto respMsg = MessagingTk::requestResponse(node, getClientStatsMsg,
+            NETMSGTYPE_GetClientStatsResp);
 
-      bool commRes = MessagingTk::requestResponse(node, &getClientStatsMsg,
-            NETMSGTYPE_GetClientStatsResp, &respBuf, &respMsg);
-
-      std::unique_ptr<char, decltype(free)*> respBufPtr(respBuf, free);
-      std::unique_ptr<NetMessage> respMsgPtr(respMsg);
-
-      if (!commRes)
+      if (!respMsg)
       {
          LOG(GENERAL, DEBUG, "Node is not responding: " + node.getNodeIDWithTypeStr());
          return ClientOpsRequestor::IdOpsUnorderedMap();
       }
 
-      GetClientStatsRespMsg* respMsgCast = static_cast<GetClientStatsRespMsg*>(respMsg);
+      GetClientStatsRespMsg* respMsgCast = static_cast<GetClientStatsRespMsg*>(respMsg.get());
       std::vector<uint64_t> dataVector;
       respMsgCast->getStatsVector().swap(dataVector);
 
@@ -165,7 +159,7 @@ ClientOpsRequestor::IdOpsUnorderedMap ClientOpsRequestor::request(Node& node, bo
          if (counter == 0)
             currentID = *iter;
          else
-            opsList.push_back(std::move(*iter));
+            opsList.push_back(*iter);
 
          counter++;
 

@@ -10,24 +10,21 @@ bool MapTargetsMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("MapTargetsMsg incoming");
 
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a MapTargetsMsg from: " + ctx.peerName() );
-
    const App* app = Program::getApp();
    const NodeStoreServers* storageNodes = app->getStorageNodes();
    TargetMapper* targetMapper = app->getTargetMapper();
 
    const NumNodeID nodeID = getNodeID();
-   const auto targetVec = getTargetVec();
-   FhgfsOpsErrVec responseCodeVec;
+   std::map<uint16_t, FhgfsOpsErr> results;
 
-   for (auto iter = targetVec.begin(); iter != targetVec.end(); iter++)
-   { // => targetVec is a vector with "targetID,storagePoolID" as elements
-      const auto targetId = iter->first;
-      const auto poolId = iter->second;
+   for (const auto mapping : getTargets())
+   {
+      const auto targetId = mapping.first;
+      const auto poolId = mapping.second;
 
       const auto mapRes = targetMapper->mapTarget(targetId, nodeID, poolId);
 
-      responseCodeVec.push_back(mapRes.first);
+      results[targetId] = mapRes.first;
 
       if ( (mapRes.first != FhgfsOpsErr_SUCCESS) && (mapRes.second) )
       { // target could be mapped and is new
@@ -41,7 +38,7 @@ bool MapTargetsMsgEx::processIncoming(ResponseContext& ctx)
    }
 
    if(!acknowledge(ctx) )
-      ctx.sendResponse(MapTargetsRespMsg(&responseCodeVec) );
+      ctx.sendResponse(MapTargetsRespMsg(results));
 
    return true;
 }

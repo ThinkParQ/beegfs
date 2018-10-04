@@ -1,6 +1,4 @@
-CAN_PACKAGE := yes
-
-include $(or $(root-dir),../..)/build/Makefile
+include ../../build/Makefile
 
 main := ../source/program/Main.cpp
 sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
@@ -8,7 +6,7 @@ sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
 $(call build-static-library,\
    Meta,\
    $(sources),\
-   opentk common dl,\
+   common dl,\
    ../source)
 
 $(call define-dep-lib,\
@@ -19,12 +17,12 @@ $(call define-dep-lib,\
 $(call build-executable,\
    beegfs-meta,\
    $(main),\
-   Meta opentk common dl)
+   Meta common dl)
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   Meta common opentk dl,\
+   Meta common dl,\
    ../tests)
 
 # enable special reference DirInode debug code

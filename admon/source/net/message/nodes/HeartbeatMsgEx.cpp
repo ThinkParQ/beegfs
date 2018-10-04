@@ -2,11 +2,11 @@
 #include <program/Program.h>
 #include "HeartbeatMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Heartbeat incoming");
-
-   //LOG_DEBUG_CONTEXT(log, Log_DEBUG, std::string("Received a HeartbeatMsg from: ") + peer);
 
    App* app = Program::getApp();
    bool isNodeNew;
@@ -15,13 +15,8 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    NicAddressList& nicList = getNicList();
 
-   auto node = std::make_shared<Node>(getNodeID(), getNodeNumID(), getPortUDP(), getPortTCP(),
-      nicList);
-
-   node->setNodeType(getNodeType() );
-   node->setFhgfsVersion(getFhgfsVersion() );
-
-   node->setFeatureFlags(&getNodeFeatureFlags() );
+   auto node = std::make_shared<Node>(getNodeType(), getNodeID(), getNodeNumID(), getPortUDP(),
+         getPortTCP(), nicList);
 
    // set local nic capabilities
 
@@ -57,11 +52,11 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       default:
       {
          LOG(GENERAL, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(getNodeType())),
-               as("Sender", ctx.peerName()),
-               as("NodeID", getNodeNumID()),
-               as("Port (UDP)", getPortUDP()),
-               as("Port (TCP)", getPortTCP())
+               ("Node Type", getNodeType()),
+               ("Sender", ctx.peerName()),
+               ("NodeID", getNodeNumID()),
+               ("Port (UDP)", getPortUDP()),
+               ("Port (TCP)", getPortTCP())
             );
 
       } break;
@@ -84,7 +79,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
          log.log(Log_WARNING,
             "Number of nodes: " + StringTk::intToStr(nodes->getSize() ) + " "
-            "(Type: " + Node::nodeTypeToStr((NodeType)getNodeType() ) + ")");
+            "(Type: " + boost::lexical_cast<std::string>(getNodeType()) + ")");
       }
 
       processIncomingRoot();
@@ -107,6 +102,6 @@ void HeartbeatMsgEx::processIncomingRoot()
    const bool rootIsBuddyMirrored = getRootIsBuddyMirrored();
 
    // try to apply the contained root info
-   Program::getApp()->getMetaNodes()->setRootNodeNumID(getRootNumID(), false, rootIsBuddyMirrored);
+   Program::getApp()->getMetaRoot().setIfDefault(getRootNumID(), rootIsBuddyMirrored);
 }
 

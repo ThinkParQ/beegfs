@@ -62,7 +62,7 @@ bool LookupIntentRespMsg_deserializePayload(NetMessage* this, DeserializeCtx* ct
 
       // stripePattern
       if(!StripePattern_deserializePatternPreprocess(ctx,
-         &thisCast->patternHeader, &thisCast->patternStart) )
+         &thisCast->patternStart, &thisCast->patternLength) )
          return false;
 
       // PathInfo

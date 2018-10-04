@@ -6,6 +6,7 @@
 #include <program/Program.h>
 #include "LockRangeNotificationWork.h"
 
+#include <mutex>
 
 Mutex LockRangeNotificationWork::ackCounterMutex;
 unsigned LockRangeNotificationWork::ackCounter = 0;
@@ -25,7 +26,7 @@ void LockRangeNotificationWork::process(char* bufIn, unsigned bufInLen, char* bu
    AcknowledgmentStore* ackStore = app->getAckStore();
    DatagramListener* dgramLis = app->getDatagramListener();
    MetaStore* metaStore = app->getMetaStore();
-   NodeStoreClientsEx* clients = app->getClientNodes();
+   NodeStoreClients* clients = app->getClientNodes();
    NumNodeID localNodeID = app->getLocalNode().getNumID();
 
    // max total time is ackWaitMS * numRetries, defaults to 333ms * 15 => 5s
@@ -72,11 +73,12 @@ void LockRangeNotificationWork::process(char* bufIn, unsigned bufInLen, char* bu
    {
       // create waitAcks copy
 
-      SafeMutexLock waitAcksLock(&notifier.waitAcksMutex);
+      WaitAckMap currentWaitAcks;
+      {
+         const std::lock_guard<Mutex> lock(notifier.waitAcksMutex);
 
-      WaitAckMap currentWaitAcks(waitAcks);
-
-      waitAcksLock.unlock();
+         currentWaitAcks = waitAcks;
+      }
 
       // send messages
 
@@ -172,15 +174,9 @@ void LockRangeNotificationWork::process(char* bufIn, unsigned bufInLen, char* bu
 
 unsigned LockRangeNotificationWork::incAckCounter()
 {
-   unsigned currentAckCounter;
+   const std::lock_guard<Mutex> lock(ackCounterMutex);
 
-   SafeMutexLock mutexLock(&ackCounterMutex);
-
-   currentAckCounter = ackCounter++;
-
-   mutexLock.unlock();
-
-   return currentAckCounter;
+   return ackCounter++;
 }
 
 Mutex* LockRangeNotificationWork::getDGramLisMutex(AbstractDatagramListener* dgramLis)

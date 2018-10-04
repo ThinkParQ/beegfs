@@ -5,7 +5,6 @@
 bool GetFileVersionMsgEx::processIncoming(ResponseContext& ctx)
 {
    auto& metaStore = *Program::getApp()->getMetaStore();
-   LOG_DBG(SESSIONS, DEBUG, "Received a GetFileVersionMsg.", ctx.peerName());
    LOG_DBG(SESSIONS, DEBUG, "", getEntryInfo().getEntryID(), getEntryInfo().getIsBuddyMirrored());
 
    auto inode = metaStore.referenceFile(&getEntryInfo());

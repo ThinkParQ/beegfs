@@ -7,6 +7,7 @@
 #include <common/threading/PThread.h>
 #include <common/Common.h>
 
+#include <mutex>
 
 class InternodeSyncer : public PThread
 {
@@ -51,22 +52,18 @@ class InternodeSyncer : public PThread
 
       void setForceNodesAndTargetStatesUpdate()
       {
-         SafeMutexLock safeLock(&forceNodesAndTargetStatesUpdateMutex);
+         const std::lock_guard<Mutex> lock(forceNodesAndTargetStatesUpdateMutex);
 
          this->forceNodesAndTargetStatesUpdate = true;
-
-         safeLock.unlock();
       }
 
       bool getAndResetForceNodesAndTargetStatesUpdate()
       {
-         SafeMutexLock safeLock(&forceNodesAndTargetStatesUpdateMutex);
+         const std::lock_guard<Mutex> lock(forceNodesAndTargetStatesUpdateMutex);
 
          bool retVal = this->forceNodesAndTargetStatesUpdate;
 
          this->forceNodesAndTargetStatesUpdate = false;
-
-         safeLock.unlock();
 
          return retVal;
       }

@@ -14,6 +14,8 @@
 #include <program/Program.h>
 #include "ModeIOTest.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 #define MODEIOTEST_ARG_UNMOUNTEDPATH            "--unmounted"
 #define MODEIOTEST_ARG_WRITE                    "--write"
@@ -105,7 +107,7 @@ int ModeIOTest::execute()
    EntryInfo entryInfo;
 
    if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, false,
-         *metaNodes, *metaBuddyGroupMapper,
+         *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
          entryInfo, ownerNode))
    {
       return APPCODE_RUNTIME_ERROR;
@@ -184,7 +186,7 @@ bool ModeIOTest::writeTest(Node& ownerNode, EntryInfo* entryInfo)
       return false;
 
    boost::scoped_array<char> buf(new char[cfgRecordsize]);
-   memset(buf.get(), 1234567890, cfgRecordsize);
+   memset(buf.get(), 0xaa, cfgRecordsize);
 
    std::cout << "*****" << std::endl;
    std::cout << "WRITE recordsize: " << UnitTk::int64ToHumanStr(cfgRecordsize) <<
@@ -339,31 +341,26 @@ bool ModeIOTest::openFile(Node& ownerNode, EntryInfo* entryInfo, unsigned openFl
    bool retVal = false;
 
    NumNodeID localNodeNumID = Program::getApp()->getLocalNode().getNumID();
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    OpenFileRespMsg* respMsgCast;
 
    FhgfsOpsErr openRes;
 
    OpenFileMsg msg(localNodeNumID, entryInfo, openFlags);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &msg, NETMSGTYPE_OpenFileResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, msg, NETMSGTYPE_OpenFileResp);
+   if (!respMsg)
    {
       std::cerr << "Communication error during open on server " << ownerNode.getID() << std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (OpenFileRespMsg*)respMsg;
+   respMsgCast = (OpenFileRespMsg*)respMsg.get();
 
    openRes = (FhgfsOpsErr)respMsgCast->getResult();
    if(openRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Server encountered an error during open: " <<
-         FhgfsOpsErrTk::toErrString(openRes) << std::endl;
+         openRes << std::endl;
       goto err_cleanup;
    }
 
@@ -374,9 +371,6 @@ bool ModeIOTest::openFile(Node& ownerNode, EntryInfo* entryInfo, unsigned openFl
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -386,40 +380,31 @@ bool ModeIOTest::closeFile(Node& ownerNode, std::string fileHandleID, EntryInfo*
    bool retVal = false;
 
    NumNodeID localNodeNumID = Program::getApp()->getLocalNode().getNumID();
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    CloseFileRespMsg* respMsgCast;
 
    FhgfsOpsErr closeRes;
 
    CloseFileMsg msg(localNodeNumID, fileHandleID, entryInfo, maxUsedNodeIndex);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &msg, NETMSGTYPE_CloseFileResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, msg, NETMSGTYPE_CloseFileResp);
+   if (!respMsg)
    {
       std::cerr << "Communication error during close on server " << ownerNode.getID() << std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (CloseFileRespMsg*)respMsg;
+   respMsgCast = (CloseFileRespMsg*)respMsg.get();
 
    closeRes = (FhgfsOpsErr)respMsgCast->getValue();
    if(closeRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Server encountered an error during close: " <<
-         FhgfsOpsErrTk::toErrString(closeRes) << std::endl;
+      std::cerr << "Server encountered an error during close: " << closeRes << std::endl;
       goto err_cleanup;
    }
 
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -488,7 +473,7 @@ ssize_t ModeIOTest::writefile(const char *buf, size_t size, off_t offset, std::s
             FhgfsOpsErr nodeError = (FhgfsOpsErr)-nodeResults[currentNodeIndex];
             LogContext(logContext).log(2, std::string("Storage node encountered an error: ") +
                StringTk::uintToStr( (*targetIDs)[currentNodeIndex] ) +
-               std::string("; msg: ") + FhgfsOpsErrTk::toErrString(nodeError) );
+               std::string("; msg: ") + boost::lexical_cast<std::string>(nodeError));
             return -nodeError;
          }
       }
@@ -577,7 +562,7 @@ ssize_t ModeIOTest::readfile(char *buf, size_t size, off_t offset, std::string f
                FhgfsOpsErr nodeError = (FhgfsOpsErr)-nodeResults[currentNodeIndex];
                LogContext(logContext).log(2, std::string("Storage node encountered an error: ") +
                   StringTk::uintToStr( (*targetIDs)[currentNodeIndex] ) +
-                  std::string("; msg: ") + FhgfsOpsErrTk::toErrString(nodeError) );
+                  std::string("; msg: ") + boost::lexical_cast<std::string>(nodeError));
                return -nodeError;
             }
          }
@@ -611,7 +596,7 @@ void ModeIOTest::printPattern(StripePattern* pattern)
       "desired: " << pattern->getDefaultNumTargets() <<
       std::endl;
 
-   if(stripeTargetIDs.size() )
+   if (!stripeTargetIDs.empty())
    {
       std::cout << "+ Storage nodes: " << std::endl;
 

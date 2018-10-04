@@ -83,7 +83,7 @@ bool IoctlTk::createFile(BeegfsIoctl_MkFileV3_Arg* fileData)
 /**
  * ioctl to test if the underlying fs is a fhgfs.
  */
-bool IoctlTk::testIsFhGFS(void)
+bool IoctlTk::testIsFhGFS()
 {
    bool testRes = beegfs_testIsBeeGFS(fd);
    if(!testRes)

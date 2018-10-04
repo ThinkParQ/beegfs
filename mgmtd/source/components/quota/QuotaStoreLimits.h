@@ -2,7 +2,7 @@
 #define QUOTASTORELIMITS_H_
 
 #include <common/threading/RWLock.h>
-#include <common/threading/SafeRWLock.h>
+#include <common/threading/RWLockGuard.h>
 #include <common/storage/quota/QuotaData.h>
 #include <common/Common.h>
 
@@ -18,7 +18,7 @@ class QuotaStoreLimits
 #ifdef BEEGFS_DEBUG
          quotaType(type),
 #endif
-         logContext(logContext), storePath(storePath), storeDirty(false)
+         logContext(logContext), storePath(storePath)
       {
          IGNORE_UNUSED_DEBUG_VARIABLE(type);
       }
@@ -29,7 +29,7 @@ class QuotaStoreLimits
       void clearLimits();
 
       void addOrUpdateLimit(const QuotaData quotaData);
-      void addOrUpdateLimits(const QuotaDataList& quotaData);
+      void addOrUpdateLimits(const QuotaDataList& quotaDataList);
 
       bool getQuotaLimit(QuotaData& quotaDataInOut);
       bool getQuotaLimitForRange(const unsigned rangeStart, const unsigned rangeEnd,
@@ -47,7 +47,6 @@ class QuotaStoreLimits
       RWLock limitsRWLock; // syncs access to the limits
 
       std::string storePath; // not thread-safe!
-      bool storeDirty; // true if saved limits file needs to be updated
 
       QuotaDataMap limits; // the individual quota limits
 
@@ -61,27 +60,14 @@ class QuotaStoreLimits
          return this->storePath;
       }
 
-      bool isStoreDirty()
-      {
-         SafeRWLock rwLock(&this->limitsRWLock, SafeRWLock_READ); // R E A D L O C K
-         bool retVal = this->storeDirty;
-         rwLock.unlock(); // U N L O C K
-
-         return retVal;
-      }
-
       /**
        * Get number of stored quota limits.
        */
       size_t getSize()
       {
-         SafeRWLock rwLock(&this->limitsRWLock, SafeRWLock_READ); // R E A D L O C K
+         RWLockGuard const lock(limitsRWLock, SafeRWLock_READ);
 
-         size_t size = this->limits.size();
-
-         rwLock.unlock(); // U N L O C K
-
-         return size;
+         return limits.size();
       }
 };
 

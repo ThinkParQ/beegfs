@@ -25,10 +25,6 @@ extern int64_t FhgfsOpsCommKitVec_rwFileCommunicate(App* app, RemotingIOInfo* io
 static inline FhgfsCommKitVec FhgfsOpsCommKitVec_assignRWfileState(FhgfsChunkPageVec* pageVec,
    unsigned pageIdx, unsigned numPages, loff_t offset, uint16_t targetID, char* msgBuf);
 
-static inline void FhgfsOpsCommKitVec_setRWfileStateUseBuddyMirrorSecond(
-   bool useBuddyMirrorSecond, FhgfsCommKitVec* outComm);
-static inline void FhgfsOpsCommKitVec_setRWfileStateUseServersideMirroring(
-   bool useServersideMirroring, FhgfsCommKitVec* outComm);
 static inline void FhgfsOpsCommKitVec_setRWFileStateFirstWriteDone(
    bool firstWriteDoneForTarget, FhgfsCommKitVec* outComm);
 
@@ -168,18 +164,6 @@ FhgfsCommKitVec FhgfsOpsCommKitVec_assignRWfileState(FhgfsChunkPageVec* pageVec,
    state.pageVec = pageVec;
 
    return state;
-}
-
-void FhgfsOpsCommKitVec_setRWfileStateUseBuddyMirrorSecond(bool useBuddyMirrorSecond,
-   FhgfsCommKitVec* outComm)
-{
-   outComm->useBuddyMirrorSecond = useBuddyMirrorSecond;
-}
-
-void FhgfsOpsCommKitVec_setRWfileStateUseServersideMirroring(bool useServersideMirroring,
-   FhgfsCommKitVec* outComm)
-{
-   outComm->useServersideMirroring = useServersideMirroring;
 }
 
 void FhgfsOpsCommKitVec_setRWFileStateFirstWriteDone(bool firstWriteDoneForTarget,

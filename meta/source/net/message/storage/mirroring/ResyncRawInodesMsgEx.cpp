@@ -13,8 +13,7 @@
 
 bool ResyncRawInodesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(MIRRORING, DEBUG, "Received a ResyncRawInodesMsg.", as("peer", ctx.getSocket()->getPeername()),
-         basePath, hasXAttrs, wholeDirectory);
+   LOG_DBG(MIRRORING, DEBUG, "", basePath, hasXAttrs, wholeDirectory);
 
    const FhgfsOpsErr resyncRes = resyncStream(ctx);
 
@@ -30,12 +29,12 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncStream(ResponseContext& ctx)
       return FhgfsOpsErr_NOTSUPP;
    }
 
+   const auto& rootInfo = Program::getApp()->getMetaRoot();
    auto* const metaBGM = Program::getApp()->getMetaBuddyGroupMapper();
-   auto* const metaNodes = Program::getApp()->getMetaNodes();
    auto* const rootDir = Program::getApp()->getRootDir();
 
    // if the local root is not buddyMirrored yet, set local buddy mirroring for the root inode.
-   if (metaNodes->getRootNodeNumID().val() == metaBGM->getLocalGroupID() &&
+   if (rootInfo.getID().val() == metaBGM->getLocalGroupID() &&
          !rootDir->getIsBuddyMirrored())
    {
       const auto setMirrorRes = SetMetadataMirroringMsgEx::setMirroring();
@@ -56,7 +55,7 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncStream(ResponseContext& ctx)
       if (mkRes.first != FhgfsOpsErr_SUCCESS)
       {
          LOG(MIRRORING, ERR, "Failed to create metadata directory.", basePath,
-             as("mkRes", mkRes.first));
+             ("mkRes", mkRes.first));
          return mkRes.first;
       }
    }
@@ -163,7 +162,7 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncInode(ResponseContext& ctx, const Path& 
       if (rmRes || errno == ENOENT)
          return FhgfsOpsErr_SUCCESS;
 
-      LOG(MIRRORING, ERR, "Failed to remove raw meta inode.", path, sysErr());
+      LOG(MIRRORING, ERR, "Failed to remove raw meta inode.", path, sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
@@ -250,7 +249,7 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncDentry(ResponseContext& ctx, const Path&
          (META_BUDDYMIRROR_SUBDIR_NAME / path).str().c_str());
    if (linkRes < 0)
    {
-      LOG(MIRRORING, ERR, "Could not link dentry to fsid.", path, idPath, sysErr());
+      LOG(MIRRORING, ERR, "Could not link dentry to fsid.", path, idPath, sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
@@ -289,14 +288,14 @@ FhgfsOpsErr ResyncRawInodesMsgEx::removeUntouchedInodes()
 
    if (!dir)
    {
-      LOG(MIRRORING, ERR, "Could not open meta directory.", dirPath, sysErr());
+      LOG(MIRRORING, ERR, "Could not open meta directory.", dirPath, sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
    int dirFD = ::dirfd(dir.get());
    if (dirFD < 0)
    {
-      LOG(MIRRORING, ERR, "Could not get directory fd.", sysErr());
+      LOG(MIRRORING, ERR, "Could not get directory fd.", sysErr);
       return FhgfsOpsErr_INTERNAL;
    }
 
@@ -336,14 +335,14 @@ FhgfsOpsErr ResyncRawInodesMsgEx::removeUntouchedInodes()
 
       if (errno != EISDIR)
       {
-         LOG(MIRRORING, ERR, "Could not remove file", basePath, found->d_name, sysErr());
+         LOG(MIRRORING, ERR, "Could not remove file", basePath, found->d_name, sysErr);
          return FhgfsOpsErr_INTERNAL;
       }
 
       const bool rmRes = StorageTk::removeDirRecursive((dirPath / found->d_name).str());
       if (!rmRes)
       {
-         LOG(MIRRORING, ERR, "Could not remove file", found->d_name, sysErr());
+         LOG(MIRRORING, ERR, "Could not remove file", found->d_name, sysErr);
          return FhgfsOpsErr_INTERNAL;
       }
    }

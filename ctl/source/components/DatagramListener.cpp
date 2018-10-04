@@ -17,8 +17,7 @@ void DatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessag
    HighResolutionStats stats; // currently ignored
    NetMessage::ResponseContext rctx(fromAddr, udpSock, sendBuf, DGRAMMGR_SENDBUF_SIZE, &stats);
 
-   NetMsgStrMapping strMapping;
-   const auto messageType = strMapping.defineToStr(msg->getMsgType());
+   const auto messageType = netMessageTypeToStr(msg->getMsgType());
 
    switch(msg->getMsgType() )
    {

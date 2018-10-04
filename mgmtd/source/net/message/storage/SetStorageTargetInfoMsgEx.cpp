@@ -6,9 +6,6 @@
 
 bool SetStorageTargetInfoMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("Set target info incoming", Log_DEBUG,
-      "Received a SetStorageTargetInfoMsg from: " + ctx.peerName() );
-
    FhgfsOpsErr result;
 
    App* app = Program::getApp();

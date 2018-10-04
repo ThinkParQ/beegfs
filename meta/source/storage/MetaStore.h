@@ -34,17 +34,17 @@ class MetaStore
       MetaFileHandle referenceFile(EntryInfo* entryInfo);
       MetaFileHandle referenceLoadedFile(const std::string& parentEntryID,
          bool parentIsBuddyMirrored, const std::string& entryID);
-      bool releaseFile(const std::string& parentEntryID, MetaFileHandle& file);
+      bool releaseFile(const std::string& parentEntryID, MetaFileHandle& inode);
       bool referenceInode(const std::string& entryID, bool isBuddyMirrored,
          MetaFileHandle& outFileInode, DirInode*& outDirInode);
 
-      FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags, MetaFileHandle& outFile,
+      FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags, MetaFileHandle& outInode,
          bool checkDisposalFirst = false);
-      void closeFile(EntryInfo* entryInfo, MetaFileHandle file, unsigned accessFlags,
+      void closeFile(EntryInfo* entryInfo, MetaFileHandle inode, unsigned accessFlags,
          unsigned* outNumHardlinks, unsigned* outNumRefs);
 
       FhgfsOpsErr stat(EntryInfo* entryInfo, bool loadFromDisk, StatData& outStatData,
-         NumNodeID* outParentNodeID = NULL, std::string* parententryID = NULL);
+         NumNodeID* outParentNodeID = NULL, std::string* outParentEntryID = NULL);
 
       FhgfsOpsErr setAttr(EntryInfo* entryInfo, int validAttribs, SettableFileAttribs* attribs);
       FhgfsOpsErr setDirParent(EntryInfo* entryInfo, NumNodeID parentNodeID);
@@ -53,14 +53,14 @@ class MetaStore
          std::unique_ptr<StripePattern> stripePattern, EntryInfo* outEntryInfo,
          FileInodeStoreData* outInodeData);
 
-      FhgfsOpsErr makeDirInode(DirInode& dir);
-      FhgfsOpsErr makeDirInode(DirInode& dir, const CharVector& defaultACLXAttr,
+      FhgfsOpsErr makeDirInode(DirInode& inode);
+      FhgfsOpsErr makeDirInode(DirInode& inode, const CharVector& defaultACLXAttr,
          const CharVector& accessACLXAttr);
-      FhgfsOpsErr removeDirInode(const std::string& dirID, bool isBuddyMirrored);
+      FhgfsOpsErr removeDirInode(const std::string& entryID, bool isBuddyMirrored);
       FhgfsOpsErr unlinkInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID);
       FhgfsOpsErr unlinkFile(DirInode& dir, const std::string& fileName,
-         EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outFile);
+         EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outInode);
 
       FhgfsOpsErr unlinkInodeLater(EntryInfo* entryInfo, bool wasInlined);
 
@@ -69,11 +69,11 @@ class MetaStore
 
       FhgfsOpsErr moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
             const std::string& newEntryName, const char* buf,
-            uint32_t bufLen, std::unique_ptr<FileInode>* outUnlinkedFile, EntryInfo& newFileInfo);
+            uint32_t bufLen, std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo);
 
       FhgfsOpsErr moveRemoteFileBegin(DirInode& dir, EntryInfo* entryInfo, char* buf, size_t bufLen,
          size_t* outUsedBufLen);
-      void moveRemoteFileComplete(DirInode& dir, const std::string& fileID);
+      void moveRemoteFileComplete(DirInode& dir, const std::string& entryID);
 
       FhgfsOpsErr getAllInodesIncremental(unsigned hashDirNum, int64_t lastOffset,
           unsigned maxOutInodes, FsckDirInodeList* outDirInodes, FsckFileInodeList* outFileInodes,
@@ -125,8 +125,8 @@ class MetaStore
       FhgfsOpsErr unlinkFileUnlocked(DirInode& subdir, const std::string& fileName,
          std::unique_ptr<FileInode>* outInode, EntryInfo* outEntryInfo, bool& outWasInlined);
 
-      FhgfsOpsErr unlinkDirEntryWithInlinedInodeUnlocked(const std::string& fileName,
-            DirInode& subdir, DirEntry* dirEntry, unsigned unlinkTypeFlags,
+      FhgfsOpsErr unlinkDirEntryWithInlinedInodeUnlocked(const std::string& entryName,
+            DirInode& subDir, DirEntry* dirEntry, unsigned unlinkTypeFlags,
             std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr unlinkDentryAndInodeUnlocked(const std::string& fileName, DirInode& subdir,
          DirEntry* dirEntry, unsigned unlinkTypeFlags, std::unique_ptr<FileInode>* outInode);

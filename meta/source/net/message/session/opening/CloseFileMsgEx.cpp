@@ -20,11 +20,7 @@ bool CloseFileMsgEx::processIncoming(ResponseContext& ctx)
 {
 #ifdef BEEGFS_DEBUG
    const char* logContext = "CloseFileMsg incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a CloseFileMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
-
-   App* app = Program::getApp();
 
    LOG_DEBUG(logContext, Log_DEBUG,
       "BuddyMirrored: " + std::string(getEntryInfo()->getIsBuddyMirrored() ? "Yes" : "No") +
@@ -32,8 +28,7 @@ bool CloseFileMsgEx::processIncoming(ResponseContext& ctx)
       std::string(hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond) ? "Yes" : "No") );
 
    // update operation counters (here on top because we have an early sock release in this msg)
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_CLOSE,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_CLOSE);
 
    return BaseType::processIncoming(ctx);
 }
@@ -54,6 +49,7 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
    bool unlinkDisposalFile = false;
    EntryInfo* entryInfo = getEntryInfo();
    bool modificationEventsMissed = true;
+   bool closeSucceeded;
 
    if(isMsgHeaderFeatureFlagSet(CLOSEFILEMSG_FLAG_CANCELAPPENDLOCKS) )
    { // client requests cleanup of granted or pending locks for this handle
@@ -85,12 +81,18 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
 
       closeRes = MsgHelperClose::closeSessionFile(
          getClientNumID(), getFileHandleID(), entryInfo, &accessFlags, inode);
+      closeSucceeded = closeRes == FhgfsOpsErr_SUCCESS;
 
       // send response
       earlyComplete(ctx, ResponseState(closeRes));
 
       modificationEventsMissed = inode->getNumHardlinks() > 1;
 
+      // if session file close succeeds but chunk file close fails we should not attempt to
+      // dispose. if chunk close failed for any other reason than network outages we might
+      // put the storage server into an even weirder state by unlinking the chunk file:
+      // the file itself is still open (has a session), but is gone on disk, and thus cannot
+      // be reopened from stored sessions when the server is restarted.
       if(likely(closeRes == FhgfsOpsErr_SUCCESS) )
          closeRes = closeFileAfterEarlyResponse(std::move(inode), accessFlags, &unlinkDisposalFile);
    }
@@ -100,6 +102,7 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
       closeRes = MsgHelperClose::closeFile(getClientNumID(), getFileHandleID(),
          entryInfo, getMaxUsedNodeIndex(), getMsgHeaderUserID(), &unlinkDisposalFile,
          &modificationEventsMissed, &dynAttribs, &inodeTimestamps);
+      closeSucceeded = closeRes == FhgfsOpsErr_SUCCESS;
 
       if (getEntryInfo()->getIsBuddyMirrored() && getMaxUsedNodeIndex() >= 0)
          addMsgHeaderFeatureFlag(CLOSEFILEMSG_FLAG_DYNATTRIBS);
@@ -109,7 +112,7 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
       earlyComplete(ctx, ResponseState(closeRes));
    }
 
-   if (closeRes == FhgfsOpsErr_SUCCESS && Program::getApp()->getFileEventLogger() && getFileEvent())
+   if (closeSucceeded && Program::getApp()->getFileEventLogger() && getFileEvent())
    {
          Program::getApp()->getFileEventLogger()->log(
                   *getFileEvent(),

@@ -22,7 +22,7 @@ bool NodeStoreMgmtEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* o
       NicAddressList nicList = node->getNicList();
 
       node = boost::make_unique<MgmtNodeEx>(nodeID, nodeNumID, node->getPortUDP(),
-            node->getPortTCP(), node->getFhgfsVersion(), *node->getNodeFeatures(), nicList);
+            node->getPortTCP(), nicList);
    }
 
    return addOrUpdateNodeUnlocked(std::move(node), outNodeNumID);

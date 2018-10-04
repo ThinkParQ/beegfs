@@ -18,8 +18,8 @@ class ModeListMirrorBuddyGroups : public Mode
 
 
    private:
-      void printGroups(NodeType nodeType, UInt16List& buddyGroupIDs, UInt16List& primaryTargetIDs,
-         UInt16List& secondaryTargetIDs);
+      static void printGroups(const NodeType nodeType, const UInt16List& buddyGroupIDs, const UInt16List& primaryTargetIDs,
+         const UInt16List& secondaryTargetIDs);
 };
 
 #endif /* MODELISTMIRRORBUDDYGROUPS_H_ */

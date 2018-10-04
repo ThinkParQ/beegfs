@@ -1,6 +1,4 @@
-CAN_PACKAGE := yes
-
-include $(or $(root-dir),../..)/build/Makefile
+include ../../build/Makefile
 
 main := ../source/program/Main.cpp
 sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
@@ -8,7 +6,7 @@ sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
 $(call build-static-library,\
    Admon,\
    $(sources),\
-   common opentk dl sqlite openssl ticpp mongoose,\
+   common dl sqlite openssl ticpp mongoose,\
    ../source)
 
 $(call define-dep-lib,\
@@ -19,12 +17,12 @@ $(call define-dep-lib,\
 $(call build-executable,\
    beegfs-admon,\
    $(main),\
-   Admon common opentk dl sqlite openssl ticpp mongoose)
+   Admon common dl sqlite openssl ticpp mongoose)
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   Admon common opentk dl sqlite openssl ticpp mongoose,\
+   Admon common dl sqlite openssl ticpp mongoose,\
    ../tests)
 
 # JAVA_HOME will be honoured automatically by 'ant'

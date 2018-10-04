@@ -43,34 +43,26 @@ class ChunkFetcher
    public:
       bool getIsBad()
       {
-         SafeMutexLock mutexLock(&chunksListMutex);
+         const std::lock_guard<Mutex> lock(chunksListMutex);
 
-         bool result = isBad;
-
-         mutexLock.unlock();
-
-         return result;
+         return isBad;
       }
 
       void setBad()
       {
-         SafeMutexLock mutexLock(&chunksListMutex);
+         const std::lock_guard<Mutex> lock(chunksListMutex);
 
          isBad = true;
-
-         mutexLock.unlock();
       }
 
       void addChunk(FsckChunk& chunk)
       {
-         SafeMutexLock mutexLock(&chunksListMutex);
+         const std::lock_guard<Mutex> lock(chunksListMutex);
 
          if (chunksList.size() > MAX_CHUNKLIST_SIZE)
             chunksListFetchedCondition.wait(&chunksListMutex);
 
          chunksList.push_back(chunk);
-
-         mutexLock.unlock();
       }
 
       bool isQueueEmpty()
@@ -82,7 +74,7 @@ class ChunkFetcher
 
       void getAndDeleteChunks(FsckChunkList& outList, unsigned numChunks)
       {
-         SafeMutexLock mutexLock(&chunksListMutex);
+         const std::lock_guard<Mutex> lock(chunksListMutex);
 
          FsckChunkListIter iterEnd = this->chunksList.begin();
          ListTk::advance(this->chunksList, iterEnd, numChunks);
@@ -90,8 +82,6 @@ class ChunkFetcher
          outList.splice(outList.end(), this->chunksList, this->chunksList.begin(), iterEnd);
 
          chunksListFetchedCondition.signal();
-
-         mutexLock.unlock();
       }
 
       unsigned getNumRunning()
@@ -100,12 +90,10 @@ class ChunkFetcher
 
          for (ChunkFetcherSlaveListIter iter = slaves.begin(); iter != slaves.end(); iter++)
          {
-            SafeMutexLock safeLock( &(iter->statusMutex) );
+            const std::lock_guard<Mutex> lock(iter->statusMutex);
 
             if ( iter->isRunning )
                retVal++;
-
-            safeLock.unlock();
          }
 
          return retVal;

@@ -11,6 +11,10 @@
 #define MSGBUF_DEFAULT_SIZE     (64*1024) // at least big enough to store a datagram
 #define MSGBUF_MAX_SIZE         (4*1024*1024) // max accepted size
 
+// we bet that small messages fits into an allocation of 2k. if this size is used for heartbeat
+// messages and ack messages, that assumption is very likely to be true. other messages are not
+// performance critical, and the overhead of a 2k allocation is small enough to ignore it.
+#define MSGBUF_SMALL_SIZE 2048
 
 DEBUG_ENV_VAR(unsigned, RECEIVE_TIMEOUT, CONN_LONG_TIMEOUT, "BEEGFS_MESSAGING_RECV_TIMEOUT_MS");
 
@@ -21,8 +25,8 @@ bool MessagingTk::requestResponse(RequestResponseArgs* rrArgs)
    if (commRes == FhgfsOpsErr_COMMUNICATION)
    {
       LOG(COMMUNICATION, WARNING, "Retrying communication.",
-           as("peer",  rrArgs->node->getNodeIDWithTypeStr()),
-           as("message type", rrArgs->requestMsg->getMsgTypeStr()));
+           ("peer",  rrArgs->node->getNodeIDWithTypeStr()),
+           ("message type", rrArgs->requestMsg->getMsgTypeStr()));
       commRes = requestResponseComm(rrArgs);
    }
 
@@ -32,25 +36,18 @@ bool MessagingTk::requestResponse(RequestResponseArgs* rrArgs)
 /**
  * Sends a message and receives the response.
  *
- * @param outRespBuf the underlying buffer for outRespMsg needs to be freed by the caller
- * if true is returned.
- * @param outRespMsg response message; needs to be freed by the caller if true is returned.
+ * @param outRespMsg response message
  * @return true if communication succeeded and expected response was received
  */
-bool MessagingTk::requestResponse(Node& node, NetMessage* requestMsg, unsigned respMsgType,
-   char** outRespBuf, NetMessage** outRespMsg)
+std::unique_ptr<NetMessage> MessagingTk::requestResponse(Node& node, NetMessage& requestMsg,
+      unsigned respMsgType)
 {
-   RequestResponseArgs rrArgs(&node, requestMsg, respMsgType);
+   RequestResponseArgs rrArgs(&node, &requestMsg, respMsgType);
 
-   bool rrRes = requestResponse(&rrArgs);
+   if (requestResponse(&rrArgs))
+      return std::move(rrArgs.outRespMsg);
 
-   *outRespBuf = rrArgs.outRespBuf;
-   *outRespMsg = rrArgs.outRespMsg;
-
-   rrArgs.outRespBuf = NULL; // to avoid deletion in RequestResponseArgs destructor
-   rrArgs.outRespMsg = NULL; // to avoid deletion in RequestResponseArgs destructor
-
-   return rrRes;
+   return nullptr;
 }
 
 /**
@@ -84,8 +81,8 @@ FhgfsOpsErr MessagingTk::requestResponseNode(RequestResponseNode* rrNode,
       {
          LogContext(logContext).logErr(
             "Invalid node mirror buddy group ID: " + rrNode->nodeID.str() + "; "
-            "type: " + (rrArgs->node ?
-               rrArgs->node->getNodeTypeStr() : rrNode->nodeStore->getStoreTypeStr() ) );
+            "type: " + boost::lexical_cast<std::string>(rrArgs->node ?
+               rrArgs->node->getNodeType() : rrNode->nodeStore->getStoreType()));
 
          return FhgfsOpsErr_UNKNOWNNODE;
       }
@@ -114,8 +111,8 @@ FhgfsOpsErr MessagingTk::requestResponseNode(RequestResponseNode* rrNode,
          {
             LOG_DEBUG(logContext, Log_SPAM,
                "Skipping communication with offline nodeID: " + nodeID.str() +"; "
-               "type: " + (rrArgs->node ?
-                  rrArgs->node->getNodeTypeStr() : rrNode->nodeStore->getStoreTypeStr() ) );
+               "type: " + boost::lexical_cast<std::string>(rrArgs->node ?
+                  rrArgs->node->getNodeType() : rrNode->nodeStore->getStoreType()));
             return FhgfsOpsErr_COMMUNICATION; // no need to wait for offline servers
          }
 
@@ -127,8 +124,8 @@ FhgfsOpsErr MessagingTk::requestResponseNode(RequestResponseNode* rrNode,
                "Skipping communication with mirror nodeID: " + nodeID.str() + "; "
                "node state: " +
                   TargetStateStore::stateToStr(rrNode->outTargetConsistencyState) + "; "
-               "type: " + (rrArgs->node ?
-                  rrArgs->node->getNodeTypeStr() : rrNode->nodeStore->getStoreTypeStr() ) );
+               "type: " + boost::lexical_cast<std::string>(rrArgs->node ?
+                  rrArgs->node->getNodeType() : rrNode->nodeStore->getStoreType()));
             return FhgfsOpsErr_COMMUNICATION;
          }
       }
@@ -142,7 +139,7 @@ FhgfsOpsErr MessagingTk::requestResponseNode(RequestResponseNode* rrNode,
       if (!loadedNode)
       {
          LogContext(logContext).log(Log_WARNING, "Unknown nodeID: " + nodeID.str() + "; "
-            "type: " + rrNode->nodeStore->getStoreTypeStr());
+            "type: " + boost::lexical_cast<std::string>(rrNode->nodeStore->getStoreType()));
 
          return FhgfsOpsErr_UNKNOWNNODE;
       }
@@ -160,8 +157,8 @@ FhgfsOpsErr MessagingTk::requestResponseNode(RequestResponseNode* rrNode,
    if (commRes == FhgfsOpsErr_COMMUNICATION)
    {
       LOG(COMMUNICATION, WARNING, "Retrying communication.",
-            as("peer", rrNode->nodeStore->getNodeIDWithTypeStr(nodeID)),
-            as("message type", rrArgs->requestMsg->getMsgTypeStr()));
+            ("peer", rrNode->nodeStore->getNodeIDWithTypeStr(nodeID)),
+            ("message type", rrArgs->requestMsg->getMsgTypeStr()));
       commRes = requestResponseComm(rrArgs);
    }
 
@@ -281,7 +278,7 @@ FhgfsOpsErr MessagingTk::requestResponseTarget(RequestResponseTarget* rrTarget,
    if (commRes == FhgfsOpsErr_COMMUNICATION)
    {
       LOG(COMMUNICATION, WARNING, "Retrying communication.",
-            targetID, as("message type", rrArgs->requestMsg->getMsgTypeStr()));
+            targetID, ("message type", rrArgs->requestMsg->getMsgTypeStr()));
       commRes = requestResponseComm(rrArgs);
    }
 
@@ -312,116 +309,41 @@ FhgfsOpsErr MessagingTk::requestResponseTarget(RequestResponseTarget* rrTarget,
       return commRes;
 }
 
-
-/**
- * Note: This version will allocate the message buffer.
- *
- * @param outBuf contains the received message; will be allocated and has to be
- * freed by the caller (only if the return value is greater than 0)
- * @return 0 on error (e.g. message to big), message length otherwise
- * @throw SocketException
- */
-unsigned MessagingTk::recvMsgBuf(Socket* sock, char** outBuf, int minTimeout)
+std::vector<char> MessagingTk::recvMsgBuf(Socket& socket, int minTimeout)
+try
 {
-   const char* logContext = "MessagingTk (recv msg out-buf)";
-
    const int recvTimeoutMS = minTimeout < 0
       ? -1
       : std::max<int>(minTimeout, RECEIVE_TIMEOUT);
 
-   unsigned numReceived = 0;
-
-   *outBuf = (char*)malloc(MSGBUF_DEFAULT_SIZE);
-   if(unlikely(!*outBuf) )
-   {
-      LogContext(logContext).log(Log_WARNING,
-         "Memory allocation for incoming message buffer failed: " + sock->getPeername() );
-      return 0;
-   }
-
-   try
-   {
-      // receive at least the message header
-
-      numReceived += sock->recvExactT(*outBuf, NETMSG_MIN_LENGTH, 0, recvTimeoutMS);
-
-      unsigned msgLength = NetMessageHeader::extractMsgLengthFromBuf(*outBuf, numReceived);
-
-      if(msgLength > MSGBUF_MAX_SIZE)
-      { // message too big to be accepted
-         LogContext(logContext).log(Log_NOTICE,
-            "Received a message with invalid length from: " + sock->getPeername() );
-
-         SAFE_FREE(*outBuf);
-
-         return 0;
-      }
-      else
-      if(msgLength > MSGBUF_DEFAULT_SIZE)
-      { // message larger than the default buffer
-         char* oldBuf = *outBuf;
-
-         *outBuf = (char*)realloc(*outBuf, msgLength);
-         if(unlikely(!*outBuf) )
-         {
-            LogContext(logContext).log(Log_WARNING,
-               "Memory reallocation for incoming message buffer failed: " + sock->getPeername() );
-            free(oldBuf);
-            return 0;
-         }
-      }
-
-      // receive the rest of the message
-
-      if(msgLength > numReceived)
-         sock->recvExactT(&(*outBuf)[numReceived], msgLength-numReceived, 0, recvTimeoutMS);
-
-      return msgLength;
-   }
-   catch(SocketException& e)
-   {
-      SAFE_FREE(*outBuf);
-
-      throw;
-   }
-}
-
-/**
- * Receive a message into a pre-alloced buffer.
- *
- * @return 0 on error (e.g. message to big), message length otherwise
- * @throw SocketException on communication error
- */
-unsigned MessagingTk::recvMsgBuf(Socket* sock, char* bufIn, size_t bufInLen)
-{
-   const char* logContext = "MessagingTk (recv msg in-buf";
-
-   const int recvTimeoutMS = RECEIVE_TIMEOUT;
-
-   unsigned numReceived = 0;
+   std::vector<char> result(MSGBUF_DEFAULT_SIZE);
 
    // receive at least the message header
 
-   numReceived += sock->recvExactT(
-      bufIn, NETMSG_MIN_LENGTH, 0, recvTimeoutMS);
+   unsigned numReceived = socket.recvExactT(&result[0], NETMSG_MIN_LENGTH, 0, recvTimeoutMS);
 
-   unsigned msgLength = NetMessageHeader::extractMsgLengthFromBuf(bufIn, numReceived);
+   unsigned msgLength = NetMessageHeader::extractMsgLengthFromBuf(&result[0], numReceived);
 
-   if(unlikely(msgLength > bufInLen) )
-   { // message too big to be accepted
-      LogContext(logContext).log(Log_NOTICE,
-         std::string("Received a message that is too large from: ") +
-         sock->getPeername() );
+   if (msgLength > MSGBUF_MAX_SIZE)
+   {
+      LOG(COMMUNICATION, ERR, "Received a message with invalid length.",
+            ("from", socket.getPeername()));
 
-      return 0;
+      return {};
    }
+
+   result.resize(msgLength);
 
    // receive the rest of the message
 
-   if(msgLength > numReceived)
-      sock->recvExactT(&bufIn[numReceived], msgLength-numReceived, 0, recvTimeoutMS);
+   if (msgLength > numReceived)
+      socket.recvExactT(&result[numReceived], msgLength-numReceived, 0, recvTimeoutMS);
 
-   return msgLength;
+   return result;
+}
+catch (const std::bad_alloc&)
+{
+   return {};
 }
 
 /**
@@ -431,7 +353,6 @@ unsigned MessagingTk::recvMsgBuf(Socket* sock, char* bufIn, size_t bufInLen)
  *    .node receiver
  *    .requestMsg the message that should be sent to the receiver
  *    .respMsgType expected response message type
- *    .outRespBuf response buffer if successful (must be freed by the caller)
  *    .outRespMsg response message if successful (must be deleted by the caller)
  * @return FhgfsOpsErr_COMMUNICATION on comm error, FhgfsOpsErr_WOULDBLOCK if remote side
  *    encountered an indirect comm error and suggests not to try again, FhgfsOpsErr_AGAIN if other
@@ -443,38 +364,20 @@ FhgfsOpsErr MessagingTk::requestResponseComm(RequestResponseArgs* rrArgs)
 
    const Node& node = *rrArgs->node;
    NodeConnPool* connPool = node.getConnPool();
-   AbstractNetMessageFactory* netMessageFactory =
-      PThread::getCurrentThreadApp()->getNetMessageFactory();
+   auto netMessageFactory = PThread::getCurrentThreadApp()->getNetMessageFactory();
 
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
    // cleanup init
    Socket* sock = NULL;
-   char* sendBuf = NULL;
-   rrArgs->outRespBuf = NULL;
-   rrArgs->outRespMsg = NULL;
 
    try
    {
       // connect
       sock = connPool->acquireStreamSocket();
 
-      // prepare sendBuf
-      std::pair<char*, unsigned> sendBuf = createMsgBuf(rrArgs->requestMsg);
-
-      if(unlikely(!sendBuf.first) )
-      { // malloc failed
-         LogContext(logContext).logErr(
-            "Memory allocation for send buffer failed. "
-            "Alloc size: " + StringTk::uintToStr(sendBuf.second) );
-
-         retVal = FhgfsOpsErr_OUTOFMEM;
-         goto err_cleanup;
-      }
-
-      // send request
-      sock->send(sendBuf.first, sendBuf.second, 0);
-      SAFE_FREE(sendBuf.first);
+      const auto sendBuf = createMsgVec(*rrArgs->requestMsg);
+      sock->send(&sendBuf[0], sendBuf.size(), 0);
 
       if (rrArgs->sendExtraData)
       {
@@ -484,9 +387,8 @@ FhgfsOpsErr MessagingTk::requestResponseComm(RequestResponseArgs* rrArgs)
       }
 
       // receive response
-      unsigned respLength = MessagingTk::recvMsgBuf(sock, &rrArgs->outRespBuf,
-            rrArgs->minTimeoutMS);
-      if(unlikely(!respLength) )
+      auto respBuf = MessagingTk::recvMsgBuf(*sock, rrArgs->minTimeoutMS);
+      if (respBuf.empty())
       { // error (e.g. message too big)
          LogContext(logContext).log(Log_WARNING,
             "Failed to receive response from: " + node.getNodeIDWithTypeStr() + "; " +
@@ -498,7 +400,7 @@ FhgfsOpsErr MessagingTk::requestResponseComm(RequestResponseArgs* rrArgs)
       }
 
       // got response => deserialize it
-      rrArgs->outRespMsg = netMessageFactory->createFromBuf(rrArgs->outRespBuf, respLength);
+      rrArgs->outRespMsg = netMessageFactory->createFromBuf(std::move(respBuf));
 
       if(unlikely(rrArgs->outRespMsg->getMsgType() == NETMSGTYPE_GenericResponse) )
       { // special control msg received
@@ -516,7 +418,7 @@ FhgfsOpsErr MessagingTk::requestResponseComm(RequestResponseArgs* rrArgs)
       { // response invalid (wrong msgType)
          LogContext(logContext).logErr(
             "Received invalid response type: " + rrArgs->outRespMsg->getMsgTypeStr() + "; "
-            "expected: " + NetMsgStrMapping().defineToStr(rrArgs->respMsgType) + ". "
+            "expected: " + netMessageTypeToStr(rrArgs->respMsgType) + ". "
             "Disconnecting: " + node.getNodeIDWithTypeStr() + " @ " +
             sock->getPeername() );
 
@@ -529,6 +431,11 @@ FhgfsOpsErr MessagingTk::requestResponseComm(RequestResponseArgs* rrArgs)
       connPool->releaseStreamSocket(sock);
 
       return FhgfsOpsErr_SUCCESS;
+   }
+   catch (const std::bad_alloc& e)
+   {
+      LOG(COMMUNICATION, ERR, "Memory allocation for send buffer failed.");
+      retVal = FhgfsOpsErr_OUTOFMEM;
    }
    catch(SocketConnectException& e)
    {
@@ -558,38 +465,24 @@ err_cleanup:
    if(sock)
       connPool->invalidateStreamSocket(sock);
 
-   SAFE_DELETE(rrArgs->outRespMsg);
-   SAFE_FREE(rrArgs->outRespBuf);
-   SAFE_FREE(sendBuf);
-
    return retVal;
 }
 
-/**
- * Creates a message buffer of the required size and serializes the message to it.
- *
- * @return buffer must be freed by the caller
- */
-std::pair<char*, unsigned> MessagingTk::createMsgBuf(NetMessage* msg)
+std::vector<char> MessagingTk::createMsgVec(NetMessage& msg)
 {
-   // just bet that the message fits into an allocation of 2k. since this function is called
-   // mostly with heartbeat message and ack messages, that assumption is very likely to be true.
-   // other messages are not performance critical, and the overhead of a 2k allocation is small
-   // enough to ignore it.
-   // NULL pointers from malloc are not treated specially, because the serializers can handle
-   // null pointers just fine.
+   std::vector<char> result(MSGBUF_SMALL_SIZE);
 
-   char* buf = (char*) malloc(2 * 1024);
-   std::pair<bool, unsigned> serializeRes = msg->serializeMessage(buf, 2 * 1024);
+   auto serializeRes = msg.serializeMessage(&result[0], result.size());
 
    if (!serializeRes.first)
    {
-      free(buf);
-      buf = (char*) malloc(serializeRes.second);
-      serializeRes = msg->serializeMessage(buf, serializeRes.second);
+      result.resize(serializeRes.second);
+      serializeRes = msg.serializeMessage(&result[0], result.size());
    }
 
-   return std::make_pair(buf, serializeRes.second);
+   result.resize(serializeRes.second);
+
+   return result;
 }
 
 /**
@@ -607,7 +500,7 @@ FhgfsOpsErr MessagingTk::handleGenericResponse(RequestResponseArgs* rrArgs)
 
    FhgfsOpsErr retVal;
 
-   GenericResponseMsg* genericResp = (GenericResponseMsg*)rrArgs->outRespMsg;
+   const auto genericResp = (const GenericResponseMsg*)rrArgs->outRespMsg.get();
 
    switch(genericResp->getControlCode() )
    {
@@ -618,9 +511,9 @@ FhgfsOpsErr MessagingTk::handleGenericResponse(RequestResponseArgs* rrArgs)
             rrArgs->logFlags |= REQUESTRESPONSEARGS_LOGFLAG_PEERTRYAGAIN;
 
             LOG(COMMUNICATION, DEBUG, "Peer is asking for a retry. Returning AGAIN to caller.",
-                  as("peer", rrArgs->node->getNodeIDWithTypeStr()),
-                  as("reason", genericResp->getLogStr()),
-                  as("message type", rrArgs->requestMsg->getMsgTypeStr()));
+                  ("peer", rrArgs->node->getNodeIDWithTypeStr()),
+                  ("reason", genericResp->getLogStr()),
+                  ("message type", rrArgs->requestMsg->getMsgTypeStr()));
          }
 
          retVal = FhgfsOpsErr_AGAIN;

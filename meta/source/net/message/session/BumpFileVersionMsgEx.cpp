@@ -5,7 +5,6 @@
 
 bool BumpFileVersionMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(SESSIONS, DEBUG, "Received a BumpFileVersionMsg.", ctx.peerName());
    LOG_DBG(SESSIONS, DEBUG, "", getEntryInfo().getEntryID(), getEntryInfo().getIsBuddyMirrored(),
          hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond),
          isMsgHeaderFeatureFlagSet(BUMPFILEVERSIONMSG_FLAG_PERSISTENT),

@@ -13,8 +13,8 @@
 class ClientOps
 {
    public:
-      typedef std::list<uint64_t> OpsList;
-      typedef std::map<uint64_t, OpsList> IdOpsMap;
+      using OpsList = std::list<int64_t>;
+      using IdOpsMap = std::map<int64_t, OpsList>;
 
       bool addOpsList(uint64_t id, const OpsList& opsList);
 

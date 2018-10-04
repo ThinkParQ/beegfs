@@ -5,7 +5,6 @@
 #include <common/components/worker/queue/MultiWorkQueue.h>
 #include <common/net/message/admon/GetNodeInfoMsg.h>
 #include <common/net/message/admon/GetNodeInfoRespMsg.h>
-#include <nodes/NodeStoreEx.h>
 #include <app/App.h>
 
 class GetNodeInfoMsgEx : public GetNodeInfoMsg

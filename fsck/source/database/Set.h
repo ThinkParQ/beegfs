@@ -2,7 +2,6 @@
 #define SET_H_
 
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
 #include <database/SetFragment.h>
 #include <database/SetFragmentCursor.h>
 #include <database/Union.h>
@@ -11,6 +10,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <sstream>
 
 #include <limits.h>
@@ -187,12 +187,10 @@ class Set {
 
       Fragment* newFragment()
       {
-         SafeMutexLock lock(&this->mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          Fragment* result = getFragment(fragmentName(nextID++), true);
          saveConfig();
-
-         lock.unlock();
 
          return result;
       }

@@ -7,7 +7,7 @@
 /**
  * Serialize into outBuf, 4-byte aligned
  */
-void EntryInfo_serialize(const EntryInfo* this, SerializeCtx* ctx)
+void EntryInfo_serialize(SerializeCtx* ctx, const EntryInfo* this)
 {
    // DirEntryType
    Serialization_serializeUInt(ctx, this->entryType);
@@ -37,7 +37,7 @@ void EntryInfo_serialize(const EntryInfo* this, SerializeCtx* ctx)
          sizeof(this->owner.node) != sizeof(this->owner.group)
             || !__builtin_types_compatible_p(
                __typeof(this->owner.node.value), __typeof(this->owner.group)));
-   NumNodeID_serialize(&this->owner.node, ctx);
+   NumNodeID_serialize(ctx, &this->owner.node);
 
    // padding for 4-byte alignment
    Serialization_serializeUShort(ctx, 0);

@@ -26,7 +26,7 @@ void MkDirMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeInt(ctx, thisCast->umask);
 
    // parentInfo
-   EntryInfo_serialize(thisCast->parentInfo, ctx);
+   EntryInfo_serialize(ctx, thisCast->parentInfo);
 
    // newDirName
    Serialization_serializeStrAlign4(ctx, thisCast->newDirNameLen, thisCast->newDirName);
@@ -35,5 +35,5 @@ void MkDirMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeUInt16List(ctx, thisCast->preferredNodes);
 
    if (this->msgHeader.msgFeatureFlags & MKDIRMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

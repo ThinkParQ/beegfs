@@ -1,5 +1,4 @@
 #include <program/Program.h>
-#include <common/threading/SafeMutexLock.h>
 #include "SessionStore.h"
 
 #include <mutex>
@@ -600,7 +599,7 @@ bool SessionStore::clear()
       }
       else
       {
-         LOG(SESSIONS, ERR, "Session still referenced", as("ID", sessionIt->first));
+         LOG(SESSIONS, ERR, "Session still referenced", ("ID", sessionIt->first));
       }
    }
 

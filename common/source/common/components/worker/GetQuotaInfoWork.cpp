@@ -2,6 +2,7 @@
 #include <common/net/message/storage/quota/GetQuotaInfoRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 
+#include <mutex>
 
 /**
  * merges a given list into the map of this worker
@@ -11,44 +12,44 @@
 void GetQuotaInfoWork::mergeOrInsertNewQuotaData(QuotaDataList* inList,
    QuotaInodeSupport inQuotaInodeSupport)
 {
-   SafeMutexLock lock(this->quotaResultsMutex);         // L O C K
-
-   mergeQuotaInodeSupportUnlocked(inQuotaInodeSupport);
-
-   for(QuotaDataListIter inListIter = inList->begin(); inListIter != inList->end(); inListIter++)
    {
-      QuotaDataMapIter outIter = this->quotaResults->find(inListIter->getID() );
-      if(outIter != this->quotaResults->end() )
+      const std::lock_guard<Mutex> lock(*quotaResultsMutex);
+
+      mergeQuotaInodeSupportUnlocked(inQuotaInodeSupport);
+
+      for(QuotaDataListIter inListIter = inList->begin(); inListIter != inList->end(); inListIter++)
       {
-         if(outIter->second.mergeQuotaDataCounter(&(*inListIter) ) )
-         { // success
-            *this->result = 0;
+         QuotaDataMapIter outIter = this->quotaResults->find(inListIter->getID() );
+         if(outIter != this->quotaResults->end() )
+         {
+            if(outIter->second.mergeQuotaDataCounter(&(*inListIter) ) )
+            { // success
+               *this->result = 0;
+            }
+            else
+            { // insert failed, error value 1 or TargetNumID depends on target selection mode
+               if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
+                  *this->result = this->cfg.cfgTargetNumID;
+               else
+                  *this->result = 1;
+            }
          }
          else
-         { // insert failed, error value 1 or TargetNumID depends on target selection mode
-            if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
-               *this->result = this->cfg.cfgTargetNumID;
+         {
+            if(this->quotaResults->insert(QuotaDataMapVal(inListIter->getID(), *inListIter) ).second)
+            { // success
+               *this->result = 0;
+            }
             else
-               *this->result = 1;
-         }
-      }
-      else
-      {
-         if(this->quotaResults->insert(QuotaDataMapVal(inListIter->getID(), *inListIter) ).second)
-         { // success
-            *this->result = 0;
-         }
-         else
-         { // insert failed, error value 1 or TargetNumID depends on target selection mode
-            if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
-               *this->result = this->cfg.cfgTargetNumID;
-            else
-               *this->result = 1;
+            { // insert failed, error value 1 or TargetNumID depends on target selection mode
+               if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
+                  *this->result = this->cfg.cfgTargetNumID;
+               else
+                  *this->result = 1;
+            }
          }
       }
    }
-
-   lock.unlock();                                                       // U N L O C K
 
    if(*this->result != 0)
    {
@@ -59,19 +60,14 @@ void GetQuotaInfoWork::mergeOrInsertNewQuotaData(QuotaDataList* inList,
 
 void GetQuotaInfoWork::process(char* bufIn, unsigned bufInLen, char* bufOut, unsigned bufOutLen)
 {
-   bool commRes = false;
-   char* respBuf = NULL;
-
    GetQuotaInfoMsg msg(this->cfg.cfgType, this->storagePoolId);
    prepareMessage(this->messageNumber, &msg);
 
-   NetMessage* respMsg = NULL;
    GetQuotaInfoRespMsg* respMsgCast;
 
-   // request/response
-   commRes = MessagingTk::requestResponse(*storageNode, &msg, NETMSGTYPE_GetQuotaInfoResp,
-      &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*storageNode, msg,
+         NETMSGTYPE_GetQuotaInfoResp);
+   if (!respMsg)
    {
       // error value 1 or TargetNumID depends on target selection mode
       if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
@@ -80,22 +76,15 @@ void GetQuotaInfoWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
          *this->result = 1;
 
       this->counter->incCount();
-
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
-
       return;
    }
 
-   respMsgCast = (GetQuotaInfoRespMsg*)respMsg;
+   respMsgCast = (GetQuotaInfoRespMsg*)respMsg.get();
 
    //merge the QuotaData from the response with the existing quotaData
    mergeOrInsertNewQuotaData(&respMsgCast->getQuotaDataList(), respMsgCast->getQuotaInodeSupport() );
 
    this->counter->incCount();
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 }
 
 /*
@@ -117,7 +106,7 @@ void GetQuotaInfoWork::prepareMessage(int messageNumber, GetQuotaInfoMsg* msg)
 
    if(this->cfg.cfgUseList || this->cfg.cfgUseAll)
    {
-      msg->setQueryType(GetQuotaInfo_QUERY_TYPE_ID_LIST);
+      msg->setQueryType(GetQuotaInfoMsg::QUERY_TYPE_ID_LIST);
       getIDsFromListForMessage(messageNumber, msg->getIDList());
    }
    else

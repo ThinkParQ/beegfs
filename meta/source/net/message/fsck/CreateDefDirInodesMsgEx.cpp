@@ -4,9 +4,6 @@
 
 bool CreateDefDirInodesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("CreateDefDirInodesMsg incoming", 4,
-      "Received a CreateDefDirInodesMsg from: " + ctx.peerName() );
-
    LogContext log("CreateDefDirInodesMsg incoming");
 
    App* app = Program::getApp();

@@ -16,8 +16,8 @@ void TruncFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeInt64(ctx, thisCast->filesize);
 
    // entryInfo
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
 
    if (this->msgHeader.msgFeatureFlags & TRUNCFILEMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

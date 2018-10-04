@@ -15,7 +15,7 @@ class TestNetFilter : public ::testing::Test {
          close(fd);
       }
 
-      void TearDown()
+      void TearDown() override
       {
          unlink(fileName.c_str());
       }

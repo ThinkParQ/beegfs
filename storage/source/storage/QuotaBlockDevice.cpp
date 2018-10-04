@@ -17,8 +17,8 @@
  * @param targetPath path to block device to check
  * @param targetNumID targetNumID of the storage target to check
  */
-QuotaBlockDevice QuotaBlockDevice::getBlockDeviceOfTarget(std::string& targetPath,
-                                                          uint16_t targetNumID)
+QuotaBlockDevice QuotaBlockDevice::getBlockDeviceOfTarget(const std::string& targetPath,
+      uint16_t targetNumID)
 {
    const auto mountFound = StorageTk::findMountForPath(targetPath);
    if (mountFound.first)
@@ -62,42 +62,8 @@ void QuotaBlockDevice::getBlockDevicesOfTargets(TargetPathMap* targetPaths,
    }
 }
 
-QuotaInodeSupport QuotaBlockDevice::updateQuotaInodeSupport(
-   QuotaInodeSupport currentQuotaInodeSupport, QuotaBlockDeviceFsType fsTypeBlockDevice)
-{
-   switch(fsTypeBlockDevice)
-   {
-      case QuotaBlockDeviceFsType_EXTX: //no break because both FS requires the same handling
-      case QuotaBlockDeviceFsType_XFS:
-         if(currentQuotaInodeSupport == QuotaInodeSupport_UNKNOWN)
-         {
-            return QuotaInodeSupport_ALL_BLOCKDEVICES;
-         }
-         else if(currentQuotaInodeSupport == QuotaInodeSupport_NO_BLOCKDEVICES)
-         {
-            return QuotaInodeSupport_SOME_BLOCKDEVICES;
-         }
-         break;
-      case QuotaBlockDeviceFsType_ZFS:
-         if(currentQuotaInodeSupport == QuotaInodeSupport_UNKNOWN)
-         {
-            return QuotaInodeSupport_NO_BLOCKDEVICES;
-         }
-         else if(currentQuotaInodeSupport == QuotaInodeSupport_ALL_BLOCKDEVICES)
-         {
-            return QuotaInodeSupport_SOME_BLOCKDEVICES;
-         }
-         break;
-      default:
-            return currentQuotaInodeSupport;
-         break;
-   }
 
-   return QuotaInodeSupport_UNKNOWN;
-}
-
-
-QuotaInodeSupport QuotaBlockDevice::quotaInodeSupportFromBlockDevice()
+QuotaInodeSupport QuotaBlockDevice::quotaInodeSupportFromBlockDevice() const
 {
    switch(fsType)
    {

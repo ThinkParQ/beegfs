@@ -1,4 +1,3 @@
-#include <common/threading/SafeMutexLock.h>
 #include <program/Program.h>
 #include <common/storage/quota/ExceededQuotaStore.h>
 #include <toolkit/StorageTkEx.h>
@@ -24,10 +23,7 @@ ChunkStore::ChunkStore()
 bool ChunkStore::dirInStoreUnlocked(std::string dirID)
 {
    DirectoryMapIter iter = this->dirs.find(dirID);
-   if(iter != this->dirs.end() )
-      return true;
-
-   return false;
+   return iter != this->dirs.end();
 }
 
 
@@ -78,7 +74,7 @@ ChunkDir* ChunkStore::referenceDir(std::string dirID)
       //   " Refcount: " + StringTk::intToStr(dirRefer->getRefCount() ) );
       IGNORE_UNUSED_VARIABLE(logContext);
 
-      if (wasReferenced == false)
+      if (!wasReferenced)
          cacheAddUnlocked(dirID, dirRefer);
 
    }
@@ -156,7 +152,7 @@ void ChunkStore::InsertChunkDirUnlocked(std::string dirID, DirectoryMapIter& new
    std::pair<DirectoryMapIter, bool> pairRes =
       this->dirs.insert(DirectoryMapVal(dirID, new ChunkDirReferencer(inode) ) );
 
-   if (pairRes.second == false)
+   if (!pairRes.second)
    {
       // element already exists in the map, we raced with another thread
       delete inode;
@@ -662,7 +658,7 @@ FhgfsOpsErr ChunkStore::openChunkFile(int targetFD, const Path* chunkDirPath,
       {
          int errCode = errno;
 
-         LOG(GENERAL, ERR, "Unable to create path for file.", chunkFilePathStr, sysErr());
+         LOG(GENERAL, ERR, "Unable to create path for file.", chunkFilePathStr, sysErr);
          return FhgfsOpsErrTk::fromSysErr(errCode);
       }
 
@@ -730,4 +726,3 @@ bool ChunkStore::chmodV2ChunkDirPath(int targetFD, const Path* chunkDirPath,
 
    return retVal;
 }
-

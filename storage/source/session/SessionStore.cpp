@@ -1,153 +1,53 @@
-#include "common/threading/SafeMutexLock.h"
 #include "SessionStore.h"
 
 #include <boost/scoped_array.hpp>
 
+#include <mutex>
 
 /**
- * @param session belongs to the store after calling this method - so do not free it and don't
- * use it any more afterwards (re-get it from this store if you need it)
- */
-void SessionStore::addSession(Session* session)
-{
-   NumNodeID sessionID = session->getSessionID();
-
-   SafeMutexLock mutexLock(&mutex);
-   
-   // is session in the store already?
-   
-   SessionMapIter iter = sessions.find(sessionID);
-   if(iter != sessions.end() )
-   {
-      delete(session);
-   }
-   else
-   { // session not in the store yet
-      sessions.insert(SessionMapVal(sessionID, new SessionReferencer(session) ) );
-   }
-
-   mutexLock.unlock();
-
-}
-
-/**
- * Note: remember to call releaseSession()
- * 
  * @return NULL if no such session exists
  */
-Session* SessionStore::referenceSession(NumNodeID sessionID, bool addIfNotExists)
+std::shared_ptr<Session> SessionStore::referenceSession(NumNodeID sessionID) const
 {
-   Session* session;
-   
-   SafeMutexLock mutexLock(&mutex);
-   
-   SessionMapIter iter = sessions.find(sessionID);
-   if(iter == sessions.end() )
-   { // not found
-      if(!addIfNotExists)
-         session = NULL;
-      else
-      { // add as new session and reference it
-         LogContext log("SessionStore (ref)");
-         log.log(Log_DEBUG, std::string("Creating a new session. SessionID: ") + sessionID.str());
-         
-         Session* newSession = new Session(sessionID);
-         SessionReferencer* sessionRefer = new SessionReferencer(newSession);
-         sessions.insert(SessionMapVal(sessionID, sessionRefer) );
-         session = sessionRefer->reference();
-      }
-   }
-   else
-   {
-      SessionReferencer* sessionRefer = iter->second;
-      session = sessionRefer->reference();
-   }
-   
-   mutexLock.unlock();
-   
+   std::lock_guard<Mutex> const lock(mutex);
+
+   auto iter = sessions.find(sessionID);
+   if (iter != sessions.end())
+      return iter->second;
+
+   return nullptr;
+}
+
+std::shared_ptr<Session> SessionStore::referenceOrAddSession(NumNodeID sessionID)
+{
+   std::lock_guard<Mutex> lock(mutex);
+
+   auto iter = sessions.find(sessionID);
+   if (iter != sessions.end())
+      return iter->second;
+
+   // add as new session and reference it
+   LogContext log("SessionStore (ref)");
+   log.log(Log_DEBUG, std::string("Creating a new session. SessionID: ") + sessionID.str());
+
+   auto session = std::make_shared<Session>(sessionID);
+   sessions[sessionID] = session;
    return session;
-}
-
-void SessionStore::releaseSession(Session* session)
-{
-   NumNodeID sessionID = session->getSessionID();
-
-   SafeMutexLock mutexLock(&mutex);
-   
-   SessionMapIter iter = sessions.find(sessionID);
-   if(iter != sessions.end() )
-   { // session exists => decrease refCount
-      SessionReferencer* sessionRefer = iter->second;
-      sessionRefer->release();
-   }
-   
-   mutexLock.unlock();
-}
-
-bool SessionStore::removeSession(NumNodeID sessionID)
-{
-   bool delErr = true;
-   
-   SafeMutexLock mutexLock(&mutex);
-   
-   SessionMapIter iter = sessions.find(sessionID);
-   if(iter != sessions.end() )
-   {
-      SessionReferencer* sessionRefer = iter->second;
-      
-      if(sessionRefer->getRefCount() )
-         delErr = true;
-      else
-      { // no references => delete
-         sessions.erase(sessionID);
-         delete(sessionRefer);
-         delErr = false;
-      }
-   }
-   
-   mutexLock.unlock();
-   
-   return !delErr;
-}
-
-/**
- * @return NULL if session is referenced, otherwise the sesion must be cleaned up by the caller
- */
-Session* SessionStore::removeSessionUnlocked(NumNodeID sessionID)
-{
-   Session* retVal = NULL;
-
-   SessionMapIter iter = sessions.find(sessionID);
-   if(iter != sessions.end() )
-   {
-      SessionReferencer* sessionRefer = iter->second;
-      
-      if(!sessionRefer->getRefCount() )
-      { // no references => return session to caller
-         retVal = sessionRefer->getReferencedObject();
-         
-         sessionRefer->setOwnReferencedObject(false);
-         delete(sessionRefer);
-         sessions.erase(sessionID);
-      }
-   }
-   
-   return retVal;
 }
 
 /**
  * @param masterList must be ordered; contained nodes will be removed and may no longer be
  * accessed after calling this method.
- * @param outRemovedSessions contained sessions must be cleaned up by the caller
- * @param outUnremovableSesssions contains sessions that would have been removed but are currently
- * referenced
+ * @return contained sessions must be cleaned up by the caller
  */
-void SessionStore::syncSessions(const std::vector<NodeHandle>& masterList,
-   SessionList* outRemovedSessions, NumNodeIDList* outUnremovableSesssions)
+std::list<std::shared_ptr<Session>> SessionStore::syncSessions(
+   const std::vector<NodeHandle>& masterList)
 {
-   SafeMutexLock mutexLock(&mutex);
+   std::lock_guard<Mutex> const lock(mutex);
 
-   SessionMapIter sessionIter = sessions.begin();
+   std::list<std::shared_ptr<Session>> result;
+
+   auto sessionIter = sessions.begin();
    auto masterIter = masterList.begin();
 
    while (sessionIter != sessions.end() && masterIter != masterList.end())
@@ -163,13 +63,11 @@ void SessionStore::syncSessions(const std::vector<NodeHandle>& masterList,
       else
       if(currentSession < currentMaster)
       { // session is removed
+         auto session = std::move(sessionIter->second);
          sessionIter++; // (removal invalidates iterator)
 
-         Session* session = removeSessionUnlocked(currentSession);
-         if(session)
-            outRemovedSessions->push_back(session);
-         else
-            outUnremovableSesssions->push_back(currentSession); // session was referenced
+         result.push_back(std::move(session));
+         sessions.erase(std::prev(sessionIter));
       }
       else
       { // session unchanged
@@ -181,56 +79,46 @@ void SessionStore::syncSessions(const std::vector<NodeHandle>& masterList,
    // remaining sessions are removed
    while(sessionIter != sessions.end() )
    {
-      NumNodeID currentSession = sessionIter->first;
+      auto session = std::move(sessionIter->second);
       sessionIter++; // (removal invalidates iterator)
-      
-      Session* session = removeSessionUnlocked(currentSession);
-      if(session)
-         outRemovedSessions->push_back(session);
-      else
-         outUnremovableSesssions->push_back(currentSession); // session was referenced
+
+      result.push_back(std::move(session));
+      sessions.erase(std::prev(sessionIter));
    }
-   
-   
-   mutexLock.unlock();
+
+   return result;
 }
 
 /**
  * @return number of sessions
  */
-size_t SessionStore::getAllSessionIDs(NumNodeIDList* outSessionIDs)
+size_t SessionStore::getAllSessionIDs(NumNodeIDList* outSessionIDs) const
 {
-   SafeMutexLock mutexLock(&mutex);
+   std::lock_guard<Mutex> const lock(mutex);
 
    size_t retVal = sessions.size();
 
-   for(SessionMapIter iter = sessions.begin(); iter != sessions.end(); iter++)
+   for (auto iter = sessions.begin(); iter != sessions.end(); iter++)
       outSessionIDs->push_back(iter->first);
-
-   mutexLock.unlock();
 
    return retVal;
 }
 
-size_t SessionStore::getSize()
+size_t SessionStore::getSize() const
 {
-   SafeMutexLock mutexLock(&mutex);
-   
-   size_t sessionsSize = sessions.size();
+   std::lock_guard<Mutex> const lock(mutex);
 
-   mutexLock.unlock();
-
-   return sessionsSize;
+   return sessions.size();
 }
 
-void SessionStore::serializeForTarget(Serializer& ser, uint16_t targetID)
+void SessionStore::serializeForTarget(Serializer& ser, uint16_t targetID) const
 {
    ser % uint32_t(sessions.size());
 
-   for (SessionMapIter it = sessions.begin(), end = sessions.end(); it != end; ++it)
+   for (auto it = sessions.begin(), end = sessions.end(); it != end; ++it)
    {
       ser % it->first;
-      it->second->getReferencedObject()->serializeForTarget(ser, targetID);
+      it->second->serializeForTarget(ser, targetID);
    }
 
    LOG_DEBUG("SessionStore serialize", Log_DEBUG, "count of serialized Sessions: " +
@@ -253,24 +141,22 @@ void SessionStore::deserializeForTarget(Deserializer& des, uint16_t targetID)
       if (unlikely(!des.good()))
          return;
 
-      Session* session = new Session();
+      auto session = boost::make_unique<Session>();
       session->deserializeForTarget(des, targetID);
       if (unlikely(!des.good()))
       {
          session->getLocalFiles()->deleteAllSessions();
-         delete(session);
          return;
       }
 
-      SessionMapIter searchResult = this->sessions.find(key);
+      auto searchResult = this->sessions.find(key);
       if (searchResult == this->sessions.end())
       {
-         this->sessions.insert(SessionMapVal(key, new SessionReferencer(session)));
+         this->sessions.insert({key, std::move(session)});
       }
       else
       { // exist so local files will merged
-         searchResult->second->getReferencedObject()->mergeSessionLocalFiles(session);
-         delete(session);
+         searchResult->second->mergeSessionLocalFiles(session.get());
       }
    }
 
@@ -293,7 +179,7 @@ bool SessionStore::loadFromFile(std::string filePath, uint16_t targetID)
    if(!filePath.length() )
       return false;
 
-   SafeMutexLock mutexLock(&mutex);
+   std::lock_guard<Mutex> const lock(mutex);
 
    int fd = open(filePath.c_str(), O_RDONLY, 0);
    if(fd == -1)
@@ -327,22 +213,20 @@ bool SessionStore::loadFromFile(std::string filePath, uint16_t targetID)
       retVal = des.good();
    }
 
-   if (retVal == false)
+   if (!retVal)
       log.logErr("Could not deserialize SessionStore from file: " + filePath);
 
 err_stat:
    close(fd);
 
 err_unlock:
-   mutexLock.unlock();
-
    return retVal;
 }
 
 /**
  * Note: setStorePath must be called before using this.
  */
-bool SessionStore::saveToFile(std::string filePath, uint16_t targetID)
+bool SessionStore::saveToFile(std::string filePath, uint16_t targetID) const
 {
    LogContext log("SessionStore (save)");
    log.log(Log_DEBUG,"save sessions of target: " + StringTk::uintToStr(targetID));
@@ -356,7 +240,7 @@ bool SessionStore::saveToFile(std::string filePath, uint16_t targetID)
    if(!filePath.length() )
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   std::lock_guard<Mutex> const lock(mutex);
 
    // create/trunc file
    int openFlags = O_CREAT|O_TRUNC|O_WRONLY;
@@ -413,7 +297,5 @@ err_closefile:
    close(fd);
 
 err_unlock:
-   mutexLock.unlock(); // U N L O C K
-
    return retVal;
 }

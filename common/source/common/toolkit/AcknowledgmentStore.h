@@ -3,7 +3,6 @@
 
 #include <common/Common.h>
 #include <common/nodes/Node.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 
 

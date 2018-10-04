@@ -46,8 +46,9 @@ void ChunkFetcherSlave::walkAllChunks()
 
    log.log(Log_DEBUG, "Starting chunks walk...");
 
-   std::string targetPath;
-   app->getStorageTargets()->getPath(this->targetID, &targetPath);
+   const auto& target = *app->getStorageTargets()->getTargets().at(targetID);
+
+   const auto& targetPath = target.getPath().str();
 
    // walk over "normal" chunks (i.e. no mirrors)
    std::string walkPath = targetPath + "/" + CONFIG_CHUNK_SUBDIR_NAME;
@@ -76,7 +77,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
    DIR* dir = ::opendir(path.c_str() );
    if(!dir)
    {
-      LOG(GENERAL, WARNING, "Could not open directory.", path, targetID, sysErr());
+      LOG(GENERAL, WARNING, "Could not open directory.", path, targetID, sysErr);
       Program::getApp()->getChunkFetcher()->setBad();
       return false;
    }
@@ -87,7 +88,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
    std::string pathBuf = path;
    pathBuf.push_back('/');
 
-   while(true && !getSelfTerminate())
+   while(!getSelfTerminate())
    {
       ::dirent* item;
 
@@ -104,8 +105,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
 #endif
       if(readRes != 0)
       {
-         LOG(GENERAL, WARNING, "readdir failed.", path, targetID,
-               as("sysErr", System::getErrString(readRes)));
+         LOG(GENERAL, WARNING, "readdir failed.", path, targetID, sysErr(readRes));
          result = false;
          break;
       }
@@ -124,7 +124,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
       int statRes = ::stat(pathBuf.c_str(), &statBuf);
       if(statRes)
       {
-         LOG(GENERAL, WARNING, "Could not stat directory.", path, targetID, sysErr());
+         LOG(GENERAL, WARNING, "Could not stat directory.", path, targetID, sysErr);
          result = false;
          break;
       }

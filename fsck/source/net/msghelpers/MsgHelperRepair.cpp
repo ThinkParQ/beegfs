@@ -43,6 +43,8 @@
 
 #include "MsgHelperRepair.h"
 
+#include <boost/lexical_cast.hpp>
+
 template<typename RepairItemT>
 static bool setSecondaryBad(uint16_t groupID, std::set<NumNodeID>& secondariesWithRepair,
       const std::list<RepairItemT>& args, std::list<RepairItemT>& failed)
@@ -75,37 +77,20 @@ FhgfsOpsErr MsgHelperRepair::setNodeState(NumNodeID node, TargetConsistencyState
    SetTargetConsistencyStatesMsg msg(NODETYPE_Meta, &targets, &states, false);
 
    {
-      char* respBuf;
-      NetMessage* respMsg;
-
       auto secondary = Program::getApp()->getMetaNodes()->referenceNode(node);
 
-      auto commRes = MessagingTk::requestResponse(*secondary, &msg,
-            NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-      if (commRes == FhgfsOpsErr_SUCCESS)
-      {
-         delete respMsg;
-         free(respBuf);
-      }
+      MessagingTk::requestResponse(*secondary, msg, NETMSGTYPE_SetTargetConsistencyStatesResp);
    }
 
    {
-      char* respBuf;
-      NetMessage* respMsg;
-
       auto mgmt = Program::getApp()->getMgmtNodes()->referenceFirstNode();
 
-      auto commRes = MessagingTk::requestResponse(*mgmt, &msg,
-            NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-      if (!commRes)
+      const auto respMsg = MessagingTk::requestResponse(*mgmt, msg,
+            NETMSGTYPE_SetTargetConsistencyStatesResp);
+      if (!respMsg)
          return FhgfsOpsErr_COMMUNICATION;
 
-      auto result = static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg)->getResult();
-
-      delete respMsg;
-      free(respBuf);
-
-      return result;
+      return static_cast<SetTargetConsistencyStatesRespMsg&>(*respMsg).getResult();
    }
 }
 
@@ -129,7 +114,7 @@ void MsgHelperRepair::deleteDanglingDirEntries(NumNodeID node, bool isBuddyMirro
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      auto* deleteDirEntriesRespMsg = (DeleteDirEntriesRespMsg*) rrArgs.outRespMsg;
+      auto* deleteDirEntriesRespMsg = (DeleteDirEntriesRespMsg*) rrArgs.outRespMsg.get();
 
       deleteDirEntriesRespMsg->getFailedEntries().swap(*failedDeletes);
 
@@ -137,7 +122,7 @@ void MsgHelperRepair::deleteDanglingDirEntries(NumNodeID node, bool isBuddyMirro
       {
          for (auto iter = failedDeletes->begin(); iter != failedDeletes->end(); iter++)
             LOG(GENERAL, CRITICAL, "Failed to delete directory entry from metadata node.",
-                 node, isBuddyMirrored, as("entryID", iter->getID()));
+                 node, isBuddyMirrored, ("entryID", iter->getID()));
       }
    }
    else
@@ -154,7 +139,7 @@ void MsgHelperRepair::createDefDirInodes(NumNodeID node, bool isBuddyMirrored,
 {
    StringList failedInodeIDs;
 
-   CreateDefDirInodesMsg createDefDirInodesMsgEx(std::move(entries));
+   CreateDefDirInodesMsg createDefDirInodesMsgEx(entries);
 
    RequestResponseNode rrNode(node, Program::getApp()->getMetaNodes());
    RequestResponseArgs rrArgs(nullptr, &createDefDirInodesMsgEx, NETMSGTYPE_CreateDefDirInodesResp);
@@ -174,7 +159,7 @@ void MsgHelperRepair::createDefDirInodes(NumNodeID node, bool isBuddyMirrored,
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      auto* createDefDirInodesRespMsg = (CreateDefDirInodesRespMsg*) rrArgs.outRespMsg;
+      auto* createDefDirInodesRespMsg = (CreateDefDirInodesRespMsg*) rrArgs.outRespMsg.get();
 
       createDefDirInodesRespMsg->getFailedInodeIDs().swap(failedInodeIDs);
       createDefDirInodesRespMsg->getCreatedInodes().swap(*createdInodes);
@@ -191,7 +176,7 @@ void MsgHelperRepair::createDefDirInodes(NumNodeID node, bool isBuddyMirrored,
    {
       for (StringListIter iter = failedInodeIDs.begin(); iter != failedInodeIDs.end(); iter++)
          LOG(GENERAL, CRITICAL, "Failed to create default directory inode.", node, isBuddyMirrored,
-               as("entryID", *iter));
+               ("entryID", *iter));
    }
 }
 
@@ -215,7 +200,7 @@ void MsgHelperRepair::correctInodeOwnersInDentry(NumNodeID node, bool isBuddyMir
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      auto* fixInodeOwnersRespMsg = (FixInodeOwnersInDentryRespMsg*) rrArgs.outRespMsg;
+      auto* fixInodeOwnersRespMsg = (FixInodeOwnersInDentryRespMsg*) rrArgs.outRespMsg.get();
 
       fixInodeOwnersRespMsg->getFailedEntries().swap(*failedCorrections);
    }
@@ -230,7 +215,7 @@ void MsgHelperRepair::correctInodeOwnersInDentry(NumNodeID node, bool isBuddyMir
    {
       for (auto iter = failedCorrections->begin(); iter != failedCorrections->end(); iter++)
          LOG(GENERAL, CRITICAL, "Failed to correct inode owner information in dentry.",
-               node, isBuddyMirrored, as("entryID", iter->getID()));
+               node, isBuddyMirrored, ("entryID", iter->getID()));
    }
 }
 
@@ -254,7 +239,7 @@ void MsgHelperRepair::correctInodeOwners(NumNodeID node, bool isBuddyMirrored,
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      FixInodeOwnersRespMsg* fixInodeOwnersRespMsg = (FixInodeOwnersRespMsg*) rrArgs.outRespMsg;
+      auto* fixInodeOwnersRespMsg = (FixInodeOwnersRespMsg*) rrArgs.outRespMsg.get();
 
       fixInodeOwnersRespMsg->getFailedInodes().swap(*failedCorrections);
    }
@@ -269,7 +254,7 @@ void MsgHelperRepair::correctInodeOwners(NumNodeID node, bool isBuddyMirrored,
    {
       for (auto iter = failedCorrections->begin(); iter != failedCorrections->end(); iter++)
          LOG(GENERAL, CRITICAL, "Failed to correct inode owner information.", node, isBuddyMirrored,
-              as("entryID", iter->getID()));
+              ("entryID", iter->getID()));
    }
 }
 
@@ -295,7 +280,7 @@ void MsgHelperRepair::deleteFiles(NumNodeID node, bool isBuddyMirrored, FsckDirE
 
       if (commRes == FhgfsOpsErr_SUCCESS)
       {
-         UnlinkFileRespMsg* unlinkFileRespMsg = (UnlinkFileRespMsg*) rrArgs.outRespMsg;
+         const auto unlinkFileRespMsg = (const UnlinkFileRespMsg*) rrArgs.outRespMsg.get();
 
          // get result
          int unlinkRes = unlinkFileRespMsg->getValue();
@@ -320,18 +305,14 @@ void MsgHelperRepair::deleteChunks(Node& node, FsckChunkList* chunks, FsckChunkL
 {
    const char* logContext = "MsgHelperRepair (deleteChunks)";
 
-   bool commRes;
-   char *respBuf = NULL;
-   NetMessage *respMsg = NULL;
-
    DeleteChunksMsg deleteChunksMsg(chunks);
 
-   commRes = MessagingTk::requestResponse(node, &deleteChunksMsg,
-      NETMSGTYPE_DeleteChunksResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(node, deleteChunksMsg,
+         NETMSGTYPE_DeleteChunksResp);
 
-   if ( commRes )
+   if (respMsg)
    {
-      DeleteChunksRespMsg* deleteChunksRespMsg = (DeleteChunksRespMsg*) respMsg;
+      DeleteChunksRespMsg* deleteChunksRespMsg = (DeleteChunksRespMsg*) respMsg.get();
 
       deleteChunksRespMsg->getFailedChunks().swap(*failedDeletes);
 
@@ -344,15 +325,9 @@ void MsgHelperRepair::deleteChunks(Node& node, FsckChunkList* chunks, FsckChunkL
                StringTk::uintToStr(iter->getTargetID()) + " chunkID: " + iter->getID());
          }
       }
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
    }
    else
    {
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
-
       *failedDeletes = *chunks;
 
       LogContext(logContext).logErr("Communication error occured with node: " + node.getID());
@@ -370,7 +345,7 @@ NodeHandle MsgHelperRepair::referenceLostAndFoundOwner(EntryInfo* outLostAndFoun
    NodeHandle ownerNode;
 
    FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, false, app->getMetaNodes(), ownerNode,
-      outLostAndFoundEntryInfo, app->getMetaMirrorBuddyGroupMapper());
+      outLostAndFoundEntryInfo, app->getMetaRoot(), app->getMetaMirrorBuddyGroupMapper());
 
    if ( findRes != FhgfsOpsErr_SUCCESS )
    {
@@ -396,7 +371,7 @@ bool MsgHelperRepair::createLostAndFound(NodeHandle& outReferencedNode,
    EntryInfo rootEntryInfo;
 
    FhgfsOpsErr findRes = MetadataTk::referenceOwner(&rootPath, false, metaNodes,
-      rootNode, &rootEntryInfo, app->getMetaMirrorBuddyGroupMapper());
+      rootNode, &rootEntryInfo, app->getMetaRoot(), app->getMetaMirrorBuddyGroupMapper());
 
    if ( findRes != FhgfsOpsErr_SUCCESS )
    {
@@ -423,13 +398,13 @@ bool MsgHelperRepair::createLostAndFound(NodeHandle& outReferencedNode,
    if (commRes != FhgfsOpsErr_SUCCESS)
       return false;
 
-   auto* mkDirRespMsg = (MkDirRespMsg*) rrArgs.outRespMsg;
+   auto* mkDirRespMsg = (MkDirRespMsg*) rrArgs.outRespMsg.get();
 
    FhgfsOpsErr mkDirRes = (FhgfsOpsErr) mkDirRespMsg->getResult();
    if ( mkDirRes != FhgfsOpsErr_SUCCESS )
    {
       LogContext(logContext).log(Log_CRITICAL,
-         std::string("Node encountered an error: ") + FhgfsOpsErrTk::toErrString(mkDirRes));
+         "Node encountered an error: " + boost::lexical_cast<std::string>(mkDirRes));
       return false;
    }
 
@@ -461,30 +436,20 @@ void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lost
       return;
    }
 
-   bool commRes;
-   char *respBuf = NULL;
-   NetMessage *respMsg = NULL;
-
    LinkToLostAndFoundMsg linkToLostAndFoundMsg(lostAndFoundInfo, dirInodes);
 
-   commRes = MessagingTk::requestResponse(lostAndFoundNode, &linkToLostAndFoundMsg,
-      NETMSGTYPE_LinkToLostAndFoundResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(lostAndFoundNode, linkToLostAndFoundMsg,
+      NETMSGTYPE_LinkToLostAndFoundResp);
 
-   if ( commRes )
+   if (respMsg)
    {
-      LinkToLostAndFoundRespMsg* linkToLostAndFoundRespMsg = (LinkToLostAndFoundRespMsg*) respMsg;
+      auto* linkToLostAndFoundRespMsg = (LinkToLostAndFoundRespMsg*) respMsg.get();
 
       linkToLostAndFoundRespMsg->getFailedDirInodes().swap(*failedInodes);
       linkToLostAndFoundRespMsg->getCreatedDirEntries().swap(*createdDentries);
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
    }
    else
    {
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
-
       *failedInodes = *dirInodes;
 
       LogContext(logContext).logErr("Communication error occured with node: " +
@@ -515,30 +480,20 @@ void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lost
       return;
    }
 
-   bool commRes;
-   char *respBuf = NULL;
-   NetMessage *respMsg = NULL;
-
    LinkToLostAndFoundMsg linkToLostAndFoundMsg(lostAndFoundInfo, fileInodes);
 
-   commRes = MessagingTk::requestResponse(lostAndFoundNode, &linkToLostAndFoundMsg,
-      NETMSGTYPE_LinkToLostAndFoundResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(lostAndFoundNode, linkToLostAndFoundMsg,
+      NETMSGTYPE_LinkToLostAndFoundResp);
 
-   if ( commRes )
+   if (respMsg)
    {
-      LinkToLostAndFoundRespMsg* linkToLostAndFoundRespMsg = (LinkToLostAndFoundRespMsg*) respMsg;
+      auto* linkToLostAndFoundRespMsg = (LinkToLostAndFoundRespMsg*) respMsg.get();
 
       linkToLostAndFoundRespMsg->getFailedFileInodes().swap(*failedInodes);
       linkToLostAndFoundRespMsg->getCreatedDirEntries().swap(*createdDentries);
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
    }
    else
    {
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
-
       *failedInodes = *fileInodes;
 
       LogContext(logContext).logErr("Communication error occured with node: " +
@@ -584,7 +539,7 @@ void MsgHelperRepair::createContDirs(NumNodeID node, bool isBuddyMirrored, FsckD
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      auto* createContDirsRespMsg = (CreateEmptyContDirsRespMsg*) rrArgs.outRespMsg;
+      auto* createContDirsRespMsg = (CreateEmptyContDirsRespMsg*) rrArgs.outRespMsg.get();
 
       createContDirsRespMsg->getFailedIDs().swap(*failedCreates);
    }
@@ -600,7 +555,7 @@ void MsgHelperRepair::createContDirs(NumNodeID node, bool isBuddyMirrored, FsckD
    if ( !failedCreates->empty() )
    {
       for ( StringListIter iter = failedCreates->begin(); iter != failedCreates->end(); iter++ )
-         LOG(GENERAL, CRITICAL, "Failed to create empty content directory.", as("dirID", *iter));
+         LOG(GENERAL, CRITICAL, "Failed to create empty content directory.", ("dirID", *iter));
    }
 }
 
@@ -623,7 +578,7 @@ void MsgHelperRepair::updateFileAttribs(NumNodeID node, bool isBuddyMirrored, Fs
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      auto* updateFileAttribsRespMsg = (UpdateFileAttribsRespMsg*) rrArgs.outRespMsg;
+      auto* updateFileAttribsRespMsg = (UpdateFileAttribsRespMsg*) rrArgs.outRespMsg.get();
 
       updateFileAttribsRespMsg->getFailedInodes().swap(*failedUpdates);
    }
@@ -638,7 +593,7 @@ void MsgHelperRepair::updateFileAttribs(NumNodeID node, bool isBuddyMirrored, Fs
    {
       for (auto iter = failedUpdates->begin(); iter != failedUpdates->end(); iter++)
          LOG(GENERAL, CRITICAL, "Failed to update attributes of file inode.",
-             as("entryID", iter->getID()));
+             ("entryID", iter->getID()));
    }
 }
 
@@ -662,7 +617,7 @@ void MsgHelperRepair::updateDirAttribs(NumNodeID node, bool isBuddyMirrored,
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      auto* updateDirAttribsRespMsg = (UpdateDirAttribsRespMsg*) rrArgs.outRespMsg;
+      auto* updateDirAttribsRespMsg = (UpdateDirAttribsRespMsg*) rrArgs.outRespMsg.get();
 
       updateDirAttribsRespMsg->getFailedInodes().swap(*failedUpdates);
    }
@@ -677,7 +632,7 @@ void MsgHelperRepair::updateDirAttribs(NumNodeID node, bool isBuddyMirrored,
    {
       for (auto iter = failedUpdates->begin(); iter != failedUpdates->end(); iter++)
          LOG(GENERAL, CRITICAL, "Failed to update attributes of directory inode.",
-               as("entryID", iter->getID()));
+               ("entryID", iter->getID()));
    }
 }
 
@@ -703,7 +658,7 @@ void MsgHelperRepair::recreateFsIDs(NumNodeID node, bool isBuddyMirrored,
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      RecreateFsIDsRespMsg* recreateFsIDsRespMsg = (RecreateFsIDsRespMsg*) rrArgs.outRespMsg;
+      RecreateFsIDsRespMsg* recreateFsIDsRespMsg = (RecreateFsIDsRespMsg*) rrArgs.outRespMsg.get();
 
       recreateFsIDsRespMsg->getFailedEntries().swap(*failedEntries);
    }
@@ -747,7 +702,7 @@ void MsgHelperRepair::recreateDentries(NumNodeID node, bool isBuddyMirrored, Fsc
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      RecreateDentriesRespMsg* recreateDentriesMsg = (RecreateDentriesRespMsg*) rrArgs.outRespMsg;
+      auto* recreateDentriesMsg = (RecreateDentriesRespMsg*) rrArgs.outRespMsg.get();
 
       recreateDentriesMsg->getFailedCreates().swap(*failedCreates);
       recreateDentriesMsg->getCreatedDentries().swap(*createdDentries);
@@ -787,10 +742,6 @@ void MsgHelperRepair::fixChunkPermissions(Node& node, FsckChunkList& chunkList,
    PathInfoListIter pathInfoIter = pathInfoList.begin();
    for ( ; chunksIter != chunkList.end(); chunksIter++, pathInfoIter++ )
    {
-      bool commRes;
-      char *respBuf = NULL;
-      NetMessage *respMsg = NULL;
-
       std::string chunkID = chunksIter->getID();
       uint16_t targetID = chunksIter->getTargetID();
       int validAttribs = SETATTR_CHANGE_USERID | SETATTR_CHANGE_GROUPID; // only interested in these
@@ -805,12 +756,12 @@ void MsgHelperRepair::fixChunkPermissions(Node& node, FsckChunkList& chunkList,
          enableCreation);
       setLocalAttrMsg.addMsgHeaderFeatureFlag(SETLOCALATTRMSG_FLAG_USE_QUOTA);
 
-      commRes = MessagingTk::requestResponse(node, &setLocalAttrMsg, NETMSGTYPE_SetLocalAttrResp,
-         &respBuf, &respMsg);
+      const auto respMsg = MessagingTk::requestResponse(node, setLocalAttrMsg,
+            NETMSGTYPE_SetLocalAttrResp);
 
-      if ( commRes )
+      if (respMsg)
       {
-         SetLocalAttrRespMsg* setLocalAttrRespMsg = (SetLocalAttrRespMsg*) respMsg;
+         SetLocalAttrRespMsg* setLocalAttrRespMsg = (SetLocalAttrRespMsg*) respMsg.get();
 
          if ( setLocalAttrRespMsg->getResult() != FhgfsOpsErr_SUCCESS )
          {
@@ -827,9 +778,6 @@ void MsgHelperRepair::fixChunkPermissions(Node& node, FsckChunkList& chunkList,
 
          failedChunks.push_back(*chunksIter);
       }
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
    }
 }
 
@@ -842,19 +790,15 @@ bool MsgHelperRepair::moveChunk(Node& node, FsckChunk& chunk, const std::string&
    const char* logContext = "MsgHelperRepair (moveChunks)";
    bool result;
 
-   bool commRes;
-   char *respBuf = NULL;
-   NetMessage *respMsg = NULL;
-
    MoveChunkFileMsg moveChunkFileMsg(chunk.getID(), chunk.getTargetID(),
          chunk.getBuddyGroupID() != 0, chunk.getSavedPath()->str(), moveTo, allowOverwrite);
 
-   commRes = MessagingTk::requestResponse(node, &moveChunkFileMsg,
-      NETMSGTYPE_MoveChunkFileResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(node, moveChunkFileMsg,
+      NETMSGTYPE_MoveChunkFileResp);
 
-   if ( commRes )
+   if (respMsg)
    {
-      MoveChunkFileRespMsg* moveChunkFileRespMsg = (MoveChunkFileRespMsg*) respMsg;
+      MoveChunkFileRespMsg* moveChunkFileRespMsg = (MoveChunkFileRespMsg*) respMsg.get();
 
       result = moveChunkFileRespMsg->getValue() == FhgfsOpsErr_SUCCESS;
 
@@ -877,9 +821,6 @@ bool MsgHelperRepair::moveChunk(Node& node, FsckChunk& chunk, const std::string&
       LogContext(logContext).logErr("Communication error occured with node: " + node.getID());
       result = false;
    }
-
-   SAFE_FREE(respBuf);
-   SAFE_DELETE(respMsg);
 
    return result;
 }
@@ -912,12 +853,12 @@ void MsgHelperRepair::deleteFileInodes(NumNodeID node, bool isBuddyMirrored,
 
    if (commRes == FhgfsOpsErr_SUCCESS)
    {
-      RemoveInodesRespMsg* removeInodesRespMsg = (RemoveInodesRespMsg*) rrArgs.outRespMsg;
+      RemoveInodesRespMsg* removeInodesRespMsg = (RemoveInodesRespMsg*) rrArgs.outRespMsg.get();
       failedDeletes = removeInodesRespMsg->releaseFailedEntryIDList();
 
       for ( StringListIter iter = failedDeletes.begin(); iter != failedDeletes.end(); iter++ )
          LOG(GENERAL, ERR, "Failed to delete file inode.", node, isBuddyMirrored,
-             as("entryID", *iter));
+             ("entryID", *iter));
    }
    else
    {

@@ -12,7 +12,6 @@ struct NodeListIter;
 typedef struct NodeListIter NodeListIter;
 
 static inline void NodeListIter_init(NodeListIter* this, NodeList* list);
-static inline bool NodeListIter_hasNext(NodeListIter* this);
 static inline void NodeListIter_next(NodeListIter* this);
 static inline struct Node* NodeListIter_value(NodeListIter* this);
 static inline bool NodeListIter_end(NodeListIter* this);
@@ -27,11 +26,6 @@ struct NodeListIter
 void NodeListIter_init(NodeListIter* this, NodeList* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool NodeListIter_hasNext(NodeListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void NodeListIter_next(NodeListIter* this)

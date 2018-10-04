@@ -14,6 +14,8 @@
 #include "DirEntry.h"
 #include "DirInode.h"
 
+#include <boost/lexical_cast.hpp>
+
 /**
  * Constructur used to create new directories.
  */
@@ -117,7 +119,7 @@ StripePattern* DirInode::createFileStripePatternUnlocked(const UInt16List* prefe
       {
          // means there won't be allowed targets => file will not be created
          LOG(GENERAL, WARNING, "Stripe pattern has storage pool ID set, which doesn't exist.",
-                      as("dirID", id), as("poolID", stripePattern->getStoragePoolId()));
+                      ("dirID", id), ("poolID", stripePattern->getStoragePoolId()));
          return NULL;
       }
 
@@ -150,7 +152,7 @@ StripePattern* DirInode::createFileStripePatternUnlocked(const UInt16List* prefe
       {
          // means there won't be allowed targets => file will not be created
          LOG(GENERAL, WARNING, "Stripe pattern has storage pool ID set, which doesn't exist.",
-                      as("dirID", id), as("poolID", stripePattern->getStoragePoolId()));
+                      ("dirID", id), ("poolID", stripePattern->getStoragePoolId()));
          return NULL;
       }
 
@@ -394,17 +396,14 @@ FhgfsOpsErr DirInode::makeDirEntry(DirEntry& entry)
    SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
 
    // we always delete the entry from this method
-   FhgfsOpsErr mkRes = makeDirEntryUnlocked(&entry, false);
+   FhgfsOpsErr mkRes = makeDirEntryUnlocked(&entry);
 
    safeLock.unlock(); // U N L O C K
 
    return mkRes;
 }
 
-/**
- * @param deleteEntry  shall we delete entry or does the caller still need it?
- */
-FhgfsOpsErr DirInode::makeDirEntryUnlocked(DirEntry* entry, bool deleteEntry)
+FhgfsOpsErr DirInode::makeDirEntryUnlocked(DirEntry* entry)
 {
    FhgfsOpsErr mkRes = FhgfsOpsErr_INTERNAL;
 
@@ -413,7 +412,7 @@ FhgfsOpsErr DirInode::makeDirEntryUnlocked(DirEntry* entry, bool deleteEntry)
       goto out;
 
    // load DirInode on demand if required, we need it now
-   if (loadIfNotLoadedUnlocked() == false)
+   if (!loadIfNotLoadedUnlocked())
    {
       mkRes = FhgfsOpsErr_PATHNOTEXISTS;
       goto out;
@@ -447,9 +446,6 @@ FhgfsOpsErr DirInode::makeDirEntryUnlocked(DirEntry* entry, bool deleteEntry)
    }
 
 out:
-   if (deleteEntry)
-      delete entry;
-
    return mkRes;
 }
 
@@ -921,8 +917,8 @@ FhgfsOpsErr DirInode::storeInitialMetaDataInode()
    {
       LOG(GENERAL, ERR, "Serialized metadata is larger than serialization buffer size.",
             id, parentDirID, metaFilename,
-            as("Data size", ser.size()),
-            as("Buffer size", META_SERBUF_SIZE));
+            ("Data size", ser.size()),
+            ("Buffer size", META_SERBUF_SIZE));
 
       retVal = FhgfsOpsErr_INTERNAL;
       goto error_closefile;
@@ -1265,8 +1261,8 @@ bool DirInode::storeUpdatedMetaDataUnlocked()
    {
       LOG(GENERAL, ERR, "Serialized metadata is larger than serialization buffer size.",
             id, parentDirID,
-            as("Data size", ser.size()),
-            as("Buffer size", META_SERBUF_SIZE));
+            ("Data size", ser.size()),
+            ("Buffer size", META_SERBUF_SIZE));
       LogContext(logContext).logBacktrace();
       return false;
    }
@@ -1307,7 +1303,7 @@ bool DirInode::removeStoredMetaDataFile(const std::string& id, bool isBuddyMirro
    return true;
 }
 
-bool DirInode::loadIfNotLoaded(void)
+bool DirInode::loadIfNotLoaded()
 {
    SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE);
 
@@ -1838,7 +1834,7 @@ bool DirInode::unlinkBusyFileUnlocked(const std::string& fileName, DirEntry* den
          "DirInode: " + this->id + " "
          "entryName: " + fileName + " "
          "entryID: " + dentry->getID() + " "
-         "Error: " + FhgfsOpsErrTk::toErrString(unlinkRes);
+         "Error: " + boost::lexical_cast<std::string>(unlinkRes);
 
       LogContext(logContext).logErr(msg);
    }

@@ -26,33 +26,24 @@ int ModeListStoragePools::execute()
       return APPCODE_INVALID_CONFIG;
    }
 
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetStoragePoolsRespMsg* respMsgCast;
 
    GetStoragePoolsMsg msg;
 
-   // request/response
-   bool commRes = MessagingTk::requestResponse(*mgmtNode,
-      &msg, NETMSGTYPE_GetStoragePoolsResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+         NETMSGTYPE_GetStoragePoolsResp);
 
-   if (!commRes)
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << mgmtNode->getNodeIDWithTypeStr()
          << std::endl;
 
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
-
       return APPCODE_RUNTIME_ERROR;
    }
 
-   respMsgCast = static_cast<GetStoragePoolsRespMsg*>(respMsg);
+   respMsgCast = static_cast<GetStoragePoolsRespMsg*>(respMsg.get());
 
    printPools(respMsgCast->getStoragePools());
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return APPCODE_NO_ERROR;
 }
@@ -83,10 +74,10 @@ void ModeListStoragePools::printPools(const StoragePoolPtrVec& pools) const
    for (StoragePoolPtrVecCIter poolIter = pools.begin(); poolIter != pools.end(); poolIter++)
    {
       const UInt16Set targets = (*poolIter)->getTargets();
-      StringVector targetsStrVec = StringTk::implode (targets, ',', 28);
+      StringVector targetsStrVec = StringTk::implodeMultiLine (targets, ',', 28);
 
       const UInt16Set buddyGroups = (*poolIter)->getBuddyGroups();
-      StringVector buddyGroupsStrVec = StringTk::implode (buddyGroups, ',', 28);
+      StringVector buddyGroupsStrVec = StringTk::implodeMultiLine (buddyGroups, ',', 28);
 
       std::cout << boost::format ("%7i %18s %|-28s| %|-28s|\n") % (*poolIter)->getId()
                 % (*poolIter)->getDescription()

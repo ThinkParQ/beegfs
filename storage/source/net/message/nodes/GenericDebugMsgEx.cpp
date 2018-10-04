@@ -22,8 +22,6 @@ bool GenericDebugMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("GenericDebugMsg incoming");
 
-   LOG_DEBUG_CONTEXT(log, 4, "Received a GenericDebugMsg from: " + ctx.peerName() );
-
    LOG_DEBUG_CONTEXT(log, 5, std::string("Command string: ") + getCommandStr() );
 
    std::string cmdRespStr = processCommand();
@@ -138,7 +136,7 @@ std::string GenericDebugMsgEx::processOpListOpenFiles(std::istringstream& comman
    {
       // note: sessionID might have become removed since we queried it, e.g. because client is gone
 
-      Session* session = sessions->referenceSession(*iter, false);
+      auto session = sessions->referenceSession(*iter);
       if(!session)
          continue;
 
@@ -147,8 +145,6 @@ std::string GenericDebugMsgEx::processOpListOpenFiles(std::istringstream& comman
       SessionLocalFileStore* sessionFiles = session->getLocalFiles();
 
       size_t numFiles = sessionFiles->getSize();
-
-      sessions->releaseSession(session);
 
       if(!numFiles)
          continue; // only print sessions with open files
@@ -275,33 +271,41 @@ std::string GenericDebugMsgEx::processOpUsedQuota(std::istringstream& commandStr
 
    if(forEachTarget)
    {
-      UInt16List targetIDs;
-      app->getStorageTargets()->getAllTargetIDs(&targetIDs);
+      const auto& targets = app->getStorageTargets()->getTargets();
 
-      responseStream << "Quota data of " << targetIDs.size() << " targets." << std::endl;
+      responseStream << "Quota data of " << targets.size() << " targets." << std::endl;
 
-      for(UInt16ListIter iter = targetIDs.begin(); iter != targetIDs.end(); iter++)
+      for (const auto& mapping : targets)
       {
+         const auto& target = *mapping.second;
+
          QuotaDataList outQuotaDataList;
 
-         QuotaBlockDeviceMap quotaBlockDevices;
-         QuotaInodeSupport quotaInodeSupport;
-         app->getStorageTargets()->getQuotaBlockDevice(&quotaBlockDevices, *iter,
-            &quotaInodeSupport);
+         QuotaBlockDeviceMap quotaBlockDevices = {
+            {mapping.first, target.getQuotaBlockDevice()}
+         };
 
          QuotaTk::requestQuotaForRange(&quotaBlockDevices, rangeStart, rangeEnd, quotaDataType,
             &outQuotaDataList, &session);
 
          responseStream << outQuotaDataList.size() << " used quota for " << quotaDataTypeStr
-            << " IDs on target: " << *iter << std::endl;
+            << " IDs on target: " << mapping.first << std::endl;
 
          QuotaData::quotaDataListToString(outQuotaDataList, &responseStream);
       }
    }
    else
    {
+      auto& targets = app->getStorageTargets()->getTargets();
+
       QuotaBlockDeviceMap quotaBlockDevices;
-      app->getStorageTargets()->getQuotaBlockDevices(&quotaBlockDevices);
+
+      std::transform(
+            targets.begin(), targets.end(),
+            std::inserter(quotaBlockDevices, quotaBlockDevices.end()),
+            [] (const auto& target) {
+               return std::make_pair(target.first, target.second->getQuotaBlockDevice());
+            });
 
       QuotaDataList outQuotaDataList;
 

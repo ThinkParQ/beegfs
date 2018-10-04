@@ -23,7 +23,7 @@ void RemoveNodeMsgEx_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeShort(ctx, thisCast->nodeType);
 
    // nodeNumID
-   NumNodeID_serialize(&thisCast->nodeNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->nodeNumID);
 
    // ackID
    Serialization_serializeStr(ctx, thisCast->ackIDLen, thisCast->ackID);

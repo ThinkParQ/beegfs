@@ -99,14 +99,14 @@ bool ClientStats::statsAdd(UInt64Vector* serverVec)
       // update the cookieIP for each vector we got and last value is then the real cookie
       this->cookieIP = ip;
 
-      UInt64Vector* currentIPOpVec = this->getVectorFromMap(&this->currentVectorMap, ip);
+      UInt64Vector* currentIPOpVec = ClientStats::getVectorFromMap(&this->currentVectorMap, ip);
 
       if (!currentIPOpVec)
       {
          // IP not found yet. We need to add it.
          newStatsData(iter, iter + elementsPerIP, elementsPerIP);
 
-         UInt64Vector* testVec = this->getVectorFromMap(&this->currentVectorMap, ip);
+         UInt64Vector* testVec = ClientStats::getVectorFromMap(&this->currentVectorMap, ip);
          if (testVec->empty() )
          {
             struct in_addr in_addr = { (in_addr_t)ip };
@@ -507,7 +507,7 @@ bool ClientStats::emptyVectorMap(ClientNodeOpVectorMap *vectorMap, bool doDelete
 /**
  * Move entries from the currentVectorMap to the oldVectorMap and clear currentVectorMap.
  */
-void ClientStats::currentToOldVectorMap(void)
+void ClientStats::currentToOldVectorMap()
 {
    this->emptyVectorMap(&this->oldVectorMap, true); // first delete everything in the old map
 

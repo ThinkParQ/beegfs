@@ -8,7 +8,6 @@ struct NumNodeIDListIter;
 typedef struct NumNodeIDListIter NumNodeIDListIter;
 
 static inline void NumNodeIDListIter_init(NumNodeIDListIter* this, NumNodeIDList* list);
-static inline bool NumNodeIDListIter_hasNext(NumNodeIDListIter* this);
 static inline void NumNodeIDListIter_next(NumNodeIDListIter* this);
 static inline NumNodeID NumNodeIDListIter_value(NumNodeIDListIter* this);
 static inline bool NumNodeIDListIter_end(NumNodeIDListIter* this);
@@ -23,11 +22,6 @@ struct NumNodeIDListIter
 void NumNodeIDListIter_init(NumNodeIDListIter* this, NumNodeIDList* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool NumNodeIDListIter_hasNext(NumNodeIDListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void NumNodeIDListIter_next(NumNodeIDListIter* this)

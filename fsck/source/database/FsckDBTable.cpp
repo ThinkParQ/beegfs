@@ -26,8 +26,10 @@ static db::DirEntry fsckDirEntryToDbDirEntry(const FsckDirEntry& dentry)
       dentry.getIsBuddyMirrored(),
    };
 
-   if(result.fileNameInlined)
-      ::strcpy(result.name.inlined.text, dentry.getName().c_str() );
+   if(result.fileNameInlined) {
+      ::strncpy(result.name.inlined.text, dentry.getName().c_str(),
+            sizeof(result.name.inlined.text));
+   }
 
    return result;
 }

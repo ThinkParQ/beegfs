@@ -14,5 +14,5 @@ void RefreshEntryInfoMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    RefreshEntryInfoMsg* thisCast = (RefreshEntryInfoMsg*)this;
 
    // entryInfo
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
 }

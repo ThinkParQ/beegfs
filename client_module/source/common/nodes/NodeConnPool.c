@@ -93,7 +93,6 @@ void NodeConnPool_uninit(NodeConnPool* this)
 
    // normal clean-up
    NicAddressList_uninit(&this->nicList);
-   Condition_uninit(&this->changeCond);
    Mutex_uninit(&this->mutex);
 }
 

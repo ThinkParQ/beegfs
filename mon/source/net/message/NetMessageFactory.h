@@ -7,7 +7,7 @@
 class NetMessageFactory : public AbstractNetMessageFactory
 {
    protected:
-      virtual NetMessage* createFromMsgType(unsigned short msgType) override;
+      virtual std::unique_ptr<NetMessage> createFromMsgType(unsigned short msgType) const override;
 } ;
 
 #endif /*NETMESSAGEFACTORY_H_*/

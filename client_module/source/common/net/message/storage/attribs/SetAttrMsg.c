@@ -32,8 +32,8 @@ void SetAttrMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeUInt(ctx, thisCast->attribs.groupID);
 
    // entryInfo
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
 
    if (this->msgHeader.msgFeatureFlags & SETATTRMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

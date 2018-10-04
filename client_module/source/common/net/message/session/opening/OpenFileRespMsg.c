@@ -27,7 +27,7 @@ bool OpenFileRespMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
 
    // stripePattern
    if(!StripePattern_deserializePatternPreprocess(ctx,
-      &thisCast->patternHeader, &thisCast->patternStart) )
+      &thisCast->patternStart, &thisCast->patternLength) )
       return false;
 
    if (!Serialization_deserializeUInt64(ctx, &thisCast->fileVersion))

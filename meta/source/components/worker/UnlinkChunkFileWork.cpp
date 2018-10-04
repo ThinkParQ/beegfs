@@ -61,7 +61,7 @@ FhgfsOpsErr UnlinkChunkFileWork::communicate()
    }
 
    // correct response type received
-   UnlinkLocalFileRespMsg* unlinkRespMsg = (UnlinkLocalFileRespMsg*)rrArgs.outRespMsg;
+   UnlinkLocalFileRespMsg* unlinkRespMsg = (UnlinkLocalFileRespMsg*)rrArgs.outRespMsg.get();
 
    FhgfsOpsErr unlinkResult = unlinkRespMsg->getResult();
    if(unlinkResult != FhgfsOpsErr_SUCCESS)

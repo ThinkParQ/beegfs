@@ -8,6 +8,7 @@
 
 #define WRITEMSG_MIRROR_RETRIES_NUM    1
 
+class StorageTarget;
 
 class WriteLocalFileMsgEx : public WriteLocalFileMsg
 {
@@ -24,6 +25,8 @@ class WriteLocalFileMsgEx : public WriteLocalFileMsg
       Socket* mirrorToSock;
       unsigned mirrorRetriesLeft;
 
+      std::pair<bool, int64_t> write(ResponseContext& ctx);
+
       int64_t incrementalRecvAndWriteStateful(ResponseContext& ctx,
          SessionLocalFile* sessionLocalFile);
       void incrementalRecvPadding(ResponseContext& ctx, int64_t padLen,
@@ -31,14 +34,13 @@ class WriteLocalFileMsgEx : public WriteLocalFileMsg
 
       ssize_t doWrite(int fd, char* buf, size_t count, off_t offset, int& outErrno);
 
-      FhgfsOpsErr openFile(SessionLocalFile* sessionLocalFile);
+      FhgfsOpsErr openFile(const StorageTarget& target, SessionLocalFile* sessionLocalFile);
 
-      FhgfsOpsErr prepareMirroring(char* respBuf, size_t bufLen,
-         SessionLocalFile* sessionLocalFile);
+      FhgfsOpsErr prepareMirroring(char* buf, size_t bufLen,
+         SessionLocalFile* sessionLocalFile, StorageTarget& target);
       FhgfsOpsErr sendToMirror(const char* buf, size_t bufLen, int64_t offset, int64_t toBeMirrored,
          SessionLocalFile* sessionLocalFile);
-      FhgfsOpsErr finishMirroring(char* buf, size_t bufLen,
-         SessionLocalFile* sessionLocalFile);
+      FhgfsOpsErr finishMirroring(SessionLocalFile* sessionLocalFile, StorageTarget& target);
 
       bool doSessionCheck();
 };

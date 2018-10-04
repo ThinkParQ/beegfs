@@ -9,6 +9,22 @@
 #include <common/Common.h>
 #include <common/toolkit/StringTk.h>
 
+#include <boost/io/ios_state.hpp>
+#include <boost/preprocessor/comparison/equal.hpp>
+#include <boost/preprocessor/if.hpp>
+#include <boost/preprocessor/punctuation/is_begin_parens.hpp>
+#include <boost/preprocessor/seq/elem.hpp>
+#include <boost/preprocessor/seq/first_n.hpp>
+#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/seq/pop_front.hpp>
+#include <boost/preprocessor/seq/rest_n.hpp>
+#include <boost/preprocessor/seq/size.hpp>
+#include <boost/preprocessor/stringize.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/tuple/to_seq.hpp>
+
+#include <system_error>
+
 enum LogLevel
 {
    Log_ERR=0, /* system error */
@@ -34,167 +50,94 @@ enum LogTopic
    LogTopic_SESSIONS=8,      // related to session(store) handling
    LogTopic_EVENTLOGGER=9,   // related to file event logger
    LogTopic_DATABASE=10,     // related to database operations
+   LogTopic_SOCKLIB=11,      // socket library message (eg ib_lib)
    LogTopic_INVALID
 };
 
-class LogMessageBuilder
+namespace beegfs { namespace logging {
+
+struct SystemError
 {
-   public:
-      LogMessageBuilder(const char* message, const char* extraInfoNames)
-         : extraInfoNames(extraInfoNames), infosAdded(0)
-      {
-         buffer << message;
-      }
+   int value;
 
-      // this overload exists only for compatibility with old-style LOG_DEBUG
-      LogMessageBuilder(const std::string& message, const char* extraInfoNames)
-         : extraInfoNames(extraInfoNames), infosAdded(0)
-      {
-         buffer << message;
-      }
+   SystemError() : value(errno) {}
+   explicit SystemError(int value) : value(value) {}
 
-      std::string finish() const
-      {
-         return buffer.str();
-      }
+   SystemError operator()(int e) const { return SystemError(e); }
 
-   private:
-      std::ostringstream buffer;
-      const char* extraInfoNames;
-      unsigned infosAdded;
+   friend std::ostream& operator<<(std::ostream& os, SystemError e)
+   {
+      char errStrBuffer[256];
+      char* errStr = strerror_r(e.value, errStrBuffer, sizeof(errStrBuffer));
 
-      bool appendNextExtraInfoName(const char* suppliedName);
+      boost::io::ios_all_saver flags(os);
 
-      template<typename T>
-      LogMessageBuilder& appendNextExtraInfo(const T& value, const char* suppliedName = NULL)
-      {
-         if (infosAdded == 0)
-            buffer << " ";
-         else
-            buffer << "; ";
+      os.flags(std::ios_base::dec);
+      os.width(0);
 
-         if (appendNextExtraInfoName(suppliedName))
-            buffer << ": ";
-
-         buffer << value;
-         infosAdded++;
-         return *this;
-      }
-
-   public:
-      LogMessageBuilder& operator,(bool value)
-      {
-         return appendNextExtraInfo(value ? "yes" : "no");
-      }
-
-      // handle uint8_t differently, because ostreams write u8 out like char, not like int
-      LogMessageBuilder& operator,(uint8_t value)
-      {
-         return appendNextExtraInfo(uint32_t(value));
-      }
-
-      // handle std::vector as comma-seperated list
-      template<typename T>
-      LogMessageBuilder& operator,(const std::vector<T>& value)
-      {
-         std::string vecAsStr = StringTk::implode(",", value);
-
-         return appendNextExtraInfo(vecAsStr);
-      }
-
-      template<typename T>
-      LogMessageBuilder& operator,(const T& value)
-      {
-         return appendNextExtraInfo(value);
-      }
-
-      template<typename T>
-      struct RenamedExtraInfo
-      {
-         const char* name;
-         const T* value;
-      };
-
-      struct RenameExtraInfo
-      {
-         template<typename T>
-         RenamedExtraInfo<T> operator()(const char* name, const T& value) const
-         {
-            RenamedExtraInfo<T> result = {name, &value};
-            return result;
-         }
-      };
-
-      template<typename T>
-      LogMessageBuilder& operator,(RenamedExtraInfo<T> value)
-      {
-         return appendNextExtraInfo(*value.value, value.name);
-      }
-
-      template<std::ios_base& (&Manip)(std::ios_base&)>
-      struct InBase
-      {
-         template<typename T>
-         std::string operator()(const T& value)
-         {
-            std::ostringstream out;
-
-            out << Manip << value;
-            return out.str();
-         }
-      };
-
-      struct SystemError
-      {
-         struct Value { int num; };
-
-         Value operator()() const
-         {
-            Value val = {errno};
-            return val;
-         }
-
-         Value operator()(int err) const
-         {
-            Value val = {err};
-            return val;
-         }
-      };
-
-      LogMessageBuilder& operator,(const SystemError::Value& desc)
-      {
-         char errStrBuffer[256];
-         char* errStr = strerror_r(desc.num, errStrBuffer, sizeof(errStrBuffer));
-
-         appendNextExtraInfo(errStr, "sysErr");
-         buffer << " (" << desc.num << ")";
-         return *this;
-      }
-
-      LogMessageBuilder& operator,(FhgfsOpsErr error)
-      {
-         appendNextExtraInfo(FhgfsOpsErrTk::toErrString(error));
-         buffer << " (" << int(error) << ")";
-         return *this;
-      }
+      return os << errStr << " (" << e.value << ")";
+   }
 };
+
+template<std::ios_base& (&Manip)(std::ios_base&)>
+struct InBase
+{
+   constexpr InBase() {}
+
+   template<typename T>
+   std::string operator()(const T& value) const
+   {
+      std::ostringstream out;
+
+      out << Manip << value;
+      return out.str();
+   }
+};
+
+struct LogInfos
+{
+   std::stringstream infos;
+
+   template<typename T>
+   LogInfos& operator<<(T data)
+   {
+      infos << data;
+      return *this;
+   }
+
+   LogInfos& operator<<(bool data)
+   {
+      infos << (data ? "yes" : "no");
+      return *this;
+   }
+
+   /*
+    * std::error_code does have an operator<<, but this prints the numeric error code, not the
+    * error message, so we define our own one that pretty-prints message and category.
+    */
+   LogInfos& operator<<(std::error_code err)
+   {
+      infos << err.message() << " (" << err.category().name() << ": " << err.value() << ")";
+      return *this;
+   }
+
+   std::string str() const
+   {
+      return infos.str();
+   }
+};
+
+}} // beegfs::logging
 
 
 class Logger
 {
    private:
-      struct LogTopicElem
-      {
-         const char* name;
-         LogTopic logTopic;
-      };
-
-      static const LogTopicElem LogTopics[];
+      static const char* const LogTopics[LogTopic_INVALID];
 
    private:
-      Logger(int defaultLevel, LogType  cfgLogType, bool errsToStdlog, bool noDate, 
-         const std::string& stdFile, const std::string& errFile, unsigned linesPerFile, 
-         unsigned rotatedFiles);
+      Logger(int defaultLevel, LogType cfgLogType, bool noDate, const std::string& stdFile,
+            unsigned linesPerFile, unsigned rotatedFiles);
 
    public:
       ~Logger();
@@ -205,10 +148,8 @@ class Logger
       // configurables
       LogType   logType;
       IntVector logLevels;
-      bool logErrsToStdlog;
       bool logNoDate;
       std::string logStdFile;
-      std::string logErrFile;
       unsigned logNumLines;
       unsigned logNumRotatedFiles;
 
@@ -226,14 +167,12 @@ class Logger
          int line, const char* msg);
       void logGranted(int level, const char* threadName, const char* context, int line,
          const char* msg);
-      void logErrGranted(const char* threadName, const char* context, const char* msg);
       void logBacktraceGranted(const char* context, int backtraceLength, char** backtraceSymbols);
 
       void prepareLogFiles();
       size_t getTimeStr(uint64_t seconds, char* buf, size_t bufLen);
       void rotateLogFile(std::string filename);
       void rotateStdLogChecked();
-      void rotateErrLogChecked();
 
    public:
       // inliners
@@ -288,45 +227,13 @@ class Logger
       }
 
       /**
-       * The normal error log method.
-       */
-      void logErr(const char* context, const char* msg)
-      {
-         if(this->logErrsToStdlog)
-         {
-            // cppcheck-suppress nullPointer [special comment to mute false cppcheck alarm]
-            log(0, context, msg);
-            return;
-         }
-
-         std::string threadName = PThread::getCurrentThreadName();
-
-         logErrGranted(threadName.c_str(), context, msg);
-      }
-
-      /**
-       * Just a wrapper for the normal logErr() method which takes "const char*" arguments.
-       */
-      void logErr(const std::string& context, const std::string& msg)
-      {
-         logErr(context.c_str(), msg.c_str() );
-      }
-
-
-      /**
        * Special version with addidional threadName argument.
        *
        * Note: Used by helperd to log client messages with threadName given by client.
        */
       void logErrWithThreadName(const char* threadName, const char* context, const char* msg)
       {
-         if(this->logErrsToStdlog)
-         {
-            logForcedWithThreadName(0, threadName, context, msg);
-            return;
-         }
-
-         logErrGranted(threadName, context, msg);
+         logForcedWithThreadName(0, threadName, context, msg);
       }
 
       void logBacktrace(const char* context, int backtraceLength, char** backtraceSymbols)
@@ -374,41 +281,31 @@ class Logger
          return logLevels;
       }
 
-      static LogTopic logTopicFromName(std::string& name)
+      static LogTopic logTopicFromName(const std::string& name)
       {
-         for(int i=0; LogTopics[i].logTopic != LogTopic_INVALID; i++)
-         {
-            if (name == LogTopics[i].name)
-            {
-               return LogTopics[i].logTopic;
-            }
-         }
+         const auto idx = std::find_if(
+               std::begin(LogTopics), std::end(LogTopics),
+               [&] (const char* c) { return c == name; });
 
-         return LogTopic_INVALID;
+         if (idx == std::end(LogTopics))
+            return LogTopic_INVALID;
+
+         return LogTopic(idx - std::begin(LogTopics));
       }
 
       static std::string logTopicToName(LogTopic logTopic)
       {
-         for(int i=0; LogTopics[i].logTopic != LogTopic_INVALID; i++)
-         {
-            if (LogTopics[i].logTopic == logTopic)
-            {
-               return LogTopics[i].name;
-            }
-         }
-
-         return LogTopics[LogTopic_INVALID].name;
+         return LogTopics[logTopic];
       }
 
-      static Logger* createLogger(int defaultLevel, LogType logType,  bool errsToStdlog, 
-         bool noDate, const std::string& stdFile, const std::string& errFile, unsigned linesPerFile,
-         unsigned rotatedFiles)
+      static Logger* createLogger(int defaultLevel, LogType logType, bool noDate,
+            const std::string& stdFile, unsigned linesPerFile, unsigned rotatedFiles)
       {
          if (logger)
             throw std::runtime_error("attempted to create a second system-wide logger");
 
-         logger.reset(new Logger(defaultLevel, logType, errsToStdlog, noDate, stdFile, errFile,
-                                 linesPerFile, rotatedFiles));
+         logger.reset(new Logger(defaultLevel, logType, noDate, stdFile, linesPerFile,
+                  rotatedFiles));
 
          return logger.get();
       }
@@ -429,18 +326,57 @@ class Logger
       }
 };
 
+#define LOG_CTX_TOP_L_ITEM__sep \
+   (_log_line << (_log_items++ ? "; " : " "))
+#define LOG_CTX_TOP_L_ITEM__1(item) \
+   LOG_CTX_TOP_L_ITEM__sep << BOOST_PP_STRINGIZE(item) << ": " << item
+#define LOG_CTX_TOP_L_ITEM__2(item) \
+   LOG_CTX_TOP_L_ITEM__sep << BOOST_PP_TUPLE_ELEM(0, item) << ": " \
+      << BOOST_PP_TUPLE_ELEM(1, item)
+#define LOG_CTX_TOP_L_ITEM__3(item) \
+    do { \
+       if (_log_level >= BOOST_PP_CAT(Log_, BOOST_PP_TUPLE_ELEM(0, item))) { \
+         LOG_CTX_TOP_L_ITEM__sep << BOOST_PP_TUPLE_ELEM(1, item) << ": " \
+            << BOOST_PP_TUPLE_ELEM(2, item); \
+       } \
+    } while (0)
+#define LOG_CTX_TOP_L_ITEM__bad(item) \
+   static_assert(false, "wrong number of arguments in log info, is " BOOST_PP_STRINGIZE(item))
+
+#define LOG_CTX_TOP_L_ITEM(r, data, item) \
+   BOOST_PP_IF( \
+      BOOST_PP_IS_BEGIN_PARENS(item), \
+      BOOST_PP_IF( \
+         BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(item), 2), \
+         LOG_CTX_TOP_L_ITEM__2, \
+         BOOST_PP_IF( \
+            BOOST_PP_EQUAL(BOOST_PP_TUPLE_SIZE(item), 3), \
+            LOG_CTX_TOP_L_ITEM__3, \
+            LOG_CTX_TOP_L_ITEM__bad)), \
+      LOG_CTX_TOP_L_ITEM__1)(item);
+
+#define LOG_CTX_TOP_L_ITEMS(items) \
+   do { \
+      BOOST_PP_SEQ_FOR_EACH(LOG_CTX_TOP_L_ITEM, , items) \
+   } while (0)
+
 #define LOG_CTX_TOP_L(Topic, Level, Context, Line, Message, ...) \
    do { \
       Logger* const _log_logger = Logger::getLogger(); \
       if (!_log_logger || _log_logger->getLogLevel(Topic) < Level) \
          break; \
-      LogMessageBuilder _log_builder(Message, #__VA_ARGS__); \
-      LogMessageBuilder::RenameExtraInfo as; (void) as; \
-      LogMessageBuilder::SystemError sysErr; (void) sysErr; \
-      LogMessageBuilder::InBase<std::hex> hex; (void) hex; \
-      LogMessageBuilder::InBase<std::oct> oct; (void) oct; \
-      (void) (_log_builder, ## __VA_ARGS__); \
-      _log_logger->log(Topic, Level, Context, Line, _log_builder.finish().c_str()); \
+      auto _log_level = _log_logger->getLogLevel(Topic); \
+      (void) _log_level; \
+      unsigned _log_items = 0; \
+      (void) _log_items; \
+      beegfs::logging::LogInfos _log_line; \
+      const beegfs::logging::SystemError sysErr; (void) sysErr; \
+      const beegfs::logging::InBase<std::hex> hex; (void) hex; \
+      const beegfs::logging::InBase<std::oct> oct; (void) oct; \
+      _log_line << Message; \
+      LOG_CTX_TOP_L_ITEMS( \
+            BOOST_PP_SEQ_POP_FRONT(BOOST_PP_TUPLE_TO_SEQ((, ##__VA_ARGS__)))); \
+      _log_logger->log(Topic, Level, Context, Line, _log_line.str().c_str()); \
    } while (0)
 
 #define LOG(Topic, Level, Message, ...) \

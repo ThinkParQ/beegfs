@@ -23,13 +23,13 @@ enum TargetConsistencyState
 template<>
 struct SerializeAs<TargetConsistencyState>
 {
-   typedef int32_t type;
+   typedef uint8_t type;
 };
 
 template<>
 struct SerializeAs<TargetReachabilityState>
 {
-   typedef int32_t type;
+   typedef uint8_t type;
 };
 
 typedef std::vector<TargetConsistencyState> TargetConsistencyStateVec;

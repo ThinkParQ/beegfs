@@ -189,15 +189,11 @@ bool SocketTk_getHostByName(struct ExternalHelperd* helperd, const char* hostnam
  */
 bool SocketTk_getHostByAddrStr(const char* hostAddr, struct in_addr* outIPAddr)
 {
-#ifndef KERNEL_HAS_IN4_PTON
-   outIPAddr->s_addr = in_aton(hostAddr); // this version has no error handling
-#else
    if(unlikely(!in4_pton(hostAddr, strlen(hostAddr), (u8 *)outIPAddr, -1, NULL) ) )
    { // not a valid address string
       outIPAddr->s_addr = INADDR_NONE;
       return false;
    }
-#endif // LINUX_VERSION_CODE
 
    return true;
 }
@@ -216,36 +212,6 @@ struct in_addr SocketTk_in_aton(const char* hostAddr)
    SocketTk_getHostByAddrStr(hostAddr, &retVal);
 
    return retVal;
-}
-
-/**
- * Checks whether the poll() call was interrupted by a signal.
- *
- * Note: Some signals are ignored.
- * Note: Should be obsolete!! (because we're blocking signal by setting the sigmask now)
- *
- * @return true if a signal is pending that should interrupt the current poll (e.g. a SIGINT)
- */
-bool __SocketTk_pollInterruptedBySignal(void)
-{
-   static const int interruptSignals[] = {SIGINT, SIGTERM, SIGKILL};
-   static const size_t numInterruptSignals = sizeof(interruptSignals) / sizeof(int);
-
-   size_t i;
-
-   if(!signal_pending(current) )
-      return false;
-
-   for(i = 0; i < numInterruptSignals; i++)
-   {
-      if(sigismember(&current->pending.signal, interruptSignals[i] ) &&
-         !sigismember(&current->blocked, interruptSignals[i] ) )
-      {
-         return true;
-      }
-   }
-
-   return false;
 }
 
 /**

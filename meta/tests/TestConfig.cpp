@@ -46,15 +46,13 @@ TEST_F(TestConfig, missingConfigFile)
    char* argv[2];
 
    std::string appNameStr = APP_NAME;
-   char appName[appNameStr.length() + 1];
-   strcpy(appName, appNameStr.c_str());
+   appNameStr += '\0';
 
    std::string cfgLineStr = "cfgFile=" + this->dummyConfigFile;
-   char cfgLine[cfgLineStr.length() + 1];
-   strcpy(cfgLine, cfgLineStr.c_str());
+   cfgLineStr += '\0';
 
-   argv[0] = appName;
-   argv[1] = cfgLine;
+   argv[0] = &appNameStr[0];
+   argv[1] = &cfgLineStr[0];
 
    // should throw InvalidConfigException now
    ASSERT_THROW(Config config(argc, argv), InvalidConfigException);
@@ -92,15 +90,13 @@ TEST_F(TestConfig, defaultConfigFile)
    char* argv[2];
 
    std::string appNameStr = APP_NAME;
-   char appName[appNameStr.length() + 1];
-   strcpy(appName, appNameStr.c_str());
+   appNameStr += '\0';
 
    std::string cfgLineStr = "cfgFile=" + defaultFileName;
-   char cfgLine[cfgLineStr.length() + 1];
-   strcpy(cfgLine, cfgLineStr.c_str());
+   cfgLineStr += '\0';
 
-   argv[0] = appName;
-   argv[1] = cfgLine;
+   argv[0] = &appNameStr[0];
+   argv[1] = &cfgLineStr[0];
 
    Config config(argc, argv);
 

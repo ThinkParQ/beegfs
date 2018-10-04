@@ -18,8 +18,8 @@ class BuddyResyncerBulkSyncSlave : public SyncSlaveBase
    friend class BuddyResyncJob;
 
    public:
-      BuddyResyncerBulkSyncSlave(MetaSyncCandidateStore* syncCanditates, uint8_t slaveID,
-         const NumNodeID& buddyNodeID, BuddyResyncJob& parentJob);
+      BuddyResyncerBulkSyncSlave(BuddyResyncJob& parentJob, MetaSyncCandidateStore* syncCandidates, uint8_t slaveID,
+         const NumNodeID& buddyNodeID);
 
       struct Stats
       {
@@ -37,7 +37,6 @@ class BuddyResyncerBulkSyncSlave : public SyncSlaveBase
 
    private:
       MetaSyncCandidateStore* syncCandidates;
-      BuddyResyncJob* parentJob;
 
       AtomicUInt64 numDirsSynced;
       AtomicUInt64 numFilesSynced;

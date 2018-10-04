@@ -57,16 +57,7 @@ struct FsFileInfo* FsFileInfo_construct(App* app, unsigned accessFlags, FileHand
 
 void FsFileInfo_uninit(FsObjectInfo* this)
 {
-   FsObjectInfo_uninit(this);
 }
-
-void FsFileInfo_destruct(FsObjectInfo* this)
-{
-   FsFileInfo_uninit(this);
-
-   kfree(this);
-}
-
 
 /**
  * Increase cache hits counter.

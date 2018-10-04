@@ -9,8 +9,8 @@
 class UnitTk
 {
    public:
-      static int64_t pebibyteToByte(double mebibyte);
-      static int64_t tebibyteToByte(double kibibyte);
+      static int64_t pebibyteToByte(double pebibyte);
+      static int64_t tebibyteToByte(double tebibyte);
       static int64_t gibibyteToByte(double gibibyte);
       static int64_t mebibyteToByte(double mebibyte);
       static int64_t kibibyteToByte(double kibibyte);

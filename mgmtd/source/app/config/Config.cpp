@@ -28,8 +28,6 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("connInterfacesFile",              "");
    configMapRedefine("connInterfacesList",              "");
 
-   configMapRedefine("debugRunComponentThreads",        "true");
-
    configMapRedefine("storeMgmtdDirectory",             "");
    configMapRedefine("storeAllowFirstRunInit",          "true");
 
@@ -71,7 +69,6 @@ void Config::loadDefaults(bool addDashes)
 
    configMapRedefine("tuneProcessFDLimit",                    "10000");
 
-   configMapRedefine("sysOverrideStoredRoot",           "false");
    configMapRedefine("sysAllowNewServers",              "true");
    configMapRedefine("sysAllowNewTargets",              "true");
    configMapRedefine("sysTargetOfflineTimeoutSecs",     "180");
@@ -81,9 +78,6 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("pidFile",                         "");
 
    configMapRedefine("quotaEnableEnforcement",          "false");
-   configMapRedefine("quotaNofificationMethod",         "disabled");
-   configMapRedefine("quotaNotfificationIntervalMin",   "360");
-   configMapRedefine("quotaAdminEmailAddress",          "");
    configMapRedefine("quotaUpdateIntervalMin",          "10");
    configMapRedefine("quotaStoreIntervalMin",           "10");
    configMapRedefine("quotaQueryType",                  MGMT_QUOTA_QUERY_TYPE_SYSTEM_STR);
@@ -124,8 +118,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          connInterfacesFile = iter->second;
       else if (iter->first == std::string("connInterfacesList"))
          connInterfacesList = iter->second;
-      else if (iter->first == std::string("debugRunComponentThreads"))
-         debugRunComponentThreads = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("storeMgmtdDirectory"))
          storeMgmtdDirectory = iter->second;
       else if (iter->first == std::string("storeAllowFirstRunInit"))
@@ -194,8 +186,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          tuneStorageInodesEmergencyDynamicLimit = UnitTk::strHumanToInt64(iter->second);
       else if (iter->first == std::string("tuneProcessFDLimit"))
          tuneProcessFDLimit = StringTk::strToUInt(iter->second);
-      else if (iter->first == std::string("sysOverrideStoredRoot"))
-         sysOverrideStoredRoot = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("sysAllowNewServers"))
          sysAllowNewServers = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("sysAllowNewTargets"))
@@ -214,12 +204,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          pidFile = iter->second;
       else if (iter->first == std::string("quotaEnableEnforcement"))
          quotaEnableEnforcement = StringTk::strToBool(iter->second);
-      else if (iter->first == std::string("quotaNofificationMethod"))
-         quotaNofificationMethod = iter->second;
-      else if (iter->first == std::string("quotaNotfificationIntervalMin"))
-         quotaNotfificationIntervalMin = StringTk::strToUInt(iter->second);
-      else if (iter->first == std::string("quotaAdminEmailAddress"))
-         quotaAdminEmailAddress = iter->second;
       else if (iter->first == std::string("quotaUpdateIntervalMin"))
          quotaUpdateIntervalMin = StringTk::strToUInt(iter->second);
       else if (iter->first == std::string("quotaStoreIntervalMin"))
@@ -258,6 +242,9 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          iter = eraseFromConfigMap(iter);
       }
    }
+
+   if (tuneClientAutoRemoveMins > 0 && tuneClientAutoRemoveMins < 5)
+      throw InvalidConfigException("config argument tuneClientAutoRemoveMins must be at least 5");
 }
 
 void Config::initImplicitVals()

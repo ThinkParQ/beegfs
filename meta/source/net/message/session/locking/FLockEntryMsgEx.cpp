@@ -13,16 +13,9 @@ bool FLockEntryMsgEx::processIncoming(ResponseContext& ctx)
    /* note: this code is very similar to FLockRangeMsgEx::processIncoming(), so if you change
       something here, you probably want to change it there, too. */
 
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "FLockEntryMsg incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a FLockEntryMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    clientResult = FhgfsOpsErr_INTERNAL;
 
-   Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
-         MetaOpCounter_FLOCKENTRY, getMsgHeaderUserID());
+   updateNodeOp(ctx, MetaOpCounter_FLOCKENTRY);
 
    return BaseType::processIncoming(ctx);
 }

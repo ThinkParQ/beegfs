@@ -2,11 +2,27 @@
 
 #include "MirrorBuddyGroupMapper.h"
 
+BEEGFS_RBTREE_FUNCTIONS(static, _MirrorBuddyGroupMapper, struct MirrorBuddyGroupMapper,
+      mirrorBuddyGroups,
+      uint16_t,
+      struct MirrorBuddyGroup, groupID, _rb_node,
+      BEEGFS_RB_KEYCMP_LT_INTEGRAL)
+
 void MirrorBuddyGroupMapper_init(MirrorBuddyGroupMapper* this)
 {
    RWLock_init(&this->rwlock);
+   this->mirrorBuddyGroups = RB_ROOT;
+}
 
-   MirrorBuddyGroupMap_init(&this->mirrorBuddyGroups);
+static void _MirrorBuddyGroupMapper_clear(MirrorBuddyGroupMapper* this)
+{
+   MirrorBuddyGroup* pos;
+   MirrorBuddyGroup* n;
+
+   rbtree_postorder_for_each_entry_safe(pos, n, &this->mirrorBuddyGroups, _rb_node)
+      MirrorBuddyGroup_put(pos);
+
+   this->mirrorBuddyGroups = RB_ROOT;
 }
 
 MirrorBuddyGroupMapper* MirrorBuddyGroupMapper_construct(void)
@@ -21,21 +37,7 @@ MirrorBuddyGroupMapper* MirrorBuddyGroupMapper_construct(void)
 
 void MirrorBuddyGroupMapper_uninit(MirrorBuddyGroupMapper* this)
 {
-   // clear map (elements have to be destructed)
-   MirrorBuddyGroupMapIter buddyGroupMapIter;
-
-   buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
-   for(/* iter init'ed above */;
-       !MirrorBuddyGroupMapIter_end(&buddyGroupMapIter);
-       MirrorBuddyGroupMapIter_next(&buddyGroupMapIter) )
-   {
-      MirrorBuddyGroup* buddyGroup = MirrorBuddyGroupMapIter_value(&buddyGroupMapIter);
-      MirrorBuddyGroup_put(buddyGroup);
-   }
-
-   MirrorBuddyGroupMap_uninit(&this->mirrorBuddyGroups);
-
-   RWLock_uninit(&this->rwlock);
+   _MirrorBuddyGroupMapper_clear(this);
 }
 
 void MirrorBuddyGroupMapper_destruct(MirrorBuddyGroupMapper* this)
@@ -56,7 +58,7 @@ uint16_t MirrorBuddyGroupMapper_getPrimaryTargetID(MirrorBuddyGroupMapper* this,
 
    RWLock_readLock(&this->rwlock); // L O C K
 
-   buddyGroup = __MirrorBuddyGroupMapper_getMirrorBuddyGroupUnlocked(this, mirrorBuddyGroupID);
+   buddyGroup = _MirrorBuddyGroupMapper_find(this, mirrorBuddyGroupID);
 
    if(likely(buddyGroup))
       targetID = buddyGroup->firstTargetID;
@@ -79,8 +81,7 @@ uint16_t MirrorBuddyGroupMapper_getSecondaryTargetID(MirrorBuddyGroupMapper* thi
 
    RWLock_readLock(&this->rwlock); // L O C K
 
-   buddyGroup = __MirrorBuddyGroupMapper_getMirrorBuddyGroupUnlocked(this, mirrorBuddyGroupID);
-
+   buddyGroup = _MirrorBuddyGroupMapper_find(this, mirrorBuddyGroupID);
    if(likely(buddyGroup))
       targetID = buddyGroup->secondTargetID;
    else
@@ -100,7 +101,7 @@ int MirrorBuddyGroupMapper_acquireSequenceNumber(MirrorBuddyGroupMapper* this,
 
    RWLock_readLock(&this->rwlock);
 
-   buddyGroup = __MirrorBuddyGroupMapper_getMirrorBuddyGroupUnlocked(this, mirrorBuddyGroupID);
+   buddyGroup = _MirrorBuddyGroupMapper_find(this, mirrorBuddyGroupID);
    if (!buddyGroup)
    {
       RWLock_readUnlock(&this->rwlock);
@@ -135,14 +136,12 @@ int MirrorBuddyGroupMapper_acquireSequenceNumber(MirrorBuddyGroupMapper* this,
 /**
  * NOTE: no sanity checks in here
  */
-void MirrorBuddyGroupMapper_syncGroupsFromLists(MirrorBuddyGroupMapper* this,
-   Config* config, UInt16List* buddyGroupIDs, UInt16List* primaryTargets,
-   UInt16List* secondaryTargets)
+void MirrorBuddyGroupMapper_syncGroups(MirrorBuddyGroupMapper* this,
+   Config* config, struct list_head* groups)
 {
    RWLock_writeLock(&this->rwlock); // L O C K
 
-   __MirrorBuddyGroupMapper_syncGroupsFromListsUnlocked(this, config, buddyGroupIDs,
-      primaryTargets, secondaryTargets);
+   __MirrorBuddyGroupMapper_syncGroupsUnlocked(this, config, groups);
 
    RWLock_writeUnlock(&this->rwlock); // U N L O C K
 }
@@ -151,79 +150,47 @@ void MirrorBuddyGroupMapper_syncGroupsFromLists(MirrorBuddyGroupMapper* this,
 /**
  * note: caller must hold writelock.
  */
-void __MirrorBuddyGroupMapper_syncGroupsFromListsUnlocked(MirrorBuddyGroupMapper* this,
-   Config* config, UInt16List* buddyGroupIDs, UInt16List* primaryTargets,
-   UInt16List* secondaryTargets)
+void __MirrorBuddyGroupMapper_syncGroupsUnlocked(MirrorBuddyGroupMapper* this,
+   Config* config, struct list_head* groups)
 {
-   UInt16ListIter buddyGroupIDsIter;
-   UInt16ListIter primaryTargetsIter;
-   UInt16ListIter secondaryTargetsIter;
+   struct BuddyGroupMapping* mapping;
 
-   MirrorBuddyGroupMapIter buddyGroupMapIter;
+   LIST_HEAD(newGroups);
 
-   UInt16ListIter_init(&buddyGroupIDsIter, buddyGroupIDs);
-   UInt16ListIter_init(&primaryTargetsIter, primaryTargets);
-   UInt16ListIter_init(&secondaryTargetsIter, secondaryTargets);
-
-   // set all known groups to unmarked. we will later delete all groups that have not been marked
-   // by the sync.
-   buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
-   for(/* iter init'ed above */;
-       !MirrorBuddyGroupMapIter_end(&buddyGroupMapIter);
-       MirrorBuddyGroupMapIter_next(&buddyGroupMapIter) )
+   list_for_each_entry(mapping, groups, _list)
    {
-      MirrorBuddyGroupMapIter_value(&buddyGroupMapIter)->marked = false;
-   }
-
-   for(/* iters init'ed above */;
-       !UInt16ListIter_end(&buddyGroupIDsIter);
-       UInt16ListIter_next(&buddyGroupIDsIter), UInt16ListIter_next(&primaryTargetsIter),
-          UInt16ListIter_next(&secondaryTargetsIter) )
-   {
-      uint16_t currentBuddyGroupID = UInt16ListIter_value(&buddyGroupIDsIter);
-      uint16_t currentPrimaryTargetID = UInt16ListIter_value(&primaryTargetsIter);
-      uint16_t currentSecondaryTargetID = UInt16ListIter_value(&secondaryTargetsIter);
-
       MirrorBuddyGroup* group;
 
-      // if the group exists already, only set the primary/secondary IDs (should they have changed)
-      group = __MirrorBuddyGroupMapper_getMirrorBuddyGroupUnlocked(this, currentBuddyGroupID);
+      // if the group exists already, update it and move it over to the new tree
+      group = _MirrorBuddyGroupMapper_find(this, mapping->groupID);
       if (group)
       {
-         group->marked = true;
-         group->firstTargetID = currentPrimaryTargetID;
-         group->secondTargetID = currentSecondaryTargetID;
-         continue;
+         group->firstTargetID = mapping->primaryTargetID;
+         group->secondTargetID = mapping->secondaryTargetID;
+
+         _MirrorBuddyGroupMapper_erase(this, group);
+         list_add_tail(&group->_list, &newGroups);
       }
-
-      group = MirrorBuddyGroup_constructFromTargetIDs(config->connMaxInternodeNum,
-            currentPrimaryTargetID, currentSecondaryTargetID);
-
-      if(unlikely(!group))
+      else
       {
-         printk_fhgfs(KERN_INFO, "%s:%d: Failed to allocate memory for MirrorBuddyGroup; some "
-            "entries could not be processed", __func__, __LINE__);
-         // doesn't make sense to go further here
-         break;
-      }
+         group = MirrorBuddyGroup_constructFromTargetIDs(mapping->groupID,
+               config->connMaxInternodeNum, mapping->primaryTargetID, mapping->secondaryTargetID);
 
-      group->marked = true;
-      MirrorBuddyGroupMap_insert(&this->mirrorBuddyGroups, currentBuddyGroupID, group);
+         list_add_tail(&group->_list, &newGroups);
+      }
    }
 
-   // remove all unmarked (aka deleted) groups from the map
-   buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
-   while (!MirrorBuddyGroupMapIter_end(&buddyGroupMapIter))
+   _MirrorBuddyGroupMapper_clear(this);
+
    {
-      MirrorBuddyGroup* group = MirrorBuddyGroupMapIter_value(&buddyGroupMapIter);
-      uint16_t key = MirrorBuddyGroupMapIter_key(&buddyGroupMapIter);
+      MirrorBuddyGroup* pos;
+      MirrorBuddyGroup* tmp;
 
-      MirrorBuddyGroupMapIter_next(&buddyGroupMapIter);
-
-      if (!group->marked)
+      list_for_each_entry_safe(pos, tmp, &newGroups, _list)
       {
-         MirrorBuddyGroupMap_erase(&this->mirrorBuddyGroups, key);
-         MirrorBuddyGroup_put(group);
+         MirrorBuddyGroup* replaced = _MirrorBuddyGroupMapper_insertOrReplace(this, pos);
+         if (replaced)
+            MirrorBuddyGroup_put(replaced);
       }
    }
 }
@@ -257,10 +224,9 @@ FhgfsOpsErr MirrorBuddyGroupMapper_addGroup(MirrorBuddyGroupMapper* this,
    if (!allowUpdate)
    {
       // If group already exists return error.
-      MirrorBuddyGroupMapIter iter =
-         MirrorBuddyGroupMap_find(&this->mirrorBuddyGroups, buddyGroupID);
+      MirrorBuddyGroup* group = _MirrorBuddyGroupMapper_find(this, buddyGroupID);
 
-      if (!MirrorBuddyGroupMapIter_end(&iter) )
+      if (group)
       {
          res = FhgfsOpsErr_EXISTS;
          goto unlock;
@@ -291,7 +257,7 @@ FhgfsOpsErr MirrorBuddyGroupMapper_addGroup(MirrorBuddyGroupMapper* this,
    }
 
    // Create and insert new mirror buddy group.
-   buddyGroup = MirrorBuddyGroup_constructFromTargetIDs(config->connMaxInternodeNum,
+   buddyGroup = MirrorBuddyGroup_constructFromTargetIDs(buddyGroupID, config->connMaxInternodeNum,
          primaryTargetID, secondaryTargetID);
 
    if (unlikely(!buddyGroup) )
@@ -302,7 +268,7 @@ FhgfsOpsErr MirrorBuddyGroupMapper_addGroup(MirrorBuddyGroupMapper* this,
       goto unlock;
    }
 
-   MirrorBuddyGroupMap_insert(&this->mirrorBuddyGroups, buddyGroupID, buddyGroup);
+   _MirrorBuddyGroupMapper_insert(this, buddyGroup);
 
 unlock:
    RWLock_writeUnlock(&this->rwlock); // U N L O C K
@@ -311,42 +277,17 @@ unlock:
 }
 
 
-/**
- * @return a pointer to the buddy group in the map or NULL if key does not exist
- *
- * NOTE: no locks, so caller should hold an RWLock
- */
-MirrorBuddyGroup* __MirrorBuddyGroupMapper_getMirrorBuddyGroupUnlocked(MirrorBuddyGroupMapper* this,
-   uint16_t mirrorBuddyGroupID)
-{
-   MirrorBuddyGroup* buddyGroup = NULL;
-
-   MirrorBuddyGroupMapIter iter;
-
-   iter = MirrorBuddyGroupMap_find(&this->mirrorBuddyGroups, mirrorBuddyGroupID);
-   if(likely(!MirrorBuddyGroupMapIter_end(&iter)))
-      buddyGroup = MirrorBuddyGroupMapIter_value(&iter);
-
-   return buddyGroup;
-}
-
 uint16_t __MirrorBuddyGroupMapper_getBuddyGroupIDUnlocked(MirrorBuddyGroupMapper* this,
    uint16_t targetID)
 {
-   uint16_t buddyGroupID = 0;
-   MirrorBuddyGroupMapIter buddyGroupMapIter;
-
-   for (buddyGroupMapIter = MirrorBuddyGroupMap_begin(&this->mirrorBuddyGroups);
-        !MirrorBuddyGroupMapIter_end(&buddyGroupMapIter);
-        MirrorBuddyGroupMapIter_next(&buddyGroupMapIter) )
+   MirrorBuddyGroup* buddyGroup;
+   BEEGFS_RBTREE_FOR_EACH_ENTRY(buddyGroup, &this->mirrorBuddyGroups, _rb_node)
    {
-      MirrorBuddyGroup* buddyGroup = MirrorBuddyGroupMapIter_value(&buddyGroupMapIter);
       if (buddyGroup->firstTargetID == targetID || buddyGroup->secondTargetID == targetID)
       {
-         targetID = MirrorBuddyGroupMapIter_key(&buddyGroupMapIter);
-         break;
+         return buddyGroup->groupID;
       }
    }
 
-   return buddyGroupID;
+   return 0;
 }

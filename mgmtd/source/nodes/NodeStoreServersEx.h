@@ -2,6 +2,7 @@
 #define NODESTORESERVERSEX_H_
 
 #include <common/nodes/NodeStoreServers.h>
+#include <common/nodes/RootInfo.h>
 
 
 class NodeStoreServersEx : public NodeStoreServers
@@ -9,36 +10,22 @@ class NodeStoreServersEx : public NodeStoreServers
    public:
       NodeStoreServersEx(NodeType storeType);
 
-      virtual bool addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* outNodeNumID=NULL);
-      virtual bool deleteNode(NumNodeID nodeID);
-
-      virtual bool setRootNodeNumID(NumNodeID nodeID, bool ignoreExistingRoot,
-         bool isBuddyMirrored);
-
       NumNodeID getLowestNodeID();
 
-      bool loadFromFile(bool longNodeIDs);
-      bool saveToFile();
+      bool loadFromFile(RootInfo* root, bool v6Format);
+      bool saveToFile(const RootInfo* root);
       void fillStateStore();
 
 
    protected:
-
+      virtual NumNodeID generateID(Node& node) const override;
 
    private:
       Mutex storeMutex; // syncs access to the storePath file
       std::string storePath; // not thread-safe!
-      bool storeDirty; // true if saved store file needs to be updated
 
-      bool loadFromBuf(const char* buf, unsigned bufLen, bool longNodeIDs);
-      ssize_t saveToBuf(boost::scoped_array<char>& buf);
-
-      void setStoreDirty()
-      {
-         SafeMutexLock mutexLock(&storeMutex);
-         storeDirty = true;
-         mutexLock.unlock();
-      }
+      bool loadFromBuf(const char* buf, unsigned bufLen, RootInfo* root, bool v6Format);
+      ssize_t saveToBuf(boost::scoped_array<char>& buf, const RootInfo* root);
 
    public:
       // getters & setters   
@@ -46,16 +33,6 @@ class NodeStoreServersEx : public NodeStoreServers
       {
          this->storePath = storePath;
       }
-
-      bool isStoreDirty()
-      {
-         SafeMutexLock mutexLock(&storeMutex);
-         bool retVal = this->storeDirty;
-         mutexLock.unlock();
-
-         return retVal;
-      }
-
 };
 
 #endif /*NODESTORESERVERSEX_H_*/

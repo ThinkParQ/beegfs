@@ -25,8 +25,8 @@ class SetAttrMsgEx : public MirroredMessage<SetAttrMsg, std::tuple<FileIDLock, D
 
       FhgfsOpsErr setAttrRoot();
       FhgfsOpsErr setChunkFileAttribs(FileInode& file, bool requestDynamicAttribs);
-      FhgfsOpsErr setChunkFileAttribsSequential(FileInode& file, bool requestDynamicAttribs);
-      FhgfsOpsErr setChunkFileAttribsParallel(FileInode& file, bool requestDynamicAttribs);
+      FhgfsOpsErr setChunkFileAttribsSequential(FileInode& inode, bool requestDynamicAttribs);
+      FhgfsOpsErr setChunkFileAttribsParallel(FileInode& inode, bool requestDynamicAttribs);
 
       FhgfsOpsErr processSecondaryResponse(NetMessage& resp) override
       {

@@ -28,9 +28,7 @@ bool QuotaStoreLimits::getQuotaLimit(QuotaData& quotaDataInOut)
          "QuotaDataType of the store.");
 #endif
 
-   bool retVal = false;
-
-   SafeRWLock rwLock(&this->limitsRWLock, SafeRWLock_READ);          // R E A D L O C K
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_READ);
 
    QuotaDataMapIter iter = this->limits.find(quotaDataInOut.getID() );
    if(iter != this->limits.end() )
@@ -39,12 +37,10 @@ bool QuotaStoreLimits::getQuotaLimit(QuotaData& quotaDataInOut)
       uint64_t inodes = iter->second.getInodes();
       quotaDataInOut.setQuotaData(size, inodes);
 
-      retVal = true;
+      return true;
    }
 
-   rwLock.unlock();                                                  // U N L O C K
-
-   return retVal;
+   return false;
 }
 
 /**
@@ -60,7 +56,7 @@ bool QuotaStoreLimits::getQuotaLimitForRange(const unsigned rangeStart, const un
    QuotaDataList& outQuotaDataList)
 {
 
-   SafeRWLock rwLock(&this->limitsRWLock, SafeRWLock_READ); // L O C K
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_READ);
 
    for (QuotaDataMapIter iter  = limits.lower_bound(rangeStart),
                           end  = limits.upper_bound(rangeEnd);
@@ -69,8 +65,6 @@ bool QuotaStoreLimits::getQuotaLimitForRange(const unsigned rangeStart, const un
    {
          outQuotaDataList.push_back(iter->second);
    }
-
-   rwLock.unlock(); // U N L O C K
 
    return outQuotaDataList.size() == rangeEnd - rangeStart + 1;
 }
@@ -82,18 +76,13 @@ bool QuotaStoreLimits::getQuotaLimitForRange(const unsigned rangeStart, const un
  */
 QuotaDataMap QuotaStoreLimits::getAllQuotaLimits()
 {
-   SafeRWLock rwLock(&this->limitsRWLock, SafeRWLock_READ);          // R E A D L O C K
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_READ);
 
-   QuotaDataMap outMap(this->limits);
-
-   rwLock.unlock();                                                  // U N L O C K
-
-   return outMap;
+   return limits;
 }
 
 /**
- * Updates or inserts QuotaData into the map. The map is write locked during the update. The store
- * is marked as dirty when the update or insert was successful.
+ * Updates or inserts QuotaData into the map. The map is write locked during the update.
  *
  * @param quotaData the QuotaData to insert or to update
  * @return true if limits successful updated or inserted
@@ -106,12 +95,9 @@ void QuotaStoreLimits::addOrUpdateLimit(const QuotaData quotaData)
          "QuotaDataType of the store.");
 #endif
 
-   SafeRWLock safeRWLock(&this->limitsRWLock, SafeRWLock_WRITE); // W R I T E L O C K
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_WRITE);
 
    addOrUpdateLimitUnlocked(quotaData);
-   this->storeDirty = true;
-
-   safeRWLock.unlock(); // U N L O C K
 }
 
 /**
@@ -137,7 +123,6 @@ void QuotaStoreLimits::addOrUpdateLimitUnlocked(const QuotaData quotaData)
 
 /**
  * Updates or inserts a List of QuotaData into the map. The map is write locked during the update.
- * The store is marked as dirty when one or more updates or inserts were successful.
  *
  * @param quotaDataList the List of QuotaData to insert or to update
  * @return true if all limits successful updated or inserted, if one or more updates/inserts fails
@@ -145,7 +130,7 @@ void QuotaStoreLimits::addOrUpdateLimitUnlocked(const QuotaData quotaData)
  */
 void QuotaStoreLimits::addOrUpdateLimits(const QuotaDataList& quotaDataList)
 {
-   SafeRWLock safeRWLock(&this->limitsRWLock, SafeRWLock_WRITE); // W R I T E L O C K
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_WRITE);
 
    for (QuotaDataListConstIter iter = quotaDataList.begin(); iter != quotaDataList.end(); iter++)
    {
@@ -157,10 +142,6 @@ void QuotaStoreLimits::addOrUpdateLimits(const QuotaDataList& quotaDataList)
 
       addOrUpdateLimitUnlocked(*iter);
    }
-
-   this->storeDirty = true;
-
-   safeRWLock.unlock(); // U N L O C K
 }
 
 /**
@@ -183,7 +164,7 @@ bool QuotaStoreLimits::loadFromFile()
    if(!this->storePath.length() )
       return false;
 
-   SafeRWLock safeRWLock(&this->limitsRWLock, SafeRWLock_WRITE);
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_WRITE);
 
    int fd = open(this->storePath.c_str(), O_RDONLY, 0);
    if(fd == -1)
@@ -230,16 +211,12 @@ err_stat:
    close(fd);
 
 err_unlock:
-   this->storeDirty = false;
-
-   safeRWLock.unlock(); // U N L O C K
 
    return retVal;
 }
 
 /**
- * Stores the quota limits into a file. The map is write locked during the save. Marks the store as
- * clean when the limits are successful stored. If an error occurs the store is marked as dirty.
+ * Stores the quota limits into a file. The map is write locked during the save.
  *
  * @return true if the limits are successful stored
  */
@@ -256,7 +233,7 @@ bool QuotaStoreLimits::saveToFile()
    if(!this->storePath.length() )
       return false;
 
-   SafeRWLock safeRWLock(&this->limitsRWLock, SafeRWLock_READ);
+   RWLockGuard const lock(limitsRWLock, SafeRWLock_READ);
 
    Path quotaDataPath(this->storePath);
    if(!StorageTk::createPathOnDisk(quotaDataPath, true))
@@ -302,9 +279,6 @@ err_closefile:
 
 err_unlock:
 
-   this->storeDirty = !retVal;
-   safeRWLock.unlock(); // U N L O C K
-
    return retVal;
 }
 
@@ -317,6 +291,6 @@ void QuotaStoreLimits::clearLimits()
 
    if ( (unlinkRes != 0) && (errno != ENOENT) )
    {
-      LOG(QUOTA, WARNING, "Could not delete file", as("path", storePath), sysErr());
+      LOG(QUOTA, WARNING, "Could not delete file", ("path", storePath), sysErr);
    }
 }

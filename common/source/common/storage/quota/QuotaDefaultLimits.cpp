@@ -18,8 +18,7 @@ bool QuotaDefaultLimits::loadFromFile()
    int fd = open(storePath.c_str(), O_RDONLY, 0);
    if(fd == -1)
    { // open failed
-      LOG(QUOTA, DEBUG, "Unable to open default limits file.",
-          storePath, as("sysErr", System::getErrString()));
+      LOG(QUOTA, DEBUG, "Unable to open default limits file.", storePath, sysErr);
 
       return false;
    }
@@ -27,8 +26,7 @@ bool QuotaDefaultLimits::loadFromFile()
    int statRes = fstat(fd, &statBuf);
    if(statRes != 0)
    { // stat failed
-      LOG(QUOTA, WARNING, "Unable to stat default limits file.",
-          storePath, as("sysErr", System::getErrString()));
+      LOG(QUOTA, WARNING, "Unable to stat default limits file.", storePath, sysErr);
 
       goto err_closefile;
    }
@@ -37,7 +35,7 @@ bool QuotaDefaultLimits::loadFromFile()
    if(!buf)
    { // malloc failed
       LOG(QUOTA, WARNING, "Unable to allocate memory to read the default limits file.",
-          storePath, as("sysErr", System::getErrString()));
+          storePath, sysErr);
 
       goto err_closefile;
    }
@@ -45,8 +43,7 @@ bool QuotaDefaultLimits::loadFromFile()
    readRes = read(fd, buf, statBuf.st_size);
    if(readRes <= 0)
    { // reading failed
-      LOG(QUOTA, WARNING, "Unable to read default limits file.",
-          storePath, as("sysErr", System::getErrString()));
+      LOG(QUOTA, WARNING, "Unable to read default limits file.", storePath, sysErr);
 
       goto err_freebuf;
    }
@@ -94,8 +91,7 @@ bool QuotaDefaultLimits::saveToFile()
    int fd = open(storePath.c_str(), openFlags, 0666);
    if(fd == -1)
    { // error
-      LOG(QUOTA, ERR, "Unable to create default quota limits file.",
-               storePath, as("sysErr", System::getErrString()));
+      LOG(QUOTA, ERR, "Unable to create default quota limits file.", storePath, sysErr);
 
       return false;
    }
@@ -108,7 +104,7 @@ bool QuotaDefaultLimits::saveToFile()
    if(!buf)
    {
       LOG(QUOTA, ERR, "Unable to allocate memory to write the default limits file.",
-                storePath, as("sysErr", System::getErrString()));
+                storePath, sysErr);
       goto err_closefile;
    }
 
@@ -119,7 +115,7 @@ bool QuotaDefaultLimits::saveToFile()
    if(writeRes != (ssize_t)bufLen)
    {
       LOG(QUOTA, ERR, "Unable to allocate memory to write the default limits file.",
-                storePath, as("sysErr", System::getErrString()));
+                storePath, sysErr);
       goto err_closefile;
    }
 
@@ -142,6 +138,6 @@ void QuotaDefaultLimits::clearLimits()
 
    if ( (unlinkRes != 0) && (errno != ENOENT) )
    {
-      LOG(QUOTA, WARNING, "Could not delete file", as("path", storePath), sysErr());
+      LOG(QUOTA, WARNING, "Could not delete file", ("path", storePath), sysErr);
    }
 }

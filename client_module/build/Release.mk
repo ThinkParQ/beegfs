@@ -66,7 +66,7 @@ KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(shell uname -r)/updates/fs/beegfs_autobui
 # Include kernel feature auto-detectors
 include KernelFeatureDetection.mk
 
-# Include version file for definition of BEEGFS_VERSION / BEEGFS_VERSION_CODE
+# Include version file for definition of BEEGFS_VERSION
 include Version.mk
 
 # Prepare CFLAGS:
@@ -85,10 +85,6 @@ endif
 
 ifneq ($(BEEGFS_VERSION),)
 BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"'
-endif
-
-ifneq ($(BEEGFS_VERSION_CODE),)
-BEEGFS_CFLAGS += '-DBEEGFS_VERSION_CODE=$(BEEGFS_VERSION_CODE)'
 endif
 
 # OFED

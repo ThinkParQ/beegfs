@@ -18,16 +18,13 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
       lastStatsTime = highResStats.back().rawVals.statsTimeMS;
    }
 
-   // generate the RequestStorageDataMsg with the lastStatsTime
    RequestStorageDataMsg requestDataMsg(lastStatsTime);
-   char *outBuf;
-   NetMessage *rspMsg = NULL;
-   bool respReceived = MessagingTk::requestResponse(*node, &requestDataMsg,
-      NETMSGTYPE_RequestStorageDataResp, &outBuf, &rspMsg);
+   const auto rspMsg = MessagingTk::requestResponse(*node, requestDataMsg,
+      NETMSGTYPE_RequestStorageDataResp);
 
    // if node does not respond set not-responding flag, otherwise process the
    // response
-   if(!respReceived)
+   if (!rspMsg)
    {
       log.log(Log_SPAM, std::string("Received no response from node: ") +
          node->getNodeIDWithTypeStr());
@@ -36,8 +33,7 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
    else
    {
       // get response and process it
-      RequestStorageDataRespMsg *storageAdmonDataMsg =
-         (RequestStorageDataRespMsg*) rspMsg;
+      auto *storageAdmonDataMsg = (RequestStorageDataRespMsg*) rspMsg.get();
       std::string nodeID = storageAdmonDataMsg->getNodeID();
       NumNodeID nodeNumID = storageAdmonDataMsg->getNodeNumID();
 
@@ -62,9 +58,6 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
       // call addOrUpdate in the node store (the newNode object will definitely
       // be deleted in there)
       storageNodeStore->addOrUpdateNode(std::move(newNode));
-
-      SAFE_FREE(outBuf);
-      SAFE_DELETE(storageAdmonDataMsg);
    }
 }
 

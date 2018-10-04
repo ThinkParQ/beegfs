@@ -13,20 +13,17 @@ void GetNodesWork::process(char* bufIn, unsigned bufInLen, char* bufOut, unsigne
    if (NodesTk::downloadNodes(*mgmtdNode, nodeType, nodesList, false))
    {
       // sync the downloaded list with the node store
-      nodes->syncNodes(nodesList, &addedNodes, &removedNodes, false, localNode.get());
+      nodes->syncNodes(nodesList, &addedNodes, &removedNodes, localNode.get());
 
-      if (addedNodes.size())
-         LOG(GENERAL, WARNING, "Nodes added.", as("addedNodes", addedNodes.size()),
-               as("NodeType", Node::nodeTypeToStr(nodeType)));
+      if (!addedNodes.empty())
+         LOG(GENERAL, WARNING, "Nodes added.", ("addedNodes", addedNodes.size()), nodeType);
 
-      if (removedNodes.size())
-         LOG(GENERAL, WARNING, "Nodes removed.", as("removedNodes", removedNodes.size()),
-               as("NodeType", Node::nodeTypeToStr(nodeType)));
+      if (!removedNodes.empty())
+         LOG(GENERAL, WARNING, "Nodes removed.", ("removedNodes", removedNodes.size()), nodeType);
    }
    else
    {
-      LOG(GENERAL, ERR, "Couldn't download server list from management daemon.",
-            as("nodeType", Node::nodeTypeToStr(nodeType)));
+      LOG(GENERAL, ERR, "Couldn't download server list from management daemon.", nodeType);
    }
 
    std::list<uint16_t> buddyGroupIDList;

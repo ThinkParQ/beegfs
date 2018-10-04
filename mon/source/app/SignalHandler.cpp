@@ -3,7 +3,7 @@
 #include <common/app/log/Logger.h>
 #include <app/App.h>
 
-#include <signal.h>
+#include <csignal>
 
 App* SignalHandler::app = nullptr;
 

@@ -261,14 +261,9 @@ void Serialization_deserializeNicList(const RawList* inList, NicAddressList* out
  */
 bool Serialization_deserializeNodeListPreprocess(DeserializeCtx* ctx, RawList* outList)
 {
-   unsigned padding;
    unsigned i;
 
    if(!Serialization_deserializeUInt(ctx, &outList->elemCount) )
-      return false;
-
-   // padding for 8 byte alignment
-   if(!Serialization_deserializeUInt(ctx, &padding) )
       return false;
 
    // store start pos for later deserialize()
@@ -277,20 +272,11 @@ bool Serialization_deserializeNodeListPreprocess(DeserializeCtx* ctx, RawList* o
 
    for(i=0; i < outList->elemCount; i++)
    {
-      const char* const nodeStartBuf = ctx->data; // for 8 byte alignment of this node
-
-      { // nodeFeatureFlags (8b aligned)
-         const char* featuresStart;
-
-         if(unlikely(!BitStore_deserializePreprocess(ctx, &featuresStart) ) )
-            return false;
-      }
-
       {// nodeID
          unsigned nodeIDLen = 0;
          const char* nodeID = NULL;
 
-         if(unlikely(!Serialization_deserializeStrAlign4(ctx, &nodeIDLen, &nodeID) ) )
+         if(unlikely(!Serialization_deserializeStr(ctx, &nodeIDLen, &nodeID) ) )
             return false;
       }
 
@@ -298,13 +284,6 @@ bool Serialization_deserializeNodeListPreprocess(DeserializeCtx* ctx, RawList* o
          RawList nicList;
 
          if(unlikely(!Serialization_deserializeNicListPreprocess(ctx, &nicList) ) )
-            return false;
-      }
-
-      {// fhgfsVersion
-         unsigned fhgfsVersion = 0;
-
-         if(unlikely(!Serialization_deserializeUInt(ctx, &fhgfsVersion) ) )
             return false;
       }
 
@@ -335,20 +314,6 @@ bool Serialization_deserializeNodeListPreprocess(DeserializeCtx* ctx, RawList* o
          if(unlikely(!Serialization_deserializeChar(ctx, &nodeType) ) )
             return false;
       }
-
-
-      { // add padding for 8 byte alignment
-         unsigned remainder = (ctx->data - nodeStartBuf) % 8;
-
-         if(ctx->length < remainder)
-            return false;
-
-         if(remainder)
-         {
-            ctx->data += (8 - remainder);
-            ctx->length -= (8 - remainder);
-         }
-      }
    }
 
    return true;
@@ -371,30 +336,22 @@ void Serialization_deserializeNodeList(App* app, const RawList* inList, NodeList
 
    for(i=0; i < inList->elemCount; i++)
    {
-      const char* const nodeStartBuf = ctx.data; // for 8 byte alignment of this node
-
-      BitStore nodeFeatureFlags;
       NicAddressList nicList;
 
       const char* nodeID = NULL;
-      unsigned fhgfsVersion = 0;
       NumNodeID nodeNumID = (NumNodeID){0};
       uint16_t portUDP = 0;
       uint16_t portTCP = 0;
       char nodeType = 0;
 
 
-      BitStore_init(&nodeFeatureFlags, false);
       NicAddressList_init(&nicList);
 
-
-      //nodeFeatureFlags (8b aligned)
-      BitStore_deserialize(&nodeFeatureFlags, &ctx);
 
       {// nodeID
          unsigned nodeIDLen = 0;
 
-         Serialization_deserializeStrAlign4(&ctx, &nodeIDLen, &nodeID);
+         Serialization_deserializeStr(&ctx, &nodeIDLen, &nodeID);
       }
 
       {// nicList (4b aligned)
@@ -403,9 +360,6 @@ void Serialization_deserializeNodeList(App* app, const RawList* inList, NodeList
          Serialization_deserializeNicListPreprocess(&ctx, &rawNicList);
          Serialization_deserializeNicList(&rawNicList, &nicList);
       }
-
-      // fhgfsVersion
-      Serialization_deserializeUInt(&ctx, &fhgfsVersion);
 
       // nodeNumID
       NumNodeID_deserialize(&ctx, &nodeNumID);
@@ -419,21 +373,10 @@ void Serialization_deserializeNodeList(App* app, const RawList* inList, NodeList
       // nodeType
       Serialization_deserializeChar(&ctx, &nodeType);
 
-      { // add padding for 8 byte alignment
-         unsigned remainder = (ctx.data - nodeStartBuf) % 8;
-         if(remainder)
-         {
-            ctx.data += (8 - remainder);
-            ctx.length -= (8 - remainder);
-         }
-      }
-
       {// construct node
          Node* node = Node_construct(app, nodeID, nodeNumID, portUDP, portTCP, &nicList);
 
          Node_setNodeType(node, (NodeType)nodeType);
-         Node_setFhgfsVersion(node, fhgfsVersion);
-         Node_setFeatureFlags(node, &nodeFeatureFlags);
 
          // append node to outList
          NodeList_append(outNodeList, node);
@@ -442,7 +385,6 @@ void Serialization_deserializeNodeList(App* app, const RawList* inList, NodeList
       // cleanup
       ListTk_kfreeNicAddressListElems(&nicList);
       NicAddressList_uninit(&nicList);
-      BitStore_uninit(&nodeFeatureFlags);
    }
 
 }
@@ -936,83 +878,6 @@ bool Serialization_deserializeInt64CpyVec(const RawList* inList, Int64CpyVec* ou
 
       Int64CpyVec_append(outVec, value);
    }
-
-   return true;
-}
-
-/**
- * Pre-processes a serialized NumNodeIDList().
- *
- * @return false on error or inconsistency
- */
-bool Serialization_deserializeNumNodeIDListPreprocess(DeserializeCtx* ctx, RawList* outList)
-{
-   DeserializeCtx outCtx;
-
-   if(!__Serialization_deserializeNestedField(ctx, &outCtx) )
-      return false;
-
-   // elem count field
-   if(unlikely(!Serialization_deserializeUInt(&outCtx, &outList->elemCount) ) )
-      return false;
-
-   outList->data = outCtx.data;
-   outList->length = outCtx.length;
-
-   return true;
-}
-
-/**
- * Deserializes a NumNodeIDList.
- * (requires pre-processing)
- *
- * @return false on error or inconsistency
- */
-bool Serialization_deserializeNumNodeIDList(const RawList* inList, NumNodeIDList* outList)
-{
-   DeserializeCtx ctx = { inList->data, inList->length };
-   unsigned i;
-
-   // read each list element
-   for(i=0; i < inList->elemCount; i++)
-   {
-      NumNodeID value;
-
-      if(!NumNodeID_deserialize(&ctx, &value) )
-         return false;
-
-      NumNodeIDList_append(outList, value);
-   }
-
-   return true;
-}
-
-/**
- * Pre-processes a serialized list of pair<uint16_t, StoragePoolId> elements; this is needed for
- * MapTargetsMsg, because the server side sends these kinds of lists
- *
- * note: this kind of deserialization is only needed in MapTargetMsgEx. Thus we don't have a generic
- * deserialize method here (only preprocessing) and deserialization is directly handled in
- * MapTargetsMsgEx.
- *
- * note: actually the servers send vectors, but this doesn't make a difference for deserialization
- * here
- *
- * @return false on error or inconsistency
- */
-bool Serialization_deserializeTargetPoolPairListPreprocess(DeserializeCtx* ctx, RawList* outList)
-{
-   DeserializeCtx outCtx;
-
-   if(!__Serialization_deserializeNestedField(ctx, &outCtx) )
-      return false;
-
-   // elem count field
-   if(unlikely(!Serialization_deserializeUInt(&outCtx, &outList->elemCount) ) )
-      return false;
-
-   outList->data = outCtx.data;
-   outList->length = outCtx.length;
 
    return true;
 }

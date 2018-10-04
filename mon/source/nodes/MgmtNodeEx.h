@@ -3,7 +3,6 @@
 
 #include <common/nodes/Node.h>
 #include <common/Common.h>
-#include <common/threading/SafeMutexLock.h>
 
 #include <mutex>
 
@@ -16,8 +15,7 @@ class MgmtNodeEx : public Node
 {
    public:
       MgmtNodeEx(std::string nodeID, NumNodeID nodeNumID,  unsigned short portUDP,
-            unsigned short portTCP, unsigned version, const BitStore& featuresFlags,
-            NicAddressList& nicList);
+            unsigned short portTCP, NicAddressList& nicList);
 
    private:
       MgmtdNodeDataContent data;

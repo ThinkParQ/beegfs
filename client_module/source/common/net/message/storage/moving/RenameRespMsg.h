@@ -8,7 +8,6 @@ struct RenameRespMsg;
 typedef struct RenameRespMsg RenameRespMsg;
 
 static inline void RenameRespMsg_init(RenameRespMsg* this);
-static inline void RenameRespMsg_initFromValue(RenameRespMsg* this, int value);
 
 // getters & setters
 static inline int RenameRespMsg_getValue(RenameRespMsg* this);
@@ -22,11 +21,6 @@ struct RenameRespMsg
 void RenameRespMsg_init(RenameRespMsg* this)
 {
    SimpleIntMsg_init( (SimpleIntMsg*)this, NETMSGTYPE_RenameResp);
-}
-
-void RenameRespMsg_initFromValue(RenameRespMsg* this, int value)
-{
-   SimpleIntMsg_initFromValue( (SimpleIntMsg*)this, NETMSGTYPE_RenameResp, value);
 }
 
 int RenameRespMsg_getValue(RenameRespMsg* this)

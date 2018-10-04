@@ -163,14 +163,14 @@ std::string StringTk::implode(char delimiter, StringList& inList, bool useTrim)
 
 int StringTk::strToInt(const char* s)
 {
-   return atoi(s);
+   return atoi(s); // NOLINT users depend on shady error behaviour
 }
 
 unsigned StringTk::strToUInt(const char* s)
 {
    unsigned retVal = 0;
 
-   sscanf(s, "%u", &retVal);
+   sscanf(s, "%u", &retVal); // NOLINT users depend on shady error behaviour
 
    return retVal;
 }
@@ -179,7 +179,7 @@ unsigned StringTk::strHexToUInt(const char* s)
 {
    unsigned retVal = 0;
 
-   sscanf(s, "%X", &retVal);
+   sscanf(s, "%X", &retVal); // NOLINT users depend on shady error behaviour
 
    return retVal;
 }
@@ -188,7 +188,7 @@ unsigned StringTk::strOctalToUInt(const char* s)
 {
    unsigned retVal = 0;
 
-   sscanf(s, "%o", &retVal);
+   sscanf(s, "%o", &retVal); // NOLINT users depend on shady error behaviour
 
    return retVal;
 }
@@ -196,14 +196,14 @@ unsigned StringTk::strOctalToUInt(const char* s)
 
 int64_t StringTk::strToInt64(const char* s)
 {
-   return atoll(s);
+   return atoll(s); // NOLINT users depend on shady error behaviour
 }
 
 uint64_t StringTk::strToUInt64(const char* s)
 {
    unsigned long long retVal = 0;
 
-   sscanf(s, "%Lu", &retVal);
+   sscanf(s, "%Lu", &retVal); // NOLINT users depend on shady error behaviour
 
    return retVal;
 }
@@ -215,15 +215,12 @@ uint64_t StringTk::strToUInt64(const char* s)
  */
 bool StringTk::strToBool(const char* s)
 {
-   if( !(s[0]) ||
+   return !(s[0]) ||
        !strcmp(s, "1") ||
        !strcasecmp(s, "y") ||
        !strcasecmp(s, "on") ||
        !strcasecmp(s, "yes") ||
-       !strcasecmp(s, "true") )
-      return true;
-
-   return false;
+       !strcasecmp(s, "true");
 }
 
 std::string StringTk::intToStr(int a)
@@ -308,7 +305,7 @@ std::string StringTk::timespanToStr(int64_t timespan_seconds)
 	int hours = 0;
 	int days = 0;
 
-	std::string outStr = "";
+	std::string outStr;
 
 	if (timespan_seconds >= 60)
 	{

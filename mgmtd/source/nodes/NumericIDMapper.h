@@ -1,9 +1,8 @@
 #ifndef NUMERICIDMAPPER_H_
 #define NUMERICIDMAPPER_H_
 
-#include <common/threading/SafeRWLock.h>
-#include <common/toolkit/Random.h>
 #include <common/Common.h>
+#include <common/threading/RWLockGuard.h>
 
 
 /**
@@ -24,8 +23,6 @@ class NumericIDMapper
       typedef NumericIDMap::value_type NumericIDMapVal;
 
 
-      NumericIDMapper();
-
       bool mapStringID(std::string stringID, uint16_t currentNumID, uint16_t* outNewNumID);
       bool unmapStringID(std::string stringID);
 
@@ -37,9 +34,6 @@ class NumericIDMapper
       mutable RWLock rwlock;
       NumericIDMap idMap; // keys: string IDs, values: numeric IDs
 
-      Random randGen; // for random new IDs; must also be synchronized by lock
-
-      bool mappingsDirty; // true if saved mappings file needs to be updated
       std::string storePath; // set to enable load/save methods (setting is not thread-safe)
 
 
@@ -61,48 +55,26 @@ class NumericIDMapper
        */
       uint16_t getNumericID(std::string stringID) const
       {
-         SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
-
-         uint16_t numericID = 0;
+         RWLockGuard const lock(rwlock, SafeRWLock_READ);
 
          NumericIDMapCIter iter = idMap.find(stringID);
          if(iter != idMap.end() )
-         {
-            numericID = iter->second;
-         }
+            return iter->second;
 
-         safeLock.unlock(); // U N L O C K
-
-         return numericID;
+         return 0;
       }
 
       size_t getSize() const
       {
-         SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
+         RWLockGuard const lock(rwlock, SafeRWLock_READ);
 
-         size_t mapSize = idMap.size();
-
-         safeLock.unlock(); // U N L O C K
-
-         return mapSize;
+         return idMap.size();
       }
 
       void setStorePath(std::string storePath)
       {
          this->storePath = storePath;
       }
-
-      bool isMapperDirty() const
-      {
-         SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
-
-         bool retVal = mappingsDirty;
-
-         safeLock.unlock(); // U N L O C K
-
-         return retVal;
-      }
-
 };
 
 

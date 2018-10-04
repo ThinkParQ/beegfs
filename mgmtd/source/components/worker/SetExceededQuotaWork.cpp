@@ -7,32 +7,24 @@ void SetExceededQuotaWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
 {
    LogContext log("SetQuotaMsg incoming");
 
-   bool commRes = false;
-   char* respBuf = NULL;
-
    SetExceededQuotaMsg msg(storagePoolId, idType, limitType);
    prepareMessage(this->messageNumber, &msg);
 
-   NetMessage* respMsg = NULL;
    SetExceededQuotaRespMsg* respMsgCast;
 
-   // request/response
-   commRes = MessagingTk::requestResponse(storageNode, &msg, NETMSGTYPE_SetExceededQuotaResp,
-      &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(storageNode, msg,
+         NETMSGTYPE_SetExceededQuotaResp);
+   if (!respMsg)
    {
       log.logErr("Failed to communicate with node: " + storageNode.getTypedNodeID() );
 
       *this->result = 0;
       this->counter->incCount();
 
-      SAFE_DELETE(respMsg);
-      SAFE_FREE(respBuf);
-
       return;
    }
 
-   respMsgCast = (SetExceededQuotaRespMsg*)respMsg;
+   respMsgCast = (SetExceededQuotaRespMsg*)respMsg.get();
    int resultValue = respMsgCast->getValue();
 
    if(resultValue != 0)
@@ -47,9 +39,6 @@ void SetExceededQuotaWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
       *this->result = 1;
 
    this->counter->incCount();
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 }
 
 /*

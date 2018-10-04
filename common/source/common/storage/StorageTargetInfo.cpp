@@ -14,21 +14,16 @@ FhgfsOpsErr StorageTargetInfo::statStoragePath(Node& node, uint16_t targetID, in
    int64_t* outTotal, int64_t* outInodesFree, int64_t* outInodesTotal)
 {
    FhgfsOpsErr retVal;
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    StatStoragePathRespMsg* respMsgCast;
 
    StatStoragePathMsg msg(targetID);
 
-   // connect & communicate
-   commRes = MessagingTk::requestResponse(
-      node, &msg, NETMSGTYPE_StatStoragePathResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(node, msg, NETMSGTYPE_StatStoragePathResp);
+   if (!respMsg)
       return FhgfsOpsErr_COMMUNICATION;
 
    // handle result
-   respMsgCast = (StatStoragePathRespMsg*)respMsg;
+   respMsgCast = (StatStoragePathRespMsg*)respMsg.get();
 
    retVal = (FhgfsOpsErr)respMsgCast->getResult();
 
@@ -36,10 +31,6 @@ FhgfsOpsErr StorageTargetInfo::statStoragePath(Node& node, uint16_t targetID, in
    *outTotal = respMsgCast->getSizeTotal();
    *outInodesFree = respMsgCast->getInodesFree();
    *outInodesTotal = respMsgCast->getInodesTotal();
-
-   // cleanup
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return retVal;
 }

@@ -8,9 +8,6 @@ bool StorageBenchControlMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "StorageBenchControlMsg incoming";
 
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a StorageBenchControlMsg from: " +
-      ctx.peerName() );
-
    StorageBenchResultsMap results;
    int cmdErrorCode = STORAGEBENCH_ERROR_NO_ERROR;
 

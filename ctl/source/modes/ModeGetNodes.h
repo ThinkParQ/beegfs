@@ -48,7 +48,6 @@ class ModeGetNodes : public Mode
       void printNodes(const std::vector<NodeHandle>& nodes,
          const std::set<NumNodeID>& unreachableNodes, NumNodeID rootNodeID);
       void printNicList(Node& node);
-      void printFhgfsVersion(Node& node);
       void printPorts(Node& node);
       void printGotRoot(Node& node, uint16_t rootNodeID);
       void printReachability(Node& node, const std::set<NumNodeID>& unreachableNodes);

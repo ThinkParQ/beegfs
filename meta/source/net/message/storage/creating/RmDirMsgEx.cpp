@@ -13,17 +13,10 @@
 
 bool RmDirMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "RmDirMsg incoming";
-
-   LOG_DEBUG(logContext, 4, "Received a RmDirMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    BaseType::processIncoming(ctx);
 
    // update operation counters
-   Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
-      MetaOpCounter_RMDIR, getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_RMDIR);
 
    return true;
 }
@@ -197,12 +190,12 @@ FhgfsOpsErr RmDirMsgEx::rmRemoteDirInode(EntryInfo* delEntryInfo)
       }
 
       // correct response type received
-      RmLocalDirRespMsg* rmRespMsg = (RmLocalDirRespMsg*)rrArgs.outRespMsg;
+      const auto rmRespMsg = (const RmLocalDirRespMsg*)rrArgs.outRespMsg.get();
 
       retVal = rmRespMsg->getResult();
       if(unlikely( (retVal != FhgfsOpsErr_SUCCESS) && (retVal != FhgfsOpsErr_NOTEMPTY) ) )
       { // error: dir inode not removed
-         std::string errString = FhgfsOpsErrTk::toErrString(retVal);
+         std::string errString = boost::lexical_cast<std::string>(retVal);
 
          LogContext(logContext).log(Log_DEBUG,
             "Metadata server was unable to remove dir inode. "
@@ -221,7 +214,7 @@ FhgfsOpsErr RmDirMsgEx::rmRemoteDirInode(EntryInfo* delEntryInfo)
          "dirID: "       + delEntryInfo->getEntryID()       + "; " +
          "dirname: "     + delEntryInfo->getFileName() );
 
-   } while(0);
+   } while(false);
 
 
    return retVal;

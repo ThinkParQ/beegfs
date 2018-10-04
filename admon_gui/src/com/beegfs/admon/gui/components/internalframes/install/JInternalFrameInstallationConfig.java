@@ -914,7 +914,6 @@ public class JInternalFrameInstallationConfig extends javax.swing.JInternalFrame
             "connMgmtdPortUDP", jTextFieldMgmtdPort.getText(),
             "connMgmtdPortTCP", jTextFieldMgmtdPort.getText(),
             "connHelperdPortTCP", jTextFieldHelperdPort.getText(),
-            "connUseSDP", "false",
             "connUseRDMA", String.valueOf(jCheckBoxUseRDMA.isSelected()),
             "logLevel", String.valueOf(jComboBoxLogLevel.getSelectedItem().toString()),
             "tuneFileCacheType", String.valueOf(jComboBoxClientCache.getSelectedItem().toString())

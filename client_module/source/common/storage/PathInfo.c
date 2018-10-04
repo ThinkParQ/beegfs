@@ -5,7 +5,7 @@
 /**
  * Serialize into outBuf, 4-byte aligned
  */
-void PathInfo_serialize(const PathInfo* this, SerializeCtx* ctx)
+void PathInfo_serialize(SerializeCtx* ctx, const PathInfo* this)
 {
    // flags
    Serialization_serializeUInt(ctx, this->flags);

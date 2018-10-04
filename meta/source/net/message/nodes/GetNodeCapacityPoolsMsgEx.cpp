@@ -8,8 +8,6 @@ bool GetNodeCapacityPoolsMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "GetNodeCapacityPools incoming";
 
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a GetNodeCapacityPoolsMsg from: " + ctx.peerName() );
-
    CapacityPoolQueryType poolType = getCapacityPoolQueryType();
 
    LOG_DEBUG(logContext, Log_SPAM, "PoolType: " + StringTk::intToStr(poolType) );

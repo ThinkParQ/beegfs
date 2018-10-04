@@ -6,10 +6,6 @@
 
 bool LogMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("LogMsgEx incoming");
-
-   LOG_DEBUG_CONTEXT(log, 4, "Received a LogMsg from: " + ctx.peerName() );
-
    int logRes = 0;
 
    // Note: level 0 is reserved for error logging (logErr() )

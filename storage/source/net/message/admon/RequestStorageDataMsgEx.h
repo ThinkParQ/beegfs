@@ -10,7 +10,6 @@
 #include <common/storage/StorageTargetInfo.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/net/message/admon/RequestStorageDataRespMsg.h>
-#include <nodes/NodeStoreEx.h>
 #include <program/Program.h>
 
 

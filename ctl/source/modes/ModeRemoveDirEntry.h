@@ -21,7 +21,7 @@ class ModeRemoveDirEntry : public Mode
    private:
       bool cfgReadFromStdin;
 
-      bool removeDirEntry(Node& ownerNode, EntryInfo* entryInfo, std::string entryName);
+      bool removeDirEntry(Node& ownerNode, EntryInfo* parentInfo, std::string entryName);
 };
 
 #endif /* MODEREMOVEDIRENTRY_H_ */

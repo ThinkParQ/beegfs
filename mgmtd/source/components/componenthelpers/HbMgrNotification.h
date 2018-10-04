@@ -67,8 +67,6 @@ class HbMgrNotificationNodeAdded : public HbMgrNotification
       std::string nodeID;
       NumNodeID nodeNumID;
       NodeType nodeType;
-
-      void propagateAddedNode(Node& node);
 };
 
 
@@ -86,8 +84,6 @@ class HbMgrNotificationNodeRemoved : public HbMgrNotification
    private:
       NumNodeID nodeNumID;
       NodeType nodeType;
-
-      void propagateRemovedNode();
 };
 
 
@@ -106,8 +102,6 @@ class HbMgrNotificationTargetAdded : public HbMgrNotification
       uint16_t targetID;
       NumNodeID nodeID;
       StoragePoolId storagePoolId;
-
-      void propagateAddedTarget();
 };
 
 class HbMgrNotificationRefreshCapacityPools : public HbMgrNotification
@@ -118,10 +112,6 @@ class HbMgrNotificationRefreshCapacityPools : public HbMgrNotification
       {}
 
       void processNotification();
-
-
-   private:
-      void propagateRefreshCapacityPools();
 };
 
 class HbMgrNotificationRefreshTargetStates : public HbMgrNotification
@@ -132,10 +122,6 @@ class HbMgrNotificationRefreshTargetStates : public HbMgrNotification
       {}
 
       void processNotification();
-
-
-   private:
-      void propagateRefreshTargetStates();
 };
 
 class HbMgrNotificationPublishCapacities : public HbMgrNotification
@@ -146,9 +132,6 @@ class HbMgrNotificationPublishCapacities : public HbMgrNotification
       {}
 
       void processNotification();
-
-   private:
-      void propagatePublishCapacities();
 };
 
 class HbMgrNotificationMirrorBuddyGroupAdded: public HbMgrNotification
@@ -169,8 +152,6 @@ class HbMgrNotificationMirrorBuddyGroupAdded: public HbMgrNotification
       uint16_t buddyGroupID;
       uint16_t primaryTargetID;
       uint16_t secondaryTargetID;
-
-      void propagateAddedMirrorBuddyGroup();
 };
 
 class HbMgrNotificationRefreshStoragePools: public HbMgrNotification
@@ -180,9 +161,6 @@ class HbMgrNotificationRefreshStoragePools: public HbMgrNotification
          HbMgrNotification(HbMgrNotificationType_REFRESHSTORAGEPOOLS) {}
 
       void processNotification();
-
-   private:
-      void propagateRefreshStoragePools();
 };
 
 #endif /* HBMGRNOTIFICATION_H_ */

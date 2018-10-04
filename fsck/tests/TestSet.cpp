@@ -21,7 +21,7 @@ TEST_F(TestSet, open)
       }
 
       FAIL();
-   } while (0);
+   } while (false);
    ASSERT_EQ(::write(cfgFile, "v1\n1\n", 5), 5);
    do {
       try {
@@ -32,7 +32,7 @@ TEST_F(TestSet, open)
       }
 
       FAIL();
-   } while (0);
+   } while (false);
    ASSERT_EQ(::close(cfgFile), 0);
    ASSERT_EQ(::unlink((this->fileName + ".t").c_str()), 0);
 
@@ -54,7 +54,7 @@ TEST_F(TestSet, open)
       }
 
       FAIL();
-   } while (0);
+   } while (false);
 }
 
 TEST_F(TestSet, drop)

@@ -8,7 +8,6 @@ struct RmDirRespMsg;
 typedef struct RmDirRespMsg RmDirRespMsg;
 
 static inline void RmDirRespMsg_init(RmDirRespMsg* this);
-static inline void RmDirRespMsg_initFromValue(RmDirRespMsg* this, int value);
 
 // getters & setters
 static inline int RmDirRespMsg_getValue(RmDirRespMsg* this);
@@ -22,11 +21,6 @@ struct RmDirRespMsg
 void RmDirRespMsg_init(RmDirRespMsg* this)
 {
    SimpleIntMsg_init( (SimpleIntMsg*)this, NETMSGTYPE_RmDirResp);
-}
-
-void RmDirRespMsg_initFromValue(RmDirRespMsg* this, int value)
-{
-   SimpleIntMsg_initFromValue( (SimpleIntMsg*)this, NETMSGTYPE_RmDirResp, value);
 }
 
 int RmDirRespMsg_getValue(RmDirRespMsg* this)

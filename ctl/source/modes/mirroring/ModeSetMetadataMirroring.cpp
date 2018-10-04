@@ -3,20 +3,27 @@
 #include <common/net/message/storage/mirroring/SetMetadataMirroringRespMsg.h>
 #include <common/toolkit/MetadataTk.h>
 #include <common/toolkit/NodesTk.h>
+#include <common/toolkit/UiTk.h>
 #include <program/Program.h>
 #include "ModeSetMetadataMirroring.h"
+#include <modes/Common.h>
+
+#include <iostream>
 
 
 int ModeSetMetadataMirroring::execute()
 {
-   int retVal = APPCODE_RUNTIME_ERROR;
 
    App* app = Program::getApp();
-   NodeStoreServers* metaNodes = app->getMetaNodes();
-   MirrorBuddyGroupMapper* metaBuddyGroupMapper = app->getMetaMirrorBuddyGroupMapper();
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
 
-   NodeList metaNodesList;
+   auto cfgIter = cfg->find("--force");
+   if (cfgIter != cfg->end())
+   {
+      cfgForce = true;
+      cfg->erase(cfgIter);
+   }
+
    StringMapIter iter;
 
    // check privileges
@@ -27,33 +34,26 @@ int ModeSetMetadataMirroring::execute()
    if(ModeHelper::checkInvalidArgs(cfg) )
       return APPCODE_INVALID_CONFIG;
 
-   if (metaNodes->getRootIsBuddyMirrored())
+   if (app->getMetaRoot().getIsMirrored())
    {
       std::cerr << "Meta mirroring is already enabled" << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 
+   auto mgmt = app->getMgmtNodes()->referenceFirstNode();
 
-   // get root node
-   auto rootNode = metaNodes->referenceRootNode(metaBuddyGroupMapper);
-
-   if(unlikely(!rootNode))
-   {
-      std::cerr << "Unable to reference root metadata node" << std::endl;
-      return APPCODE_RUNTIME_ERROR;
+   if (verifyBuddyGroupsDefined() && (cfgForce || verifyNoClientsActive())) {
+      if (setMirroring(*mgmt))
+         return APPCODE_NO_ERROR;
    }
 
-   // apply mirroring
-   if(setMirroring(*rootNode) )
-      retVal = APPCODE_NO_ERROR;
-
-   return retVal;
+   return APPCODE_RUNTIME_ERROR;
 }
 
 void ModeSetMetadataMirroring::printHelp()
 {
    std::cout << "MODE ARGUMENTS:" << std::endl;
-   std::cout << " --mirrormd does not receive any arguments." << std::endl;
+   std::cout << "  --force    Skip safety question." << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
    std::cout << " Enables metadata mirroring for the root directory." << std::endl;
@@ -75,32 +75,29 @@ bool ModeSetMetadataMirroring::setMirroring(Node& rootNode)
 {
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    SetMetadataMirroringRespMsg* respMsgCast;
 
    FhgfsOpsErr setRemoteRes;
 
    SetMetadataMirroringMsg setMsg;
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      rootNode, &setMsg, NETMSGTYPE_SetMetadataMirroringResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(rootNode, setMsg,
+         NETMSGTYPE_SetMetadataMirroringResp);
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << rootNode.getNodeIDWithTypeStr() <<
          std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (SetMetadataMirroringRespMsg*)respMsg;
+   respMsgCast = (SetMetadataMirroringRespMsg*)respMsg.get();
 
    setRemoteRes = respMsgCast->getResult();
    if(setRemoteRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Operation failed on server: " << rootNode.getNodeIDWithTypeStr() << "; " <<
-         "Error: " << FhgfsOpsErrTk::toErrString(setRemoteRes) << std::endl;
+         "Error: " << setRemoteRes << std::endl;
+      std::cerr << "See the server's log file for details." << std::endl;
       goto err_cleanup;
    }
 
@@ -113,8 +110,39 @@ bool ModeSetMetadataMirroring::setMirroring(Node& rootNode)
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
+}
+
+bool ModeSetMetadataMirroring::verifyNoClientsActive()
+{
+   return ctl::common::downloadNodes(NODETYPE_Client).reduce(
+      [] (const auto& data) {
+            const auto& clients = data.second;
+            if (!clients.empty())
+               std::cerr << "Error: There are still " << clients.size() << " clients activce.\n"
+                            "To activate metadata mirroring, all cients have to stopped.\n"
+                            "See beegfs-ctl --listnodes --nodetype=client for more information."
+                         << std::endl;
+            return clients.empty();
+      },
+      [] (const auto&) {
+            std::cerr << "Unable to download list of clients." << std::endl;
+            return false; }
+   );
+}
+
+bool ModeSetMetadataMirroring::verifyBuddyGroupsDefined()
+{
+   return ctl::common::downloadMirrorBuddyGroups(NODETYPE_Meta).reduce(
+      [] (const auto& data) {
+         if (std::get<0>(data).empty()) {
+            std::cerr << "There are no metadata buddy mirror groups defined." << std::endl;
+            return false;
+         }
+         return true;
+      },
+      [] (const auto&) {
+         return false;
+      }
+   );
 }

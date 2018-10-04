@@ -9,7 +9,6 @@
 #include <common/nodes/NodeStoreClients.h>
 #include <common/nodes/NodeStoreServers.h>
 #include <common/threading/PThread.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 #include <common/Common.h>
 #include <components/componenthelpers/HbMgrNotification.h>
@@ -60,15 +59,10 @@ class HeartbeatManager : public PThread
 
       void mgmtInit();
 
-      void broadcastHeartbeat();
-
-      bool checkNodeComm(Node& node, NodeType nodeType, Time* lastHbT);
-      void requestHeartbeat(Node& node);
-
       void performClientsCheck();
       bool processNotificationList();
 
-      void saveDirtyNodeStores();
+      void saveNodeStores();
 };
 
 #endif /*HEARTBEATMANAGER_H_*/

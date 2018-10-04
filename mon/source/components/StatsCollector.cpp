@@ -148,7 +148,7 @@ void StatsCollector::requestLoop()
             processClientOps(userStorageClientOps, NODETYPE_Storage, true);
          }
 
-         app->getTSDB()->writePoints();
+         app->getTSDB()->write();
       }
    }
 }

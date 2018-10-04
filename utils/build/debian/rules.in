@@ -20,7 +20,6 @@ build-stamp: $(QUILT_STAMPFN) configure-stamp
 	
 	make BEEGFS_VERSION='__BEEGFS_VERSION__' 			\
 		BEEGFS_COMMON_PATH='__BEEGFS_COMMON_PATH__'	\
-		BEEGFS_OPENTK_PATH='__BEEGFS_OPENTK_PATH__'	\
 		BEEGFS_THIRDPARTY_PATH='__BEEGFS_THIRDPARTY_PATH__' \
 		BEEGFS_ONLINE_CFG_PATH='__BEEGFS_ONLINE_CFG_PATH__' \
 		BEEGFS_FSCK_PATH='__BEEGFS_FSCK_PATH__'	        \
@@ -39,7 +38,6 @@ clean:
 
 	make BEEGFS_VERSION='__BEEGFS_VERSION__' 			\
 		BEEGFS_COMMON_PATH='__BEEGFS_COMMON_PATH__'	\
-		BEEGFS_OPENTK_PATH='__BEEGFS_OPENTK_PATH__'	\
 		BEEGFS_ONLINE_CFG_PATH='__BEEGFS_ONLINE_CFG_PATH__' \
 		BEEGFS_FSCK_PATH='__BEEGFS_FSCK_PATH__' \
 		clean
@@ -57,17 +55,21 @@ install: build
 	# manual installation
 	install -D --mode=u+rwxs,g+rx,o+rx beegfs-ctl $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-ctl
 	install -D --mode=u+rwx,g+rx,o+rx beegfs-fsck $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-fsck
+
 	mkdir -p ${DEB_BUILD_ROOT}/sbin
 	cp -a ../scripts/fsck.beegfs ${DEB_BUILD_ROOT}/sbin/
 	mkdir -p $(DEB_BUILD_ROOT)/usr/bin/
+
 	ln -s /opt/beegfs/sbin/beegfs-ctl $(DEB_BUILD_ROOT)/usr/bin/beegfs-ctl
 	ln -s /opt/beegfs/sbin/beegfs-fsck $(DEB_BUILD_ROOT)/usr/bin/beegfs-fsck
+
 	cp -a ../scripts/beegfs-* ${DEB_BUILD_ROOT}/usr/bin/
 	mkdir -p ${DEB_BUILD_ROOT}/opt/beegfs/lib
 	cp libjbeegfs.so jbeegfs.jar ${DEB_BUILD_ROOT}/opt/beegfs/lib/
 	mkdir -p ${DEB_BUILD_ROOT}/etc/bash_completion.d
 	cp -a ../scripts/etc/bash_completion.d/beegfs-ctl ${DEB_BUILD_ROOT}/etc/bash_completion.d/
 	install -D --mode=u+rwx,g+rx,o+rx beegfs-event-listener $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-event-listener
+
 
 # Build architecture-independent files here.
 binary-indep:

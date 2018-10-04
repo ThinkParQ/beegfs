@@ -1,12 +1,14 @@
 #include "MirrorBuddyGroup.h"
 
-struct MirrorBuddyGroup* MirrorBuddyGroup_constructFromTargetIDs(uint16_t doneBufferSize,
-   uint16_t firstTargetID, uint16_t secondTargetID)
+struct MirrorBuddyGroup* MirrorBuddyGroup_constructFromTargetIDs(uint16_t groupID,
+      uint16_t doneBufferSize, uint16_t firstTargetID, uint16_t secondTargetID)
 {
    struct MirrorBuddyGroup* this = (MirrorBuddyGroup*) os_kmalloc(sizeof(*this));
 
    if (!this)
       return NULL;
+
+   this->groupID = groupID;
 
    this->firstTargetID = firstTargetID;
    this->secondTargetID = secondTargetID;

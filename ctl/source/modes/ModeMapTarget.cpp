@@ -128,7 +128,7 @@ int ModeMapTarget::mapTarget(uint16_t targetID, uint16_t nodeID, StoragePoolId s
    {
       std::cout << "Mapping failed: " <<
          "target " << targetID << " -> " << "storage " << nodeID << " " <<
-         "(Error: " << FhgfsOpsErrTk::toErrString(mapRes) << ")" << std::endl;
+         "(Error: " << mapRes << ")" << std::endl;
    }
    else
    {
@@ -149,36 +149,25 @@ FhgfsOpsErr ModeMapTarget::mapTargetComm(uint16_t targetID, uint16_t nodeID,
    NodeStore* mgmtNodes = app->getMgmtNodes();
    auto mgmtNode = mgmtNodes->referenceFirstNode();
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    MapTargetsRespMsg* respMsgCast;
 
-   TargetPoolPairVec targets;
+   std::map<uint16_t, StoragePoolId> targets = {{targetID, storagePoolId}};
+   MapTargetsMsg msg(targets, NumNodeID(nodeID));
 
-   targets.push_back(std::make_pair(targetID, storagePoolId));
-
-   MapTargetsMsg msg(&targets, NumNodeID(nodeID));
-
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *mgmtNode, &msg, NETMSGTYPE_MapTargetsResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg, NETMSGTYPE_MapTargetsResp);
+   if (!respMsg)
    {
       //std::cerr << "Network error." << std::endl;
       retVal = FhgfsOpsErr_COMMUNICATION;
       goto err_cleanup;
    }
 
-   respMsgCast = (MapTargetsRespMsg*)respMsg;
+   respMsgCast = (MapTargetsRespMsg*)respMsg.get();
 
    // we only send one target, so we only get one response
-   retVal = respMsgCast->getResultVec().front();
+   retVal = respMsgCast->getResults().at(targetID);
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 

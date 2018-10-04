@@ -9,14 +9,12 @@
 
 #include <utime.h>
 
+#include <boost/lexical_cast.hpp>
+
 
 bool SetLocalAttrMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "SetLocalAttrMsgEx incoming";
-
-#ifdef BEEGFS_DEBUG
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a SetLocalAttrMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
 
    App* app = Program::getApp();
 
@@ -28,6 +26,7 @@ bool SetLocalAttrMsgEx::processIncoming(ResponseContext& ctx)
    int targetFD;
    FhgfsOpsErr clientErrRes = FhgfsOpsErr_SUCCESS;
    DynamicFileAttribs currentDynAttribs(0, 0, 0, 0, 0);
+   StorageTarget* target;
 
    // select the right targetID
 
@@ -50,12 +49,28 @@ bool SetLocalAttrMsgEx::processIncoming(ResponseContext& ctx)
       }
    }
 
+   target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+   { // unknown targetID
+      if (isMsgHeaderFeatureFlagSet(SETLOCALATTRMSG_FLAG_BUDDYMIRROR))
+      { /* buddy mirrored file => fail with GenericResp to make the caller retry.
+           mgmt will mark this target as (p)offline in a few moments. */
+         ctx.sendResponse(
+               GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, "Unknown target ID"));
+         return true;
+      }
+
+      LOG(GENERAL, ERR, "Unknown target ID.", targetID);
+      clientErrRes = FhgfsOpsErr_UNKNOWNTARGET;
+      return true;
+   }
+
    { // get targetFD and check consistency state
       bool skipResponse = false;
 
-      targetFD = getTargetFD(ctx, targetID, &skipResponse);
+      targetFD = getTargetFD(*target, ctx, &skipResponse);
       if(unlikely(targetFD == -1) )
-      { // failed => either unknown targetID or consistency state not good
+      { // failed => consistency state not good
          if(skipResponse)
             goto skip_response; // GenericResponseMsg sent
 
@@ -65,7 +80,7 @@ bool SetLocalAttrMsgEx::processIncoming(ResponseContext& ctx)
    }
 
    // forward to secondary (if appropriate)
-   clientErrRes = forwardToSecondary(ctx, targetID, &chunkLocked);
+   clientErrRes = forwardToSecondary(*target, ctx, &chunkLocked);
    if(unlikely(clientErrRes != FhgfsOpsErr_SUCCESS) )
    {
       if(clientErrRes == FhgfsOpsErr_COMMUNICATION)
@@ -201,56 +216,30 @@ skip_response:
 /**
  * @param outResponseSent true if a response was sent from within this method; can only be true if
  * -1 is returned.
- * @return -1 if no such target exists or if consistency state was not good (in which case a special
- * response is sent within this method), otherwise the file descriptor to chunks dir (or mirror
- * dir).
+ * @return -1 if consistency state was not good (in which case a special response is sent within
+ * this method), otherwise the file descriptor to chunks dir (or mirror dir).
  */
-int SetLocalAttrMsgEx::getTargetFD(ResponseContext& ctx, uint16_t actualTargetID,
-   bool* outResponseSent)
+int SetLocalAttrMsgEx::getTargetFD(const StorageTarget& target, ResponseContext& ctx,
+      bool* outResponseSent)
 {
-   const char* logContext = "TruncChunkFileMsg (get target FD)";
-
-   App* app = Program::getApp();
-
    bool isBuddyMirrorChunk = isMsgHeaderFeatureFlagSet(SETLOCALATTRMSG_FLAG_BUDDYMIRROR);
-   TargetConsistencyState consistencyState = TargetConsistencyState_BAD; // silence gcc
 
    *outResponseSent = false;
 
    // get targetFD and check consistency state
 
-   int targetFD = app->getTargetFDAndConsistencyState(actualTargetID, isBuddyMirrorChunk,
-      &consistencyState);
-
-   if(unlikely(targetFD == -1) )
-   { // unknown targetID
-      if(isBuddyMirrorChunk)
-      { /* buddy mirrored file => fail with GenericResp to make the caller retry.
-           mgmt will mark this target as (p)offline in a few moments. */
-         std::string respMsgLogStr = "Refusing request. "
-            "Unknown targetID: " + StringTk::uintToStr(actualTargetID);
-
-         ctx.sendResponse(
-               GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, respMsgLogStr.c_str() ) );
-
-         *outResponseSent = true;
-         return -1;
-      }
-
-      LogContext(logContext).logErr("Unknown targetID: " + StringTk::uintToStr(actualTargetID) );
-
-      return -1;
-   }
+   const auto consistencyState = target.getConsistencyState();
+   const int targetFD = isBuddyMirrorChunk ? *target.getMirrorFD() : *target.getChunkFD();
 
    if(unlikely(consistencyState != TargetConsistencyState_GOOD) &&
       isBuddyMirrorChunk &&
       !isMsgHeaderFeatureFlagSet(SETLOCALATTRMSG_FLAG_BUDDYMIRROR_SECOND) )
    { // this is a msg to a non-good primary
       std::string respMsgLogStr = "Refusing request. Target consistency is not good. "
-         "targetID: " + StringTk::uintToStr(actualTargetID);
+         "targetID: " + StringTk::uintToStr(target.getID());
 
       ctx.sendResponse(
-            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, respMsgLogStr.c_str() ) );
+            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, std::move(respMsgLogStr)));
 
       *outResponseSent = true;
       return -1;
@@ -266,14 +255,13 @@ int SetLocalAttrMsgEx::getTargetFD(ResponseContext& ctx, uint16_t actualTargetID
  *    case *outChunkLocked==false is guaranteed).
  * @throw SocketException if sending of GenericResponseMsg fails.
  */
-FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(ResponseContext& ctx, uint16_t actualTargetID,
-   bool* outChunkLocked)
+FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(StorageTarget& target, ResponseContext& ctx,
+      bool* outChunkLocked)
 {
    const char* logContext = "SetLocalAttrMsg incoming (forward to secondary)";
 
    App* app = Program::getApp();
    ChunkLockStore* chunkLockStore = app->getChunkLockStore();
-   StorageTargets* storageTargets = app->getStorageTargets();
 
    *outChunkLocked = false;
 
@@ -282,9 +270,9 @@ FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(ResponseContext& ctx, uint16_t
       return FhgfsOpsErr_SUCCESS; // nothing to do
 
    // mirrored chunk should be modified, check if resync is in progress and lock chunk
-   *outChunkLocked = storageTargets->isBuddyResyncInProgress(actualTargetID);
+   *outChunkLocked = target.getBuddyResyncInProgress();
    if(*outChunkLocked)
-      chunkLockStore->lockChunk(actualTargetID, getEntryID() ); // lock chunk
+      chunkLockStore->lockChunk(target.getID(), getEntryID() ); // lock chunk
 
    // instead of creating a new msg object, we just re-use "this" with "buddymirror second" flag
    addMsgHeaderFeatureFlag(SETLOCALATTRMSG_FLAG_BUDDYMIRROR_SECOND);
@@ -306,8 +294,7 @@ FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(ResponseContext& ctx, uint16_t
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
       // buddy is marked offline, so local msg processing will be done and buddy needs resync
-      auto secTargetID = app->getMirrorBuddyGroupMapper()->getSecondaryTargetID(getTargetID());
-      storageTargets->setBuddyNeedsResync(actualTargetID, true, secTargetID);
+      target.setBuddyNeedsResync(true);
 
       return FhgfsOpsErr_SUCCESS; // go ahead with local msg processing
    }
@@ -316,11 +303,11 @@ FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(ResponseContext& ctx, uint16_t
    {
       LogContext(logContext).log(Log_DEBUG, "Forwarding failed: "
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) + "; "
-         "error: " + FhgfsOpsErrTk::toErrString(commRes) );
+         "error: " + boost::lexical_cast<std::string>(commRes));
 
       if(*outChunkLocked)
       { // unlock chunk
-         chunkLockStore->unlockChunk(actualTargetID, getEntryID() );
+         chunkLockStore->unlockChunk(target.getID(), getEntryID() );
          *outChunkLocked = false;
       }
 
@@ -328,12 +315,12 @@ FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(ResponseContext& ctx, uint16_t
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() );
 
       ctx.sendResponse(
-            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, genericRespStr.c_str() ) );
+            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, std::move(genericRespStr)));
 
       return FhgfsOpsErr_COMMUNICATION;
    }
 
-   SetLocalAttrRespMsg* respMsg = (SetLocalAttrRespMsg*)rrArgs.outRespMsg;
+   const auto respMsg = (const SetLocalAttrRespMsg*)rrArgs.outRespMsg.get();
    FhgfsOpsErr secondaryRes = respMsg->getResult();
    if(unlikely(secondaryRes != FhgfsOpsErr_SUCCESS) )
    {
@@ -347,14 +334,13 @@ FhgfsOpsErr SetLocalAttrMsgEx::forwardToSecondary(ResponseContext& ctx, uint16_t
             "Secondary reports unknown target error and will need resync. "
             "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
-         auto secTargetID = app->getMirrorBuddyGroupMapper()->getSecondaryTargetID(getTargetID());
-         storageTargets->setBuddyNeedsResync(actualTargetID, true, secTargetID);
+         target.setBuddyNeedsResync(true);
 
          return FhgfsOpsErr_SUCCESS;
       }
 
       LogContext(logContext).log(Log_NOTICE, std::string("Secondary reported error: ") +
-         FhgfsOpsErrTk::toErrString(secondaryRes) + "; "
+         boost::lexical_cast<std::string>(secondaryRes) + "; "
          "mirror buddy group ID: " + StringTk::uintToStr(getTargetID() ) );
 
       return secondaryRes;

@@ -13,26 +13,10 @@ class SimpleIntStringMsg : public NetMessageSerdes<SimpleIntStringMsg>
       /**
        * @param strValue just a reference
        */
-      SimpleIntStringMsg(unsigned short msgType, int intValue, const char* strValue) :
-         BaseType(msgType)
-      {
-         this->intValue = intValue;
-
-         this->strValue = strValue;
-         this->strValueLen = strlen(strValue);
-      }
-
-      /**
-       * @param strValue just a reference
-       */
-      SimpleIntStringMsg(unsigned short msgType, int intValue, std::string& strValue) :
-         BaseType(msgType)
-      {
-         this->intValue = intValue;
-
-         this->strValue = strValue.c_str();
-         this->strValueLen = strValue.length();
-      }
+      SimpleIntStringMsg(unsigned short msgType, int intValue, std::string strValue) :
+         BaseType(msgType),
+         intValue(intValue), strValue(std::move(strValue))
+      { }
 
       /**
        * For deserialization only!
@@ -47,19 +31,18 @@ class SimpleIntStringMsg : public NetMessageSerdes<SimpleIntStringMsg>
       {
          ctx
             % obj->intValue
-            % serdes::rawString(obj->strValue, obj->strValueLen);
+            % obj->strValue;
       }
 
    private:
       int32_t intValue;
 
-      const char* strValue;
-      unsigned strValueLen;
+      std::string strValue;
 
    public:
       int getIntValue() const { return intValue; }
 
-      const char* getStrValue() const { return strValue; }
+      const std::string& getStrValue() const { return strValue; }
 };
 
 

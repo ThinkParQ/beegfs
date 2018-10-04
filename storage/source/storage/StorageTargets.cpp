@@ -10,101 +10,175 @@
 #include <toolkit/StorageTkEx.h>
 #include "StorageTargets.h"
 
+#include <boost/lexical_cast.hpp>
 
-#define STORAGETARGETS_CONFIG_DELIMITER   ','
 
 #define STORAGETARGETS_TARGETDIR_MKDIR_MODE (S_IRWXU)
 #define STORAGETARGETS_CHUNKDIR_MKDIR_MODE (S_IRWXU | S_IRWXG | S_IRWXO)
 
+#define BUDDY_NEEDS_RESYNC_FILENAME        ".buddyneedsresync"
+#define LAST_BUDDY_COMM_TIMESTAMP_FILENAME ".lastbuddycomm"
 
-/**
- * Note: Initialization is split into two steps. The first one is read-only loading followed by
- * locking and the second one is preparation of dirs, subdirs etc.
- * So make sure to call prepareTargetDirs() later.
- */
-StorageTargets::StorageTargets(Config* cfg)
-   : targetOfflineWait(cfg)
+
+StorageTarget::StorageTarget(Path path, uint16_t targetID, TimerQueue& timerQueue,
+      NodeStoreServers& mgmtNodes, MirrorBuddyGroupMapper& buddyGroupMapper):
+   path(std::move(path)), id(targetID),
+   buddyNeedsResyncFile((this->path / BUDDY_NEEDS_RESYNC_FILENAME).str(), S_IRUSR | S_IWUSR),
+   lastBuddyCommFile((this->path / LAST_BUDDY_COMM_TIMESTAMP_FILENAME).str(), S_IRUSR | S_IWUSR),
+   timerQueue(timerQueue), mgmtNodes(mgmtNodes),
+   buddyGroupMapper(buddyGroupMapper), buddyResyncInProgress(false),
+   consistencyState(TargetConsistencyState_GOOD), cleanShutdown(false)
 {
-   // step one (of two): read-only init...
+   const auto chunkPath = this->path / CONFIG_CHUNK_SUBDIR_NAME;
+   chunkFD = FDHandle(open(chunkPath.str().c_str(), O_RDONLY | O_DIRECTORY));
+   if (!chunkFD.valid())
+      throw std::system_error(errno, std::system_category(), chunkPath.str());
 
-   initTargetPathsList(cfg);
+   // mirror chunks path
 
-   initQuotaBlockDevices();
+   const auto mirrorPath = this->path / CONFIG_BUDDYMIRROR_SUBDIR_NAME;
+   mirrorFD = FDHandle(open(mirrorPath.str().c_str(), O_RDONLY | O_DIRECTORY));
+   if (!mirrorFD.valid())
+      throw std::system_error(errno, std::system_category(), mirrorPath.str());
 
-   lockTargetPaths();
-}
+   quotaBlockDevice = QuotaBlockDevice::getBlockDeviceOfTarget(this->path.str(), targetID);
 
-StorageTargets::~StorageTargets()
-{
-   removeAllTargetDirs();
-   unlockTargetPaths();
-}
-
-/**
- * Fill internal target paths list from config and check validity.
- */
-void StorageTargets::initTargetPathsList(Config* cfg)
-{
-   if(cfg->getStoreStorageDirectoryV2().empty() )
-      throw InvalidConfigException("No storage target defined");
-
-   StringTk::explode(cfg->getStoreStorageDirectoryV2(), STORAGETARGETS_CONFIG_DELIMITER,
-      &targetPathsList);
-
-   for(StringListIter iter = targetPathsList.begin();
-       iter != targetPathsList.end();
-       /* conditional iter inc inside loop */)
+   if (buddyNeedsResyncFile.read().get_value_or(0) & BUDDY_RESYNC_UNACKED_FLAG)
    {
-      Path currentPath(StringTk::trim(*iter) );
-
-      if(currentPath.empty())
-      { // empty path => remove
-         iter = targetPathsList.erase(iter);
-         continue;
-      }
-
-      *iter = currentPath.str(); // normalize path
-
-      if(!currentPath.absolute() ) /* (check to avoid problems after chdir) */
-         throw InvalidConfigException("Path to storage target directory must be absolute: " +
-            *iter);
-
-      if(!cfg->getStoreAllowFirstRunInit() &&
-         !StorageTk::checkStorageFormatFileExists(*iter) )
-         throw InvalidConfigException(std::string("Found uninitialized storage target directory "
-            "and initialization has been disabled: ") + *iter);
-
-      if(primaryPath.empty() )
-         primaryPath = *iter;
-
-      iter++;
-   }
-
-   // check whether there are any targetPaths left after trimming in the loop above
-   if(targetPathsList.empty() )
-      throw InvalidConfigException("No storage target directory defined");
-}
-
-/**
- * initialize the quotaBlockDevice which contains quota related information about the block devices
- *
- * Note: requires initialized targetPaths
- * Note: No locking needed because it is only used in the constructor (no parallel access).
- */
-void StorageTargets::initQuotaBlockDevices()
-{
-   supportForInodeQuota = QuotaInodeSupport_UNKNOWN;
-
-   for (StorageTargetDataMapIter iter = storageTargetDataMap.begin();
-      iter != storageTargetDataMap.end(); iter++)
-   {
-      (iter->second).quotaBlockDevice = QuotaBlockDevice::getBlockDeviceOfTarget(
-         (iter->second).targetPath, iter->first);
-
-      supportForInodeQuota = QuotaBlockDevice::updateQuotaInodeSupport(supportForInodeQuota,
-         (iter->second).quotaBlockDevice.getFsType() );
+      setBuddyNeedsResyncEntry = timerQueue.enqueue(std::chrono::seconds(0), [this] {
+         retrySetBuddyNeedsResyncComm();
+      });
    }
 }
+
+void StorageTarget::prepareTargetDir(const Path& path)
+{
+   mode_t targetMkdirMode = STORAGETARGETS_TARGETDIR_MKDIR_MODE;
+   mode_t chunkMkDirMode  = STORAGETARGETS_CHUNKDIR_MKDIR_MODE;
+
+   if (!StorageTk::createPathOnDisk(path, false, &targetMkdirMode))
+      throw InvalidConfigException("Unable to create storage directory: " + path.str());
+
+   // storage format file
+   if (!StorageTk::createStorageFormatFile(path.str(), STORAGETK_FORMAT_CURRENT_VERSION))
+      throw InvalidConfigException("Unable to create storage format file in: " + path.str());
+
+   StorageTk::loadAndUpdateStorageFormatFile(path.str(), STORAGETK_FORMAT_MIN_VERSION,
+      STORAGETK_FORMAT_CURRENT_VERSION);
+
+   // chunks directory
+   Path chunksPath = path / CONFIG_CHUNK_SUBDIR_NAME;
+
+   if (!StorageTk::createPathOnDisk(chunksPath, false, &chunkMkDirMode))
+      throw InvalidConfigException("Unable to create chunks directory: " + chunksPath.str());
+
+   // buddy mirror directory
+   Path mirrorPath = path / CONFIG_BUDDYMIRROR_SUBDIR_NAME;
+   if (!StorageTk::createPathOnDisk(mirrorPath, false, &chunkMkDirMode))
+      throw InvalidConfigException("Unable to create buddy mirror directory: " + mirrorPath.str());
+}
+
+bool StorageTarget::isTargetDir(const Path& path)
+{
+   return StorageTk::checkStorageFormatFileExists(path.str());
+}
+
+void StorageTarget::setBuddyNeedsResync(bool needsResync)
+{
+   const RWLockGuard lock(rwlock, SafeRWLock_WRITE);
+
+   const auto oldState = buddyNeedsResyncFile.read().get_value_or(BUDDY_RESYNC_NOT_REQUIRED);
+   const auto newState = needsResync
+      ? BUDDY_RESYNC_REQUIRED_UNACKED
+      : BUDDY_RESYNC_NOT_REQUIRED_UNACKED;
+
+   // if the change has already been requested by some other thread, we should not request it
+   // again - even if the change is unacked, as retrying immediately after a failed communication
+   // attempt is not likely to be successful, we must handle externally started resyncs however,
+   // which *do not* change the buddyneedsresync file contents but *do* use this mechanism to
+   // communicate that a resync has finished and the buddy is good again - these only use us to
+   // set the buddy to "needs no resync" though, so we can still skip setting needs-resync when that
+   // is already pending.
+   if (needsResync
+         && (oldState & BUDDY_RESYNC_REQUIRED_FLAG) == (newState & BUDDY_RESYNC_REQUIRED_FLAG))
+      return;
+
+   // cancel any pending retries, we will send a message to mgmt anyway.
+   if (setBuddyNeedsResyncEntry)
+      setBuddyNeedsResyncEntry->cancel();
+
+   buddyNeedsResyncFile.write(newState);
+
+   if (!setBuddyNeedsResyncComm())
+      LOG(GENERAL, CRITICAL, "Could not reach mgmt for state update, will retry.",
+            ("primary target", id), ("buddyNeedsResync", needsResync));
+}
+
+bool StorageTarget::setBuddyNeedsResyncComm()
+{
+   // this is a timer callback. as such we must be prepared to deal with the fact that we were
+   // cancelled *after* we were dequeued and started executing, but were blocked on the lock in
+   // retrySetBuddyNeedsResyncComm. always reading the current state and sending that fixes this:
+   // if the state is not unacked we can return without doing anything, and if it is nobody can
+   // change it while we are using it.
+   const auto state = buddyNeedsResyncFile.read().get_value_or(BUDDY_RESYNC_NOT_REQUIRED);
+   const bool needsResync = state & BUDDY_RESYNC_REQUIRED_FLAG;
+
+   if (!(state & BUDDY_RESYNC_UNACKED_FLAG))
+      return true;
+
+   const TargetConsistencyState stateToSet = needsResync
+      ? TargetConsistencyState_NEEDS_RESYNC
+      : TargetConsistencyState_GOOD;
+
+   bool currentIsPrimary;
+   const uint16_t buddyTargetID = buddyGroupMapper.getBuddyTargetID(id, &currentIsPrimary);
+
+   // until mgmt handles resync decision, refuse to set a primary to needs-resync locally.
+   if (!currentIsPrimary)
+      return true;
+
+   UInt16List targetIDList(1, buddyTargetID);
+   UInt8List stateList(1, stateToSet);
+
+   SetTargetConsistencyStatesMsg msg(NODETYPE_Storage, &targetIDList, &stateList, false);
+
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNodes.referenceFirstNode(), msg,
+         NETMSGTYPE_SetTargetConsistencyStatesResp);
+
+   if (!respMsg)
+   {
+      setBuddyNeedsResyncEntry = timerQueue.enqueue(std::chrono::seconds(5), [this] {
+         retrySetBuddyNeedsResyncComm();
+      });
+      return false;
+   }
+
+   auto* respMsgCast = (SetTargetConsistencyStatesRespMsg*)respMsg.get();
+
+   if (respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
+   {
+      LOG(GENERAL, CRITICAL, "Management node did not accept target states.", buddyTargetID,
+            needsResync);
+      return true;
+   }
+
+   buddyNeedsResyncFile.write(state & ~BUDDY_RESYNC_UNACKED_FLAG);
+   if (state & BUDDY_RESYNC_REQUIRED_FLAG)
+      LOG(GENERAL, CRITICAL, "Marked secondary buddy for needed resync.", ("primary target", id));
+   return true;
+}
+
+void StorageTarget::handleTargetStateChange()
+{
+   const auto newState = getConsistencyState();
+
+   LOG(GENERAL, DEBUG, "Notifying management node of target state change.", id, newState);
+
+   if (getOfflineTimeout())
+      Program::getApp()->getInternodeSyncer()->publishTargetState(id, newState);
+}
+
 
 /**
  * Decide whether a resync is needed for any of the storage targets, and set its targetState to
@@ -118,6 +192,18 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
    App* app = Program::getApp();
    MirrorBuddyGroupMapper* mirrorBuddyGroupMapper = app->getMirrorBuddyGroupMapper();
 
+   std::map<uint16_t, uint16_t> targetBuddyGroupMap;
+   {
+      MirrorBuddyGroupMap groupMap;
+      mirrorBuddyGroupMapper->getMirrorBuddyGroups(groupMap);
+
+      for (const auto& group : groupMap)
+      {
+         targetBuddyGroupMap[group.second.firstTargetID] = group.first;
+         targetBuddyGroupMap[group.second.secondTargetID] = group.first;
+      }
+   }
+
 
    // Make a map of targetID->Iterator on statesFromMgmtd containing only the local target
    // to make lookup under lock quicker.
@@ -128,10 +214,8 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
    // big) statesFromMgmtd, only in the smaller stateFromMgmtdIterMap.
    UInt16List localTargetIDs;
    {
-      RWLockGuard safeLock(rwlock, SafeRWLock_READ);
-
-      for (StorageTargetDataMapCIter localTargetIt = this->storageTargetDataMap.begin();
-           localTargetIt != this->storageTargetDataMap.end(); ++localTargetIt)
+      for (StorageTargetMapCIter localTargetIt = this->storageTargetMap.begin();
+           localTargetIt != this->storageTargetMap.end(); ++localTargetIt)
          localTargetIDs.push_back(localTargetIt->first);
    }
 
@@ -153,16 +237,12 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
          targetID, targetStateMapIter) );
    }
 
-   const bool anyTargetHasTimeout = this->targetOfflineWait.anyTargetHasTimeout();
-
-   // Now we can iterate over the storageTargetDataMap and do the actual resync decision.
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
-
-   for (StorageTargetDataMapIter storageTargetDataIt = this->storageTargetDataMap.begin();
-        storageTargetDataIt != this->storageTargetDataMap.end(); ++storageTargetDataIt)
+   // Now we can iterate over the storageTargetMap and do the actual resync decision.
+   for (auto storageTargetIt = this->storageTargetMap.begin();
+        storageTargetIt != this->storageTargetMap.end(); ++storageTargetIt)
    {
-      uint16_t targetID = storageTargetDataIt->first;
-      StorageTargetData& targetData = storageTargetDataIt->second;
+      uint16_t targetID = storageTargetIt->first;
+      StorageTarget& targetData = *storageTargetIt->second;
 
       TargetStateIterMap::const_iterator newStateFromMgmtdIt = stateFromMgmtdIterMap.find(targetID);
       if (newStateFromMgmtdIt == stateFromMgmtdIterMap.end() )
@@ -174,11 +254,9 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
       MirrorBuddyState buddyState = BuddyState_UNMAPPED;
 
       {
-         RWLockGuard targetBuddyGroupSafeLock(targetBuddyGroupMapLock, SafeRWLock_READ);
+         const auto bgIDIter = targetBuddyGroupMap.find(targetID);
 
-         TargetBuddyGroupMapCIter bgIDIter = this->targetBuddyGroupMap.find(targetID);
-
-         if (bgIDIter != this->targetBuddyGroupMap.end() )
+         if (bgIDIter != targetBuddyGroupMap.end())
             buddyState = mirrorBuddyGroupMapper->getBuddyState(targetID, bgIDIter->second);
       }
 
@@ -186,9 +264,10 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
       {
          LOG_DBG(STATES, DEBUG,
                "Setting target to state good because it is not part of a mirror group.",
-               as("oldState", TargetStateStore::stateToStr(targetData.consistencyState)), targetID);
+               ("oldState", TargetStateStore::stateToStr(targetData.getConsistencyState())),
+               targetID);
 
-         targetData.consistencyState = TargetConsistencyState_GOOD;
+         targetData.setConsistencyState(TargetConsistencyState_GOOD);
 
          outLocalStateChanges.insert(TargetStateMapVal(targetID,
             CombinedTargetState(TargetReachabilityState_ONLINE, TargetConsistencyState_GOOD) ) );
@@ -198,30 +277,30 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
          //   clean nothing can be done about it.
          // * A newly created target has to be marked as "clean" before it can join any mirror buddy
          //   group.
-         targetData.cleanShutdown = true;
+         targetData.setCleanShutdown(true);
 
          continue;
       }
 
       // BAD targets will stay BAD unless server is restarted.
-      if(targetData.consistencyState == TargetConsistencyState_BAD)
+      if (targetData.getConsistencyState() == TargetConsistencyState_BAD)
          continue;
 
-      const TargetConsistencyState oldState = targetData.consistencyState;
+      const TargetConsistencyState oldState = targetData.getConsistencyState();
 
       const bool isResyncing =
          newStateFromMgmtd.consistencyState == TargetConsistencyState_NEEDS_RESYNC;
       const bool isBad = newStateFromMgmtd.consistencyState == TargetConsistencyState_BAD;
-      const bool isClean = targetData.cleanShutdown;
+      const bool isClean = targetData.getCleanShutdown();
 
       // cleanShutdown should only be handled once at startup, so it is reset here after its value
       // has been copied.
-      targetData.cleanShutdown = true;
+      targetData.setCleanShutdown(true);
 
-      if (anyTargetHasTimeout && this->targetOfflineWait.targetHasTimeout(targetID) )
+      if (storageTargetIt->second->getOfflineTimeout())
       {
          // Targets with a waiting-for-offline timeout will always be NEEDS_RESYNC.
-         targetData.consistencyState = TargetConsistencyState_NEEDS_RESYNC;
+         targetData.setConsistencyState(TargetConsistencyState_NEEDS_RESYNC);
          outLocalStateChanges.insert(TargetStateMapVal(targetID, CombinedTargetState(
             TargetReachabilityState_ONLINE, TargetConsistencyState_NEEDS_RESYNC) ) );
       }
@@ -230,7 +309,7 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
       {
          // If our local state is already RESYNCING, this state can only be left
          // when our primary tells us the resync is finished.
-         targetData.consistencyState = TargetConsistencyState_NEEDS_RESYNC;
+         targetData.setConsistencyState(TargetConsistencyState_NEEDS_RESYNC);
          outLocalStateChanges.insert(TargetStateMapVal(targetID, CombinedTargetState(
             TargetReachabilityState_ONLINE, TargetConsistencyState_NEEDS_RESYNC) ) );
       }
@@ -243,7 +322,7 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
          //           \ `-------------->o->(resyncing)---------------------,`---> YES
          //            `------->(bad)-------------------------------------'
 
-         targetData.consistencyState = TargetConsistencyState_NEEDS_RESYNC;
+         targetData.setConsistencyState(TargetConsistencyState_NEEDS_RESYNC);
          outLocalStateChanges.insert(TargetStateMapVal(targetID, CombinedTargetState(
             TargetReachabilityState_ONLINE, TargetConsistencyState_NEEDS_RESYNC) ) );
       }
@@ -254,21 +333,21 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
          if( (newStateFromMgmtd.reachabilityState == TargetReachabilityState_OFFLINE)
             || (newStateFromMgmtd.reachabilityState == TargetReachabilityState_POFFLINE) )
          {
-            targetData.consistencyState = TargetConsistencyState_GOOD;
+            targetData.setConsistencyState(TargetConsistencyState_GOOD);
             outLocalStateChanges.insert(TargetStateMapVal(targetID, CombinedTargetState(
                TargetReachabilityState_ONLINE, TargetConsistencyState_GOOD) ) );
 
          }
          else
          {
-            targetData.consistencyState = newStateFromMgmtd.consistencyState;
+            targetData.setConsistencyState(newStateFromMgmtd.consistencyState);
             outLocalStateChanges.insert(TargetStateMapVal(targetID, CombinedTargetState(
                TargetReachabilityState_ONLINE, newStateFromMgmtd.consistencyState) ) );
          }
       }
 
-      if ( targetData.consistencyState != oldState
-        || targetData.consistencyState != newStateFromMgmtd.consistencyState
+      if ( targetData.getConsistencyState() != oldState
+        || targetData.getConsistencyState() != newStateFromMgmtd.consistencyState
         || newStateFromMgmtd.reachabilityState != TargetReachabilityState_ONLINE)
       {
          LOG_DEBUG(logContext, Log_DEBUG, "Target " + StringTk::uintToStr(targetID)
@@ -280,7 +359,7 @@ void StorageTargets::decideResync(const TargetStateMap& statesFromMgmtd,
 
          LogContext(logContext).log(Log_NOTICE, "Target " + StringTk::uintToStr(targetID)
             + ": Setting new target state: "
-            + TargetStateStore::stateToStr(targetData.consistencyState)
+            + TargetStateStore::stateToStr(targetData.getConsistencyState())
             + " (old state: " + TargetStateStore::stateToStr(oldState) + ")" );
       }
    }
@@ -303,7 +382,7 @@ void StorageTargets::checkBuddyNeedsResync()
 
    // For targets where primary is on this storage server:
    // Maps targetID->targetPath.
-   TargetPathMap targetPathMap;
+   std::map<uint16_t, Path> targetPathMap;
    // Maps primary->secondary. (Note: Not the same as TargetBuddyGroupMap, which maps target->group)
    typedef std::map<uint16_t, uint16_t> BuddyGroupMap;
    typedef BuddyGroupMap::const_iterator BuddyGroupMapCIter;
@@ -311,14 +390,12 @@ void StorageTargets::checkBuddyNeedsResync()
    BuddyGroupMap buddyGroupMap;
 
    {
-      RWLockGuard safeLock(rwlock, SafeRWLock_READ);
-
-      for (StorageTargetDataMapIter targetDataIt = this->storageTargetDataMap.begin();
-            targetDataIt != this->storageTargetDataMap.end(); ++targetDataIt)
+      for (auto targetDataIt = this->storageTargetMap.begin();
+            targetDataIt != this->storageTargetMap.end(); ++targetDataIt)
       {
          uint16_t targetID = targetDataIt->first;
 
-         targetPathMap.insert(TargetPathMapVal(targetID, targetDataIt->second.targetPath) );
+         targetPathMap.insert({targetID, targetDataIt->second->getPath()});
 
          bool isPrimary;
          uint16_t buddyTargetID = mirrorBuddyGroupMapper->getBuddyTargetID(targetID, &isPrimary);
@@ -330,10 +407,9 @@ void StorageTargets::checkBuddyNeedsResync()
    }
 
    // Now, check all the primary targets for the existence of a buddyneedsresync file.
-   for (TargetPathMapCIter targetPathIter = targetPathMap.begin();
-        targetPathIter != targetPathMap.end(); ++targetPathIter)
+   for (const auto& targetPath : targetPathMap)
    {
-      const uint16_t targetID = targetPathIter->first;
+      const uint16_t targetID = targetPath.first;
 
       bool isPrimary;
       const uint16_t buddyTargetID = mirrorBuddyGroupMapper->getBuddyTargetID(targetID, &isPrimary);
@@ -341,11 +417,11 @@ void StorageTargets::checkBuddyNeedsResync()
       if (!isPrimary)
          continue;
 
-      const bool buddyNeedsResyncFileExists = getBuddyNeedsResyncByPath(targetPathIter->second);
+      const bool buddyNeedsResync = storageTargetMap.at(targetID)->getBuddyNeedsResync();
 
-      if (buddyNeedsResyncFileExists)
+      if (buddyNeedsResync)
       {
-         LOG_DEBUG(logContext, Log_DEBUG, "buddyneedsresync file found for target "
+         LOG_DEBUG(logContext, Log_DEBUG, "buddyneedsresync indication found for target "
             + StringTk::uintToStr(targetID) );
 
          CombinedTargetState state = CombinedTargetState(TargetReachabilityState_ONLINE,
@@ -356,7 +432,7 @@ void StorageTargets::checkBuddyNeedsResync()
          // already knows it needs a resync, or it's BAD and shouldn't be resynced anyway.
          if (state.consistencyState == TargetConsistencyState_GOOD)
          {
-            setBuddyNeedsResyncState(buddyTargetID, true, true);
+            storageTargetMap.at(targetID)->setBuddyNeedsResync(true);
 
             LogContext(logContext).log(Log_NOTICE, "Set needs-resync state for buddy target "
                + StringTk::uintToStr(buddyTargetID) );
@@ -371,13 +447,7 @@ void StorageTargets::checkBuddyNeedsResync()
       const uint16_t targetID = buddyGroupIter->first;
       const uint16_t buddyTargetID = buddyGroupIter->second;
 
-      TargetConsistencyState targetConsistencyState = TargetConsistencyState_BAD; // avoid warning
-      if (!getState(targetID, targetConsistencyState) )
-      {
-         LOG_DEBUG(logContext, Log_DEBUG, "Target state invalid for target ID "
-            + StringTk::uintToStr(targetID) );
-         continue;
-      }
+      const auto targetConsistencyState = storageTargetMap.at(targetID)->getConsistencyState();
 
       // If primary is not GOOD, don't start a resync (wait until InternodeSyncer sets the primary
       // to GOOD again).
@@ -410,334 +480,31 @@ void StorageTargets::checkBuddyNeedsResync()
          {
             LOG_DEBUG(logContext, Log_DEBUG, "Target: " + StringTk::uintToStr(targetID)
                + " start buddy resync job failed ("
-               + FhgfsOpsErrTk::toErrString(resyncRes) + ")");
+               + boost::lexical_cast<std::string>(resyncRes) + ")");
          }
       }
    }
 }
 
-
-/**
- * Sets the NEEDS_RESYNC state on the mgmtd for a target or its buddy.
- * @param targetID ID of the target for whose buddy the state is to be set
- *                 (example: A buddy group consists of targets 5 and 6. If targetID=5, then the
- *                 resync state will be set for target 6)
- * @param needsResync If true: Set state to NEEDS_RESYNC. If false: Set state to GOOD.
- * @param targetIDIsBuddy: If false: buddy target ID resolution will be done as described above.
- *                         If true: Target ID is treated as buddy target ID - therefore the state
- *                         will be set for the target itself, not for its buddy.
- */
-void StorageTargets::setBuddyNeedsResyncState(uint16_t targetID, bool needsResync,
-   bool targetIDIsBuddy)
+void StorageTargets::generateTargetInfoList(StorageTargetInfoList& outTargetInfoList)
 {
-   const char* logContext = "Set buddy needs resync state";
-
-   App* app = Program::getApp();
-   NodeStore* mgmtNodes = app->getMgmtNodes();
-   MirrorBuddyGroupMapper* mirrorBuddyGroupMapper= app->getMirrorBuddyGroupMapper();
-
-   auto mgmtNode = mgmtNodes->referenceFirstNode();
-   if (!mgmtNode)
+   for (const auto& mapping : storageTargetMap)
    {
-      LogContext(logContext).logErr("Management node not defined.");
-      return;
-   }
-
-   TargetConsistencyState stateToSet = needsResync
-      ? TargetConsistencyState_NEEDS_RESYNC
-      : TargetConsistencyState_GOOD;
-
-   uint16_t buddyTargetID = targetIDIsBuddy
-      ? targetID
-      : mirrorBuddyGroupMapper->getBuddyTargetID(targetID, NULL);
-
-   UInt16List targetIDList(1, buddyTargetID);
-   UInt8List stateList(1, stateToSet);
-
-   SetTargetConsistencyStatesMsg msg(NODETYPE_Storage, &targetIDList, &stateList, false);
-
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-   bool sendRes = MessagingTk::requestResponse(*mgmtNode, &msg,
-      NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-
-   if (!sendRes)
-   {
-      LogContext(logContext).log(Log_WARNING, "Could not reach management node when trying to set "
-         "needs-resync state for buddy target " + StringTk::uintToStr(buddyTargetID) );
-   }
-   else
-   {
-      SetTargetConsistencyStatesRespMsg* respMsgCast =
-         (SetTargetConsistencyStatesRespMsg*)respMsg;
-
-      if ( (FhgfsOpsErr)respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
-         LogContext(logContext).log(Log_CRITICAL, "Management node did not accept target states.");
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
-   }
-}
-
-/**
- * Locks all targetPaths by creating a lock file for each target.
- *
- * Note: Don't forget to call unlockTargets() later.
- */
-void StorageTargets::lockTargetPaths()
-{
-   for(StringListIter iter = targetPathsList.begin(); iter != targetPathsList.end(); iter++)
-   {
-      int lockFD = StorageTk::lockWorkingDirectory(*iter);
-      if(lockFD == -1)
-         throw InvalidConfigException("Invalid storage directory: locking failed");
-
-      targetLockFDs.push_back(lockFD);
-   }
-}
-
-void StorageTargets::unlockTargetPaths()
-{
-   for(IntListIter iter = targetLockFDs.begin();
-       iter != targetLockFDs.end();
-       /* iter inc'ed inside loop */)
-   {
-      if(*iter != -1)
-         StorageTk::unlockWorkingDirectory(*iter);
-
-      iter = targetLockFDs.erase(iter);
-   }
-}
-
-/**
- * Initialize subdirectory structure of each target dir.
- */
-void StorageTargets::prepareTargetDirs(Config* cfg)
-{
-   // walk over all target dirs and create subdirs, format file, ...
-
-   mode_t targetMkdirMode = STORAGETARGETS_TARGETDIR_MKDIR_MODE;
-   mode_t chunkMkDirMode  = STORAGETARGETS_CHUNKDIR_MKDIR_MODE;
-
-   for(StringListIter iter = targetPathsList.begin(); iter != targetPathsList.end(); iter++)
-   {
-      Path currentPath(*iter);
-
-      if(!StorageTk::createPathOnDisk(currentPath, false, &targetMkdirMode) )
-         throw InvalidConfigException("Unable to create storage directory: " + *iter);
-
-      // storage format file
-      if(!StorageTk::createStorageFormatFile(*iter, STORAGETK_FORMAT_CURRENT_VERSION) )
-         throw InvalidConfigException("Unable to create storage format file in: " + *iter);
-
-      StorageTk::loadAndUpdateStorageFormatFile(*iter, STORAGETK_FORMAT_MIN_VERSION,
-         STORAGETK_FORMAT_CURRENT_VERSION);
-
-      // chunks directory
-      Path chunksPath(*iter + "/" CONFIG_CHUNK_SUBDIR_NAME);
-
-      if(!StorageTk::createPathOnDisk(chunksPath, false, &chunkMkDirMode) )
-         throw InvalidConfigException("Unable to create chunks directory: " +
-            chunksPath.str() );
-
-      // chunks subdirs
-      if(cfg->getStoreInitHashDirs() )
-         StorageTk::initHashPaths(chunksPath,
-            CONFIG_CHUNK_LEVEL1_SUBDIR_NUM, CONFIG_CHUNK_LEVEL1_SUBDIR_NUM);
-
-      // buddy mirror directory
-      Path mirrorPath(*iter + "/" CONFIG_BUDDYMIRROR_SUBDIR_NAME);
-      if(!StorageTk::createPathOnDisk(mirrorPath, false, &chunkMkDirMode) )
-         throw InvalidConfigException("Unable to create buddy mirror directory: " +
-            mirrorPath.str() );
-
-   } // end of for(targetPathsList) loop
-
-}
-
-/**
- * Add (or overwrite) a targetNumID/storagePath pair
- */
-bool StorageTargets::addTargetDir(uint16_t targetNumID, std::string storagePathStr)
-{
-   const char* logContext = "StorageTargets add target";
-
-   Path storagePath(storagePathStr); // to get a normalized path string
-
-   std::string chunkPath;
-   std::string mirrorPath;
-   int chunkFD;
-   int mirrorFD;
-   bool sessionFileExists;
-
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
-
-   // plain chunks path
-
-   chunkPath = storagePathStr + "/" CONFIG_CHUNK_SUBDIR_NAME;
-   chunkFD = open(chunkPath.c_str(), O_RDONLY | O_DIRECTORY);
-   if (chunkFD == -1)
-   {
-      LogContext(logContext).logErr("Failed to open directory: " + chunkPath + ". SysErr: " +
-         System::getErrString() );
-
-      return false; // don't even try mirrors and buddy mirrors
-   }
-   else
-   { // successfully opened
-      StorageTargetData& storageTargetData = storageTargetDataMap[targetNumID];
-      storageTargetData.chunkFD = chunkFD;
-
-      // mirror chunks path
-
-      mirrorPath = storagePathStr + "/" CONFIG_BUDDYMIRROR_SUBDIR_NAME;
-      mirrorFD = open(mirrorPath.c_str(), O_RDONLY | O_DIRECTORY);
-      if (mirrorFD == -1)
-      {
-         LogContext(logContext).logErr("Failed to open directory: " + mirrorPath + ". SysErr: " +
-               System::getErrString() );
-
-         // cleanup
-         close(chunkFD);
-         storageTargetData.chunkFD = -1;
-
-         return false; // don't even try buddy mirrors
-      }
-      else
-      {  // successfully opened
-         storageTargetData.mirrorFD = mirrorFD;
-      }
-
-      storageTargetData.targetPath = storagePath.str();
-
-      // Check if target was cleanly shut down.
-      sessionFileExists = StorageTk::checkSessionFileExists(storagePath.str());
-      storageTargetData.cleanShutdown = sessionFileExists;
-   }
-
-   return true;
-}
-
-/**
- * Remove a numID/storagePath pair by numID
- *
- * @return true if such a numID existed
- */
-bool StorageTargets::removeTargetDir(uint16_t targetNumID)
-{
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
-   return removeTargetDirUnlocked(targetNumID);
-}
-
-/**
- * Remove a numID/storagePath pair by numID
- *
- * @return true if such a numID existed
- */
-bool StorageTargets::removeTargetDirUnlocked(uint16_t targetNumID)
-{
-   int chunkFD = getChunkFDUnlocked(targetNumID);
-   if (chunkFD != -1)
-      close(chunkFD); // ignore the error, we don't know what to do with it anyway
-
-   int mirrorFD = getMirrorFDUnlocked(targetNumID);
-   if (mirrorFD != -1)
-      close(mirrorFD); // ignore the error, we don't know what to do with it anyway
-
-   size_t numErased = storageTargetDataMap.erase(targetNumID);
-   bool retVal = (numErased) ? true : false;
-
-   return retVal;
-}
-
-/**
- * Remove a numID/storagePath pair by storagePath and the corresponding quotaBlockDevice
- *
- * @param removeAll false by default, if true storagePathStr is ignored
- * @return true if such a storagePathStr existed
- */
-bool StorageTargets::removeTargetDir(std::string storagePathStr, bool removeAll)
-{
-   Path storagePath(storagePathStr); // to get a normalized path string
-   std::string normalizedStoragePath(storagePath.str() );
-
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
-
-   // walk over all targetPaths and compare storage paths
-   for(StorageTargetDataMapIter iter = storageTargetDataMap.begin();
-      iter != storageTargetDataMap.end(); iter++)
-   {
-      if(removeAll || (iter->second).targetPath == normalizedStoragePath)
-      {
-         uint16_t targetNumID = iter->first;
-
-         removeTargetDirUnlocked(targetNumID);
-
-         return true;
-      }
-   }
-
-   return false;
-}
-
-/**
- * Handles TargetState changes and carries out necessary actions (notify mgmtd, start resync, ...).
- */
-void StorageTargets::handleTargetStateChange(uint16_t targetID, TargetConsistencyState newState)
-{
-   const char* logContext("Handle target state change");
-
-   App* app = Program::getApp();
-   InternodeSyncer* internodeSyncer = app->getInternodeSyncer();
-
-   // Inform Mgmtd about state change.
-   LogContext(logContext).log(Log_DEBUG, "Notifying management node about of change. targetID: "
-      + StringTk::uintToStr(targetID) + "; new state: " + TargetStateStore::stateToStr(newState) );
-
-   if (unlikely(this->targetOfflineWait.anyTargetHasTimeout() &&
-       this->targetOfflineWait.targetHasTimeout(targetID) ) )
-      internodeSyncer->publishTargetState(targetID, newState);
-}
-
-void StorageTargets::generateTargetInfoList(const UInt16List& targetIDs,
-   StorageTargetInfoList& outTargetInfoList)
-{
-   const char* logContext = "Generate storage target info list";
-
-   for (UInt16ListConstIter iter = targetIDs.begin(); iter != targetIDs.end(); iter++)
-   {
-      uint16_t targetID = *iter;
+      uint16_t targetID = mapping.first;
+      const auto& target = mapping.second;
       std::string targetPathStr;
       int64_t sizeTotal = 0;
       int64_t sizeFree = 0;
       int64_t inodesTotal = 0;
       int64_t inodesFree = 0;
       TargetConsistencyState targetState = TargetConsistencyState_BAD;
-      bool gotTargetPath;
-      bool getStateRes;
 
-      gotTargetPath = this->getPath(targetID, &targetPathStr);
-
-      if(unlikely(!gotTargetPath) )
-      { // unknown targetID
-         LogContext(logContext).logErr("Unknown targetID: " + StringTk::uintToStr(targetID) );
-
-         targetPathStr.clear();
-         // Leave targetState as "BAD".
-
-         goto append_info;
-      }
+      targetPathStr = target->getPath().str();
 
       getStatInfo(targetPathStr, &sizeTotal, &sizeFree, &inodesTotal, &inodesFree);
 
-      getStateRes = this->getState(targetID, targetState);
+      targetState = target->getConsistencyState();
 
-      if(unlikely(!getStateRes) )
-         LogContext(logContext).logErr("Target state unknown; "
-            "targetID: " + StringTk::uintToStr(targetID) );
-
-
-   append_info:
       StorageTargetInfo targetInfo(targetID, targetPathStr, sizeTotal, sizeFree, inodesTotal,
          inodesFree, targetState);
       outTargetInfoList.push_back(targetInfo);
@@ -772,48 +539,7 @@ void StorageTargets::getStatInfo(std::string& targetPathStr, int64_t* outSizeTot
 }
 
 /**
- * Add a targetOfflineWait timeout to each target which is "NEEDS_RESYNC" at the moment.
- * Intended to be called at startup so the targets that need a resync to not report a state to the
- * mgmtd until they are surely OFFLINEd.
- */
-void StorageTargets::addStartupTimeout()
-{
-   App* app = Program::getApp();
-   MirrorBuddyGroupMapper* mirrorBuddyGroupMapper = app->getMirrorBuddyGroupMapper();
-
-   RWLockGuard safeLock(rwlock, SafeRWLock_READ);
-
-   for (StorageTargetDataMapCIter targetDataIter = storageTargetDataMap.begin();
-        targetDataIter != storageTargetDataMap.end(); ++targetDataIter)
-   {
-      uint16_t targetID = targetDataIter->first;
-
-      if (targetDataIter->second.consistencyState == TargetConsistencyState_NEEDS_RESYNC
-          && mirrorBuddyGroupMapper->getBuddyState(targetID) == BuddyState_PRIMARY)
-         targetOfflineWait.addTarget(targetID);
-   }
-}
-
-void StorageTargets::syncBuddyGroupMap(const UInt16List& buddyGroupIDs, const UInt16List& primaryTargetIDs,
-   const UInt16List& secondaryTargetIDs)
-{
-   TargetBuddyGroupMap newTargetBuddyGroupMap;
-
-   for (ZipConstIterRange<UInt16List, UInt16List, UInt16List>
-        iter(buddyGroupIDs, primaryTargetIDs, secondaryTargetIDs);
-        !iter.empty(); ++iter)
-   {
-      uint16_t groupID = *iter()->first;
-      newTargetBuddyGroupMap.insert(std::pair<uint16_t, uint16_t>(*iter()->second, groupID) );
-      newTargetBuddyGroupMap.insert(std::pair<uint16_t, uint16_t>(*iter()->third, groupID) );
-   }
-
-   RWLockGuard safeLock(targetBuddyGroupMapLock, SafeRWLock_WRITE);
-   newTargetBuddyGroupMap.swap(this->targetBuddyGroupMap);
-}
-
-/**
- * Fill a storageTargetDataMap with the contents of the three lists passed.
+ * Fill a storageTargetMap with the contents of the three lists passed.
  * targetIDs, reachabilityStates and consistencyStates is interpreted as a 1:1 mapping.
  */
 void StorageTargets::fillTargetStateMap(const UInt16List& targetIDs,
@@ -829,45 +555,4 @@ void StorageTargets::fillTargetStateMap(const UInt16List& targetIDs,
             static_cast<TargetConsistencyState>(*iter()->third)
          ) ) );
    }
-}
-
-void StorageTargets::updateTargetStateLists(const TargetStateMap& stateMap,
-      const UInt16List& targetIDs, UInt8List& outReachabilityStates,
-      UInt8List& outConsistencyStates)
-{
-   UInt16ListConstIter targetIDIter = targetIDs.begin();
-   UInt8ListIter reachabilityStateIter = outReachabilityStates.begin();
-   UInt8ListIter consistencyStateIter = outConsistencyStates.begin();
-
-   for ( ; targetIDIter != targetIDs.end();
-      ++targetIDIter, ++reachabilityStateIter, ++consistencyStateIter)
-   {
-      TargetStateMapCIter newStateIter = stateMap.find(*targetIDIter);
-
-      if (newStateIter == stateMap.end() )
-         continue;
-
-      *reachabilityStateIter = newStateIter->second.reachabilityState;
-      *consistencyStateIter = newStateIter->second.consistencyState;
-   }
-}
-
-TargetConsistencyStateVec StorageTargets::getTargetConsistencyStates(UInt16Vector targetIDs)
-{
-   RWLockGuard lock(rwlock, SafeRWLock_READ);
-
-   TargetConsistencyStateVec states;
-   states.reserve(targetIDs.size());
-
-   for (auto it = targetIDs.cbegin(); it != targetIDs.cend(); ++it)
-   {
-      auto dataIt = storageTargetDataMap.find(*it);
-
-      if (dataIt == storageTargetDataMap.end())
-         states.push_back(TargetConsistencyState_BAD);
-      else
-         states.push_back((dataIt->second).consistencyState);
-   }
-
-   return states;
 }

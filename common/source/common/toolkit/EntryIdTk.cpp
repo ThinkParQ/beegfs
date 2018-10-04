@@ -8,7 +8,7 @@ bool isValidEntryIdFormat(const std::string& entryId)
    const auto sep1 = entryId.find('-');
    const auto sep2 = entryId.find('-', sep1 + 1);
 
-   return  sep1 != entryId.npos && sep2 != entryId.npos
+   return  sep1 != std::string::npos && sep2 != std::string::npos
           &&  isValidHexToken(entryId.substr(0, sep1))
           &&  isValidHexToken(entryId.substr(sep1 + 1, sep2 - (sep1 + 1)))
           &&  isValidHexToken(entryId.substr(sep2 + 1));

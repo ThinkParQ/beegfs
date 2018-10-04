@@ -7,7 +7,6 @@ struct IntMapIter;
 typedef struct IntMapIter IntMapIter;
 
 static inline void IntMapIter_init(IntMapIter* this, IntMap* map, RBTreeElem* treeElem);
-static inline bool IntMapIter_hasNext(IntMapIter* this);
 static inline char* IntMapIter_next(IntMapIter* this);
 static inline int IntMapIter_key(IntMapIter* this);
 static inline char* IntMapIter_value(IntMapIter* this);
@@ -21,10 +20,6 @@ struct IntMapIter
 void IntMapIter_init(IntMapIter* this, IntMap* map, RBTreeElem* treeElem)
 {
    PointerRBTreeIter_init( (RBTreeIter*)this, (RBTree*)map, (RBTreeElem*)treeElem);
-}
-bool IntMapIter_hasNext(IntMapIter* this)
-{
-   return PointerRBTreeIter_hasNext( (RBTreeIter*)this);
 }
 
 char* IntMapIter_next(IntMapIter* this)

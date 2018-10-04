@@ -207,7 +207,7 @@ int ModeSetPattern::execute()
       EntryInfo entryInfo;
 
       if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, false,
-            *metaNodes, *metaBuddyGroupMapper,
+            *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
             entryInfo, ownerNode))
       {
          retVal = APPCODE_RUNTIME_ERROR;
@@ -292,21 +292,14 @@ void ModeSetPattern::printHelp()
 bool ModeSetPattern::setPattern(Node& ownerNode, EntryInfo* entryInfo, unsigned chunkSize,
    unsigned numTargets, StoragePoolId storagePoolId, StripePatternType patternType)
 {
-   bool commRes;
-   char* tmpBuf = nullptr;
-   NetMessage* tmpMsg = nullptr;
-
    // retrieve current pattern settings
 
    GetEntryInfoMsg getInfoMsg(entryInfo);
 
-   commRes = MessagingTk::requestResponse(ownerNode, &getInfoMsg,
-         NETMSGTYPE_GetEntryInfoResp, &tmpBuf, &tmpMsg);
+   auto infoRespMsg = MessagingTk::requestResponse(ownerNode, getInfoMsg,
+         NETMSGTYPE_GetEntryInfoResp);
 
-   std::unique_ptr<NetMessage> infoRespMsg(tmpMsg);
-   std::unique_ptr<char> infoRespBuf(tmpBuf);
-
-   if (!commRes)
+   if (!infoRespMsg)
    {
       std::cerr << "Communication with server failed: " << ownerNode.getNodeIDWithTypeStr() <<
          std::endl;
@@ -319,7 +312,7 @@ bool ModeSetPattern::setPattern(Node& ownerNode, EntryInfo* entryInfo, unsigned 
    if (getInfoRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Server encountered an error: " << ownerNode.getNodeIDWithTypeStr() << "; " <<
-         "Error: " << FhgfsOpsErrTk::toErrString(getInfoRes) << std::endl;
+         "Error: " << getInfoRes << std::endl;
       return false;
    }
 
@@ -362,14 +355,9 @@ bool ModeSetPattern::setPattern(Node& ownerNode, EntryInfo* entryInfo, unsigned 
    if (actorUID != 0)
       setPatternMsg.setUID(actorUID);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &setPatternMsg, NETMSGTYPE_SetDirPatternResp, &tmpBuf, &tmpMsg);
-
-   std::unique_ptr<NetMessage> respMsg(tmpMsg);
-   std::unique_ptr<char> respBuf(tmpBuf);
-
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, setPatternMsg,
+         NETMSGTYPE_SetDirPatternResp);
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << ownerNode.getNodeIDWithTypeStr() <<
          std::endl;
@@ -381,8 +369,7 @@ bool ModeSetPattern::setPattern(Node& ownerNode, EntryInfo* entryInfo, unsigned 
    setPatternRes = (FhgfsOpsErr)respMsgCast->getValue();
    if(setPatternRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Node encountered an error: " << FhgfsOpsErrTk::toErrString(setPatternRes) <<
-         std::endl;
+      std::cerr << "Node encountered an error: " << setPatternRes << std::endl;
       return false;
    }
 

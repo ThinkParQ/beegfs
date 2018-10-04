@@ -7,12 +7,6 @@
 
 bool StorageResyncStartedMsgEx::processIncoming(ResponseContext& ctx)
 {
-   #ifdef BEEGFS_DEBUG
-      const char* logContext = "StorageResyncStartedMsg incoming";
-      LOG_DEBUG(logContext, Log_DEBUG,
-         "Received a StorageResyncStartedMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
    uint16_t targetID = getValue();
 
    deleteMirrorSessions(targetID);
@@ -30,14 +24,12 @@ void StorageResyncStartedMsgEx::deleteMirrorSessions(uint16_t targetID)
 
    for (NumNodeIDListCIter iter = sessionIDs.begin(); iter != sessionIDs.end(); iter++)
    {
-      Session* session = sessions->referenceSession(*iter, false);
+      auto session = sessions->referenceSession(*iter);
 
       if (!session) // meanwhile deleted
          continue;
 
       SessionLocalFileStore* sessionLocalFiles = session->getLocalFiles();
       sessionLocalFiles->removeAllMirrorSessions(targetID);
-
-      sessions->releaseSession(session);
    }
 }

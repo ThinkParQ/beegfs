@@ -12,13 +12,6 @@ bool NicAddress_preferenceComp(const NicAddress* lhs, const NicAddress* rhs)
    unsigned lhsHostOrderIP;
    unsigned rhsHostOrderIP;
 
-
-   // prefer lower metric
-   if(lhs->metric < rhs->metric)
-      return true;
-   if(lhs->metric > rhs->metric)
-      return false;
-
    // prefer RDMA NICs
    if( (lhs->nicType == NICADDRTYPE_RDMA) && (rhs->nicType != NICADDRTYPE_RDMA) )
       return true;
@@ -43,22 +36,7 @@ bool NicAddress_preferenceComp(const NicAddress* lhs, const NicAddress* rhs)
    rhsHostOrderIP = ntohl(rhs->ipAddr.s_addr);
 
    // this is the original IP-order version
-   if(lhsHostOrderIP > rhsHostOrderIP)
-      return true;
-   if(lhsHostOrderIP < rhsHostOrderIP)
-      return false;
-
-
-   /*
-   // IP-order alternative
-   if(lhsHostOrderIP < rhsHostOrderIP)
-      return true;
-   if(lhsHostOrderIP > rhsHostOrderIP)
-      return false;
-   */
-
-   // prefer lower hwAddr
-   return(memcmp(lhs->hwAddr, rhs->hwAddr, IFHWADDRLEN) < 0);
+   return lhsHostOrderIP > rhsHostOrderIP;
 }
 
 

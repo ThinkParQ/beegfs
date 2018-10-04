@@ -1,7 +1,5 @@
 #include "InternodeSyncer.h"
 
-#include <common/net/message/storage/GetStorageTargetInfoMsg.h>
-#include <common/net/message/storage/GetStorageTargetInfoRespMsg.h>
 #include <common/net/message/storage/StatStoragePathMsg.h>
 #include <common/net/message/storage/StatStoragePathRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
@@ -16,6 +14,8 @@
 #include <nodes/StoragePoolStoreEx.h>
 #include <storage/StoragePoolEx.h>
 #include <program/Program.h>
+
+#include <boost/lexical_cast.hpp>
 
 InternodeSyncer::InternodeSyncer():
    PThread("XNodeSync"),
@@ -203,62 +203,62 @@ void InternodeSyncer::updateNodeCapacityPools(NodeCapacityPools* pools, bool upd
 
    clearStaleCapacityReports(NODETYPE_Meta);
 
-   SafeRWLock capacityReportReadLock(&nodeCapacityReportMapLock, SafeRWLock_READ); // L O C K
-
-   for (CapacityInfoListIter capacityInfoIter = capacityInfos.begin();
-        capacityInfoIter != capacityInfos.end(); /* iterator increment in loop */ )
    {
-      CapacityInfo& capacityInfo = *capacityInfoIter;
+      RWLockGuard const lock(nodeCapacityReportMapLock, SafeRWLock_READ);
 
-      // Find node ID in map.
-      TargetCapacityReportMapIter capacityReportIter =
-         nodeCapacityReportMap.find(capacityInfo.getNodeID().val() );
-      if (capacityReportIter == nodeCapacityReportMap.end() )
-      {  // No known capacity report for the node. Either it's not (yet) reported, or has not
-         // sent a report since the last capacity pools update. Carefully move the node to the
-         // emergency pool to at least avoid new allocations on this node when other nodes are still
-         // available.
-         bool updateRes = assignNodeToPool(pools, capacityInfo.getNodeID(),
-            CapacityPool_EMERGENCY, "No capacity report received.");
-         poolsModified |= updateRes;
+      for (CapacityInfoListIter capacityInfoIter = capacityInfos.begin();
+           capacityInfoIter != capacityInfos.end(); /* iterator increment in loop */ )
+      {
+         CapacityInfo& capacityInfo = *capacityInfoIter;
 
-         // Remove node from list (it is now assigned to a pool).
-         capacityInfoIter = capacityInfos.erase(capacityInfoIter);
-         continue;
+         // Find node ID in map.
+         TargetCapacityReportMapIter capacityReportIter =
+            nodeCapacityReportMap.find(capacityInfo.getNodeID().val() );
+         if (capacityReportIter == nodeCapacityReportMap.end() )
+         {  // No known capacity report for the node. Either it's not (yet) reported, or has not
+            // sent a report since the last capacity pools update. Carefully move the node to the
+            // emergency pool to at least avoid new allocations on this node when other nodes are
+            // still available.
+            bool updateRes = assignNodeToPool(pools, capacityInfo.getNodeID(),
+               CapacityPool_EMERGENCY, "No capacity report received.");
+            poolsModified |= updateRes;
+
+            // Remove node from list (it is now assigned to a pool).
+            capacityInfoIter = capacityInfos.erase(capacityInfoIter);
+            continue;
+         }
+
+         TargetCapacityReport& capacityReport = capacityReportIter->second;
+         int64_t freeSpace = capacityReport.diskSpaceFree;
+         int64_t freeInodes = capacityReport.inodesFree;
+
+         CapacityPoolType poolTypeFreeSpace =
+            pools->getPoolLimitsSpace().getPoolTypeFromFreeCapacity(freeSpace);
+         CapacityPoolType poolTypeInodes =
+            pools->getPoolLimitsInodes().getPoolTypeFromFreeCapacity(freeInodes);
+
+         capacityInfo.setFreeSpace(freeSpace);
+         capacityInfo.updateTargetPoolType(poolTypeFreeSpace);
+         capacityInfo.setFreeInodes(freeInodes);
+         capacityInfo.updateTargetPoolType(poolTypeInodes);
+
+         // store minimum / maximum free space for each pool
+
+         if(poolTypeFreeSpace == CapacityPool_NORMAL)
+            normalPoolFreeSpaceMinMax.enter(freeSpace);
+         else
+         if(poolTypeFreeSpace == CapacityPool_LOW)
+            lowPoolFreeSpaceMinMax.enter(freeSpace);
+
+         if(poolTypeInodes == CapacityPool_NORMAL)
+            normalPoolInodesMinMax.enter(freeInodes);
+         else
+         if(poolTypeInodes == CapacityPool_LOW)
+            lowPoolInodesMinMax.enter(freeInodes);
+
+         ++capacityInfoIter;
       }
-
-      TargetCapacityReport& capacityReport = capacityReportIter->second;
-      int64_t freeSpace = capacityReport.diskSpaceFree;
-      int64_t freeInodes = capacityReport.inodesFree;
-
-      CapacityPoolType poolTypeFreeSpace =
-         pools->getPoolLimitsSpace().getPoolTypeFromFreeCapacity(freeSpace);
-      CapacityPoolType poolTypeInodes =
-         pools->getPoolLimitsInodes().getPoolTypeFromFreeCapacity(freeInodes);
-
-      capacityInfo.setFreeSpace(freeSpace);
-      capacityInfo.updateTargetPoolType(poolTypeFreeSpace);
-      capacityInfo.setFreeInodes(freeInodes);
-      capacityInfo.updateTargetPoolType(poolTypeInodes);
-
-      // store minimum / maximum free space for each pool
-
-      if(poolTypeFreeSpace == CapacityPool_NORMAL)
-         normalPoolFreeSpaceMinMax.enter(freeSpace);
-      else
-      if(poolTypeFreeSpace == CapacityPool_LOW)
-         lowPoolFreeSpaceMinMax.enter(freeSpace);
-
-      if(poolTypeInodes == CapacityPool_NORMAL)
-         normalPoolInodesMinMax.enter(freeInodes);
-      else
-      if(poolTypeInodes == CapacityPool_LOW)
-         lowPoolInodesMinMax.enter(freeInodes);
-
-      ++capacityInfoIter;
    }
-
-   capacityReportReadLock.unlock(); // U N L O C K
 
    if (pools->getDynamicPoolsEnabled() )
    {
@@ -302,62 +302,62 @@ void InternodeSyncer::updateTargetCapacityPools(TargetCapacityPools* pools,
    MinMaxStore<int64_t> normalPoolInodesMinMax;
    MinMaxStore<int64_t> lowPoolInodesMinMax;
 
-   SafeRWLock capacityReportReadLock(&targetCapacityReportMapLock, SafeRWLock_READ); // L O C K
-
-   // First loop: Look at all target infos and check free space.
-   for (TargetCapacityInfoListIter targetCapacityInfoIter = targetCapacityInfos.begin();
-        targetCapacityInfoIter != targetCapacityInfos.end(); /* iterator increment in loop */)
    {
-      TargetCapacityInfo& targetCapacityInfo = *targetCapacityInfoIter;
+      RWLockGuard const lock(targetCapacityReportMapLock, SafeRWLock_READ);
 
-      // Find target ID in map.
-      TargetCapacityReportMapIter capacityReportIter =
-         targetCapacityReportMap.find(targetCapacityInfo.getTargetID() );
-      if (capacityReportIter == targetCapacityReportMap.end() )
-      { // No known capacity report for the target. Either it's not (yet) reported, or timed out.
-         // Carefully move this target to the emergency pool to at least avoid new allocations on
-         // this target when other targets are still available.
-         bool updateRes = assignTargetToPool(pools, targetCapacityInfo.getTargetID(),
-            targetCapacityInfo.getNodeID(), CapacityPool_EMERGENCY,
-            "No capacity report received." );
-         poolsModified |= updateRes;
+      // First loop: Look at all target infos and check free space.
+      for (TargetCapacityInfoListIter targetCapacityInfoIter = targetCapacityInfos.begin();
+           targetCapacityInfoIter != targetCapacityInfos.end(); /* iterator increment in loop */)
+      {
+         TargetCapacityInfo& targetCapacityInfo = *targetCapacityInfoIter;
 
-         // Remove target from list (as it is now assigned to a pool).
-         targetCapacityInfoIter = targetCapacityInfos.erase(targetCapacityInfoIter);
-         continue;
+         // Find target ID in map.
+         TargetCapacityReportMapIter capacityReportIter =
+            targetCapacityReportMap.find(targetCapacityInfo.getTargetID() );
+         if (capacityReportIter == targetCapacityReportMap.end() )
+         { // No known capacity report for the target. Either it's not (yet) reported, or timed out.
+            // Carefully move this target to the emergency pool to at least avoid new allocations on
+            // this target when other targets are still available.
+            bool updateRes = assignTargetToPool(pools, targetCapacityInfo.getTargetID(),
+               targetCapacityInfo.getNodeID(), CapacityPool_EMERGENCY,
+               "No capacity report received." );
+            poolsModified |= updateRes;
+
+            // Remove target from list (as it is now assigned to a pool).
+            targetCapacityInfoIter = targetCapacityInfos.erase(targetCapacityInfoIter);
+            continue;
+         }
+
+         TargetCapacityReport& capacityReport = capacityReportIter->second;
+         int64_t freeSpace = capacityReport.diskSpaceFree;
+         int64_t freeInodes = capacityReport.inodesFree;
+
+         CapacityPoolType poolTypeFreeSpace =
+            pools->getPoolLimitsSpace().getPoolTypeFromFreeCapacity(freeSpace);
+         CapacityPoolType poolTypeInodes =
+            pools->getPoolLimitsInodes().getPoolTypeFromFreeCapacity(freeInodes);
+
+         targetCapacityInfo.setFreeSpace(freeSpace);
+         targetCapacityInfo.updateTargetPoolType(poolTypeFreeSpace);
+         targetCapacityInfo.setFreeInodes(freeInodes);
+         targetCapacityInfo.updateTargetPoolType(poolTypeInodes);
+
+         // Store minimum / maximum for each pool.
+         if (poolTypeFreeSpace == CapacityPool_NORMAL)
+            normalPoolFreeSpaceMinMax.enter(freeSpace);
+         else
+         if (poolTypeFreeSpace == CapacityPool_LOW)
+            lowPoolFreeSpaceMinMax.enter(freeSpace);
+
+         if (poolTypeInodes == CapacityPool_NORMAL)
+            normalPoolInodesMinMax.enter(freeInodes);
+         else
+         if (poolTypeInodes == CapacityPool_LOW)
+            lowPoolInodesMinMax.enter(freeInodes);
+
+         ++targetCapacityInfoIter;
       }
-
-      TargetCapacityReport& capacityReport = capacityReportIter->second;
-      int64_t freeSpace = capacityReport.diskSpaceFree;
-      int64_t freeInodes = capacityReport.inodesFree;
-
-      CapacityPoolType poolTypeFreeSpace =
-         pools->getPoolLimitsSpace().getPoolTypeFromFreeCapacity(freeSpace);
-      CapacityPoolType poolTypeInodes =
-         pools->getPoolLimitsInodes().getPoolTypeFromFreeCapacity(freeInodes);
-
-      targetCapacityInfo.setFreeSpace(freeSpace);
-      targetCapacityInfo.updateTargetPoolType(poolTypeFreeSpace);
-      targetCapacityInfo.setFreeInodes(freeInodes);
-      targetCapacityInfo.updateTargetPoolType(poolTypeInodes);
-
-      // Store minimum / maximum for each pool.
-      if (poolTypeFreeSpace == CapacityPool_NORMAL)
-         normalPoolFreeSpaceMinMax.enter(freeSpace);
-      else
-      if (poolTypeFreeSpace == CapacityPool_LOW)
-         lowPoolFreeSpaceMinMax.enter(freeSpace);
-
-      if (poolTypeInodes == CapacityPool_NORMAL)
-         normalPoolInodesMinMax.enter(freeInodes);
-      else
-      if (poolTypeInodes == CapacityPool_LOW)
-         lowPoolInodesMinMax.enter(freeInodes);
-
-      ++targetCapacityInfoIter;
    }
-
-   capacityReportReadLock.unlock(); // U N L O C K
 
    // Handle dynamic pool assignments (for targets that were not assigned to fixed pools above).
 
@@ -579,7 +579,7 @@ void InternodeSyncer::logDemotionFlags(const DemotionFlags& demotionFlags, NodeT
    if (  ( (nodeType == NODETYPE_Storage) && (previousFlagsStorage != demotionFlags) )
       || ( (nodeType == NODETYPE_Meta)    && (previousFlagsMeta != demotionFlags) ) )
    {
-      LogContext("Demote targets (" + Node::nodeTypeToStr(nodeType) + ")").log(Log_NOTICE,
+      LogContext("Demote targets (" + boost::lexical_cast<std::string>(nodeType) + ")").log(Log_NOTICE,
          "demotion NORMAL->LOW [free space]: "
          + std::string(demotionFlags.getNormalPoolSpaceFlag() ? "on" : "off") +
          " [inodes]: "
@@ -704,25 +704,16 @@ void InternodeSyncer::saveTargetMappings()
 {
    App* app = Program::getApp();
    NumericIDMapper* targetNumIDMapper = app->getTargetNumIDMapper();
-   TargetMapper* targetMapper = app->getTargetMapper();
-   MirrorBuddyGroupMapper* storageMirrorGroupMapper = app->getStorageBuddyGroupMapper();
-   MirrorBuddyGroupMapper* metaMirrorGroupMapper = app->getMetaBuddyGroupMapper();
-   StoragePoolStore* storagePoolStore = app->getStoragePoolStore();
+   auto targetMapper = app->getTargetMapper();
+   auto storageMirrorGroupMapper = app->getStorageBuddyGroupMapper();
+   auto metaMirrorGroupMapper = app->getMetaBuddyGroupMapper();
+   auto storagePoolStore = app->getStoragePoolStore();
 
-   if(targetNumIDMapper->isMapperDirty() )
-      targetNumIDMapper->saveToFile();
-
-   if(targetMapper->isMapperDirty() )
-      targetMapper->saveToFile();
-
-   if (storageMirrorGroupMapper->isMapperDirty() )
-      storageMirrorGroupMapper->saveToFile();
-
-   if (metaMirrorGroupMapper->isMapperDirty() )
-      metaMirrorGroupMapper->saveToFile();
-
-   if(storagePoolStore->isMapperDirty() )
-      storagePoolStore->saveToFile();
+   targetNumIDMapper->saveToFile();
+   targetMapper->saveToFile();
+   storageMirrorGroupMapper->saveToFile();
+   metaMirrorGroupMapper->saveToFile();
+   storagePoolStore->saveToFile();
 }
 
 /**
@@ -749,14 +740,13 @@ void InternodeSyncer::dropIdleConns()
  *
  * @return number of dropped connections
  */
-unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServersEx* nodes)
+unsigned InternodeSyncer::dropIdleConnsByStore(const NodeStoreServersEx* nodes)
 {
    App* app = Program::getApp();
 
    unsigned numDroppedConns = 0;
 
-   auto node = nodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : nodes->referenceAllNodes())
    {
       /* don't do any idle disconnect stuff with local node
          (the LocalNodeConnPool doesn't support and doesn't need this kind of treatment) */
@@ -767,8 +757,6 @@ unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServersEx* nodes)
 
          numDroppedConns += connPool->disconnectAndResetIdleStreams();
       }
-
-      node = nodes->referenceNextNode(node); // iterate to next node
    }
 
    return numDroppedConns;
@@ -798,7 +786,7 @@ void InternodeSyncer::clearStaleCapacityReports(const NodeType nodeType)
    const CombinedTargetState onlineGoodState(
       TargetReachabilityState_ONLINE, TargetConsistencyState_GOOD);
 
-   SafeRWLock safeLock(reportsRWLock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(*reportsRWLock, SafeRWLock_WRITE);
 
    for (TargetCapacityReportMapIter reportIter = capacityReportMap.begin();
         reportIter != capacityReportMap.end(); /* iter increment in loop body */ )
@@ -814,6 +802,4 @@ void InternodeSyncer::clearStaleCapacityReports(const NodeType nodeType)
       else
          ++reportIter;
    }
-
-   safeLock.unlock(); // U N L O C K
 }

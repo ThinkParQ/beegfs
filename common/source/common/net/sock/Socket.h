@@ -26,7 +26,7 @@ class Socket : public Channel
    public:
       virtual ~Socket();
 
-      static std::string ipaddrToStr(struct in_addr* ipaddress);
+      static std::string ipaddrToStr(const struct in_addr* ipaddress);
       static std::string endpointAddrToString(struct in_addr* ipaddress, unsigned short port);
       static std::string endpointAddrToString(const char* hostname, unsigned short port);
 

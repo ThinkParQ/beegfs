@@ -59,42 +59,38 @@ You also have the choice between
 the openssl, nss, or gnutls version of `libcurl-dev`. Choose the one you prefer.
 
 ## Building Packages
-BeeGFS comes with a shell script that can build all BeeGFS packages for the
-system on which it is executed.
-The packages include all services, the client module and utilities.
-
-Go to the `auto_package` subdirectory:
-```
- $ cd auto_package
-```
+BeeGFS comes with a Makefile capable of building packages for the system on which it is executed.
+These include all services, the client module and utilities.
 
 To build RPM packages, run
 ```
- $ ./make-rpms.sh
+ $ make package-rpm PACKAGE_DIR=packages
 ```
+You may also enable parallel execution with
+```
+ $ make package-rpm PACKAGE_DIR=packages RPMBUILD_OPTS="-D 'MAKE_CONCURRENCY <n>'"
+```
+where `<n>` is the number of concurrent processes.
 
 For DEB packages use this command:
 ```
- $ ./make-debs.sh
+ $ make package-deb PACKAGE_DIR=packages
 ```
-This will generate individual packages for search service (management, meta-data, storage)
-as well as the client kernel module and administration tools.
-In both cases you can append `-j <n>` to enable parallel execution, where
-`<n>` is the number of processes to run at the same time.
-Additional options are described in the help message of both scripts (`-h` option).
+Or start with `<n>` jobs running in parallel:
+```
+ $ make package-deb PACKAGE_DIR=packages DEBUILD_OPTS="-j<n>"
+```
 
-To generate individual packages instead of building the whole system,
-run
-```
-$ make opentk_lib-all thirdparty common-all
-```
-to prepare common parts required by the services and tools.
-The packages can then be built by running the `make-deb` or `make-rpm` script
-in the corresponding sub-project folders. For example:
-```
-$ cd storage/build
-$ ./make-deb
-```
+This will generate individual packages for each service (management, meta-data, storage)
+as well as the client kernel module and administration tools.
+
+The above examples use `packages` as the output folder for packages, which must not exist
+and will be created during the build process.
+You may specify any other non-existent directory instead.
+
+Note, however, that having `PACKAGE_DIR` on a NFS or similar network share may slow down
+the build process significantly.
+
 
 ## Building without packaging
 To build the complete project without generating any packages,

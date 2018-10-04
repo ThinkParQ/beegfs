@@ -58,6 +58,17 @@ void beegfs_native_release()
 
 
 
+static bool is_pipe_iter(struct iov_iter* iter)
+{
+#ifdef KERNEL_HAS_ITER_PIPE
+      return iter->type & ITER_PIPE;
+#else
+      return false;
+#endif
+}
+
+
+
 /*
  * PVRs and ARDs use the Private and Checked bits of pages to determine which is attached to a
  * page. Once we support only kernels that have the Private2 bit, we should use Private2 instead
@@ -315,12 +326,7 @@ static int beegfs_release_range(struct file* filp, loff_t first, loff_t last)
 
    clear_bit(AS_EIO, &filp->f_mapping->flags);
 
-#if !defined(KERNEL_HAS_FILEMAP_WRITE_AND_WAIT_RANGE) || LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-   /* rhel5 kernels declare the *_range symbol, but don't actually have it ... */
-   writeRes = filemap_write_and_wait(filp->f_mapping);
-#else
    writeRes = filemap_write_and_wait_range(filp->f_mapping, first, last);
-#endif
    if(writeRes < 0)
    {
       App* app = FhgfsOps_getApp(file_dentry(filp)->d_sb);
@@ -609,8 +615,9 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
    if(filp->f_flags & O_APPEND)
       return beegfs_append_iter(iocb, from);
 
-   if(from->count >= Config_getTuneFileCacheBufSize(App_getConfig(app) ) ||
-         BEEGFS_SHOULD_FAIL(write_force_cache_bypass, 1) )
+   if (!is_pipe_iter(from)
+         && (from->count >= Config_getTuneFileCacheBufSize(App_getConfig(app))
+               || BEEGFS_SHOULD_FAIL(write_force_cache_bypass, 1)))
    {
       ssize_t result;
 
@@ -737,8 +744,9 @@ static ssize_t beegfs_read_iter(struct kiocb* iocb, struct iov_iter* to)
    IGNORE_UNUSED_VARIABLE(app);
    IGNORE_UNUSED_VARIABLE(size);
 
-   if(to->count >= Config_getTuneFileCacheBufSize(App_getConfig(app) ) ||
-         BEEGFS_SHOULD_FAIL(read_force_cache_bypass, 1) )
+   if (!is_pipe_iter(to)
+         && (to->count >= Config_getTuneFileCacheBufSize(App_getConfig(app))
+               || BEEGFS_SHOULD_FAIL(read_force_cache_bypass, 1)))
    {
       /* like with write_iter, this is basically the O_DIRECT generic_file_read_iter. */
       struct address_space* mapping = filp->f_mapping;
@@ -1307,10 +1315,9 @@ free:
    return result;
 }
 
-static BEEGFS_WORK_FUNCTION(beegfs_writepages_work_wrapper)
+static void beegfs_writepages_work_wrapper(struct work_struct* w)
 {
-   struct beegfs_writepages_state* state = container_of(BEEGFS_CURRENT_WORK_STRUCT,
-      struct beegfs_writepages_state, work);
+   struct beegfs_writepages_state* state = container_of(w, struct beegfs_writepages_state, work);
    SynchronizedCounter* barrier = &state->context->barrier;
 
    beegfs_writepages_work(state);
@@ -1334,7 +1341,7 @@ static void beegfs_writepages_submit(struct beegfs_writepages_context* context)
 
    context->submitted += 1;
 
-   OS_INIT_WORK(&state->work, beegfs_writepages_work_wrapper);
+   INIT_WORK(&state->work, beegfs_writepages_work_wrapper);
    queue_work(remoting_io_queue, &state->work);
 }
 
@@ -1459,7 +1466,7 @@ static int beegfs_do_write_pages(struct address_space* mapping, struct writeback
    if(page)
       err = beegfs_writepages_callback(page, wbc, &context);
    else
-      err = os_write_cache_pages(mapping, wbc, beegfs_writepages_callback, &context);
+      err = write_cache_pages(mapping, wbc, beegfs_writepages_callback, &context);
 
    beegfs_writepages_submit(&context);
 
@@ -1469,7 +1476,6 @@ static int beegfs_do_write_pages(struct address_space* mapping, struct writeback
       FhgfsOpsHelper_releaseAppendLock(BEEGFS_INODE(inode), &context.ioInfo);
 
    FhgfsInode_releaseHandle(BEEGFS_INODE(inode), handleType, NULL);
-   SynchronizedCounter_uninit(&context.barrier);
 
    FhgfsInode_decWriteBackCounter(BEEGFS_INODE(inode) );
    FhgfsInode_unsetNoIsizeDecrease(BEEGFS_INODE(inode) );
@@ -1683,10 +1689,9 @@ static void rps_free(struct beegfs_readpages_state* state)
    kfree(state);
 }
 
-static BEEGFS_WORK_FUNCTION(beegfs_readpages_work)
+static void beegfs_readpages_work(struct work_struct* w)
 {
-   struct beegfs_readpages_state* state = container_of(BEEGFS_CURRENT_WORK_STRUCT,
-      struct beegfs_readpages_state, work);
+   struct beegfs_readpages_state* state = container_of(w, struct beegfs_readpages_state, work);
 
    App* app;
    struct iov_iter iter;
@@ -1748,7 +1753,7 @@ static void beegfs_readpages_submit(struct beegfs_readpages_context* context)
 {
    struct beegfs_readpages_state* state = context->currentState;
 
-   OS_INIT_WORK(&state->work, beegfs_readpages_work);
+   INIT_WORK(&state->work, beegfs_readpages_work);
    queue_work(remoting_io_queue, &state->work);
 }
 
@@ -2182,12 +2187,10 @@ static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* 
 }
 #endif
 
-#if defined(KERNEL_HAS_LAUNDER_PAGE)
 static int beegfs_launderpage(struct page* page)
 {
    return beegfs_flush_page(page);
 }
-#endif
 
 const struct address_space_operations fhgfs_addrspace_native_ops = {
    .readpage = beegfs_readpage,
@@ -2200,9 +2203,7 @@ const struct address_space_operations fhgfs_addrspace_native_ops = {
    .readpages = beegfs_readpages,
    .writepages = beegfs_writepages,
 
-#if defined(KERNEL_HAS_LAUNDER_PAGE)
    .launder_page = beegfs_launderpage,
-#endif
 
 #ifdef KERNEL_HAS_PREPARE_WRITE
    .prepare_write = beegfs_prepare_write,

@@ -19,8 +19,8 @@
 #define MGMT_TIMEOUT_MS 2500
 
 #define MODE_FIND_ERR_SUCCESS     0 // file is located on given target
-#define MODE_FIND_ERR_INTERNAL   -1 // internal error
-#define MODE_FIND_ERR_NOT_FOUND  -2 // file not found on given targets
+#define MODE_FIND_ERR_INTERNAL   (-1) // internal error
+#define MODE_FIND_ERR_NOT_FOUND  (-2) // file not found on given targets
 
 typedef std::map<NumNodeID, UInt16List*> NodeTargetMap;
 typedef NodeTargetMap::iterator NodeTargetMapIter;
@@ -140,26 +140,18 @@ out:
  */
 int ModeMigrate::getTargets(const Node& mgmtNode, const StoragePoolPtr& destStoragePool)
 {
-   // get lists of targetIDs and nodeIDs, mapped 1:1
-   UInt16List targetIDs;
-   NumNodeIDList nodeIDs;
-   if(!NodesTk::downloadTargetMappings(mgmtNode, &targetIDs, &nodeIDs, false) )
+   auto mappings = NodesTk::downloadTargetMappings(mgmtNode, false);
+   if (!mappings.first)
    {
       std::cerr << "Mappings download failed." << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 
-   if (targetIDs.size() != nodeIDs.size() )
-   {
-      std::cerr << "Bug: targetIDs.size() vs. nodeIDs.size() mismatch." << std::endl;
-      return APPCODE_RUNTIME_ERROR;
-   }
-
-   int fromRes = getFromTargets(targetIDs, nodeIDs);
+   int fromRes = getFromTargets(mappings.second);
    if (fromRes != APPCODE_NO_ERROR)
       return fromRes;
 
-   int destRes = getDestTargets(destStoragePool, targetIDs, nodeIDs);
+   int destRes = getDestTargets(destStoragePool, mappings.second);
    if (destRes != APPCODE_NO_ERROR)
       return destRes;
 
@@ -193,20 +185,17 @@ int ModeMigrate::getTargets(const Node& mgmtNode, const StoragePoolPtr& destStor
 /**
  * Get the targets we want to migrate files to
  */
-int ModeMigrate::getDestTargets(const StoragePoolPtr& destStoragePool, const UInt16List& targetIDs,
-   const NumNodeIDList& nodeIDs)
+int ModeMigrate::getDestTargets(const StoragePoolPtr& destStoragePool,
+      const std::map<uint16_t, NumNodeID>& mappings)
 {
-   ZipConstIterRange<UInt16List, NumNodeIDList> targetNodeIDIt(targetIDs, nodeIDs);
    NodeTargetMap targetMap;
 
-   /* Walk over the 1:1 mapped targetIDs and nodeIDs here and put targets in a per node list
-    * Those lists can be located by the node-key in a map */
-   while (!targetNodeIDIt.empty() )
+   for (const auto mapping : mappings)
    {
       bool isSearchTarget = false; // search targets are those we want to migrate files from
 
-      uint16_t targetID = *targetNodeIDIt()->first;
-      NumNodeID nodeID = *targetNodeIDIt()->second;
+      const uint16_t targetID = mapping.first;
+      const NumNodeID nodeID = mapping.second;
 
       // check the targets to migrate files from
       UInt16ListIter searchTargetIter = this->searchStorageTargetIDs.begin();
@@ -236,8 +225,6 @@ int ModeMigrate::getDestTargets(const StoragePoolPtr& destStoragePool, const UIn
          perNodeTargetList->push_back(targetID);
 
       }
-
-      ++targetNodeIDIt;
    }
 
    /* We have the targets in lists per node. Now we will add those targets to a linear list,
@@ -283,7 +270,7 @@ int ModeMigrate::getDestTargets(const StoragePoolPtr& destStoragePool, const UIn
  *
  * @return APPCODE_...
  */
-int ModeMigrate::getFromTargets(UInt16List& targetIDs, NumNodeIDList& nodeIDs)
+int ModeMigrate::getFromTargets(const std::map<uint16_t, NumNodeID>& mappings)
 {
    if (cfgTargetID)
    { // we are looking for a specific targetID
@@ -291,21 +278,17 @@ int ModeMigrate::getFromTargets(UInt16List& targetIDs, NumNodeIDList& nodeIDs)
 
       return APPCODE_NO_ERROR;
    }
-   else if (cfgNodeID != 0)
+   else if (cfgNodeID)
    { // get all targetIDs from the given node
-      ZipIterRange<UInt16List, NumNodeIDList> targetNodeIter(targetIDs, nodeIDs);
-
-      while (!targetNodeIter.empty() )
+      for (const auto mapping : mappings)
       {
-         if (*(targetNodeIter()->second) == cfgNodeID)
-            searchStorageTargetIDs.push_back(*(targetNodeIter()->first));
-
-         ++targetNodeIter;
+         if (mapping.second == cfgNodeID)
+            searchStorageTargetIDs.push_back(mapping.first);
       }
 
       return APPCODE_NO_ERROR;
    }
-   else if (cfgStoragePoolId != 0)
+   else if (cfgStoragePoolId)
    {
       StoragePoolStore* storagePoolStore = Program::getApp()->getStoragePoolStore();
       const auto pool = storagePoolStore->getPool(cfgStoragePoolId);
@@ -565,7 +548,7 @@ int ModeMigrate::getParams()
       return APPCODE_RUNTIME_ERROR;
    }
 
-   if ((cfgNodeID != 0) && (cfgTargetID != 0) && (cfgStoragePoolId != 0))
+   if (cfgNodeID && cfgTargetID && cfgStoragePoolId)
    {
       std::cerr << "Only one of 'nodeid', 'targetid' and 'storagepoolid' can be specified."
                 << std::endl;
@@ -623,9 +606,9 @@ void ModeMigrate::printHelpMigrate()
    std::cout << " is possible that these files are created on the target which you want to free" << std::endl;
    std::cout << " up. Thus, be careful regarding how you access the file system during migration." << std::endl;
    std::cout << "\n";
-   std::cout << " If files of source storage pool has buddy mirroring as the pattern, make sure the\n"
-                " destination pool contains at least one buddy mirror group. Otherwise migration of\n"
-                " these files will not be possible.\n";
+   std::cout << " When migrating between storage pools, if any of the source files has buddy" << std::endl;
+   std::cout << " mirroring as the pattern type, make sure the destination pool contains at least" << std::endl;
+   std::cout << " one buddy mirror group. Otherwise migrating these files will not be possible." << std::endl;
    std::cout << std::endl;
    std::cout << " Examples:" << std::endl;
    std::cout << "   Migrate all files from storage target with ID \"5\" to other targets." << std::endl;
@@ -653,7 +636,9 @@ void ModeMigrate::printHelpFind()
    std::cout << "  --nodetype=<nodetype>    Find files on the given nodetype (meta, storage)." << std::endl;
    std::cout << "                           (Default: storage)" << std::endl;
    std::cout << "  --nomirrors              Do not include buddy mirrored files in search." << std::endl;
-   std::cout << "  --onlyallocated          Only include targets that actually hold file chunks." << std::endl;
+   std::cout << "  --onlyallocated          List only files that actually have data chunks on the\n"
+                "                           specified target; exclude files that contain the\n"
+                "                           target in their target pattern, but don't use it (yet)." << std::endl;
    std::cout << "  --uid=<uid,...>          Filter on the user ids. " << std::endl;
    std::cout << "  --user=<user name,...>   Filter on the user names." << std::endl;
    std::cout << "  --gid=<gid,...>          Filter on the group ids." << std::endl;
@@ -692,7 +677,7 @@ int ModeMigrate::findFiles(std::string fileName, std::string dirName, int fileTy
 
    if (fileType == DT_DIR)
    {
-      std::string rootPath = ""; // relative to this->rootFD
+      std::string rootPath; // relative to this->rootFD
       if(!processDir(rootPath) )
          retVal = MODE_FIND_ERR_INTERNAL;
    }
@@ -886,7 +871,7 @@ bool ModeMigrate::startFileMigration(std::string fileName, int fileType, std::st
    if(destTargets->empty() )
    {
       std::string errorTargetString;
-      if(isBuddyMirrored)
+      if(!isBuddyMirrored)
          errorTargetString = "targets";
       else
          errorTargetString = "MirrorBuddyGroups";
@@ -1040,9 +1025,6 @@ bool ModeMigrate::getEntryTargets(std::string& path, StripePattern** outStripePa
 
    NodeHandle metaOwnerNode;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetEntryInfoRespMsg* respMsgCast;
 
    FhgfsOpsErr getInfoRes;
@@ -1053,19 +1035,17 @@ bool ModeMigrate::getEntryTargets(std::string& path, StripePattern** outStripePa
 
    GetEntryInfoMsg getInfoMsg(&pathInfo);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *metaOwnerNode, &getInfoMsg, NETMSGTYPE_GetEntryInfoResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*metaOwnerNode, getInfoMsg,
+         NETMSGTYPE_GetEntryInfoResp);
+   if (!respMsg)
       goto err_cleanup;
 
-   respMsgCast = (GetEntryInfoRespMsg*)respMsg;
+   respMsgCast = (GetEntryInfoRespMsg*)respMsg.get();
 
    getInfoRes = (FhgfsOpsErr)respMsgCast->getResult();
    if(getInfoRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Server encountered an error: " << FhgfsOpsErrTk::toErrString(getInfoRes) <<
-         std::endl;
+      std::cerr << "Server encountered an error: " << getInfoRes << std::endl;
       retVal = false;
       goto err_cleanup;
    }
@@ -1076,9 +1056,6 @@ bool ModeMigrate::getEntryTargets(std::string& path, StripePattern** outStripePa
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -1092,7 +1069,7 @@ int ModeMigrate::pathToEntryInfo(std::string& pathStr, EntryInfo* outEntryInfo,
 
    Path path(pathStr);
    if(!ModeHelper::getEntryAndOwnerFromPath(path, true, false,
-         *app->getMetaNodes(), *app->getMetaMirrorBuddyGroupMapper(),
+         *app->getMetaNodes(), app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
          *outEntryInfo, outMetaOwnerNode))
    {
       return APPCODE_RUNTIME_ERROR;

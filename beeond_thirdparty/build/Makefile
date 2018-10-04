@@ -20,12 +20,6 @@ MCTP3_PATH           = $(SOURCE_PATH)/mctp3
 
 all: pcopy gpi mctp
 
-rpm:
-	./make-rpm
-
-deb:
-	./make-deb
-
 gpi: $(GPI2_TAR)
 	tar -C $(SOURCE_PATH) -xzf $(GPI2_TAR)
 	cd $(GPI2_PATH) && ./install.sh -p $(GPI2_OUT_PATH) --with-ethernet

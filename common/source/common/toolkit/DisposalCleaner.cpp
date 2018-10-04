@@ -10,14 +10,11 @@
 void DisposalCleaner::run(NodeStore& nodes, const std::function<OnItemFn>& onItem,
    const std::function<OnErrorFn>& onError)
 {
-   auto node = nodes.referenceFirstNode();
-   while (node)
+   for (const auto& node : nodes.referenceAllNodes())
    {
       FhgfsOpsErr walkRes = walkNode(*node, onItem);
       if (walkRes != FhgfsOpsErr_SUCCESS)
          onError(*node, walkRes);
-
-      node = nodes.referenceNextNode(node);
    }
 }
 
@@ -26,9 +23,6 @@ FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>&
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
    size_t numEntriesThisRound = 0; // received during last RPC round
-   bool commRes = true;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    ListDirFromOffsetRespMsg* respMsgCast;
 
    FhgfsOpsErr listRes = FhgfsOpsErr_SUCCESS;
@@ -66,23 +60,16 @@ FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>&
 
          ListDirFromOffsetMsg listMsg(&entryInfo, currentServerOffset, maxOutNames, true);
 
-         // request/response
-         commRes = MessagingTk::requestResponse(
-            node, &listMsg, NETMSGTYPE_ListDirFromOffsetResp, &respBuf, &respMsg);
-         if (!commRes)
-         {
-            retVal = FhgfsOpsErr_COMMUNICATION;
-            goto err_cleanup;
-         }
+         const auto respMsg = MessagingTk::requestResponse(node, listMsg,
+               NETMSGTYPE_ListDirFromOffsetResp);
+         if (!respMsg)
+            return FhgfsOpsErr_COMMUNICATION;
 
-         respMsgCast = (ListDirFromOffsetRespMsg*)respMsg;
+         respMsgCast = (ListDirFromOffsetRespMsg*)respMsg.get();
 
          listRes = (FhgfsOpsErr)respMsgCast->getResult();
          if (listRes != FhgfsOpsErr_SUCCESS)
-         {
-            retVal = listRes;
-            goto err_cleanup;
-         }
+            return listRes;
 
          entryNames = &respMsgCast->getNames();
 
@@ -95,10 +82,6 @@ FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>&
             if (retVal != FhgfsOpsErr_SUCCESS)
                break;
          }
-
-      err_cleanup:
-         SAFE_DELETE(respMsg);
-         SAFE_FREE(respBuf);
       }
    } while (retVal == FhgfsOpsErr_SUCCESS && numEntriesThisRound == maxOutNames);
 
@@ -107,11 +90,6 @@ FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>&
 
 FhgfsOpsErr DisposalCleaner::unlinkFile(Node& node, std::string entryName, const bool isMirrored)
 {
-   FhgfsOpsErr retVal;
-
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    UnlinkFileRespMsg* respMsgCast;
 
    std::string entryID = isMirrored
@@ -123,22 +101,11 @@ FhgfsOpsErr DisposalCleaner::unlinkFile(Node& node, std::string entryName, const
 
    UnlinkFileMsg getInfoMsg(&parentInfo, entryName);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      node, &getInfoMsg, NETMSGTYPE_UnlinkFileResp, &respBuf, &respMsg);
-   if (!commRes)
-   {
-      retVal = FhgfsOpsErr_COMMUNICATION;
-      goto err_cleanup;
-   }
+   const auto respMsg = MessagingTk::requestResponse(node, getInfoMsg, NETMSGTYPE_UnlinkFileResp);
+   if (!respMsg)
+      return FhgfsOpsErr_COMMUNICATION;
 
-   respMsgCast = (UnlinkFileRespMsg*)respMsg;
+   respMsgCast = (UnlinkFileRespMsg*)respMsg.get();
 
-   retVal = (FhgfsOpsErr)respMsgCast->getValue();
-
-err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
-   return retVal;
+   return (FhgfsOpsErr)respMsgCast->getValue();
 }

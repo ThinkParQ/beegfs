@@ -11,14 +11,14 @@ class MsgHelperOpen
 {
    public:
       static FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags,
-         bool useQuota, unsigned msgUserID, MetaFileHandle& outOpenFile);
+         bool useQuota, unsigned msgUserID, MetaFileHandle& outFileInode);
 
 
    private:
       MsgHelperOpen() {}
 
       static FhgfsOpsErr openMetaFile(EntryInfo* entryInfo,
-         unsigned accessFlags, MetaFileHandle& outOpenFile);
+         unsigned accessFlags, MetaFileHandle& outOpenInode);
       static void openMetaFileCompensate(EntryInfo* entryInfo,
          MetaFileHandle inode, unsigned accessFlags);
 

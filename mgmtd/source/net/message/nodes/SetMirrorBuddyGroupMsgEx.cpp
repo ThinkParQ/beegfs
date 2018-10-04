@@ -10,10 +10,6 @@
 
 bool SetMirrorBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("SetMirrorBuddyGroupMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a SetMirrorBuddyGroupMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
 
    if (app->isShuttingDown())

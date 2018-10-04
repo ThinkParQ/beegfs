@@ -15,12 +15,6 @@ static inline void LogMsg_initFromEntry(LogMsg* this, int level,
 extern void LogMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
 extern bool LogMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx);
 
-// getters & setters
-static inline int LogMsg_getLevel(LogMsg* this);
-static inline const char* LogMsg_getThreadName(LogMsg* this);
-static inline const char* LogMsg_getContext(LogMsg* this);
-static inline const char* LogMsg_getLogMsg(LogMsg* this);
-
 
 struct LogMsg
 {
@@ -63,26 +57,6 @@ void LogMsg_initFromEntry(LogMsg* this, int level, int threadID, const char* thr
 
    this->logMsg = logMsg;
    this->logMsgLen = strlen(logMsg);
-}
-
-int LogMsg_getLevel(LogMsg* this)
-{
-   return this->level;
-}
-
-const char* LogMsg_getThreadName(LogMsg* this)
-{
-   return this->threadName;
-}
-
-const char* LogMsg_getContext(LogMsg* this)
-{
-   return this->context;
-}
-
-const char* LogMsg_getLogMsg(LogMsg* this)
-{
-   return this->logMsg;
 }
 
 #endif /*LOGMSG_H_*/

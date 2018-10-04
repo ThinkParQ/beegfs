@@ -65,7 +65,7 @@ FhgfsOpsErr SetChunkFileAttribsWork::communicate()
    }
 
    // correct response type received
-   SetLocalAttrRespMsg* setRespMsg = (SetLocalAttrRespMsg*)rrArgs.outRespMsg;
+   const auto setRespMsg = (const SetLocalAttrRespMsg*)rrArgs.outRespMsg.get();
 
    FhgfsOpsErr setRespVal = setRespMsg->getResult();
    if(setRespVal != FhgfsOpsErr_SUCCESS)

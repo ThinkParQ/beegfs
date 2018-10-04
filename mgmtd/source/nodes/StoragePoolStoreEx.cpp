@@ -120,6 +120,161 @@ StoragePoolId StoragePoolStoreEx::removeBuddyGroup(uint16_t buddyGroupId)
    return poolId;
 }
 
+/**
+ * @return true if successfully loaded, false if not
+ *
+ * Note: setStorePath must be called before using this.
+ */
+bool StoragePoolStoreEx::loadFromFile()
+{
+   RWLockGuard lock(rwlock, SafeRWLock_WRITE);
+
+   if (storePath.empty())
+      return false;
+
+   // create/trunc file
+   const int openFlags = O_RDONLY;
+
+   int fd = open(storePath.c_str(), openFlags, 0);
+   if (fd == -1)
+   { // error
+      LOG(STORAGEPOOLS, ERR, "Could not open storage pool mappings file.", storePath, sysErr);
+
+      return false;
+   }
+
+   // file open -> read contents
+   bool retVal;
+
+   try
+   {
+      // determine buffer length
+      struct stat statBuf;
+      int statRes = fstat(fd, &statBuf);
+
+      if (statRes != 0)
+      { // stat failed
+         LOG(STORAGEPOOLS, ERR, "Could not stat storage pool mappings file.", storePath, sysErr);
+
+         retVal = false;
+         goto cleanup_and_exit;
+      }
+
+      // allocate memory for contents
+      boost::scoped_array<char> buf(new char[statBuf.st_size]);
+
+      // read from file
+      const ssize_t readRes = read(fd, buf.get(), statBuf.st_size);
+
+      if(readRes == -1)
+      { // reading failed
+         LOG(STORAGEPOOLS, ERR, "Could not read from storage pool mappings file.",
+             storePath, sysErr);
+
+         retVal = false;
+         goto cleanup_and_exit;
+      }
+      else
+      {  // do the actual deserialization
+         Deserializer des(buf.get(), readRes);
+         deserialize(des);
+         retVal = des.good();
+
+         if (!retVal)
+            LOG(STORAGEPOOLS, ERR, "Could not deserialize storage pool mappings file.", storePath);
+      }
+   }
+   catch (const std::bad_alloc& e)
+   {
+      LOG(STORAGEPOOLS, ERR,
+          "Could not allocate memory for contents of storage pool mappings file.", storePath);
+      retVal = false;
+   }
+
+cleanup_and_exit:
+   close (fd);
+
+   return retVal;
+}
+
+
+/**
+ * @return true if successfully stored, false if not
+ *
+ * Note: setStorePath must be called before using this.
+ */
+bool StoragePoolStoreEx::saveToFile()
+{
+   RWLockGuard lock(rwlock, SafeRWLock_READ);
+
+   if (storePath.empty())
+      return false;
+
+   // create/trunc file
+   const int openFlags = O_CREAT | O_TRUNC | O_WRONLY;
+
+   int fd = open(storePath.c_str(), openFlags, 0660);
+   if (fd == -1)
+   { // error
+      LOG(STORAGEPOOLS, ERR, "Could not open storage pool mappings file.", storePath, sysErr);
+
+      return false;
+   }
+
+   // file open -> write contents
+   bool retVal = true;
+
+   try
+   {
+      // determine buffer length
+      Serializer lengthSerializer;
+      serialize(lengthSerializer);
+      const unsigned bufLen = lengthSerializer.size();
+
+      // do the actual serialization
+      boost::scoped_array<char> buf(new char[bufLen]);
+
+      Serializer ser(buf.get(), bufLen);
+      serialize(ser);
+
+      if (!ser.good())
+      {
+         LOG(STORAGEPOOLS, ERR, "Could not serialize storage pool mappings file.", storePath);
+         retVal = false;
+
+         goto cleanup_and_exit;
+      }
+
+      const ssize_t writeRes = write(fd, buf.get(), bufLen);
+      if ( (writeRes == -1) || (static_cast<size_t>(writeRes) != bufLen))
+      {
+         LOG(STORAGEPOOLS, ERR, "Could not store storage pool mappings file.", storePath, sysErr);
+         retVal = false;
+
+         goto cleanup_and_exit;
+      }
+   }
+   catch (const std::bad_alloc& e)
+   {
+      LOG(STORAGEPOOLS, ERR, "Could not allocate memory for storage pool mappings file.",
+          storePath);
+      retVal = false;
+   }
+
+cleanup_and_exit:
+   close (fd);
+
+   return retVal;
+}
+
+
+void StoragePoolStoreEx::setStorePath(const std::string& storePath)
+{
+   RWLockGuard lock(rwlock, SafeRWLock_WRITE);
+
+   this->storePath = storePath;
+}
+
 FhgfsOpsErr StoragePoolStoreEx::removePool(StoragePoolId poolId)
 {
    if (poolId == StoragePoolStore::DEFAULT_POOL_ID)
@@ -155,8 +310,6 @@ FhgfsOpsErr StoragePoolStoreEx::removePool(StoragePoolId poolId)
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
 
    storagePools.erase(poolId);
-
-   mappingsDirty = true;
 
    return FhgfsOpsErr_SUCCESS;
 }

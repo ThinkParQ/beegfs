@@ -8,10 +8,6 @@ bool RmChunkPathsMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "RmChunkPathsMsg incoming";
 
-   #ifdef BEEGFS_DEBUG
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a RmChunkPathsMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
    App* app = Program::getApp();
    ChunkStore* chunkStore = app->getChunkDirStore();
 
@@ -21,16 +17,18 @@ bool RmChunkPathsMsgEx::processIncoming(ResponseContext& ctx)
 
    targetID = getTargetID();
 
-   // get targetFD
-   int targetFD = app->getTargetFD(targetID,
-      isMsgHeaderFeatureFlagSet(RMCHUNKPATHSMSG_FLAG_BUDDYMIRROR));
-   if(unlikely(targetFD == -1))
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+
+   if (!target)
    { // unknown targetID
       LogContext(logContext).logErr("Unknown targetID: " + StringTk::uintToStr(targetID));
       failedPaths = relativePaths;
    }
    else
    { // valid targetID
+      const int targetFD = isMsgHeaderFeatureFlagSet(RMCHUNKPATHSMSG_FLAG_BUDDYMIRROR)
+         ? *target->getMirrorFD()
+         : *target->getChunkFD();
       for(StringListIter iter = relativePaths.begin(); iter != relativePaths.end(); iter++)
       {
          // remove chunk

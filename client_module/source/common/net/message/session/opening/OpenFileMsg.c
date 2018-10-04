@@ -14,14 +14,14 @@ void OpenFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    OpenFileMsg* thisCast = (OpenFileMsg*)this;
 
    // clientNumID
-   NumNodeID_serialize(&thisCast->clientNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->clientNumID);
 
    // accessFlags
    Serialization_serializeUInt(ctx, thisCast->accessFlags);
 
    // entryInfo
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
 
    if (this->msgHeader.msgFeatureFlags & OPENFILEMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

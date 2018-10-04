@@ -5,14 +5,6 @@
 
 bool SetLastBuddyCommOverrideMsgEx::processIncoming(ResponseContext& ctx)
 {
-   #ifdef BEEGFS_DEBUG
-      const char* logContext = "SetLastBuddyCommOverrideMsg incoming";
-
-      LOG_DEBUG(logContext, Log_DEBUG,
-         "Received a SetLastBuddyCommOverrideMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
-   FhgfsOpsErr result;
    uint16_t targetID = getTargetID();
    int64_t timestamp = getTimestamp();
    bool abortResync = getAbortResync();
@@ -20,7 +12,14 @@ bool SetLastBuddyCommOverrideMsgEx::processIncoming(ResponseContext& ctx)
    App* app = Program::getApp();
    StorageTargets* storageTargets = app->getStorageTargets();
 
-   result = storageTargets->overrideLastBuddyComm(targetID, timestamp);
+   const auto target = storageTargets->getTarget(targetID);
+   if (!target)
+   {
+      ctx.sendResponse(SetLastBuddyCommOverrideRespMsg(FhgfsOpsErr_UNKNOWNTARGET));
+      return true;
+   }
+
+   target->setLastBuddyComm(std::chrono::system_clock::from_time_t(timestamp), true);
 
    if (abortResync)
    {
@@ -29,7 +28,7 @@ bool SetLastBuddyCommOverrideMsgEx::processIncoming(ResponseContext& ctx)
          resyncJob->abort();
    }
 
-   ctx.sendResponse(SetLastBuddyCommOverrideRespMsg(result) );
+   ctx.sendResponse(SetLastBuddyCommOverrideRespMsg(FhgfsOpsErr_SUCCESS));
 
    return true;
 }

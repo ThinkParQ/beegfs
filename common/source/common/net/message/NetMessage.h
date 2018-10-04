@@ -9,6 +9,8 @@
 #include "NetMessageLogHelper.h"
 #include "NetMessageTypes.h"
 
+#include <climits>
+
 
 // common message constants
 // ========================
@@ -19,15 +21,9 @@
 
 #define NETMSG_DEFAULT_USERID    (~0) // non-zero to avoid mixing up with root userID
 
-
-
-
 struct NetMessageHeader
 {
-   // u64 representation of "fhgfs05". since uint64_t is serialized as LE in the protocol, but
-   // we want to have the string "fhgfs05" in the messages byte-for-byte, the bytes are
-   // swapped here to compensate
-   static const uint64_t MSG_PREFIX = 0x0035307366676866ULL;
+   static constexpr const uint64_t MSG_PREFIX = (0x42474653ULL << 32) + BEEGFS_DATA_VERSION;
 
    static const uint8_t Flag_BuddyMirrorSecond = 0x01;
    static const uint8_t Flag_IsSelectiveAck    = 0x02;
@@ -39,7 +35,6 @@ struct NetMessageHeader
    uint16_t       msgFeatureFlags; // feature flags for derived messages (depend on msgType)
    uint8_t        msgCompatFeatureFlags;
    uint8_t        msgFlags;
-// char*          msgPrefix; // NETMSG_PREFIX_STR (8 bytes)
    uint16_t       msgType; // the type of payload, defined as NETMSGTYPE_x
    uint16_t       msgTargetID; // targetID (not groupID) for per-target workers on storage server
    uint32_t       msgUserID; // system user ID for per-user msg queues, stats etc.
@@ -104,6 +99,8 @@ class NetMessage
       {
          Deserializer des(buf, bufLen);
          des % *outHeader;
+         if(unlikely(!des.good()))
+            outHeader->msgType = NETMSGTYPE_Invalid;
       }
 
       class ResponseContext
@@ -199,23 +196,15 @@ class NetMessage
       virtual void serializePayload(Serializer& ser) const = 0;
       virtual bool deserializePayload(const char* buf, size_t bufLen) = 0;
 
-      // getters & setters
-      void setMsgType(unsigned short msgType)
-      {
-         this->msgHeader.msgType = msgType;
-      }
-
-
    private:
       NetMessageHeader msgHeader;
 
       bool releaseSockAfterProcessing; /* false if sock was already released during
                                           processIncoming(), e.g. due to early response. */
 
+      std::vector<char> backingBuffer;
 
    public:
-      // inliners
-
       std::pair<bool, unsigned> serializeMessage(char* buf, size_t bufLen) const
       {
          Serializer ser(buf, bufLen);
@@ -258,7 +247,7 @@ class NetMessage
        */
       std::string getMsgTypeStr() const
       {
-         return NetMsgStrMapping().defineToStr(msgHeader.msgType);
+         return netMessageTypeToStr(msgHeader.msgType);
       }
 
       unsigned getMsgHeaderFeatureFlags() const

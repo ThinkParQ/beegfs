@@ -14,12 +14,6 @@
 
 bool MkDirMsgEx::processIncoming(ResponseContext& ctx)
 {
-   #ifdef BEEGFS_DEBUG
-      const char* logContext = "MkDirMsg incoming";
-
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a MkDirMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
-
    App* app = Program::getApp();
 
    entryID = StorageTk::generateFileID(app->getLocalNode().getNumID());
@@ -27,8 +21,7 @@ bool MkDirMsgEx::processIncoming(ResponseContext& ctx)
    BaseType::processIncoming(ctx);
 
    // update operation counters
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_MKDIR,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_MKDIR);
 
    return true;
 }
@@ -42,9 +35,9 @@ std::unique_ptr<MirroredMessageResponseState> MkDirMsgEx::executeLocally(Respons
 
    if (result && result->getResult() != FhgfsOpsErr_SUCCESS)
       LOG_DBG(GENERAL, DEBUG, "Failed to create directory",
-            as("parentID", getParentInfo()->getEntryID()),
-            as("newDirName", getNewDirName()),
-            as("error", FhgfsOpsErrTk::toErrString(result->getResult())));
+            ("parentID", getParentInfo()->getEntryID()),
+            ("newDirName", getNewDirName()),
+            ("error", result->getResult()));
 
    return std::move(result);
 }
@@ -352,7 +345,7 @@ FhgfsOpsErr MkDirMsgEx::mkRemoteDirInode(DirInode& parentDir, const std::string&
       }
 
       // correct response type received
-      MkLocalDirRespMsg* mkRespMsg = (MkLocalDirRespMsg*)rrArgs.outRespMsg;
+      const auto mkRespMsg = (const MkLocalDirRespMsg*)rrArgs.outRespMsg.get();
 
       FhgfsOpsErr mkRemoteInodeRes = mkRespMsg->getResult();
       if(mkRemoteInodeRes != FhgfsOpsErr_SUCCESS)
@@ -372,7 +365,7 @@ FhgfsOpsErr MkDirMsgEx::mkRemoteDirInode(DirInode& parentDir, const std::string&
          "nodeID: " + ownerNodeID.str() + "; "
          "dirname: " + name);
 
-   } while(0);
+   } while(false);
 
 
    delete(pattern);

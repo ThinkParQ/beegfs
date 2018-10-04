@@ -11,7 +11,6 @@ typedef struct Raid10Pattern Raid10Pattern;
 static inline void Raid10Pattern_initFromChunkSize(Raid10Pattern* this, unsigned chunkSize);
 static inline Raid10Pattern* Raid10Pattern_constructFromChunkSize(unsigned chunkSize);
 static inline void Raid10Pattern_uninit(StripePattern* this);
-static inline void Raid10Pattern_destruct(StripePattern* this);
 
 static inline void __Raid10Pattern_assignVirtualFunctions(Raid10Pattern* this);
 
@@ -76,15 +75,6 @@ void Raid10Pattern_uninit(StripePattern* this)
 
    UInt16Vec_uninit(&thisCast->stripeTargetIDs);
    UInt16Vec_uninit(&thisCast->mirrorTargetIDs);
-
-   StripePattern_uninit( (StripePattern*)this);
-}
-
-void Raid10Pattern_destruct(StripePattern* this)
-{
-   Raid10Pattern_uninit( (StripePattern*)this);
-
-   kfree(this);
 }
 
 void __Raid10Pattern_assignVirtualFunctions(Raid10Pattern* this)

@@ -68,8 +68,6 @@ KSRCDIR_PRUNED_HEAD := $(firstword $(KSRCDIR_PRUNED) )
 # Include kernel feature auto-detectors
 include KernelFeatureDetection.mk
 
-BEEGFS_VERSION_PATH       ?= $(BEEGFS_BUILDDIR)/../../beegfs-version
-
 KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(shell uname -r)/updates/fs/beegfs
 
 # Prepare CFLAGS:
@@ -114,28 +112,16 @@ ifeq ($(STRIP),)
 STRIP=strip
 endif
 
-# beegfs version
-BEEGFS_VERSION := $(shell bash -c "BEEGFS_VERSION=$(BEEGFS_VERSION) $(BEEGFS_VERSION_PATH) --print_version || echo **FAIL**")
-BEEGFS_VERSION_CODE := $(shell bash -c "BEEGFS_VERSION=$(BEEGFS_VERSION) $(BEEGFS_VERSION_PATH) --print_version_code || echo **FAIL**")
-BEEGFS_MAJOR_VERSION := $(shell bash -c "BEEGFS_VERSION=$(BEEGFS_VERSION) $(BEEGFS_VERSION_PATH) --print_major_version || echo **FAIL**")
-
-BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"' -DBEEGFS_VERSION_CODE=$(BEEGFS_VERSION_CODE)
+BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"'
 
 # Prepare RELEASE_PATH extension
 ifneq ($(RELEASE_PATH),)
-RELEASE_PATH_CLIENT := $(RELEASE_PATH)/client_module_$(BEEGFS_MAJOR_VERSION)
+RELEASE_PATH_CLIENT := $(RELEASE_PATH)/client_module_$(shell echo '$(BEEGFS_VERSION)' | cut -d. -f1)
 endif
 
 
-all: test_version module
+all: module
 	@ /bin/true
-
-test_version:
-	@# just call the beegfs-version script to check whether it returns an error. the script output is
-	@# used in other places of this makefile and we want to make sure that we don't mess up version
-	@# tags in the binary with script errors.
-	@echo "beegfs version check..."
-	@$(BEEGFS_VERSION_PATH) --verbose
 
 module: $(TARGET_ALL_DEPS)
 	@if [ -z "$(KDIR_PRUNED_HEAD)" ]; then \
@@ -173,7 +159,7 @@ coccicheck:
 include AutoRebuild.mk # adds auto_rebuild targets
 
 
-prepare_release: test_version
+prepare_release:
 ifeq ($(RELEASE_PATH),)
 	$(error RELEASE_PATH not defined)
 endif
@@ -182,16 +168,11 @@ ifeq ($(BEEGFS_VERSION),)
 	$(error BEEGFS_VERSION not defined)
 endif
 
-ifeq ($(BEEGFS_VERSION_CODE),)
-	$(error BEEGFS_VERSION_CODE not defined)
-endif
-
 	@ echo "Creating release directory:" $(RELEASE_PATH_CLIENT)
 	mkdir --parents $(RELEASE_PATH_CLIENT)/build $(RELEASE_PATH_CLIENT)/source
 
 	@ echo "Storing beegfs version:" $(BEEGFS_VERSION)
 	echo "BEEGFS_VERSION =" $(BEEGFS_VERSION) > $(RELEASE_PATH_CLIENT)/build/Version.mk
-	echo "BEEGFS_VERSION_CODE =" $(BEEGFS_VERSION_CODE) >> $(RELEASE_PATH_CLIENT)/build/Version.mk
 
 	@ echo "Copying beegfs client release files to" $(RELEASE_PATH_CLIENT) "..."
 	cp Release.mk $(RELEASE_PATH_CLIENT)/build/Makefile
@@ -219,12 +200,6 @@ clean:
 	find ../source/ -mount -name '.*.o.cmd' -type f -delete
 	find ../source/ -mount -name '.*.o.d' -type f -delete
 	find ../source/ -mount -name '*.gcno' -type f -delete
-
-rpm:
-	./make-rpm
-
-deb:
-	./make-deb
 
 help:
 	@echo "This makefile creates the kernel module: $(TARGET) (beegfs-client)"
@@ -259,5 +234,3 @@ help:
 	@echo '   install           - install the kernel modules'
 	@echo '   clean             - delete previously compiled files'
 	@echo '   prepare_release   - build and copy files into the RELEASE_PATH directory'
-	@echo '   rpm               - create a rpm package file'
-	@echo '   deb               - build debian package file'

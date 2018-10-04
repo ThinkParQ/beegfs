@@ -1,7 +1,7 @@
 #include <linux/limits.h>
 #include <algorithm>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <mntent.h>
 
 #include <common/system/System.h>

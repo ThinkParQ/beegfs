@@ -110,16 +110,9 @@ void ModeHelperGetNodes::pingNodes(NodeType nodeType, const std::vector<NodeHand
          auto const start = Clock::now();
 
          {
-            char* respBuf = nullptr;
-            NetMessage* respMsg = nullptr;
+            const auto respMsg = MessagingTk::requestResponse(node, msg, NETMSGTYPE_Heartbeat);
 
-            bool commRes = MessagingTk::requestResponse(
-               node, &msg, NETMSGTYPE_Heartbeat, &respBuf, &respMsg);
-
-            delete(respMsg);
-            free(respBuf);
-
-            if(!commRes)
+            if (!respMsg)
             {
                std::cerr << "Node " << node.getID() << ": " << "Communication error." << std::endl;
                break;

@@ -74,7 +74,7 @@ struct EntryLockDetails
 
    bool isSet() const
    {
-      return clientNumID;
+      return bool(clientNumID);
    }
 
    bool allowsWaiting() const
@@ -271,7 +271,7 @@ struct RangeLockDetails
 
    bool isSet() const
    {
-      return clientNumID;
+      return bool(clientNumID);
    }
 
    bool allowsWaiting() const

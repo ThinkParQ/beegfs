@@ -11,7 +11,6 @@ static inline void StringList_uninit(StringList* this);
 static inline void StringList_addHead(StringList* this, char* valuePointer);
 static inline void StringList_append(StringList* this, char* valuePointer);
 static inline size_t StringList_length(StringList* this);
-static inline char* StringList_getTailValue(StringList* this);
 static inline void StringList_clear(StringList* this);
 
 struct StringList
@@ -43,11 +42,6 @@ void StringList_append(StringList* this, char* valuePointer)
 size_t StringList_length(StringList* this)
 {
    return PointerList_length( (PointerList*)this);
-}
-
-char* StringList_getTailValue(StringList* this)
-{
-   return (char*)PointerList_getTailValue( (PointerList*)this);
 }
 
 void StringList_clear(StringList* this)

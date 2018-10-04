@@ -11,7 +11,6 @@ static inline void StrCpyList_uninit(StrCpyList* this);
 static inline void StrCpyList_addHead(StrCpyList* this, const char* valuePointer);
 static inline void StrCpyList_append(StrCpyList* this, const char* valuePointer);
 static inline size_t StrCpyList_length(StrCpyList* this);
-static inline char* StrCpyList_getTailValue(StrCpyList* this);
 static inline void StrCpyList_clear(StrCpyList* this);
 
 struct StrCpyList
@@ -60,11 +59,6 @@ void StrCpyList_append(StrCpyList* this, const char* valuePointer)
 size_t StrCpyList_length(StrCpyList* this)
 {
    return StringList_length( (StringList*)this);
-}
-
-char* StrCpyList_getTailValue(StrCpyList* this)
-{
-   return StringList_getTailValue( (StringList*)this);
 }
 
 void StrCpyList_clear(StrCpyList* this)

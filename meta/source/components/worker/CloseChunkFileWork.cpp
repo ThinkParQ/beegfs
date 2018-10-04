@@ -7,6 +7,8 @@
 #include <program/Program.h>
 #include "CloseChunkFileWork.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 void CloseChunkFileWork::process(char* bufIn, unsigned bufInLen, char* bufOut, unsigned bufOutLen)
 {
@@ -21,7 +23,6 @@ FhgfsOpsErr CloseChunkFileWork::communicate()
    const char* logContext = "Close chunk file work";
 
    App* app = Program::getApp();
-   Config* cfg = app->getConfig();
 
    // prepare request message
 
@@ -35,27 +36,6 @@ FhgfsOpsErr CloseChunkFileWork::communicate()
       {
          closeMsg.addMsgHeaderFeatureFlag(CLOSECHUNKFILEMSG_FLAG_NODYNAMICATTRIBS);
          closeMsg.addMsgHeaderFeatureFlag(CLOSECHUNKFILEMSG_FLAG_BUDDYMIRROR_SECOND);
-      }
-   }
-
-   // generate chunk backlink info
-   bool backlinksEnabled = cfg->getStoreBacklinksEnabled();
-   boost::scoped_array<char> serialEntryInfoBuf;
-
-   if(backlinksEnabled && entryInfo)
-   {
-      ssize_t serialEntryInfoBufLen = serializeIntoNewBuffer(*entryInfo, serialEntryInfoBuf);
-
-      if(unlikely(serialEntryInfoBufLen < 0))
-      {
-         LogContext(logContext).log(Log_CRITICAL,
-            "Memory allocation for backlink buffer failed. Trying to continue without it. "
-            "Session: " + sessionID.str() + "; "
-            "FileHandle: " + fileHandleID);
-      }
-      else
-      {
-         closeMsg.setEntryInfoBuf(serialEntryInfoBuf.get(), serialEntryInfoBufLen);
       }
    }
 
@@ -89,7 +69,7 @@ FhgfsOpsErr CloseChunkFileWork::communicate()
    }
 
    // correct response type received
-   CloseChunkFileRespMsg* closeRespMsg = (CloseChunkFileRespMsg*)rrArgs.outRespMsg;
+   CloseChunkFileRespMsg* closeRespMsg = (CloseChunkFileRespMsg*)rrArgs.outRespMsg.get();
 
    FhgfsOpsErr closeRemoteRes = closeRespMsg->getResult();
 
@@ -114,7 +94,7 @@ FhgfsOpsErr CloseChunkFileWork::communicate()
          "Closing chunk file on target failed. " +
          std::string(pattern->getPatternType() == StripePatternType_BuddyMirror ? "Mirror " : "") +
          "TargetID: " + StringTk::uintToStr(targetID) + "; "
-         "Error: " + FhgfsOpsErrTk::toErrString(closeRemoteRes) + "; "
+         "Error: " + boost::lexical_cast<std::string>(closeRemoteRes) + "; "
          "Session: " + sessionID.str() + "; "
          "FileHandle: " + std::string(fileHandleID) );
 

@@ -12,6 +12,7 @@
 #include <nodes/NodeStoreServersEx.h>
 #include <nodes/TargetCapacityReport.h>
 
+#include <mutex>
 
 class InternodeSyncer : public PThread
 {
@@ -66,7 +67,7 @@ class InternodeSyncer : public PThread
       void saveStates();
 
       void dropIdleConns();
-      unsigned dropIdleConnsByStore(NodeStoreServersEx* nodes);
+      unsigned dropIdleConnsByStore(const NodeStoreServersEx* nodes);
 
       void clearStaleCapacityReports(const NodeType nodeType);
 
@@ -76,24 +77,20 @@ class InternodeSyncer : public PThread
 
       void setForcePoolsUpdate()
       {
-         SafeMutexLock safeLock(&forcePoolsUpdateMutex);
+         const std::lock_guard<Mutex> lock(forcePoolsUpdateMutex);
 
          this->forcePoolsUpdate = true;
-
-         safeLock.unlock();
       }
 
       // inliners
 
       bool getAndResetForcePoolsUpdate()
       {
-         SafeMutexLock safeLock(&forcePoolsUpdateMutex);
+         const std::lock_guard<Mutex> lock(forcePoolsUpdateMutex);
 
          bool retVal = this->forcePoolsUpdate;
 
          this->forcePoolsUpdate = false;
-
-         safeLock.unlock();
 
          return retVal;
       }
@@ -116,7 +113,7 @@ class InternodeSyncer : public PThread
 
          Time timeNow; // Default-initialized to "now".
 
-         SafeRWLock safeLock(reportsRWLock, SafeRWLock_WRITE); // L O C K
+         RWLockGuard const lock(*reportsRWLock, SafeRWLock_WRITE);
 
          for (StorageTargetInfoListCIter targetInfoIter = targetInfoList.begin();
               targetInfoIter != targetInfoList.end(); ++targetInfoIter)
@@ -134,8 +131,6 @@ class InternodeSyncer : public PThread
 
             capacityReportMap[targetID] = capacityReport;
          }
-
-         safeLock.unlock(); // U N L O C K
       }
 };
 

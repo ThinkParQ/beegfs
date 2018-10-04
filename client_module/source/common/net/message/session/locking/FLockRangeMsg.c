@@ -14,7 +14,7 @@ void FLockRangeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    FLockRangeMsg* thisCast = (FLockRangeMsg*)this;
 
    // clientNumID
-   NumNodeID_serialize(&thisCast->clientNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->clientNumID);
 
    // start
    Serialization_serializeUInt64(ctx, thisCast->start);
@@ -29,7 +29,7 @@ void FLockRangeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeInt(ctx, thisCast->lockTypeFlags);
 
    // entryInfo
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
 
    // fileHandleID
    Serialization_serializeStrAlign4(ctx, thisCast->fileHandleIDLen, thisCast->fileHandleID);

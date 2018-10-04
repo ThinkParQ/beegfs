@@ -117,7 +117,7 @@ class StatData
 
       void updateDynamicFileAttribs(ChunkFileInfoVec& fileInfoVec, StripePattern* stripePattern);
 
-      bool operator==(const StatData& other) const;
+      bool operator==(const StatData& second) const;
 
       bool operator!=(const StatData& other) const { return !(*this == other); }
 

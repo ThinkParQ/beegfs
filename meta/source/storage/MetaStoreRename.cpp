@@ -15,6 +15,8 @@
 #include <dirent.h>
 #include "MetaStore.h"
 
+#include <boost/lexical_cast.hpp>
+
 /**
  * Simple rename on the same server in the same directory.
  *
@@ -110,7 +112,7 @@ FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& f
             " FileName: "      + toName                         +
             " ParentEntryID: " + parentDir.getID()             +
             " entryID: "       + overWrittenEntry->getEntryID() +
-            " Error: "         + FhgfsOpsErrTk::toErrString(unlinkRes) );
+            " Error: "         + boost::lexical_cast<std::string>(unlinkRes));
 
 
          // TODO: Restore the dentry
@@ -437,7 +439,7 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
                " FileName: "      + newEntryName                   +
                " ParentEntryID: " + toParent.getID()              +
                " entryID: "       + overWrittenEntry->getEntryID() +
-               " Error: "         + FhgfsOpsErrTk::toErrString(unlinkRes) );
+               " Error: "         + boost::lexical_cast<std::string>(unlinkRes));
       }
 
       delete overWrittenEntry;

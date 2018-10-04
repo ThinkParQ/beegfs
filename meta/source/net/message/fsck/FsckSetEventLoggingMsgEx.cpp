@@ -4,9 +4,6 @@
 
 bool FsckSetEventLoggingMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("FsckSetEventLoggingMsg incoming", Log_DEBUG,
-      "Received a FsckSetEventLoggingMsg from: " + ctx.peerName() );
-
    LogContext log("FsckSetEventLoggingMsg incoming");
 
    App* app = Program::getApp();

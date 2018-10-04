@@ -20,10 +20,6 @@ extern bool MapTargetsMsgEx_deserializePayload(NetMessage* this, DeserializeCtx*
 extern bool __MapTargetsMsgEx_processIncoming(NetMessage* this, struct App* app,
    fhgfs_sockaddr_in* fromAddr, struct Socket* sock, char* respBuf, size_t bufLen);
 
-// inliners
-static inline void MapTargetsMsgEx_parseTargetIDs(MapTargetsMsgEx* this,
-   UInt16List* outTargetIDs);
-
 // getters & setters
 static inline NumNodeID MapTargetsMsgEx_getNodeID(MapTargetsMsgEx* this);
 static inline const char* MapTargetsMsgEx_getAckID(MapTargetsMsgEx* this);
@@ -37,8 +33,7 @@ struct MapTargetsMsgEx
    unsigned ackIDLen;
    const char* ackID;
 
-   // for deserialization
-   RawList rawTargetsList;
+   struct list_head poolMappings; /* struct TargetPoolMapping */
 };
 
 extern const struct NetMessageOps MapTargetsMsgEx_Ops;
@@ -46,30 +41,8 @@ extern const struct NetMessageOps MapTargetsMsgEx_Ops;
 void MapTargetsMsgEx_init(MapTargetsMsgEx* this)
 {
    NetMessage_init(&this->netMessage, NETMSGTYPE_MapTargets, &MapTargetsMsgEx_Ops);
-}
 
-/*
- * note: actually the servers send vectors, but this doesn't make a difference for deserialization
- * here
- */
-void MapTargetsMsgEx_parseTargetIDs(MapTargetsMsgEx* this, UInt16List* outTargetIDs)
-{
-   DeserializeCtx ctx = { this->rawTargetsList.data, this->rawTargetsList.length };
-   unsigned i;
-
-   // read each list element
-   for(i=0; i < this->rawTargetsList.elemCount; i++)
-   {
-      uint16_t targetId = 0;
-      StoragePoolId storagePoolId = { 0 };
-
-      Serialization_deserializeUShort(&ctx, &targetId);
-
-      StoragePoolId_deserialize(&ctx, &storagePoolId);
-
-      // note: we are not interested in the storage pool id, so we drop it
-      UInt16List_append(outTargetIDs, targetId);
-   }
+   INIT_LIST_HEAD(&this->poolMappings);
 }
 
 NumNodeID MapTargetsMsgEx_getNodeID(MapTargetsMsgEx* this)

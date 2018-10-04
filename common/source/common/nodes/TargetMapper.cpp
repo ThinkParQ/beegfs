@@ -1,13 +1,12 @@
 #include "TargetMapper.h"
 
 #include <common/app/log/LogContext.h>
-#include <common/toolkit/MapTk.h>
 #include <common/nodes/TargetStateInfo.h>
 #include <common/threading/RWLockGuard.h>
 #include <common/toolkit/ZipIterator.h>
 
 TargetMapper::TargetMapper():
-   states(NULL), storagePools(NULL), exceededQuotaStores(NULL), mappingsDirty(false) { }
+   states(NULL), storagePools(NULL), exceededQuotaStores(NULL) { }
 
 /**
  * Note: re-maps targetID if it was mapped before.
@@ -50,8 +49,6 @@ std::pair<FhgfsOpsErr, bool> TargetMapper::mapTarget(uint16_t targetID, NumNodeI
          exceededQuotaStores->add(targetID, false);
    }
 
-   mappingsDirty = true;
-
    return { FhgfsOpsErr_SUCCESS, (oldSize != newSize) };
 }
 
@@ -60,9 +57,7 @@ std::pair<FhgfsOpsErr, bool> TargetMapper::mapTarget(uint16_t targetID, NumNodeI
  */
 bool TargetMapper::unmapTarget(uint16_t targetID)
 {
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
-
-   bool targetFound = false;
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    TargetMapIter iter = targets.find(targetID);
    if(iter != targets.end() )
@@ -79,13 +74,10 @@ bool TargetMapper::unmapTarget(uint16_t targetID)
       if (exceededQuotaStores)
          exceededQuotaStores->remove(targetID);
 
-      mappingsDirty = true;
-      targetFound = true;
+      return true;
    }
 
-   safeLock.unlock(); // U N L O C K
-
-   return targetFound;
+   return false;
 }
 
 /**
@@ -95,7 +87,7 @@ bool TargetMapper::unmapByNodeID(NumNodeID nodeID)
 {
    bool elemsErased = false;
 
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    for(TargetMapIter iter = targets.begin(); iter != targets.end(); /* iter inc'ed inside loop */)
    {
@@ -118,95 +110,39 @@ bool TargetMapper::unmapByNodeID(NumNodeID nodeID)
             exceededQuotaStores->remove(targetID);
 
          elemsErased = true;
-
-         mappingsDirty = true;
       }
       else
          iter++;
    }
 
-   safeLock.unlock(); // U N L O C K
-
    return elemsErased;
 }
 
-/**
- * Applies the mapping from two separate lists (keys and values).
- */
-void TargetMapper::syncTargetsFromLists(UInt16List& targetIDs, NumNodeIDList& nodeIDs)
+void TargetMapper::syncTargets(TargetMap newTargets)
 {
-   /* note: we pre-create a new map, then check if it is different from the current map and swap
-      elements if the maps are different (to avoid long write-locking) */
+   {
+      RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
+      targets.swap(newTargets);
+   }
 
-   // pre-create new map
+   {
+      RWLockGuard const lock(rwlock, SafeRWLock_READ);
 
-   TargetMap newTargets;
-
-   for (ZipConstIterRange<UInt16List, NumNodeIDList> iter(targetIDs, nodeIDs);
-        !iter.empty(); ++iter)
-      newTargets[*iter()->first] = *iter()->second;
-
-   // compare old and new targets map
-
-   SafeRWLock safeCompareReadLock(&rwlock, SafeRWLock_READ); // L O C K (read)
-
-   bool mapsEqual = true;
-
-   if(unlikely(targets.size() != newTargets.size() ) )
-      mapsEqual = false;
-   else
-   { // compare all keys and values
-      TargetMapCIter targetsIter = targets.begin();
-      TargetMapCIter newTargetsIter = newTargets.begin();
-
-      for( ; targetsIter != targets.end(); targetsIter++, newTargetsIter++)
+      for (TargetMapCIter iter = targets.begin(); iter != targets.end(); iter++)
       {
-         if(unlikely(
-            (targetsIter->first != newTargetsIter->first) ||
-            (targetsIter->second != newTargetsIter->second) ) )
+         // add to attached states
+         if (states)
          {
-            mapsEqual = false;
-            break;
+            states->addIfNotExists(iter->first, CombinedTargetState());
+         }
+
+         if (exceededQuotaStores)
+         {
+            exceededQuotaStores->add(iter->first);
          }
       }
-
    }
-
-   safeCompareReadLock.unlock(); // U N L O C K (read)
-
-   if(mapsEqual)
-      return; // nothing has changed
-
-
-   // update (swap) targets map
-
-   SafeRWLock safeWriteLock(&rwlock, SafeRWLock_WRITE); // L O C K (write)
-
-   targets.clear();
-   targets.swap(newTargets);
-
-   mappingsDirty = true;
-
-   safeWriteLock.unlock(); // U N L O C K (write)
-
-   SafeRWLock safePoolsUpdateReadLock(&rwlock, SafeRWLock_READ); // L O C K (read)
-
-   for (TargetMapCIter iter = targets.begin(); iter != targets.end(); iter++)
-   {
-      // add to attached states
-      if (states)
-      {
-         states->addIfNotExists(iter->first, CombinedTargetState());
-      }
-
-      if (exceededQuotaStores)
-      {
-         exceededQuotaStores->add(iter->first);
-      }
-   }
-
-   safePoolsUpdateReadLock.unlock(); // U N L O C K (read)
 }
 
 /**
@@ -221,19 +157,6 @@ void TargetMapper::getMappingAsLists(UInt16List& outTargetIDs, NumNodeIDList& ou
       outTargetIDs.push_back(iter->first);
       outNodeIDs.push_back(iter->second);
    }
-}
-
-/**
- * Returns a copy of the internal targets map.
- *
- * Note: This method is expensive; if you just need to know to which nodeID a certain target is
- * mapped, use getNodeID() instead of this method.
- */
-void TargetMapper::getMapping(TargetMap& outTargetMap) const
-{
-   RWLockGuard safeLock(rwlock, SafeRWLock_READ); // L O C K
-
-   outTargetMap = targets;
 }
 
 /**
@@ -258,11 +181,9 @@ void TargetMapper::getTargetsByNode(NumNodeID nodeID, UInt16List& outTargetIDs) 
 */
 void TargetMapper::attachStateStore(TargetStateStore* states)
 {
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard const lock(rwlock, SafeRWLock_WRITE);
 
    this->states = states;
-
-   safeLock.unlock(); // U N L O C K
 }
 
 /**
@@ -270,7 +191,7 @@ void TargetMapper::attachStateStore(TargetStateStore* states)
 */
 void TargetMapper::attachStoragePoolStore(StoragePoolStore* storagePools)
 {
-   RWLockGuard(rwlock, SafeRWLock_WRITE);
+   RWLockGuard const _(rwlock, SafeRWLock_WRITE);
 
    this->storagePools = storagePools;
 }
@@ -281,149 +202,7 @@ void TargetMapper::attachStoragePoolStore(StoragePoolStore* storagePools)
 */
 void TargetMapper::attachExceededQuotaStores(ExceededQuotaPerTarget* exceededQuotaStores)
 {
-   RWLockGuard(rwlock, SafeRWLock_WRITE);
+   RWLockGuard const _(rwlock, SafeRWLock_WRITE);
 
    this->exceededQuotaStores = exceededQuotaStores;
 }
-
-/**
- * Note: setStorePath must be called before using this.
- */
-bool TargetMapper::loadFromFile()
-{
-   const char* logContext = "TargetMapper (load)";
-
-   bool loaded = false;
-
-   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
-
-   if(!storePath.length() )
-      goto unlock_and_exit;
-
-   try
-   {
-      StringMap newTargetsStrMap;
-
-      // load from file
-      MapTk::loadStringMapFromFile(storePath.c_str(), &newTargetsStrMap);
-
-      // apply loaded targets
-      targets.clear();
-      importFromStringMap(newTargetsStrMap);
-
-      for (TargetMapCIter iter = targets.begin(); iter != targets.end(); iter++)
-      {
-         // add to attached states
-         if (states)
-         {
-            const CombinedTargetState defaultTargetState(TargetReachabilityState_POFFLINE,
-                  TargetConsistencyState_GOOD);
-            CombinedTargetState ignoredReturnState;
-
-            if (!states->getState(iter->first, ignoredReturnState)) {
-               LogContext(logContext).log(Log_WARNING,
-                     "Storage target " + StringTk::intToStr(iter->first)
-                     + " missing in targetStates. Consistency state is lost.");
-               LogContext(logContext).log(Log_WARNING, "Adding default state for storage target "
-                     + StringTk::intToStr(iter->first) + ": "
-                     + states->stateToStr(defaultTargetState));
-               IGNORE_UNUSED_VARIABLE(logContext);
-
-               states->addIfNotExists(iter->first, defaultTargetState);
-            }
-         }
-
-         // add to attached storage pools
-         // NOTE: only targets, which are not already present in a pool are added. This should usually
-         // not happen, but is normal after an update from BeeGFS v6
-         if (storagePools)
-         {
-            storagePools->addTarget(iter->first, iter->second,  StoragePoolStore::DEFAULT_POOL_ID,
-                                    true);
-         }
-
-         // add to attached exceededQuotaStores
-         if (exceededQuotaStores)
-         {
-            exceededQuotaStores->add(iter->first);
-         }
-      }
-
-      mappingsDirty = true;
-
-      loaded = true;
-   }
-   catch(InvalidConfigException& e)
-   {
-      LOG_DEBUG(logContext, Log_DEBUG, "Unable to open target mappings file: " + storePath + ". " +
-         "SysErr: " + System::getErrString() );
-      IGNORE_UNUSED_VARIABLE(logContext);
-   }
-
-unlock_and_exit:
-
-   safeLock.unlock(); // U N L O C K
-
-   return loaded;
-}
-
-/**
- * Note: setStorePath must be called before using this.
- *
- * @return true if file was successfully saved
- */
-bool TargetMapper::saveToFile()
-{
-   const char* logContext = "TargetMapper (save)";
-
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE); // L O C K
-
-   if(storePath.empty() )
-      return false;
-
-   try
-   {
-      StringMap targetsStrMap;
-
-      exportToStringMap(targetsStrMap);
-
-      MapTk::saveStringMapToFile(storePath.c_str(), &targetsStrMap);
-
-      mappingsDirty = false;
-
-      return true;
-   }
-   catch(InvalidConfigException& e)
-   {
-      LogContext(logContext).logErr("Unable to save target mappings file: " + storePath + ". " +
-         "SysErr: " + System::getErrString() );
-      IGNORE_UNUSED_VARIABLE(logContext);
-
-      return false;
-   }
-}
-
-/**
- * Note: unlocked, caller must hold lock.
- */
-void TargetMapper::exportToStringMap(StringMap& outExportMap) const
-{
-   for(TargetMapCIter iter = targets.begin(); iter != targets.end(); iter++)
-   {
-      outExportMap[StringTk::uintToHexStr(iter->first) ] = iter->second.strHex();
-   }
-}
-
-/**
- * Note: unlocked, caller must hold lock.
- * Note: the internal targets map is not cleared in this method.
- */
-void TargetMapper::importFromStringMap(StringMap& importMap)
-{
-   for(StringMapIter iter = importMap.begin(); iter != importMap.end(); iter++)
-   {
-      targets[StringTk::strHexToUInt(iter->first) ] =
-         NumNodeID(StringTk::strHexToUInt(iter->second) );
-   }
-}
-

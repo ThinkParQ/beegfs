@@ -2,8 +2,6 @@
 #include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/storage/attribs/GetEntryInfoMsg.h>
 #include <common/net/message/storage/attribs/GetEntryInfoRespMsg.h>
-#include <common/net/message/storage/attribs/UpdateBacklinkMsg.h>
-#include <common/net/message/storage/attribs/UpdateBacklinkRespMsg.h>
 #include <common/net/message/storage/attribs/UpdateDirParentMsg.h>
 #include <common/net/message/storage/attribs/UpdateDirParentRespMsg.h>
 #include <common/net/message/storage/moving/MovingDirInsertMsg.h>
@@ -17,7 +15,6 @@
 #include <common/toolkit/MetadataTk.h>
 #include <components/FileEventLogger.h>
 #include <components/ModificationEventFlusher.h>
-#include <net/msghelpers/MsgHelperChunkBacklinks.h>
 #include <net/msghelpers/MsgHelperUnlink.h>
 #include <net/msghelpers/MsgHelperXAttr.h>
 #include <program/Program.h>
@@ -163,12 +160,7 @@ RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
 
 bool RenameV2MsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "RenameV2Msg incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a RenameV2Msg from: " + ctx.peerName() );
-   IGNORE_UNUSED_VARIABLE(logContext);
-
-   LOG_DEBUG(logContext, Log_DEBUG, "FromDirID: " + getFromDirInfo()->getEntryID() + "; "
+   LOG_DEBUG(__func__, Log_DEBUG, "FromDirID: " + getFromDirInfo()->getEntryID() + "; "
       "oldName: '" + getOldName() + "'; "
       "ToDirID: " + getToDirInfo()->getEntryID() + "; "
       "newName: '" + getNewName() + "'");
@@ -176,8 +168,7 @@ bool RenameV2MsgEx::processIncoming(ResponseContext& ctx)
    BaseType::processIncoming(ctx);
 
    // update operation counters
-   Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
-      MetaOpCounter_RENAME, getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_RENAME);
 
    return true;
 }
@@ -305,7 +296,7 @@ FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInf
 
    DirEntry fromDirEntry(oldName);
    bool dirEntryCopyRes = fromParent.getDirDentry(oldName, fromDirEntry);
-   if (dirEntryCopyRes == false)
+   if (!dirEntryCopyRes)
    {
       LOG_DEBUG("RenameV2MsgEx::movingPerform", Log_SPAM, "getDirEntryCopy() failed");
       return FhgfsOpsErr_NOTADIR;
@@ -356,7 +347,7 @@ FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInf
       {
          LogContext(logContext).log(Log_CRITICAL,
             std::string("Failed to remove fromDir: ") + oldName +
-            std::string(" Error: ") + FhgfsOpsErrTk::toErrString(retVal) );
+            " Error: " + boost::lexical_cast<std::string>(retVal));
       }
 
       SAFE_DELETE(rmDirEntry);
@@ -380,7 +371,7 @@ FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirIn
 
    EntryInfo fromFileEntryInfo;
    bool getRes = fromParent.getFileEntryInfo(oldName, fromFileEntryInfo);
-   if(getRes == false )
+   if(!getRes )
    {
       LOG_DEBUG(logContext, Log_SPAM, "Error: fromDir does not exist.");
       return FhgfsOpsErr_PATHNOTEXISTS;
@@ -448,9 +439,6 @@ FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirIn
 
 /**
  * Renames a directory or a file (no moving between different directories involved).
- *
- * Note: We do not need to update chunk backlinks here, as nothing relevant to an
- *       for those will be modified here.
  */
 FhgfsOpsErr RenameV2MsgEx::renameInSameDir(DirInode& fromParent, const std::string& oldName,
    const std::string& toName, std::string& unlinkedEntryID)
@@ -570,7 +558,7 @@ FhgfsOpsErr RenameV2MsgEx::remoteFileInsertAndUnlink(EntryInfo* fromFileInfo, En
 
    // correct response type received
 
-   MovingFileInsertRespMsg* insertRespMsg = (MovingFileInsertRespMsg*)rrArgs.outRespMsg;
+   const auto insertRespMsg = (const MovingFileInsertRespMsg*)rrArgs.outRespMsg.get();
 
    retVal = insertRespMsg->getResult();
 
@@ -599,7 +587,7 @@ FhgfsOpsErr RenameV2MsgEx::remoteFileInsertAndUnlink(EntryInfo* fromFileInfo, En
       LOG_DEBUG_CONTEXT(log, Log_NOTICE,
          "Metadata server was unable to insert file. "
          "nodeID: " + toNodeID.str() + "; "
-         "Error: " + FhgfsOpsErrTk::toErrString(retVal) );
+         "Error: " + boost::lexical_cast<std::string>(retVal));
    }
    else
    {
@@ -652,7 +640,7 @@ FhgfsOpsErr RenameV2MsgEx::remoteDirInsert(EntryInfo* toDirInfo,  const std::str
    }
 
    // correct response type received
-   MovingDirInsertRespMsg* insertRespMsg = (MovingDirInsertRespMsg*)rrArgs.outRespMsg;
+   const auto insertRespMsg = (const MovingDirInsertRespMsg*)rrArgs.outRespMsg.get();
 
    retVal = insertRespMsg->getResult();
    if(retVal != FhgfsOpsErr_SUCCESS)
@@ -660,7 +648,7 @@ FhgfsOpsErr RenameV2MsgEx::remoteDirInsert(EntryInfo* toDirInfo,  const std::str
       LOG_DEBUG_CONTEXT(log, Log_NOTICE,
          "Metdata server was unable to insert directory. "
          "nodeID: " + toNodeID.str() + "; "
-         "Error: " + FhgfsOpsErrTk::toErrString(retVal) );
+         "Error: " + boost::lexical_cast<std::string>(retVal));
    }
    else
    {
@@ -714,7 +702,7 @@ FhgfsOpsErr RenameV2MsgEx::updateRenamedDirInode(EntryInfo* renamedDirEntryInfo,
    }
 
    // correct response type received
-   UpdateDirParentRespMsg* updateRespMsg = (UpdateDirParentRespMsg*)rrArgs.outRespMsg;
+   const auto updateRespMsg = (const UpdateDirParentRespMsg*)rrArgs.outRespMsg.get();
 
    FhgfsOpsErr retVal = (FhgfsOpsErr)updateRespMsg->getValue();
    if(retVal != FhgfsOpsErr_SUCCESS)
@@ -722,7 +710,7 @@ FhgfsOpsErr RenameV2MsgEx::updateRenamedDirInode(EntryInfo* renamedDirEntryInfo,
       LOG_DEBUG_CONTEXT(log, Log_NOTICE,
          "Failed to update ParentEntryID: " + renamedDirEntryInfo->getEntryID() + "; "
          "nodeID: " + toNodeID.str() + "; "
-         "Error: " + FhgfsOpsErrTk::toErrString(retVal) );
+         "Error: " + boost::lexical_cast<std::string>(retVal));
    }
 
    return retVal;

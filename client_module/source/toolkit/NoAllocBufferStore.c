@@ -70,7 +70,6 @@ bool NoAllocBufferStore_init(NoAllocBufferStore* this, size_t numBufs, size_t bu
 
    if(!__NoAllocBufferStore_initBuffers(this) )
    {
-      Condition_uninit(&this->newBufCond);
       Mutex_uninit(&this->mutex);
       return false;
    }
@@ -164,7 +163,6 @@ void NoAllocBufferStore_uninit(NoAllocBufferStore* this)
       vfree(this->bufArray[i]);
 
    // normal clean-up
-   Condition_uninit(&this->newBufCond);
    Mutex_uninit(&this->mutex);
 
    SAFE_KFREE(this->bufArray);

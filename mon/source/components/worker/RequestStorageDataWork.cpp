@@ -13,18 +13,14 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
    if (!node->getIsResponding())
    {
       HeartbeatRequestMsg heartbeatRequestMsg;
-      char* respBuf;
-      NetMessage* respMsg;
 
-      if(MessagingTk::requestResponse(*node, &heartbeatRequestMsg,
-            NETMSGTYPE_Heartbeat, &respBuf, &respMsg))
+      if(MessagingTk::requestResponse(*node, heartbeatRequestMsg,
+            NETMSGTYPE_Heartbeat))
       {
          LOG(GENERAL, DEBUG, "Node is responding again.",
-               as("NodeID", node->getNodeIDWithTypeStr()));
+               ("NodeID", node->getNodeIDWithTypeStr()));
          node->setIsResponding(true);
       }
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
    }
 
    Result result = {};
@@ -34,25 +30,18 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
    {
       // generate the RequestStorageDataMsg with the lastStatsTime
       RequestStorageDataMsg requestDataMsg(node->getLastStatRequestTime().count());
-      char* respBuf;
-      NetMessage* respMsg;
-      bool commRes;
-      commRes = MessagingTk::requestResponse(*node, &requestDataMsg,
-            NETMSGTYPE_RequestStorageDataResp, &respBuf, &respMsg);
+      auto respMsg = MessagingTk::requestResponse(*node, requestDataMsg,
+            NETMSGTYPE_RequestStorageDataResp);
 
-      // make sure respBuf and respMsg are gonna be deleted
-      std::unique_ptr<char, decltype(free)*> respBufPtr(respBuf, free);
-      std::unique_ptr<NetMessage> respMsgPtr(respMsg);
-
-      if (!commRes)
+      if (!respMsg)
       {
-         LOG(GENERAL, DEBUG, "Node is not responding.", as("NodeID", node->getNodeIDWithTypeStr()));
+         LOG(GENERAL, DEBUG, "Node is not responding.", ("NodeID", node->getNodeIDWithTypeStr()));
          node->setIsResponding(false);
       }
       else
       {
          // get response and process it
-         auto storageRspMsg = static_cast<RequestStorageDataRespMsg*>(respMsg);
+         auto storageRspMsg = static_cast<RequestStorageDataRespMsg*>(respMsg.get());
          result.highResStatsList = std::move(storageRspMsg->getStatsList());
          result.storageTargetList = std::move(storageRspMsg->getStorageTargets());
 

@@ -32,16 +32,6 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
 
    bool retVal = true; // return value
 
-   #ifdef BEEGFS_DEBUG
-      LOG_DEBUG(logContext, Log_DEBUG,
-         "Received a ReadLocalFileV2Msg from: " + ctx.peerName() );
-
-//      LOG_DEBUG(logContext, Log_SPAM,
-//         std::string("Values for sessionID/FD/offset/count: ") +
-//         std::string(getSessionID() ) + "/" + StringTk::intToStr(getFD() ) + "/" +
-//         StringTk::intToStr(getOffset() ) + "/" + StringTk::intToStr(getCount() ) );
-   #endif // BEEGFS_DEBUG
-
    int64_t readRes = 0;
 
    std::string fileHandleID(getFileHandleID() );
@@ -53,7 +43,7 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
 
    App* app = Program::getApp();
    SessionStore* sessions = app->getSessions();
-   Session* session = sessions->referenceSession(getClientNumID(), true);
+   auto session = sessions->referenceOrAddSession(getClientNumID());
    this->sessionLocalFiles = session->getLocalFiles();
 
    // select the right targetID
@@ -74,9 +64,25 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
             StringTk::uintToStr(getTargetID() ) );
    }
 
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+   {
+      if (isMirrorSession)
+      { /* buddy mirrored file => fail with Err_COMMUNICATION to make the requestor retry.
+           mgmt will mark this target as (p)offline in a few moments. */
+         LOG(GENERAL, NOTICE, "Unknown target ID, refusing request.", targetID);
+         sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_COMMUNICATION);
+         return true;
+      }
+
+      LOG(GENERAL, ERR, "Unknown target ID.", targetID);
+      sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_UNKNOWNTARGET);
+      return true;
+   }
+
    // check if we already have a session for this file...
 
-   this->sessionLocalFile = sessionLocalFiles->referenceSession(
+   auto sessionLocalFile = sessionLocalFiles->referenceSession(
       fileHandleID, targetID, isMirrorSession);
    if(!sessionLocalFile)
    { // sessionLocalFile not exists yet => create, insert, re-get it
@@ -93,14 +99,14 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
 
       std::string fileID = SessionTk::fileIDFromHandleID(fileHandleID);
       int openFlags = SessionTk::sysOpenFlagsFromFhgfsAccessFlags(getAccessFlags() );
-      
-      this->sessionLocalFile = new SessionLocalFile(fileHandleID, targetID, fileID, openFlags,
+
+      auto newFile = boost::make_unique<SessionLocalFile>(fileHandleID, targetID, fileID, openFlags,
          false);
 
       if(isMirrorSession)
-         sessionLocalFile->setIsMirrorSession(true);
+         newFile->setIsMirrorSession(true);
 
-      sessionLocalFile = sessionLocalFiles->addAndReferenceSession(sessionLocalFile);
+      sessionLocalFile = sessionLocalFiles->addAndReferenceSession(std::move(newFile));
    }
    else
    { // session file exists
@@ -116,8 +122,6 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
       }
    }
 
-   this->needFileUnlockAndRelease = true;
-
    /* Note: the session file must be unlocked/released before we send the finalizing info,
        because otherwise we have a race when the client assumes the read is complete and tries
        to close the file (while the handle is actually still referenced on the server). */
@@ -129,25 +133,23 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
    try
    {
       // prepare file descriptor (if file not open yet then open it if it exists already)
-      FhgfsOpsErr openRes = openFile(sessionLocalFile);
+      FhgfsOpsErr openRes = openFile(*target, sessionLocalFile.get());
       if(openRes != FhgfsOpsErr_SUCCESS)
       {
-         releaseFile();
          sendLengthInfo(ctx.getSocket(), -openRes);
          goto release_session;
       }
 
       // check if file exists
-      if(sessionLocalFile->getFD() == -1)
+      if(!sessionLocalFile->getFD().valid())
       { // file didn't exist (not an error) => send EOF
-         releaseFile();
          sendLengthInfo(ctx.getSocket(), 0);
          goto release_session;
       }
 
       // the actual read workhorse...
 
-      readRes = incrementalReadStatefulAndSendV2(ctx, sessionLocalFile);
+      readRes = incrementalReadStatefulAndSendV2(ctx, sessionLocalFile.get());
 
       LOG_DEBUG(logContext, Log_SPAM, "sending completed. "
          "readRes: " + StringTk::int64ToStr(readRes) );
@@ -163,28 +165,14 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
          "offset: " + StringTk::int64ToStr(getOffset() ) + "; "
          "count: " + StringTk::int64ToStr(getCount() ) );
 
-      if(this->needFileUnlockAndRelease)
-      {
-         sessionLocalFile->setOffset(-1); /* invalidate offset (we can only do this if still locked,
-            but that's not a prob if we update offset correctly before send - see notes above) */
-
-         sessionLocalFiles->releaseSession(sessionLocalFile);
-      }
+      sessionLocalFile->setOffset(-1); /* invalidate offset (we can only do this if still locked,
+         but that's not a prob if we update offset correctly before send - see notes above) */
 
       retVal = false;
       goto release_session;
    }
 
-   
-   if(unlikely(this->needFileUnlockAndRelease) )
-   { /* this typically shoudn't be called here because then we would have a potential client race
-        (see notes above) */
-      sessionLocalFiles->releaseSession(sessionLocalFile);
-   }
-
 release_session:
-
-   sessions->releaseSession(session);
 
    // update operation counters
 
@@ -233,7 +221,7 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
    const ssize_t dataBufLen = ctx.getBufferLength() - READ_BUF_LEN_PROTOCOL_CUTOFF; /* cutoff for
       prepended and finalizing length info */
 
-   int fd = sessionLocalFile->getFD();
+   auto& fd = sessionLocalFile->getFD();
    int64_t oldOffset = sessionLocalFile->getOffset();
    int64_t newOffset = getOffset();
 
@@ -275,7 +263,7 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
       ssize_t readLength = BEEGFS_MIN(maxReadAtOnceLen, toBeRead);
 
       ssize_t readRes = unlikely(isMsgHeaderFeatureFlagSet(READLOCALFILEMSG_FLAG_DISABLE_IO) ) ?
-         readLength : MsgHelperIO::pread(fd, dataBuf, readLength,  readOffset);
+         readLength : MsgHelperIO::pread(*fd, dataBuf, readLength,  readOffset);
 
       LOG_DEBUG(logContext, Log_SPAM,
          "toBeRead: " + StringTk::int64ToStr(toBeRead) + "; "
@@ -303,8 +291,6 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
 
          if(isFinal)
          { // we reached the end of the requested data
-            releaseFile();
-
             return getCount();
          }
       }
@@ -318,7 +304,6 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
                "SysErr: " + System::getErrString() );
 
             sessionLocalFile->setOffset(-1);
-            releaseFile();
             sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_INTERNAL);
             return -1;
          }
@@ -341,8 +326,6 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
             sessionLocalFile->incReadCounter(readRes); // update sequential read length
 
             ctx.getStats()->incVals.diskReadBytes += readRes; // update stats
-
-            releaseFile();
 
             if(readRes > 0)
                sendLengthInfoAndData(ctx.getSocket(), readRes, sendBuf, true);
@@ -393,7 +376,7 @@ void ReadLocalFileV2MsgEx::checkAndStartReadAhead(SessionLocalFile* sessionLocal
       "size: " + StringTk::int64ToStr(readAheadSize) );
    IGNORE_UNUSED_VARIABLE(logContext);
 
-   MsgHelperIO::readAhead(sessionLocalFile->getFD(), currentOffset, readAheadSize);
+   MsgHelperIO::readAhead(*sessionLocalFile->getFD(), currentOffset, readAheadSize);
 
    // update trigger
 
@@ -409,47 +392,27 @@ void ReadLocalFileV2MsgEx::checkAndStartReadAhead(SessionLocalFile* sessionLocal
  * @return we return the special value FhgfsOpsErr_COMMUNICATION here in some cases to indirectly
  * ask the client for a retry (e.g. if target consistency is not good for buddymirrored chunks).
  */
-FhgfsOpsErr ReadLocalFileV2MsgEx::openFile(SessionLocalFile* sessionLocalFile)
+FhgfsOpsErr ReadLocalFileV2MsgEx::openFile(const StorageTarget& target,
+      SessionLocalFile* sessionLocalFile)
 {
    const char* logContext = "ReadChunkFileV2Msg (open)";
 
-   App* app = Program::getApp();
-
-   int actualTargetID = sessionLocalFile->getTargetID();
    bool isBuddyMirrorChunk = sessionLocalFile->getIsMirrorSession();
-   TargetConsistencyState consistencyState = TargetConsistencyState_BAD; // silence gcc
 
 
-   if(sessionLocalFile->getFD() != -1)
+   if (sessionLocalFile->getFD().valid())
       return FhgfsOpsErr_SUCCESS; // file already open => nothing to be done here
 
 
    // file not open yet => get targetFD and check consistency state
 
-   int targetFD = app->getTargetFDAndConsistencyState(actualTargetID, isBuddyMirrorChunk,
-      &consistencyState);
-
-   if(unlikely(targetFD == -1) )
-   { // unknown targetID
-      if(isBuddyMirrorChunk)
-      { /* buddy mirrored file => fail with Err_COMMUNICATION to make the requestor retry.
-           mgmt will mark this target as (p)offline in a few moments. */
-         LogContext(logContext).log(Log_NOTICE, "Refusing request. "
-            "Unknown targetID: " + StringTk::uintToStr(actualTargetID) );
-
-         return FhgfsOpsErr_COMMUNICATION;
-      }
-
-      LogContext(logContext).logErr(
-         "Unknown targetID: " + StringTk::uintToStr(actualTargetID) );
-
-      return FhgfsOpsErr_UNKNOWNTARGET;
-   }
+   const auto consistencyState = target.getConsistencyState();
+   const int targetFD = isBuddyMirrorChunk ? *target.getMirrorFD() : *target.getChunkFD();
 
    if(unlikely(consistencyState != TargetConsistencyState_GOOD) && isBuddyMirrorChunk)
    { // this is a request for a buddymirrored chunk on a non-good target
       LogContext(logContext).log(Log_NOTICE, "Refusing request. Target consistency is not good. "
-         "targetID: " + StringTk::uintToStr(actualTargetID) );;
+         "targetID: " + StringTk::uintToStr(target.getID()));
 
       return FhgfsOpsErr_COMMUNICATION;
    }

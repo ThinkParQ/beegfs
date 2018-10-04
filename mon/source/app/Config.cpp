@@ -28,12 +28,18 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("runDaemonized",              "false");
    configMapRedefine("pidFile",                    "");
 
+   configMapRedefine("dbType",                     "influxdb");
    configMapRedefine("dbHostName",                 "localhost");
    configMapRedefine("dbHostPort",                 "8086");
    configMapRedefine("dbDatabase",                 "beegfs_mon");
+
+   // those are used by influxdb only but are kept like this for compatibility
    configMapRedefine("dbMaxPointsPerRequest",      "5000");
    configMapRedefine("dbSetRetentionPolicy",       "true");
    configMapRedefine("dbRetentionDuration",        "1d");
+
+   configMapRedefine("cassandraMaxInsertsPerBatch","25");
+   configMapRedefine("cassandraTTLSecs", "86400");
 
    configMapRedefine("collectClientOpsByNode",     "true");
    configMapRedefine("collectClientOpsByUser",     "true");
@@ -80,6 +86,17 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       if (iter->first == std::string("pidFile"))
          pidFile = iter->second;
       else
+      if (iter->first == std::string("dbType"))
+      {
+         if (iter->second == "influxdb")
+            dbType = DbTypes::INFLUXDB;
+         else if (iter->second == "cassandra")
+            dbType = DbTypes::CASSANDRA;
+         else
+            throw InvalidConfigException("The value of config argument dbType is invalid:"
+                  " Must be influxdb or cassandra.");
+      }
+      else
       if (iter->first == std::string("dbHostName"))
          dbHostName = iter->second;
       else
@@ -89,14 +106,23 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       if (iter->first == std::string("dbDatabase"))
          dbDatabase = iter->second;
       else
+
+      // those are used by influxdb only but are kept like this for compatibility
       if (iter->first == std::string("dbMaxPointsPerRequest"))
-         dbMaxPointsPerRequest = StringTk::strToUInt(iter->second);
+         influxdbMaxPointsPerRequest = StringTk::strToUInt(iter->second);
       else
       if (iter->first == std::string("dbSetRetentionPolicy"))
-         dbSetRetentionPolicy = StringTk::strToBool(iter->second);
+         influxdbSetRetentionPolicy = StringTk::strToBool(iter->second);
       else
       if (iter->first == std::string("dbRetentionDuration"))
-         dbRetentionDuration = iter->second;
+         influxdbRetentionDuration = iter->second;
+      else
+
+      if (iter->first == std::string("cassandraMaxInsertsPerBatch"))
+         cassandraMaxInsertsPerBatch = StringTk::strToUInt(iter->second);
+      else
+      if (iter->first == std::string("cassandraTTLSecs"))
+         cassandraTTLSecs = StringTk::strToUInt(iter->second);
       else
       if (iter->first == std::string("collectClientOpsByNode"))
          collectClientOpsByNode = StringTk::strToBool(iter->second);

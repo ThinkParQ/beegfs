@@ -7,10 +7,6 @@ bool DeleteChunksMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "DeleteChunksMsg incoming";
 
-#ifdef BEEGFS_DEBUG
-   LOG_DEBUG(logContext, 4, "Received a DeleteChunksMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    App* app = Program::getApp();
    ChunkStore* chunkDirStore = app->getChunkDirStore();
 
@@ -21,20 +17,15 @@ bool DeleteChunksMsgEx::processIncoming(ResponseContext& ctx)
    {
       std::string chunkDirRelative;
       std::string delPathStrRelative;
-      bool isMirrorFD;
-
-      if (iter->getBuddyGroupID()) // it's a mirror chunk
-         isMirrorFD = true;
-      else
-         isMirrorFD = false;
+      bool isMirrorFD = iter->getBuddyGroupID();
 
       chunkDirRelative = iter->getSavedPath()->str();
 
       delPathStrRelative = chunkDirRelative + "/" + iter->getID();
 
-      int targetFD = app->getTargetFD(iter->getTargetID(), isMirrorFD);
+      auto* const target = app->getStorageTargets()->getTarget(iter->getTargetID());
 
-      if ( unlikely(targetFD == -1) )
+      if (!target)
       { // unknown targetID
          LogContext(logContext).logErr(std::string("Unknown targetID: ") +
             StringTk::uintToStr(iter->getTargetID()));
@@ -42,6 +33,7 @@ bool DeleteChunksMsgEx::processIncoming(ResponseContext& ctx)
       }
       else
       { // valid targetID
+         int targetFD = isMirrorFD ? *target->getMirrorFD() : *target->getChunkFD();
          int unlinkRes = unlinkat(targetFD, delPathStrRelative.c_str(), 0);
          if ( (unlinkRes == -1) && (errno != ENOENT) )
          { // error

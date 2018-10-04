@@ -12,7 +12,6 @@ void IncomingDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
    const int recvTimeoutMS = 5000;
 
    unsigned numReceived = 0;
-   NetMessage* msg = NULL;
 
    sock->setStats(&stats);
 
@@ -43,10 +42,10 @@ void IncomingDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
       // we got the complete message buffer => create msg object
 
       AbstractApp* app = PThread::getCurrentThreadApp();
-      ICommonConfig* cfg = app->getCommonConfig();
-      AbstractNetMessageFactory* netMessageFactory = app->getNetMessageFactory();
+      auto cfg = app->getCommonConfig();
+      auto netMessageFactory = app->getNetMessageFactory();
 
-      msg = netMessageFactory->createFromBuf(bufIn, msgLength);
+      auto msg = netMessageFactory->createFromRaw(bufIn, msgLength);
 
       if(unlikely(msg->getMsgType() == NETMSGTYPE_Invalid) )
       { // message invalid
@@ -55,8 +54,6 @@ void IncomingDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
 
          sock->unsetStats();
          invalidateConnection(sock);
-         delete(msg);
-
          return;
       }
 
@@ -86,15 +83,10 @@ void IncomingDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
             sock->getPeername() );
 
          invalidateConnection(sock);
-         delete(msg);
-
          return;
       }
 
       // processing completed successfully
-
-      delete(msg);
-      msg = NULL;
 
       if(checkRDMASocketImmediateData(streamListener, sock) )
       { // immediate data available => do not return the socket to the streamListener
@@ -127,7 +119,6 @@ void IncomingDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, uns
 
    sock->unsetStats();
    invalidateConnection(sock);
-   SAFE_DELETE(msg);
 }
 
 void IncomingDataWork::invalidateConnection(Socket* sock)

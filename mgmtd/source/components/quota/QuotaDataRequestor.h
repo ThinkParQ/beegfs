@@ -79,8 +79,7 @@ class QuotaDataRequestor : public GetQuotaInfo
          this->cfg.cfgWithSystemUsersGroups = withSystemusersGroups;
       }
 
-      bool requestQuota(QuotaDataMapForTarget* outQuotaData, RWLock* outQuotaResultsRWLock,
-         bool* isStoreDirty);
+      bool requestQuota(QuotaDataMapForTarget* outQuotaData, RWLock* outQuotaResultsRWLock);
 
       /**
        * Updates the the targetID of the target to query. In this case only this target will be
@@ -98,7 +97,7 @@ class QuotaDataRequestor : public GetQuotaInfo
       MultiWorkQueue& workQueue;
 
       void updateQuotaDataWithResponse(QuotaDataMapForTarget* inQuotaData,
-         QuotaDataMapForTarget* outQuotaData, TargetMapper* mapper);
+         QuotaDataMapForTarget* outQuotaData, const TargetMapper* mapper);
 };
 
 #endif /* QUOTADATAREQUESTOR_H_ */

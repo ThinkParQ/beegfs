@@ -160,8 +160,8 @@ FileInode* InodeFileStore::referenceFileInodeMapIterUnlocked(InodeMapIter& iter)
       // note: we don't need to check unload here, because exclusive means there already is a
       // reference so we definitely didn't load here
 
-      LOG_DBG(GENERAL, SPAM, "Reference file inode.", as("FileInodeID", iter->first),
-            as("Refcount", inodeRefer->getRefCount()));
+      LOG_DBG(GENERAL, SPAM, "Reference file inode.", ("FileInodeID", iter->first),
+            ("Refcount", inodeRefer->getRefCount()));
       return inode;
    }
 
@@ -182,8 +182,8 @@ unsigned InodeFileStore::decreaseInodeRefCountUnlocked(InodeMapIter& iter)
 
    unsigned refCount = (unsigned) inodeRefer->release();
 
-   LOG_DBG(GENERAL, SPAM, "Release file inode.", as("FileInodeID", iter->first),
-         as("Refcount", inodeRefer->getRefCount()));
+   LOG_DBG(GENERAL, SPAM, "Release file inode.", ("FileInodeID", iter->first),
+         ("Refcount", inodeRefer->getRefCount()));
 
    if(!refCount)
    { // dropped last reference => unload outInode
@@ -446,7 +446,7 @@ FhgfsOpsErr InodeFileStore::stat(EntryInfo* entryInfo, bool loadFromDisk, StatDa
 
    lock.unlock(); // no need to keep the lock anymore
 
-   if (loadFromDisk == true)
+   if (loadFromDisk)
    {  // not loaded => static stat
       return FileInode::getStatData(entryInfo, outStatData);
    }
@@ -542,7 +542,7 @@ void InodeFileStore::clearStoreUnlocked()
    App* app = Program::getApp();
 
    LOG_DBG(GENERAL, DEBUG, "InodeFileStore::clearStoreUnlocked",
-         as("# of loaded entries to be cleared", inodes.size()));
+         ("# of loaded entries to be cleared", inodes.size()));
 
    for(InodeMapIter iter = inodes.begin(); iter != inodes.end(); iter++)
    {

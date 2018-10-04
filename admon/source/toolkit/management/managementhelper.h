@@ -34,7 +34,7 @@ namespace managementhelper
    int stopService(std::string service, StringList *failedNodes);
    int stopService(std::string service, std::string host);
    int checkStatus(std::string service, std::string host, std::string *status);
-   int checkStatus(std::string service, StringList *runningHosts, StringList *downHosts);
+   int checkStatus(std::string service, StringList *runningHosts, StringList *stoppedHosts);
 } /* namespace managementhelper */
 
 #endif /* TOOLKIT_MANAGEMENT_MANAGEMENTHELPER_H_ */

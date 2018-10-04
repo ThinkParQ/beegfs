@@ -28,7 +28,7 @@ TARGET_NUMID_FILE=targetNumID
 PREFERRED_MDS_FILE=/tmp/preferredMds.fod
 PREFERRED_TARGET_FILE=/tmp/preferredTarget.fod
 
-DEFAULT_STATUSFILE=/tmp/beeond.tmp
+DEFAULT_STATUSFILE=/var/tmp/beeond.tmp
 STATUSFILE=${DEFAULT_STATUSFILE}
 
 NUM_META_SERVER=1
@@ -39,7 +39,7 @@ BEEGFS_BIN_PATH=/opt/beegfs/sbin
 DEFAULT_PORT_SHIFT=1000
 
 SSH="ssh"
-SSH_PARAMS=( -qq -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no )
+SSH_PARAMS=( -qq -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no -n )
 DEFAULT_PDSH_PATH=$(which pdsh 2>/dev/null)
 PDSH=${DEFAULT_PDSH_PATH}
 PDSH_RCMD="ssh"
@@ -108,7 +108,14 @@ print_usage_and_exit()
    echo "                        numbers are shifted by this number. Useful in order to"
    echo "                        have several BeeGFS instances running on the same node."
    echo "                        Default: ${DEFAULT_PORT_SHIFT}"
-   echo "         -f PATH     => Path to additional BeeGFS config files."
+   echo "         -f PATH     => Directory containing additional beegfs config files."
+   echo "                        There can be one file for each service as well as the client."
+   echo "                        They must be  named in the form beegfs-<service>.conf, where "
+   echo "                        <service> can be meta, storage, mgmtd, helperd or client."
+   echo "                        Only the options specified within the files are"
+   echo "                        set/overwritten, the rest of the defaults will not be"
+   echo "                        touched and still be applied. The directory and the "
+   echo "                        files need to be present on every node."
    echo "         -L PATH     => Log file directory. If necessary, the directory will be"
    echo "                        created. Default: ${DEFAULT_LOG_PATH}"
    echo "         -l          => Prefer local storage nodes."
@@ -128,6 +135,28 @@ print_usage_and_exit()
    echo "         -j          => enable metadata server mirroring"
    echo "                        Note: Needs an even number of metadata servers (-m)."
    echo "         -q          => Suppress INFO messages, only print ERRORs."
+   echo "         -t FILE     => Use FILE to define multiple storage targets and assign"
+   echo "                        them to storage pools. The file needs to be in the"
+   echo "                        following format:"
+   echo ""
+   echo "                        pool_1:/path/to/target_1,/path/to/target_2,..."
+   echo "                        pool_2:/path/to/target_3,/path/to/target_4,..."
+   echo "                        ..."
+   echo ""
+   echo "                        pool_n is the name of the storage pool, the comma separated"
+   echo "                        list after the colon are the paths to the target directories"
+   echo "                        that shall be part of this pool."
+   echo "                        The lines can't contain whitespaces. BeeOND will look for"
+   echo "                        these directories and add them as a storage target on all"
+   echo "                        nodes where they exist. To avoid having unwanted targets"
+   echo "                        in a pool, make sure each of the specified paths only"
+   echo "                        exists on nodes where they are actually mounted on the"
+   echo "                        desired storage medium."
+   echo "                        BeeOND will then assign the targets to the corresponding"
+   echo "                        storage pools and create a directory for each pool"
+   echo "                        on the root level of the BeeGFS mount."
+   echo "                        This option can only be used together with -F."
+   echo "         -T          => Don't create and assign the pool directories when using -t."
    echo ""
    echo "   stop:"
    echo "      Stop the file system on a number of nodes, specified by the node file."
@@ -602,20 +631,38 @@ needed parameters"
 
    DATAPATH=${DATAPATH}/${STORAGE_BIN}
 
-   PARAMS="sysMgmtdHost=${MGMTD} storeStorageDirectory=${DATAPATH} logStdFile=${LOGFILE} \
-runDaemonized=true pidFile=${PIDFILE}"
+   PARAMS="sysMgmtdHost=${MGMTD} logStdFile=${LOGFILE} runDaemonized=true pidFile=${PIDFILE}"
 
    if [ "${PORT_SHIFT}" != "" ]
    then
       PARAMS="${PARAMS} connPortShift=${PORT_SHIFT}"
    fi
 
-   CMD="PARAMS=\"${PARAMS}\"; \
-if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
-   PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi;
-if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
-   rm -rf ${DATAPATH}; fi; \
-${BEEGFS_BIN_PATH}/${STORAGE_BIN} \${PARAMS}"
+   if [ "${TARGETFILE}" != "" ]
+   then
+      local ALL_TARGETS
+      ALL_TARGETS=$(get_all_targets_from_targetfile)
+
+      CMD="while read T; do \
+            if [ -d \"\${T}\" ] ; then EXISTING_TARGETS=\"\${EXISTING_TARGETS}\${T},\"; \
+               if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
+                  rm -rf \"${T}/*\"; \
+               fi;
+            fi ; \
+         done < <(echo \"${ALL_TARGETS}\" | tr ',' '\n' ); \
+         PARAMS=\"${PARAMS} storeStorageDirectory=\${EXISTING_TARGETS}\"; \
+         if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
+            PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi; \
+         ${BEEGFS_BIN_PATH}/${STORAGE_BIN} \${PARAMS}"
+   else
+      CMD="PARAMS=\"${PARAMS} storeStorageDirectory=${DATAPATH}\"; \
+         if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
+         PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi; \
+         if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
+         rm -rf ${DATAPATH}; fi; \
+         ${BEEGFS_BIN_PATH}/${STORAGE_BIN} \${PARAMS}"
+   fi
+
 
    if [ "${USE_PDSH}" = "true" ]
    then
@@ -665,10 +712,122 @@ ${BEEGFS_BIN_PATH}/${STORAGE_BIN} \${PARAMS}"
       unset IFS
    fi
 
+   if [ "${TARGETFILE}" != "" ]
+   then
+      create_storage_pools "${HOSTS}"
+   fi
+
    if [ "${QUIET}" != "true" ]
    then
       echo ""
    fi
+}
+
+create_storage_pools()
+{
+   local HOSTS=$1
+
+   if [ "${TARGETFILE}" != "" ]
+   then
+      while read LINE
+      do
+         IFS=: read POOL TARGETS <<< "${LINE}"
+         TARGETS=$(echo "${TARGETS}" | tr -d "[:space:]")
+
+         TARGET_IDS=
+         while read HOST
+         do
+            CMD="echo \"${TARGETS}\" | tr ',' '\n' | \
+               while read T; do if [ -f \"\${T}/${TARGET_NUMID_FILE}\" ]; then \
+               echo -n \$(cat \"\${T}/targetNumID\"),; fi; done"
+            HOST_TARGETS=$(execute_ssh_cmd "${HOST}" "${CMD}")
+            TARGET_IDS="$TARGET_IDS$HOST_TARGETS"
+         done < <(echo "${HOSTS}" | tr ',' '\n')
+
+         # create pool with collected ids
+         "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
+             --addstoragepool --desc="${POOL}" --targets="${TARGET_IDS}"
+      done < <(grep -v "^$" "${TARGETFILE}" | grep -v "^\s*\#")
+   fi
+}
+
+assign_storage_pool_dirs()
+{
+   local POOLS
+   POOLS=$("${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
+      --liststoragepools | tail -n+4 | awk '{print $1 " " $2}')
+
+   while read LINE
+   do
+      read ID DESC <<< "${LINE}"
+
+      "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
+      --createdir --unmounted "/${DESC}"
+
+      "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
+      --setpattern --unmounted --storagepoolid="${ID}" "/${DESC}"
+
+   done < <(echo "${POOLS}")
+}
+
+check_targetfile()
+{
+   local CHECK1
+   local CHECK2
+   local LINE_REGEX
+
+   LINE_REGEX='^\w+:([\w/_.-]+,?)+\s*$'
+
+   CHECK1=$(grep -i -P "${LINE_REGEX}" "${TARGETFILE}")
+   CHECK2=$(grep -i -P -v "${LINE_REGEX}" "${TARGETFILE}" | grep -v "^\s*\#" | \
+      grep -v "^$")
+
+   if [ "${CHECK1}" == "" ] || [ "${CHECK2}" != "" ]
+   then
+      print_error_and_exit "${TARGETFILE} contains invalid entries or is empty."
+   fi
+
+   CHECK1=$(grep -v "^$" "${TARGETFILE}" | grep -v "^\s*\#" | \
+      tr -d ' ' | awk -F ':' '{print $1}' | sort | uniq -i -d)
+
+   if [ "${CHECK1}" != "" ]
+   then
+      print_error_and_exit "${TARGETFILE} contains non-unique pool names."
+   fi
+
+   CHECK1=$(get_all_targets_from_targetfile | tr ',' '\n' | sort | uniq -i -d)
+
+   if [ "${CHECK1}" != "" ]
+   then
+      print_error_and_exit "${TARGETFILE} contains non-unique target paths."
+   fi
+
+   if [ "${CLEAR_DATA}" != "true" ]
+   then
+      print_error_and_exit "Using storage pools requires the -F option \
+to make sure no old data is left."
+   fi
+
+   if [ "${STORAGE_MIRROR}" == "true" ]
+   then
+      print_error_and_exit "Using storage pools doesn't support storage mirroring (-k)."
+   fi
+}
+
+get_all_targets_from_targetfile()
+{
+   local ALL_TARGETS
+
+   while read LINE
+   do
+      IFS=: read POOL TARGETS <<< ${LINE}
+      while read T
+      do
+         T=$(echo "${T}" | tr -d "[:space:]")
+         ALL_TARGETS="${ALL_TARGETS}${T},"
+      done < <(echo "${TARGETS}" | tr ',' '\n')
+   done < <(grep -v "^$" "${TARGETFILE}" | grep -v "^\s*\#")
+   echo "$ALL_TARGETS"
 }
 
 start_mgmtd()
@@ -772,7 +931,7 @@ if [ \"${PREFER_LOCAL}\" = \"true\" ] && [ -e \"${PREFERRED_MDS_FILE}\" ]; \
 then PARAMS=\"\${PARAMS},tunePreferredMetaFile=${PREFERRED_MDS_FILE}\"; fi; \
 if [ \"${PREFER_LOCAL}\" = \"true\" ] && [ -e \"${PREFERRED_TARGET_FILE}\" ]; \
 then PARAMS=\"\${PARAMS},tunePreferredStorageFile=${PREFERRED_TARGET_FILE}\"; fi; \
-mkdir -p ${MOUNTPOINT} && modprobe beegfs && mount -t beegfs beegfs_ondemand ${MOUNTPOINT} \${PARAMS}"
+mkdir -p ${MOUNTPOINT} && ${MODPROBE_CMD} && mount -t beegfs beegfs_ondemand ${MOUNTPOINT} \${PARAMS}"
 
    if [ "${USE_PDSH}" = "true" ]
    then
@@ -995,8 +1154,9 @@ do_start()
    STORAGE_MIRROR="false"
    META_MIRROR="false"
    PORT_SHIFT=${DEFAULT_PORT_SHIFT}
+   ASSIGN_STORAGE_POOL_DIRS=true
 
-   while getopts ":c:d:f:Fi:m:n:p:lL:Pb:s:qrkj" opt; do
+   while getopts ":c:d:f:Fi:m:n:p:lL:Pb:s:qrkjt:T" opt; do
       case $opt in
          n)
             HOSTFILE=${OPTARG}
@@ -1044,6 +1204,9 @@ do_start()
             NUM_STORAGE_SERVER=$OPTARG
          ;;
          f)
+            if ! [[ -d ${OPTARG} ]]; then
+               print_error_and_exit "The -f option expects a path to a directory: ${OPTARG}"
+            fi
             CONFIGPATH=${OPTARG}
          ;;
          l)
@@ -1060,6 +1223,12 @@ do_start()
          ;;
          j)
             META_MIRROR="true"
+         ;;
+         t)
+            TARGETFILE=${OPTARG}
+         ;;
+         T)
+            ASSIGN_STORAGE_POOL_DIRS="false"
          ;;
          \?)
             echo "ERROR: invalid option: -${OPTARG}" >&2
@@ -1079,6 +1248,11 @@ do_start()
    if [ "${STORAGE_MIRROR}" = "true" ] && [ "${PREFER_LOCAL}" = "true" ]
    then
       print_error_and_exit "Options -k and -l are mutually exclusive."
+   fi
+
+   if [ "${TARGETFILE}" != "" ]
+   then
+      check_targetfile
    fi
 
 
@@ -1192,6 +1366,11 @@ do_start()
    # take all hosts as client
    # port shift and config path may be empty, but that's ok
    start_clients "${ALLNODES}" "${MGMTD}" "${MOUNTPOINT}" "${PORT_SHIFT}" "${CONFIGPATH}"
+
+   if [ "${ASSIGN_STORAGE_POOL_DIRS}" = "true" ] && [ "${TARGETFILE}" != "" ]
+   then
+      assign_storage_pool_dirs
+   fi
 
    if [ "${STORAGE_MIRROR}" = "true" ]
    then

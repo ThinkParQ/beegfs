@@ -71,8 +71,7 @@ class WriteLocalFileWork : public Work
       bool firstWriteDoneForTarget; /* true if the first chunk was written to the storage target,
                                        it's needed for the session check*/
 
-      int64_t communicate(Node& node, char* bufIn, unsigned bufInLen,
-         char* bufOut, unsigned bufOutLen);
+      int64_t communicate(Node& node, char* bufOut, unsigned bufOutLen);
 
 };
 

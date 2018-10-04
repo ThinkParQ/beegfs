@@ -18,7 +18,7 @@ bool SessionFile::relinkInode(MetaStore& store)
    if (openRes == FhgfsOpsErr_SUCCESS)
       return true;
 
-   Logger::getLogger()->logErr(__func__, "Could not relink session for inode "
-         + entryInfo.getParentEntryID() + "/" + entryInfo.getEntryID());
+   LOG(SESSIONS, ERR, "Could not relink session for inode.",
+         ("inode", entryInfo.getParentEntryID() + "/" + entryInfo.getEntryID()));
    return false;
 }

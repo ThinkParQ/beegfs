@@ -1,6 +1,8 @@
 #include <common/app/log/LogContext.h>
 #include "StorageErrors.h"
 
+#include <boost/io/ios_state.hpp>
+
 /**
  * Note: This is based on the FhgfsOpsErr entries
  * Note: We use EREMOTEIO as a generic error here
@@ -43,15 +45,12 @@ struct FhgfsOpsErrListEntry const __FHGFSOPS_ERRLIST[] =
 };
 
 
-/**
- * @return human-readable error string
- */
-const char* FhgfsOpsErrTk::toErrString(FhgfsOpsErr errCode)
+std::ostream& operator<<(std::ostream& os, FhgfsOpsErr errCode)
 {
    size_t unsignedErrCode = (size_t)errCode;
 
    if(likely(unsignedErrCode < __FHGFSOPS_ERRLIST_SIZE) )
-      return __FHGFSOPS_ERRLIST[errCode].errString;
+      return os << __FHGFSOPS_ERRLIST[errCode].errString;
 
    // error code unknown...
 
@@ -63,7 +62,12 @@ const char* FhgfsOpsErrTk::toErrString(FhgfsOpsErr errCode)
 
    log.logBacktrace();
 
-   return "Unknown error code";
+   const boost::io::ios_all_saver ifs(os);
+
+   os.flags(std::ios_base::dec);
+   os.width(0);
+
+   return os << "Unknown error code " << int(errCode);
 }
 
 /**

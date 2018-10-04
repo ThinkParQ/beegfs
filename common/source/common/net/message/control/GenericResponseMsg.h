@@ -35,8 +35,8 @@ class GenericResponseMsg : public SimpleIntStringMsg
        * @param controlCode GenericRespMsgCode_...
        * @param logStr human-readable explanation or background information.
        */
-      GenericResponseMsg(GenericRespMsgCode controlCode, const char* logStr) :
-         SimpleIntStringMsg(NETMSGTYPE_GenericResponse, controlCode, logStr)
+      GenericResponseMsg(GenericRespMsgCode controlCode, std::string logStr) :
+         SimpleIntStringMsg(NETMSGTYPE_GenericResponse, controlCode, std::move(logStr))
       {
       }
 
@@ -58,7 +58,7 @@ class GenericResponseMsg : public SimpleIntStringMsg
          return (GenericRespMsgCode)getIntValue();
       }
 
-      const char* getLogStr() const
+      const std::string& getLogStr() const
       {
          return getStrValue();
       }

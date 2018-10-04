@@ -21,7 +21,7 @@ class CloseChunkFileWork : public Work
          DynamicFileAttribs *outDynAttribs, FhgfsOpsErr* outResult, SynchronizedCounter* counter) :
          sessionID(sessionID), fileHandleID(fileHandleID), pattern(pattern), targetID(targetID),
          pathInfoPtr(pathInfo), outDynAttribs(outDynAttribs), outResult(outResult),
-         counter(counter), entryInfo(NULL), useBuddyMirrorSecond(false),
+         counter(counter), useBuddyMirrorSecond(false),
          msgUserID(NETMSG_DEFAULT_USERID)
       {
          // all assignments done in initializer list
@@ -45,8 +45,6 @@ class CloseChunkFileWork : public Work
       FhgfsOpsErr* outResult;
       SynchronizedCounter* counter;
 
-      EntryInfo* entryInfo; // needed for backlinks
-
       bool useBuddyMirrorSecond;
 
       unsigned msgUserID;
@@ -57,11 +55,6 @@ class CloseChunkFileWork : public Work
 
    public:
       // getters & setters
-
-      void setEntryInfo(EntryInfo* entryInfo)
-      {
-         this->entryInfo = entryInfo;
-      }
 
       void setMsgUserID(unsigned msgUserID)
       {

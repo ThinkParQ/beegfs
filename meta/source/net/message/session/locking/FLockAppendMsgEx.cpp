@@ -15,8 +15,6 @@ bool FLockAppendMsgEx::processIncoming(ResponseContext& ctx)
 
 #ifdef BEEGFS_DEBUG
    const char* logContext = "FLockAppendMsg incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a FLockAppendMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
 
    unsigned ownerFD = SessionTk::ownerFDFromHandleID(getFileHandleID() );
@@ -30,8 +28,7 @@ bool FLockAppendMsgEx::processIncoming(ResponseContext& ctx)
 
    FhgfsOpsErr clientResult = MsgHelperLocking::flockAppend(entryInfo, ownerFD, lockDetails);
 
-   LOG_DEBUG(logContext, Log_SPAM, std::string("Client result: ") +
-      FhgfsOpsErrTk::toErrString(clientResult) );
+   LOG_DBG(GENERAL, SPAM, "", clientResult);
 
    ctx.sendResponse(FLockAppendRespMsg(clientResult) );
 

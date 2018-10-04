@@ -26,14 +26,15 @@
  * @param hostname hostname of mgmtd service
  * @param portUDP udp port of mgmtd service
  * @param timeoutMS 0 for infinite
+ * @param nameResolutionRetries number of times to try resolving the hostname of the
+ *                              management node. 0 for infinite.
  * @return true if heartbeat received, false if cancelled because of termination order
  */
 bool NodesTk::waitForMgmtHeartbeat(PThread* currentThread, AbstractDatagramListener* dgramLis,
    const NodeStoreServers* mgmtNodes, std::string hostname, unsigned short portUDP,
-   unsigned timeoutMS)
+   unsigned timeoutMS, unsigned nameResolutionRetries)
 {
    bool gotMgmtHeartbeat = false;
-   struct in_addr ipAddr;
 
    const int waitForNodeSleepMS = 750;
    Time startTime;
@@ -41,7 +42,7 @@ bool NodesTk::waitForMgmtHeartbeat(PThread* currentThread, AbstractDatagramListe
    unsigned nextRetryDelayMS = 0;
 
    HeartbeatRequestMsg msg;
-   std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(&msg);
+   auto msgBuf = MessagingTk::createMsgVec(msg);
 
 
    // wait for mgmt node to appear and periodically resend request
@@ -49,9 +50,18 @@ bool NodesTk::waitForMgmtHeartbeat(PThread* currentThread, AbstractDatagramListe
    {
       if(lastRetryTime.elapsedMS() >= nextRetryDelayMS)
       { // time to send request again
-         bool getHostByNameRes = SocketTk::getHostByName(hostname.c_str(), &ipAddr);
-         if(getHostByNameRes)
-            dgramLis->sendto(msgBuf.first, msgBuf.second, 0, ipAddr, portUDP);
+         const auto ipAddr = SocketTk::getHostByName(hostname.c_str());
+         if(ipAddr)
+         {
+            dgramLis->sendto(&msgBuf[0], msgBuf.size(), 0, ipAddr.value(), portUDP);
+         }
+         else
+         {
+            LOG(COMMUNICATION, ERR, "Failed to resolve hostname.", hostname,
+                  ("System error", ipAddr.error()));
+            if (nameResolutionRetries != 0 && --nameResolutionRetries == 0)
+               break;
+         }
 
          lastRetryTime.setToNow();
          nextRetryDelayMS = getRetryDelayMS(startTime.elapsedMS() );
@@ -67,8 +77,6 @@ bool NodesTk::waitForMgmtHeartbeat(PThread* currentThread, AbstractDatagramListe
       if(timeoutMS && (startTime.elapsedMS() >= timeoutMS) )
          break; // caller-given timeout expired
    }
-
-   free(msgBuf.first);
 
    return gotMgmtHeartbeat;
 }
@@ -96,28 +104,23 @@ std::shared_ptr<Node> NodesTk::downloadNodeInfo(const std::string& hostname,
          if (connAuthHash)
          {
             AuthenticateChannelMsg msg(connAuthHash);
-            std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(&msg);
-            std::unique_ptr<char> msgBufPtr(msgBuf.first);
-            socket.send(msgBuf.first, msgBuf.second, 0);
+            auto msgBuf = MessagingTk::createMsgVec(msg);
+            socket.send(&msgBuf[0], msgBuf.size(), 0);
          }
 
          {
             HeartbeatRequestMsg msg;
-            std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(&msg);
-            std::unique_ptr<char, decltype(free)*> respBufPtr(msgBuf.first, free);
-            socket.send(msgBuf.first, msgBuf.second, 0);
+            auto msgBuf = MessagingTk::createMsgVec(msg);
+            socket.send(&msgBuf[0], msgBuf.size(), 0);
          }
 
-         char* respBuf = nullptr;
          // wait for a while - if the connection is not reset, we are very likely to receive a reply
-         unsigned respBufLen = MessagingTk::recvMsgBuf(&socket, &respBuf, std::min(1000, timeoutMS));
-         std::unique_ptr<char, decltype(free)*> respBufPtr(respBuf, free);
+         auto respBuf = MessagingTk::recvMsgBuf(socket, std::min(1000, timeoutMS));
 
-         if (!respBufLen)
+         if (respBuf.empty())
             continue;
 
-         std::unique_ptr<NetMessage> respMsg(
-               netMessageFactory->createFromBuf(&respBuf[0], respBufLen));
+         auto respMsg = netMessageFactory->createFromBuf(std::move(respBuf));
          if (respMsg->getMsgType() != NETMSGTYPE_Heartbeat)
             return nullptr;
 
@@ -126,7 +129,7 @@ std::shared_ptr<Node> NodesTk::downloadNodeInfo(const std::string& hostname,
          if (hb.getNodeType() != nodeType)
             return nullptr;
 
-         return std::make_shared<Node>(hb.getNodeID(),
+         return std::make_shared<Node>(hb.getNodeType(), hb.getNodeID(),
             hb.getNodeNumID(), hb.getPortUDP(),
             hb.getPortTCP(), hb.getNicList());
       }
@@ -173,7 +176,7 @@ bool NodesTk::downloadNodes(Node& sourceNode, NodeType nodeType, std::vector<Nod
       return false;
 
    // handle result
-   GetNodesRespMsg* respMsgCast = static_cast<GetNodesRespMsg*>(rrArgs.outRespMsg);
+   GetNodesRespMsg* respMsgCast = static_cast<GetNodesRespMsg*>(rrArgs.outRespMsg.get());
 
    respMsgCast->getNodeList().swap(outNodes);
 
@@ -190,17 +193,9 @@ bool NodesTk::downloadNodes(Node& sourceNode, NodeType nodeType, std::vector<Nod
  * Downloads target mappings from given sourceNode.
  *
  * @param sourceNode     - the node to query about targets (usually management)
- * @param outTargetIDs   - list of targets sourceNode knows about
- * @param outNodeIDs     - nodeIDs corresponding to outTargetsIDs
  * @return true if download successful
- *
- * NOTE:  outTargetIDs and outNodeIDs match 1:1
- *        Example: targetA of nodeA is at list-position 10 of outTargetIDs, then 'nodeA' also is
- *                 at list position 10 of outNodeIDs. If a node has several targets that node
- *                 will appear several time in outNodeIDs, depending on its number of targets.
  */
-bool NodesTk::downloadTargetMappings(const Node& sourceNode, UInt16List* outTargetIDs,
-   NumNodeIDList* outNodeIDs, bool silenceLog)
+std::pair<bool, TargetMap> NodesTk::downloadTargetMappings(const Node& sourceNode, bool silenceLog)
 {
    GetTargetMappingsMsg msg;
    RequestResponseArgs rrArgs(&sourceNode, &msg, NETMSGTYPE_GetTargetMappingsResp);
@@ -214,16 +209,13 @@ bool NodesTk::downloadTargetMappings(const Node& sourceNode, UInt16List* outTarg
    // connect & communicate
    bool commRes = MessagingTk::requestResponse(&rrArgs);
    if(!commRes)
-      return false;
+      return {false, {}};
 
    // handle result
    GetTargetMappingsRespMsg* respMsgCast =
-      static_cast<GetTargetMappingsRespMsg*>(rrArgs.outRespMsg);
+      static_cast<GetTargetMappingsRespMsg*>(rrArgs.outRespMsg.get());
 
-   respMsgCast->getTargetIDs().swap(*outTargetIDs);
-   respMsgCast->getNodeIDs().swap(*outNodeIDs);
-
-   return true;
+   return {true, respMsgCast->releaseMappings()};
 }
 
 /*
@@ -251,7 +243,7 @@ bool NodesTk::downloadMirrorBuddyGroups(const Node& sourceNode, NodeType nodeTyp
 
    // handle result
    GetMirrorBuddyGroupsRespMsg* respMsgCast =
-      static_cast<GetMirrorBuddyGroupsRespMsg*>(rrArgs.outRespMsg);
+      static_cast<GetMirrorBuddyGroupsRespMsg*>(rrArgs.outRespMsg.get());
 
    respMsgCast->getBuddyGroupIDs().swap(*outBuddyGroupIDs);
    respMsgCast->getPrimaryTargetIDs().swap(*outPrimaryTargetIDs);
@@ -285,7 +277,7 @@ bool NodesTk::downloadTargetStates(Node& sourceNode, NodeType nodeType, UInt16Li
       return false;
 
    // handle result
-   GetTargetStatesRespMsg* respMsgCast = static_cast<GetTargetStatesRespMsg*>(rrArgs.outRespMsg);
+   auto* respMsgCast = static_cast<GetTargetStatesRespMsg*>(rrArgs.outRespMsg.get());
 
    if (outTargetIDs)
       respMsgCast->getTargetIDs().swap(*outTargetIDs);
@@ -304,9 +296,7 @@ bool NodesTk::downloadTargetStates(Node& sourceNode, NodeType nodeType, UInt16Li
  *       outTargetIDs and outTargetStates match 1:1.
  */
 bool NodesTk::downloadStatesAndBuddyGroups(Node& sourceNode, NodeType nodeType,
-   UInt16List* outBuddyGroupIDs, UInt16List* outPrimaryTargetIDs, UInt16List* outSecondaryTargetIDs,
-   UInt16List* outTargetIDs, UInt8List* outTargetReachabilityStates,
-   UInt8List* outTargetConsistencyStates, bool silenceLog)
+   MirrorBuddyGroupMap& outBuddyGroups, TargetStateMap& outStates, bool silenceLog)
 {
    GetStatesAndBuddyGroupsMsg msg(nodeType);
    RequestResponseArgs rrArgs(&sourceNode, &msg, NETMSGTYPE_GetStatesAndBuddyGroupsResp);
@@ -326,16 +316,10 @@ bool NodesTk::downloadStatesAndBuddyGroups(Node& sourceNode, NodeType nodeType,
       return false;
 
    // handle result
-   GetStatesAndBuddyGroupsRespMsg* respMsgCast =
-      static_cast<GetStatesAndBuddyGroupsRespMsg*>(rrArgs.outRespMsg);
+   auto* respMsgCast = static_cast<GetStatesAndBuddyGroupsRespMsg*>(rrArgs.outRespMsg.get());
 
-   respMsgCast->getBuddyGroupIDs().swap(*outBuddyGroupIDs);
-   respMsgCast->getPrimaryTargetIDs().swap(*outPrimaryTargetIDs);
-   respMsgCast->getSecondaryTargetIDs().swap(*outSecondaryTargetIDs);
-
-   respMsgCast->getTargetIDs().swap(*outTargetIDs);
-   respMsgCast->getReachabilityStates().swap(*outTargetReachabilityStates);
-   respMsgCast->getConsistencyStates().swap(*outTargetConsistencyStates);
+   outBuddyGroups = respMsgCast->releaseGroups();
+   outStates = respMsgCast->releaseStates();
 
    return true;
 }
@@ -358,7 +342,7 @@ bool NodesTk::downloadStoragePools(Node& sourceNode, StoragePoolPtrVec& outStora
       return false;
 
    // handle result
-   GetStoragePoolsRespMsg* respMsgCast = static_cast<GetStoragePoolsRespMsg*>(rrArgs.outRespMsg);
+   const auto respMsgCast = static_cast<const GetStoragePoolsRespMsg*>(rrArgs.outRespMsg.get());
    StoragePoolPtrVec& storagePools = respMsgCast->getStoragePools();
 
    storagePools.swap(outStoragePools);

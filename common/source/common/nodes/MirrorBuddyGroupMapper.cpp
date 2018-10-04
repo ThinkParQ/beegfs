@@ -1,18 +1,17 @@
 #include <common/app/log/LogContext.h>
 #include <common/nodes/MirrorBuddyGroupCreator.h>
 #include <common/toolkit/MapTk.h>
-#include <common/toolkit/Random.h>
 #include <common/nodes/TargetStateStore.h>
 
 #include "MirrorBuddyGroupMapper.h"
 
 MirrorBuddyGroupMapper::MirrorBuddyGroupMapper(TargetMapper* targetMapper):
       targetMapper(targetMapper), metaCapacityPools(NULL), storagePools(NULL), usableNodes(NULL),
-      mappingsDirty(false), localGroupID(0) { }
+      localGroupID(0) { }
 
 MirrorBuddyGroupMapper::MirrorBuddyGroupMapper():
      targetMapper(NULL), metaCapacityPools(NULL), storagePools(NULL), usableNodes(NULL),
-     mappingsDirty(false), localGroupID(0) { }
+     localGroupID(0) { }
 
 /**
  * Map two target IDs to a buddyGroupID.
@@ -118,8 +117,6 @@ FhgfsOpsErr MirrorBuddyGroupMapper::mapMirrorBuddyGroup(uint16_t buddyGroupID,
    if (localNodeID == NumNodeID(primaryTargetID) || localNodeID == NumNodeID(secondaryTargetID) )
       localGroupID = buddyGroupID;
 
-   mappingsDirty = true;
-
    return retVal;
 }
 
@@ -139,8 +136,6 @@ bool MirrorBuddyGroupMapper::unmapMirrorBuddyGroup(uint16_t buddyGroupID, NumNod
 
    if(numErased)
    {
-      mappingsDirty = true;
-
       if (metaCapacityPools)
          metaCapacityPools->remove(buddyGroupID);
 
@@ -177,8 +172,6 @@ void MirrorBuddyGroupMapper::syncGroupsFromLists(UInt16List& buddyGroupIDs,
    RWLockGuard safeWriteLock(rwlock, SafeRWLock_WRITE);
 
    mirrorBuddyGroups.swap(newGroups);
-
-   mappingsDirty = true;
 
    if (localGroupID != 0)
       setLocalGroupIDUnlocked(localGroupID);
@@ -263,127 +256,6 @@ void MirrorBuddyGroupMapper::getMappingAsListsUnlocked(UInt16List& outBuddyGroup
    }
 }
 
-/**
- * Note: setStorePath must be called before using this.
- */
-bool MirrorBuddyGroupMapper::loadFromFile()
-{
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
-
-   if ( !storePath.length() )
-      return false;
-
-   try
-   {
-      StringMap newGroupsStrMap;
-
-      // load from file
-      MapTk::loadStringMapFromFile(storePath.c_str(), &newGroupsStrMap);
-
-      // apply loaded targets
-      mirrorBuddyGroups.clear();
-      importFromStringMap(newGroupsStrMap);
-
-      mappingsDirty = true;
-
-      return true;
-   }
-   catch (InvalidConfigException& e)
-   {
-      LOG_DEBUG(__func__, Log_DEBUG, "Unable to open mirror buddy groups mappings file: "
-         + storePath + ". " + "SysErr: " + System::getErrString());
-
-      return false;
-   }
-}
-
-/**
- * Note: setStorePath must be called before using this.
- */
-bool MirrorBuddyGroupMapper::saveToFile()
-{
-   RWLockGuard safeLock(rwlock, SafeRWLock_WRITE);
-
-   if ( storePath.empty() )
-      return false;
-
-   try
-   {
-      StringMap groupsStrMap;
-
-      exportToStringMap(groupsStrMap);
-
-      MapTk::saveStringMapToFile(storePath.c_str(), &groupsStrMap);
-
-      mappingsDirty = false;
-
-      return true;
-   }
-   catch (InvalidConfigException& e)
-   {
-      LogContext(__func__).logErr(
-         "Unable to save mirror buddy groups mappings file: " + storePath + ". " + "SysErr: "
-            + System::getErrString());
-
-      return false;
-   }
-}
-
-/**
- * Note: unlocked, caller must hold lock.
- */
-void MirrorBuddyGroupMapper::exportToStringMap(StringMap& outExportMap) const
-{
-   for ( MirrorBuddyGroupMapCIter iter = mirrorBuddyGroups.begin(); iter != mirrorBuddyGroups.end();
-      iter++ )
-   {
-      const MirrorBuddyGroup mbg = iter->second;
-
-      const std::string mbgStr = StringTk::uint16ToHexStr(mbg.firstTargetID) + ","
-         + StringTk::uint16ToHexStr(mbg.secondTargetID);
-
-      outExportMap[StringTk::uintToHexStr(iter->first)] = mbgStr;
-   }
-}
-
-/**
- * Note: unlocked, caller must hold lock.
- * Note: the internal map is not cleared in this method.
- */
-void MirrorBuddyGroupMapper::importFromStringMap(StringMap& importMap)
-{
-   for(StringMapIter iter = importMap.begin(); iter != importMap.end(); iter++)
-   {
-      const uint16_t groupID = StringTk::strHexToUInt(iter->first);
-      const std::string mbgStr = iter->second;
-      StringVector mbgStrVec;
-
-      StringTk::explode(mbgStr, ',', &mbgStrVec);
-
-      if (mbgStrVec.size() > 1)
-      {
-         const uint16_t primaryTargetID = StringTk::strHexToUInt(mbgStrVec[0]);
-         const uint16_t secondaryTargetID = StringTk::strHexToUInt(mbgStrVec[1]);
-         mirrorBuddyGroups[groupID] = MirrorBuddyGroup(primaryTargetID, secondaryTargetID);
-
-         // add to attached storage pools
-         // NOTE: only groups, which are not already present in a pool are added. This should
-         // usually not happen, but is normal after an update from BeeGFS v6
-         if (storagePools)
-         {
-            // automatically add the buddy group to the pool of the primary target
-            const StoragePoolId poolID = storagePools->getPool(primaryTargetID)->getId();
-            storagePools->addBuddyGroup(groupID, poolID, true);
-         }
-      }
-      else
-      {
-         LogContext(__func__).logErr("Corrupt importMap supplied");
-         mirrorBuddyGroups[groupID] = MirrorBuddyGroup(0, 0);
-      }
-   }
-}
-
 /*
  * generate a free buddy group ID.
  *
@@ -391,12 +263,26 @@ void MirrorBuddyGroupMapper::importFromStringMap(StringMap& importMap)
  */
 uint16_t MirrorBuddyGroupMapper::generateID() const
 {
-   UInt16List groupIDs;
-   MirrorBuddyGroupList groupList;
+   typedef MirrorBuddyGroupMap::value_type Group;
+   const auto hasGap = [] (const Group& a, const Group& b) {
+      return a.first + 1 < b.first;
+   };
 
-   getMappingAsListsUnlocked(groupIDs, groupList);
+   if (mirrorBuddyGroups.empty())
+      return 1;
 
-   return MirrorBuddyGroupCreator::generateID(&groupIDs);
+   if (mirrorBuddyGroups.rbegin()->first
+         < std::numeric_limits<MirrorBuddyGroupMap::key_type>::max())
+      return mirrorBuddyGroups.rbegin()->first + 1;
+
+   if (mirrorBuddyGroups.begin()->first > 1)
+      return 1;
+
+   const auto gap = std::adjacent_find( mirrorBuddyGroups.begin(), mirrorBuddyGroups.end(), hasGap);
+   if (gap != mirrorBuddyGroups.end())
+      return gap->first + 1;
+
+   return 0;
 }
 
 /*
@@ -586,38 +472,7 @@ void MirrorBuddyGroupMapper::attachNodeStore(NodeStore* usableNodes)
 */
 void MirrorBuddyGroupMapper::attachStoragePoolStore(StoragePoolStore* storagePools)
 {
-   RWLockGuard(rwlock, SafeRWLock_WRITE);
+   RWLockGuard const _(rwlock, SafeRWLock_WRITE);
 
    this->storagePools = storagePools;
 }
-
-
-/**
- * Switch buddy buddy group's primary and secondary targets.
- *
- * Note: Unlocked, caller must hold writelock.
- * Note: Private, but intended to be called by friend class MgmtdTargetStateStore.
- */
-void MirrorBuddyGroupMapper::switchover(uint16_t buddyGroupID)
-{
-   const char* logContext = "Primary/secondary switch";
-
-   MirrorBuddyGroupMapIter iter = mirrorBuddyGroups.find(buddyGroupID);
-
-   if (unlikely(iter == mirrorBuddyGroups.end() ) )
-   {
-      LogContext(logContext).log(Log_ERR, "Unknown mirror group ID: "
-         + StringTk::uintToStr(buddyGroupID) );
-
-      return;
-   }
-
-   MirrorBuddyGroup& mbg = iter->second;
-
-   LogContext(logContext).log(Log_WARNING, "Switching primary and secondary target. "
-         "Mirror group ID: "+ StringTk::uintToStr(iter->first) );
-
-   std::swap(mbg.firstTargetID, mbg.secondTargetID);
-   mappingsDirty = true;
-}
-

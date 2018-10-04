@@ -22,10 +22,6 @@ static inline void SetAttrMsg_initFromEntryInfo(SetAttrMsg* this, const EntryInf
 // virtual functions
 extern void SetAttrMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
 
-// getters & setters
-static inline int SetAttrMsg_getValidAttribs(SetAttrMsg* this);
-static inline SettableFileAttribs* SetAttrMsg_getAttribs(SetAttrMsg* this);
-
 
 struct SetAttrMsg
 {
@@ -63,16 +59,5 @@ void SetAttrMsg_initFromEntryInfo(SetAttrMsg* this, const EntryInfo* entryInfo, 
    if (fileEvent)
       this->netMessage.msgHeader.msgFeatureFlags |= SETATTRMSG_FLAG_HAS_EVENT;
 }
-
-int SetAttrMsg_getValidAttribs(SetAttrMsg* this)
-{
-   return this->validAttribs;
-}
-
-SettableFileAttribs* SetAttrMsg_getAttribs(SetAttrMsg* this)
-{
-   return &this->attribs;
-}
-
 
 #endif /*SETATTRMSG_H_*/

@@ -1,6 +1,8 @@
 #include <program/Program.h>
 #include "MsgHelperLocking.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 /**
  * Try to recover a file session that got lost (e.g. due to a mds restart) and was implicitly
@@ -36,7 +38,7 @@ FhgfsOpsErr MsgHelperLocking::trySesssionRecovery(EntryInfo* entryInfo, NumNodeI
    if(openRes != FhgfsOpsErr_SUCCESS)
    { // file could not be opened => there's nothing we can do in this case
       LogContext(logContext).log(Log_WARNING, std::string("Recovery of file session failed: ") +
-         FhgfsOpsErrTk::toErrString(openRes) );
+         boost::lexical_cast<std::string>(openRes));
 
       return openRes;
    }

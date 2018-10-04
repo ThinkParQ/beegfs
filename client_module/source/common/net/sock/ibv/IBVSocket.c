@@ -79,7 +79,7 @@ bool __IBVSocket_createNewID(IBVSocket* _this)
 {
    struct rdma_cm_id* new_cm_id;
 
-   #if defined(OFED_HAS_NETNS)
+   #if defined(OFED_HAS_NETNS) || defined(rdma_create_id)
       new_cm_id = rdma_create_id(&init_net, __IBVSocket_cmaHandler, _this, RDMA_PS_TCP, IB_QPT_RC);
    #elif defined(OFED_HAS_RDMA_CREATE_QPTYPE)
       new_cm_id = rdma_create_id(__IBVSocket_cmaHandler, _this, RDMA_PS_TCP, IB_QPT_RC);

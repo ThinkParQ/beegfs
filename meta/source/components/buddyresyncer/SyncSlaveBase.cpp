@@ -30,24 +30,16 @@ void SyncSlaveBase::run()
 
 FhgfsOpsErr SyncSlaveBase::receiveAck(Socket& socket)
 {
-   char* respBuf = nullptr;
-   NetMessage* respMsg = nullptr;
-
-   const unsigned respLength = MessagingTk::recvMsgBuf(&socket, &respBuf, 0);
-   if (respLength == 0)
+   auto resp = MessagingTk::recvMsgBuf(socket);
+   if (resp.empty())
       return FhgfsOpsErr_INTERNAL;
 
-   respMsg = PThread::getCurrentThreadApp()->getNetMessageFactory()->createFromBuf(
-         respBuf, respLength);
+   const auto respMsg = PThread::getCurrentThreadApp()->getNetMessageFactory()->createFromBuf(
+         std::move(resp));
    if (respMsg->getMsgType() != NETMSGTYPE_ResyncRawInodesResp)
       return FhgfsOpsErr_COMMUNICATION;
 
-   const FhgfsOpsErr result = static_cast<ResyncRawInodesRespMsg*>(respMsg)->getResult();
-
-   delete respMsg;
-   free(respBuf);
-
-   return result;
+   return static_cast<ResyncRawInodesRespMsg&>(*respMsg).getResult();
 }
 
 FhgfsOpsErr SyncSlaveBase::resyncAt(const Path& basePath, bool wholeDirectory,
@@ -76,7 +68,7 @@ FhgfsOpsErr SyncSlaveBase::resyncAt(const Path& basePath, bool wholeDirectory,
       return commRes;
    }
 
-   const auto resyncRes = static_cast<ResyncRawInodesRespMsg*>(rrArgs.outRespMsg)->getResult();
+   const auto resyncRes = static_cast<ResyncRawInodesRespMsg&>(*rrArgs.outRespMsg).getResult();
 
    if (resyncRes != FhgfsOpsErr_SUCCESS)
       LOG(MIRRORING, ERR, "Error while resyncing directory.", basePath, resyncRes);
@@ -168,14 +160,14 @@ FhgfsOpsErr SyncSlaveBase::streamInode(Socket& socket, const Path& inodeRelPath,
       auto xattrs = XAttrTk::listUserXAttrs(fullPath.str());
       if (xattrs.first != FhgfsOpsErr_SUCCESS)
       {
-         LOG(MIRRORING, ERR, "Could not list resync candidate xattrs.", fullPath, as("error", xattrs.first));
+         LOG(MIRRORING, ERR, "Could not list resync candidate xattrs.", fullPath, ("error", xattrs.first));
          xattrs.second.clear();
          return FhgfsOpsErr_INTERNAL;
       }
 
       MsgHelperXAttr::StreamXAttrState state(fullPath.str(), std::move(xattrs.second));
 
-      const FhgfsOpsErr xattrRes = state.streamXattrFn(&socket, &state);
+      const FhgfsOpsErr xattrRes = MsgHelperXAttr::StreamXAttrState::streamXattrFn(&socket, &state);
       if (xattrRes != FhgfsOpsErr_SUCCESS)
       {
          LOG(MIRRORING, ERR, "Error while sending xattrs to secondary.", fullPath, xattrRes);

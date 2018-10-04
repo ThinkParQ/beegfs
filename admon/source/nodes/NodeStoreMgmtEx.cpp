@@ -1,7 +1,6 @@
-#include <common/threading/SafeMutexLock.h>
-#include <common/toolkit/Random.h>
 #include "NodeStoreMgmtEx.h"
 
+#include <mutex>
 
 NodeStoreMgmtEx::NodeStoreMgmtEx():
    NodeStoreServers(NODETYPE_Mgmt, false)
@@ -13,17 +12,12 @@ NodeStoreMgmtEx::NodeStoreMgmtEx():
 bool NodeStoreMgmtEx::addOrUpdateNode(std::shared_ptr<MgmtNodeEx> node)
 {
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
-   bool precheckRes = addOrUpdateNodePrecheck(*node);
-   if(!precheckRes)
+   if (!node->getNumID())
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
-   bool retVal = addOrUpdateNodeUnlocked(std::move(node), NULL);
-
-   mutexLock.unlock(); // U N L O C K
-
-   return retVal;
+   return addOrUpdateNodeUnlocked(std::move(node), NULL);
 }
 
 /**
@@ -47,11 +41,10 @@ bool NodeStoreMgmtEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* o
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
-   bool precheckRes = addOrUpdateNodePrecheck(*node);
-   if(!precheckRes)
+   if (!node->getNumID())
       return false;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    // check if this is a new node
 
@@ -65,23 +58,13 @@ bool NodeStoreMgmtEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* o
             node->getPortTCP(), nicList);
    }
 
-   bool retVal = addOrUpdateNodeUnlocked(std::move(node), NULL);
-
-   mutexLock.unlock(); // U N L O C K
-
-   return retVal;
+   return addOrUpdateNodeUnlocked(std::move(node), NULL);
 }
 
 void NodeStoreMgmtEx::deleteAllNodes()
 {
-   auto node = referenceFirstNode();
-
-   while(node)
-   {
+   for (const auto& node : referenceAllNodes())
       deleteNode(node->getNumID() );
-
-      node = referenceNextNode(node);
-   }
 }
 
 bool NodeStoreMgmtEx::statusMgmtd(NumNodeID nodeID, std::string *outInfo)

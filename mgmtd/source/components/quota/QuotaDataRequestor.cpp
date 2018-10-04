@@ -8,16 +8,13 @@
  *
  * @param outQuotaData the map for the quota data separated for every target
  * @param outQuotaResultsRWLock the lock for outQuotaData
- * @param isStoreDirty is set to true if some data are changed in the given map and the quota data
- *                     needs to be stored on the hard-drives
  *
  * @return true if the quota data successful collected from the storage servers
  */
 bool QuotaDataRequestor::requestQuota(QuotaDataMapForTarget* outQuotaData,
-   RWLock* outQuotaResultsRWLock, bool* isStoreDirty)
+   RWLock* outQuotaResultsRWLock)
 {
    App* app = Program::getApp();
-   NodeStoreServers* mgmtNodes = app->getMgmtNodes();
    NodeStoreServers* storageNodes = app->getStorageNodes();
    TargetMapper* mapper = app->getTargetMapper();
 
@@ -30,31 +27,22 @@ bool QuotaDataRequestor::requestQuota(QuotaDataMapForTarget* outQuotaData,
    }
 
    //remove all duplicated IDs, the list::unique() needs a sorted list
-   if(this->cfg.cfgIDList.size() > 0)
+   if (!this->cfg.cfgIDList.empty())
    {
       this->cfg.cfgIDList.sort();
       this->cfg.cfgIDList.unique();
    }
 
-   auto mgmtNode = mgmtNodes->referenceFirstNode();
-
-   if (!mgmtNode)
-      return false;
-
    QuotaDataMapForTarget tmpQuotaData;
    QuotaInodeSupport quotaInodeSupport;
 
    // ignore return value, update of quota data is required also when a target is off-line
-   requestQuotaDataAndCollectResponses(mgmtNode, storageNodes, &workQueue, &tmpQuotaData,
-      mapper, false, &quotaInodeSupport);
+   requestQuotaDataAndCollectResponses(storageNodes, &workQueue, &tmpQuotaData, mapper,
+         &quotaInodeSupport);
 
-   SafeRWLock lock(outQuotaResultsRWLock, SafeRWLock_WRITE);                  // W R I T E L O C K
+   RWLockGuard const lock(*outQuotaResultsRWLock, SafeRWLock_WRITE);
 
    updateQuotaDataWithResponse(&tmpQuotaData, outQuotaData, mapper);
-   *isStoreDirty = true;
-
-   lock.unlock();                                                             // U N L O C K
-
 
    return true;
 }
@@ -68,7 +56,7 @@ bool QuotaDataRequestor::requestQuota(QuotaDataMapForTarget* outQuotaData,
  * @param mapper the target mapper with all known targets
  */
 void QuotaDataRequestor::updateQuotaDataWithResponse(QuotaDataMapForTarget* inQuotaData,
-   QuotaDataMapForTarget* outQuotaData, TargetMapper* mapper)
+   QuotaDataMapForTarget* outQuotaData, const TargetMapper* mapper)
 {
    // replace existing quota data of a target or add new quota data of a target
    for(QuotaDataMapForTargetIter iter = inQuotaData->begin(); iter != inQuotaData->end(); iter++)

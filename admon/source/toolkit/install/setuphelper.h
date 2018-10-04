@@ -50,8 +50,8 @@ namespace setuphelper
    int readConfigFile(std::map<std::string, std::string> *paramsMap);
    int changeConfig(std::map<std::string, std::string> *paramsMap, StringList *failedNodes);
    int writeRolesFile(RoleType roleType, StringList *nodeNames);
-   int readRolesFile(RoleType roleType, StringList *nodeNames);
-   int readRolesFile(RoleType roleType, StringVector *nodeNames);
+   int readRolesFile(RoleType roleType, StringList *outNodeNames);
+   int readRolesFile(RoleType roleType, StringVector *outNodeNames);
    int updateAdmonConfig();
 
    int detectIBPaths(std::string host, StringList *incPaths, StringList *libPaths,

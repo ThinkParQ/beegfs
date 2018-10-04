@@ -23,8 +23,6 @@ typedef struct GenericResponseMsg GenericResponseMsg;
 
 
 static inline void GenericResponseMsg_init(GenericResponseMsg* this);
-static inline void GenericResponseMsg_initFromValue(GenericResponseMsg* this,
-   GenericRespMsgCode controlCode, const char* logStr);
 
 // getters & setters
 static inline GenericRespMsgCode GenericResponseMsg_getControlCode(GenericResponseMsg* this);
@@ -51,18 +49,6 @@ struct GenericResponseMsg
 void GenericResponseMsg_init(GenericResponseMsg* this)
 {
    SimpleIntStringMsg_init( (SimpleIntStringMsg*)this, NETMSGTYPE_GenericResponse);
-}
-
-/**
- * @param controlCode GenericRespMsgCode_...
- * @param logStr human-readable explanation or background information; (just a reference, so don't
- *    free or modify it while this msg is used).
- */
-void GenericResponseMsg_initFromValue(GenericResponseMsg* this, GenericRespMsgCode controlCode,
-   const char* logStr)
-{
-   SimpleIntStringMsg_initFromValue( (SimpleIntStringMsg*)this, NETMSGTYPE_GenericResponse,
-      controlCode, logStr);
 }
 
 GenericRespMsgCode GenericResponseMsg_getControlCode(GenericResponseMsg* this)

@@ -8,7 +8,6 @@ struct UInt16ListIter;
 typedef struct UInt16ListIter UInt16ListIter;
 
 static inline void UInt16ListIter_init(UInt16ListIter* this, UInt16List* list);
-static inline bool UInt16ListIter_hasNext(UInt16ListIter* this);
 static inline void UInt16ListIter_next(UInt16ListIter* this);
 static inline uint16_t UInt16ListIter_value(UInt16ListIter* this);
 static inline bool UInt16ListIter_end(UInt16ListIter* this);
@@ -23,11 +22,6 @@ struct UInt16ListIter
 void UInt16ListIter_init(UInt16ListIter* this, UInt16List* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool UInt16ListIter_hasNext(UInt16ListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void UInt16ListIter_next(UInt16ListIter* this)

@@ -7,8 +7,6 @@
 
 bool FixInodeOwnersInDentryMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("FixInodeOwnersInDentryMsg incoming", 4,
-      "Received a FixInodeOwnersInDentryMsg from: " + ctx.peerName() );
    LogContext log("FixInodeOwnersInDentryMsgEx");
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();

@@ -4,6 +4,8 @@
 
 #define CONFIG_DEFAULT_CFGFILENAME "/etc/beegfs/beegfs-storage.conf"
 
+#define CONFIG_STORAGETARGETS_DELIMITER   ','
+
 
 Config::Config(int argc, char** argv) :
       AbstractConfig(argc, argv)
@@ -27,11 +29,8 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("connInterfacesFile",       "");
    configMapRedefine("connInterfacesList",       "");
 
-   configMapRedefine("debugRunComponentThreads", "true");
-
    configMapRedefine("storeStorageDirectory",    "");
    configMapRedefine("storeAllowFirstRunInit",   "true");
-   configMapRedefine("storeInitHashDirs",        "false");
 
    configMapRedefine("tuneNumStreamListeners",        "1");
    configMapRedefine("tuneNumWorkers",                "8");
@@ -95,14 +94,24 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          connInterfacesFile = iter->second;
       else if (iter->first == std::string("connInterfacesList"))
          connInterfacesList = iter->second;
-      else if (iter->first == std::string("debugRunComponentThreads"))
-         debugRunComponentThreads = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("storeStorageDirectory"))
-         storeStorageDirectory = iter->second;
+      {
+         storageDirectories.clear();
+
+         std::list<std::string> split;
+
+         StringTk::explode(iter->second, CONFIG_STORAGETARGETS_DELIMITER, &split);
+
+         std::transform(
+               split.begin(), split.end(),
+               std::back_inserter(storageDirectories),
+               [] (const std::string& p) {
+                  return Path(StringTk::trim(p));
+               });
+         storageDirectories.remove_if(std::mem_fn(&Path::empty));
+      }
       else if (iter->first == std::string("storeAllowFirstRunInit"))
          storeAllowFirstRunInit = StringTk::strToBool(iter->second);
-      else if(iter->first == std::string("storeInitHashDirs") )
-         storeInitHashDirs = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("tuneNumStreamListeners"))
          tuneNumStreamListeners = StringTk::strToUInt(iter->second);
       else if (iter->first == std::string("tuneNumWorkers"))

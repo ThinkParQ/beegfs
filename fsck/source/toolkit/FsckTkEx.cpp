@@ -7,8 +7,9 @@
 #include <common/toolkit/ListTk.h>
 #include <common/toolkit/FsckTk.h>
 #include <common/toolkit/UnitTk.h>
-#include <common/toolkit/VersionTk.h>
 #include <program/Program.h>
+
+#include <mutex>
 
 char FsckTkEx::progressChar = '-';
 Mutex FsckTkEx::outputMutex;
@@ -38,28 +39,22 @@ bool FsckTkEx::checkReachability()
       commSuccess = false;
    }
 
-   auto node = metaNodes->referenceFirstNode();
-   while (node)
+   for (const auto& node : metaNodes->referenceAllNodes())
    {
       if ( !FsckTkEx::checkReachability(*node, NODETYPE_Meta) )
       {
          errors.push_back("Communication with metadata node failed: " + node->getID());
          commSuccess = false;
       }
-
-      node = metaNodes->referenceNextNode(node);
    }
 
-   node = storageNodes->referenceFirstNode();
-   while (node)
+   for (const auto& node : storageNodes->referenceAllNodes())
    {
       if ( !FsckTkEx::checkReachability(*node, NODETYPE_Storage) )
       {
          errors.push_back("Communication with storage node failed: " + node->getID());
          commSuccess = false;
       }
-
-      node = storageNodes->referenceNextNode(node);
    }
 
    if ( commSuccess )
@@ -83,35 +78,23 @@ bool FsckTkEx::checkReachability(Node& node, NodeType nodetype)
 {
    bool retVal = false;
    HeartbeatRequestMsg heartbeatRequestMsg;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    std::string realNodeID = node.getID();
 
-   bool commRes = MessagingTk::requestResponse(node, &heartbeatRequestMsg, NETMSGTYPE_Heartbeat,
-      &respBuf, &respMsg);
-   if(commRes)
+   const auto respMsg = MessagingTk::requestResponse(node, heartbeatRequestMsg,
+         NETMSGTYPE_Heartbeat);
+   if (respMsg)
    {
-      HeartbeatMsg *heartbeatMsg = (HeartbeatMsg *) respMsg;
+      HeartbeatMsg *heartbeatMsg = (HeartbeatMsg *) respMsg.get();
       std::string receivedNodeID = heartbeatMsg->getNodeID();
-      if(receivedNodeID.compare(realNodeID) == 0)
-      {
-         retVal = true;
-      }
-      else
-      {
-         retVal = false;
-      }
+      retVal = receivedNodeID.compare(realNodeID) == 0;
    }
-
-   SAFE_FREE(respBuf);
-   SAFE_DELETE(respMsg);
 
    return retVal;
 }
 
 void FsckTkEx::fsckOutput(std::string text, int optionFlags)
 {
-   SafeMutexLock mutexLock(&outputMutex);
+   const std::lock_guard<Mutex> lock(outputMutex);
 
    static bool fileErrLogged = false; // to make sure we print logfile open err only once
 
@@ -242,8 +225,6 @@ void FsckTkEx::fsckOutput(std::string text, int optionFlags)
    {
       fclose(logFile);
    }
-
-   mutexLock.unlock();
 }
 
 void FsckTkEx::printVersionHeader(bool toStdErr, bool noLogFile)
@@ -266,7 +247,8 @@ void FsckTkEx::printVersionHeader(bool toStdErr, bool noLogFile)
 
 void FsckTkEx::progressMeter()
 {
-   SafeMutexLock mutexLock(&outputMutex);
+   const std::lock_guard<Mutex> lock(outputMutex);
+
    printf("\b%c",progressChar);
    fflush(stdout);
 
@@ -299,8 +281,6 @@ void FsckTkEx::progressMeter()
       }
 
    }
-
-   mutexLock.unlock();
 }
 
 /*
@@ -314,20 +294,17 @@ int64_t FsckTkEx::calcNeededSpace()
    // get used inodes from all meta data servers and sum them up
    NodeStore* metaNodes = Program::getApp()->getMetaNodes();
 
-   auto metaNode = metaNodes->referenceFirstNode();
-   while (metaNode)
+   for (const auto& metaNode : metaNodes->referenceAllNodes())
    {
       NumNodeID nodeID = metaNode->getNumID();
 
       StatStoragePathMsg statStoragePathMsg(0);
-      char* respBuf = NULL;
-      NetMessage* respMsg = NULL;
 
-      bool commRes = MessagingTk::requestResponse(*metaNode, &statStoragePathMsg,
-         NETMSGTYPE_StatStoragePathResp, &respBuf, &respMsg);
-      if ( commRes )
+      const auto respMsg = MessagingTk::requestResponse(*metaNode, statStoragePathMsg,
+         NETMSGTYPE_StatStoragePathResp);
+      if (respMsg)
       {
-         StatStoragePathRespMsg* statStoragePathRespMsg = (StatStoragePathRespMsg *) respMsg;
+         StatStoragePathRespMsg* statStoragePathRespMsg = (StatStoragePathRespMsg *) respMsg.get();
          int64_t usedInodes = statStoragePathRespMsg->getInodesTotal()
             - statStoragePathRespMsg->getInodesFree();
          neededSpace += usedInodes * NEEDED_DISKSPACE_META_INODE;
@@ -339,19 +316,13 @@ int64_t FsckTkEx::calcNeededSpace()
             + nodeID.str());
          return 0;
       }
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
-
-      metaNode = metaNodes->referenceNextNode(metaNode);
    }
 
    // get used inodes from all storage servers and sum them up
    NodeStore* storageNodes = Program::getApp()->getStorageNodes();
    TargetMapper* targetMapper = Program::getApp()->getTargetMapper();
 
-   auto storageNode = storageNodes->referenceFirstNode();
-   while (storageNode)
+   for (const auto& storageNode : storageNodes->referenceAllNodes())
    {
       NumNodeID nodeID = storageNode->getNumID();
       UInt16List targetIDs;
@@ -362,14 +333,12 @@ int64_t FsckTkEx::calcNeededSpace()
       {
          uint16_t targetID = *targetIDIter;
          StatStoragePathMsg statStoragePathMsg(targetID);
-         char* respBuf = NULL;
-         NetMessage* respMsg = NULL;
 
-         bool commRes = MessagingTk::requestResponse(*storageNode, &statStoragePathMsg,
-            NETMSGTYPE_StatStoragePathResp, &respBuf, &respMsg);
-         if ( commRes )
+         const auto respMsg = MessagingTk::requestResponse(*storageNode, statStoragePathMsg,
+            NETMSGTYPE_StatStoragePathResp);
+         if (respMsg)
          {
-            StatStoragePathRespMsg* statStoragePathRespMsg = (StatStoragePathRespMsg *) respMsg;
+            auto* statStoragePathRespMsg = (StatStoragePathRespMsg *) respMsg.get();
             int64_t usedInodes = statStoragePathRespMsg->getInodesTotal()
                - statStoragePathRespMsg->getInodesFree();
             neededSpace += usedInodes * NEEDED_DISKSPACE_STORAGE_INODE;
@@ -381,12 +350,7 @@ int64_t FsckTkEx::calcNeededSpace()
                + nodeID.str());
             return -1;
          }
-
-         SAFE_FREE(respBuf);
-         SAFE_DELETE(respMsg);
       }
-
-      storageNode = storageNodes->referenceNextNode(storageNode);
    }
 
    // now we take the calculated approximation and double it to have a lot of space for errors
@@ -482,21 +446,16 @@ FhgfsOpsErr FsckTkEx::startModificationLogging(NodeStore* metaNodes, Node& local
    {
       auto node = metaNodes->referenceNode((*iter)->getNumID());
 
-      bool commRes;
-      char *respBuf = NULL;
-      NetMessage *respMsg = NULL;
-
       NicAddressList nicList;
       FsckSetEventLoggingMsg fsckSetEventLoggingMsg(true, localPortUDP,
          &localNicList, forceRestart);
 
-      commRes = MessagingTk::requestResponse(*node, &fsckSetEventLoggingMsg,
-         NETMSGTYPE_FsckSetEventLoggingResp, &respBuf, &respMsg);
+      const auto respMsg = MessagingTk::requestResponse(*node, fsckSetEventLoggingMsg,
+         NETMSGTYPE_FsckSetEventLoggingResp);
 
-      if (commRes)
+      if (respMsg)
       {
-         FsckSetEventLoggingRespMsg* fsckSetEventLoggingRespMsg =
-            (FsckSetEventLoggingRespMsg*) respMsg;
+         auto* fsckSetEventLoggingRespMsg = (FsckSetEventLoggingRespMsg*) respMsg.get();
 
          bool started = fsckSetEventLoggingRespMsg->getLoggingEnabled();
 
@@ -506,9 +465,6 @@ FhgfsOpsErr FsckTkEx::startModificationLogging(NodeStore* metaNodes, Node& local
                   + node->getID());
 
             retVal = FhgfsOpsErr_INUSE;
-
-            SAFE_FREE(respBuf);
-            SAFE_DELETE(respMsg);
             break;
          }
       }
@@ -517,9 +473,6 @@ FhgfsOpsErr FsckTkEx::startModificationLogging(NodeStore* metaNodes, Node& local
          LogContext(logContext).logErr("Communication error occured with node: " + node->getID());
          retVal = FhgfsOpsErr_COMMUNICATION;
       }
-
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
    }
 
    return retVal;
@@ -553,20 +506,15 @@ bool FsckTkEx::stopModificationLogging(NodeStore* metaNodes)
 
       auto node = metaNodes->referenceNode(nodeID);
 
-      bool commRes;
-      char *respBuf = NULL;
-      NetMessage *respMsg = NULL;
-
       NicAddressList nicList;
       FsckSetEventLoggingMsg fsckSetEventLoggingMsg(false, 0, &nicList, false);
 
-      commRes = MessagingTk::requestResponse(*node, &fsckSetEventLoggingMsg,
-         NETMSGTYPE_FsckSetEventLoggingResp, &respBuf, &respMsg);
+      const auto respMsg = MessagingTk::requestResponse(*node, fsckSetEventLoggingMsg,
+         NETMSGTYPE_FsckSetEventLoggingResp);
 
-      if ( commRes )
+      if (respMsg)
       {
-         FsckSetEventLoggingRespMsg* fsckSetEventLoggingRespMsg =
-            (FsckSetEventLoggingRespMsg*) respMsg;
+         auto* fsckSetEventLoggingRespMsg = (FsckSetEventLoggingRespMsg*) respMsg.get();
 
          bool result = fsckSetEventLoggingRespMsg->getResult();
          bool missedEvents = fsckSetEventLoggingRespMsg->getMissedEvents();
@@ -588,9 +536,6 @@ bool FsckTkEx::stopModificationLogging(NodeStore* metaNodes)
          retVal = false;
       }
 
-      SAFE_FREE(respBuf);
-      SAFE_DELETE(respMsg);
-
       if (nodeIdIter == nodeIDs.end())
       {
          nodeIdIter = nodeIDs.begin();
@@ -599,49 +544,6 @@ bool FsckTkEx::stopModificationLogging(NodeStore* metaNodes)
    }
 
    return retVal;
-}
-
-/**
- * Make sure that no metadata node or storage node has a higher fhgfs version than fsck.
- *
- * This is intended to ensure that fsck doesn't report problems or breaks things because it doesn't
- * understand the data format of a newer server version.
- */
-bool FsckTkEx::testVersions(NodeStore* metaNodes, NodeStore* storageNodes)
-{
-   unsigned fsckVersionCode = BEEGFS_VERSION_CODE;
-
-   // check metadata node version codes
-
-   auto node = metaNodes->referenceFirstNode();
-
-   while (node)
-   {
-      unsigned nodeVersionCode = node->getFhgfsVersion();
-
-      bool compareRes = VersionTk::checkRequiredRelease(nodeVersionCode, fsckVersionCode);
-      if(!compareRes)
-         return false;
-
-      node = metaNodes->referenceNextNode(node);
-   }
-
-   // check storage node version codes
-
-   node = storageNodes->referenceFirstNode();
-
-   while (node)
-   {
-      unsigned nodeVersionCode = node->getFhgfsVersion();
-
-      bool compareRes = VersionTk::checkRequiredRelease(nodeVersionCode, fsckVersionCode);
-      if(!compareRes)
-         return false;
-
-      node = storageNodes->referenceNextNode(node);
-   }
-
-   return true;
 }
 
 bool FsckTkEx::checkConsistencyStates()

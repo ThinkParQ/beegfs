@@ -86,6 +86,7 @@ bool NodeListRequestor::getMgmtNodeInfo()
 {
    unsigned numRetries = MGMT_HEARTBEAT_NUM_RETRIES;
    unsigned tryTimeoutMS = MGMT_HEARTBEAT_TIMEOUT_MS;
+   unsigned nameResolutionRetries = MGMT_NAME_RESOLUTION_RETRIES;
 
    for (unsigned i = 0; i <= numRetries; i++)
    {
@@ -94,7 +95,8 @@ bool NodeListRequestor::getMgmtNodeInfo()
 
       // get mgmtd node using NodesTk
       bool waitRes = NodesTk::waitForMgmtHeartbeat(this, dgramLis, mgmtNodes,
-         cfg->getSysMgmtdHostLocked(), cfg->getConnMgmtdPortUDPLocked(), tryTimeoutMS);
+            cfg->getSysMgmtdHostLocked(), cfg->getConnMgmtdPortUDPLocked(), tryTimeoutMS,
+            nameResolutionRetries);
 
       if(waitRes)
       {

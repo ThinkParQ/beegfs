@@ -20,6 +20,8 @@
 #include <toolkit/BuddyCommTk.h>
 #include "InternodeSyncer.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 InternodeSyncer::InternodeSyncer(TargetConsistencyState initialConsistencyState)
    : PThread("XNodeSync"),
@@ -94,14 +96,14 @@ void InternodeSyncer::syncLoop()
 
    while(!waitForSelfTerminateOrder(sleepIntervalMS) )
    {
-      const bool capacityPoolsUpdateForced = getAndResetForcePoolsUpdate();
+      const bool capacityPoolsUpdateForced = forcePoolsUpdate.exchange(false);
       const bool doCapacityPoolsUpdate = capacityPoolsUpdateForced
             || (lastCapacityUpdateT.elapsedMS() > updateCapacityPoolsMS);
-      const bool doTargetStatesUpdate = getAndResetForceTargetStatesUpdate()
+      const bool doTargetStatesUpdate = forceTargetStatesUpdate.exchange(false)
             || (lastTargetStatesUpdateT.elapsedMS() > updateTargetStatesMS);
-      const bool doPublishCapacities = getAndResetForcePublishCapacities()
+      const bool doPublishCapacities = forcePublishCapacities.exchange(false)
             || (lastCapacityPublishedT.elapsedMS() > updateTargetStatesMS);
-      const bool doStoragePoolsUpdate = getAndResetForceStoragePoolsUpdate()
+      const bool doStoragePoolsUpdate = forceStoragePoolsUpdate.exchange(false)
             || (lastStoragePoolsUpdateT.elapsedMS() > updateStoragePoolsMS);
 
       // download & sync nodes
@@ -166,8 +168,8 @@ void InternodeSyncer::syncLoop()
          else
          {
             TargetConsistencyState newConsistencyState;
-            updateMetaStatesAndBuddyGroups(newConsistencyState, true);
-            setNodeConsistencyState(newConsistencyState);
+            if (updateMetaStatesAndBuddyGroups(newConsistencyState, true))
+               setNodeConsistencyState(newConsistencyState);
             downloadAndSyncTargetStatesAndBuddyGroups();
          }
 
@@ -230,7 +232,7 @@ bool InternodeSyncer::updateStorageCapacityPools()
    if(cfg->getSysTargetAttachmentMap() )
       targetMap = *cfg->getSysTargetAttachmentMap(); // user-provided custom assignment map
    else
-      targetMapper->getMapping(targetMap);
+      targetMap = targetMapper->getMapping();
 
    const GetNodeCapacityPoolsRespMsg::PoolsMap& poolsMap = downloadRes.second;
 
@@ -241,7 +243,7 @@ bool InternodeSyncer::updateStorageCapacityPools()
       if (!storagePool)
       {
          LOG(CAPACITY, ERR, "Received capacity pools for unknown storage pool.",
-             as("storagePoolId", iter->first));
+             ("storagePoolId", iter->first));
          
          failed = true;
          continue;
@@ -271,7 +273,7 @@ bool InternodeSyncer::updateTargetBuddyCapacityPools()
       if (!storagePool)
       {
          LOG(CAPACITY, ERR, "Received capacity pools for unknown storage pool.",
-             as("storagePoolId", iter->first));
+             ("storagePoolId", iter->first));
          
          failed = true;
          continue;
@@ -291,7 +293,7 @@ std::pair<bool, GetNodeCapacityPoolsRespMsg::PoolsMap> InternodeSyncer::download
    CapacityPoolQueryType poolType)
 {
    LOG(STATES, DEBUG, "Downloading capacity pools.",
-       as("Pool type", GetNodeCapacityPoolsMsg::queryTypeToStr(poolType)));
+       ("Pool type", GetNodeCapacityPoolsMsg::queryTypeToStr(poolType)));
 
    NodeStore* mgmtNodes = Program::getApp()->getMgmtNodes();
 
@@ -314,7 +316,7 @@ std::pair<bool, GetNodeCapacityPoolsRespMsg::PoolsMap> InternodeSyncer::download
       return std::make_pair(false, GetNodeCapacityPoolsRespMsg::PoolsMap());
 
    // handle result
-   respMsgCast = (GetNodeCapacityPoolsRespMsg*)rrArgs.outRespMsg;
+   respMsgCast = (GetNodeCapacityPoolsRespMsg*)rrArgs.outRespMsg.get();
 
    GetNodeCapacityPoolsRespMsg::PoolsMap poolsMap = respMsgCast->getPoolsMap();
 
@@ -331,7 +333,6 @@ bool InternodeSyncer::registerNode(AbstractDatagramListener* dgramLis)
 
    App* app = Program::getApp();
    NodeStore* mgmtNodes = app->getMgmtNodes();
-   NodeStore* metaNodes = app->getMetaNodes();
    Config* cfg = app->getConfig();
 
    auto mgmtNode = mgmtNodes->referenceFirstNode();
@@ -340,16 +341,14 @@ bool InternodeSyncer::registerNode(AbstractDatagramListener* dgramLis)
 
    Node& localNode = Program::getApp()->getLocalNode();
    NumNodeID localNodeNumID = localNode.getNumID();
-   NumNodeID rootNodeID = metaNodes->getRootNodeNumID();
-   bool rootIsBuddyMirrored = metaNodes->getRootIsBuddyMirrored();
+   NumNodeID rootNodeID = app->getMetaRoot().getID();
+   bool rootIsBuddyMirrored = app->getMetaRoot().getIsMirrored();
    NicAddressList nicList(localNode.getNicList());
-   const BitStore* nodeFeatureFlags = localNode.getNodeFeatures();
 
-   HeartbeatMsg msg(localNode.getID(), localNodeNumID, NODETYPE_Meta, &nicList, nodeFeatureFlags);
+   HeartbeatMsg msg(localNode.getID(), localNodeNumID, NODETYPE_Meta, &nicList);
    msg.setRootNumID(rootNodeID);
    msg.setRootIsBuddyMirrored(rootIsBuddyMirrored);
    msg.setPorts(cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
-   msg.setFhgfsVersion(BEEGFS_VERSION_CODE);
 
    bool nodeRegistered = dgramLis->sendToNodeUDPwithAck(mgmtNode, &msg);
 
@@ -393,14 +392,6 @@ bool InternodeSyncer::updateMetaStatesAndBuddyGroups(TargetConsistencyState& out
       return false;
    }
 
-   UInt16List buddyGroupIDs;
-   UInt16List primaryNodeIDs;
-   UInt16List secondaryNodeIDs;
-
-   UInt16List nodeIDs; // this should actually be targetIDs, but MDS doesn't have targets yet
-   UInt8List reachabilityStates;
-   UInt8List consistencyStates;
-
    unsigned numRetries = 10; // If publishing states fails 10 times, give up (-> POFFLINE).
 
    // Note: Publishing fails if between downloadStatesAndBuddyGroups and
@@ -412,18 +403,11 @@ bool InternodeSyncer::updateMetaStatesAndBuddyGroups(TargetConsistencyState& out
 
    while (!publishSuccess && (numRetries--) )
    {
-      // In case we're already retrying, clear out leftover data from the lists.
-      buddyGroupIDs.clear();
-      primaryNodeIDs.clear();
-      secondaryNodeIDs.clear();
-      nodeIDs.clear();
-      reachabilityStates.clear();
-      consistencyStates.clear();
+      MirrorBuddyGroupMap buddyGroups;
+      TargetStateMap states;
 
-
-      bool downloadRes = NodesTk::downloadStatesAndBuddyGroups(*node, NODETYPE_Meta, &buddyGroupIDs,
-         &primaryNodeIDs, &secondaryNodeIDs, &nodeIDs, &reachabilityStates, &consistencyStates,
-         true);
+      bool downloadRes = NodesTk::downloadStatesAndBuddyGroups(*node, NODETYPE_Meta, buddyGroups,
+         states, true);
 
       if (!downloadRes)
       {
@@ -442,31 +426,26 @@ bool InternodeSyncer::updateMetaStatesAndBuddyGroups(TargetConsistencyState& out
 
       downloadFailedLogged = false;
 
-      UInt8List oldConsistencyStates = consistencyStates;
-
       // Sync buddy groups here, because decideResync depends on it.
-      metaStateStore->syncStatesAndGroupsFromLists(buddyGroupMapper, nodeIDs, reachabilityStates,
-         consistencyStates, buddyGroupIDs, primaryNodeIDs, secondaryNodeIDs, localNodeID);
+      metaStateStore->syncStatesAndGroups(buddyGroupMapper, states,
+         std::move(buddyGroups), localNodeID);
 
       CombinedTargetState newStateFromMgmtd;
       // Find local state which was sent by mgmtd
-      for (ZipIterRange<UInt16List, UInt8List, UInt8List>
-           statesFromMgmtdIter(nodeIDs, reachabilityStates, consistencyStates);
-           !statesFromMgmtdIter.empty(); ++statesFromMgmtdIter)
+      for (const auto& state : states)
       {
-         if (*(statesFromMgmtdIter()->first) == localNodeID.val())
+         if (state.first == localNodeID.val())
          {
-            newStateFromMgmtd = CombinedTargetState(
-               TargetReachabilityState(*(statesFromMgmtdIter()->second) ),
-               TargetConsistencyState(*(statesFromMgmtdIter()->third) ) );
+            newStateFromMgmtd = CombinedTargetState(state.second.reachabilityState,
+               state.second.consistencyState);
          }
       }
 
       TargetConsistencyState localChangedState = decideResync(newStateFromMgmtd);
+      outConsistencyState = localChangedState;
 
       if (!publish)
       {
-         outConsistencyState = localChangedState;
          metaStateStore->setState(localNodeID.val(),
             CombinedTargetState(TargetReachabilityState_ONLINE, localChangedState) );
 
@@ -481,8 +460,6 @@ bool InternodeSyncer::updateMetaStatesAndBuddyGroups(TargetConsistencyState& out
 
       if (publishSuccess)
       {
-         outConsistencyState = localChangedState;
-
          metaStateStore->setState(localNodeID.val(),
             CombinedTargetState(TargetReachabilityState_ONLINE, localChangedState) );
 
@@ -564,7 +541,7 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
 
       // print session files results (upfront)
 
-      if(removedSessionFiles.size() || referencedSessionFiles.size() )
+      if (!removedSessionFiles.empty() || !referencedSessionFiles.empty())
       {
          std::ostringstream logMsgStream;
          logMsgStream << "Removing " << removedSessionFiles.size() << " file sessions. ("
@@ -667,8 +644,8 @@ bool InternodeSyncer::downloadAndSyncNodes()
    if(NodesTk::downloadNodes(*mgmtNode, NODETYPE_Meta, metaNodesList, true, &rootNodeID,
       &rootIsBuddyMirrored) )
    {
-      metaNodes->syncNodes(metaNodesList, &addedMetaNodes, &removedMetaNodes, true, &localNode);
-      if(metaNodes->setRootNodeNumID(rootNodeID, false, rootIsBuddyMirrored) )
+      metaNodes->syncNodes(metaNodesList, &addedMetaNodes, &removedMetaNodes, &localNode);
+      if (app->getMetaRoot().setIfDefault(rootNodeID, rootIsBuddyMirrored))
       {
          LOG(STATES, CRITICAL,
             std::string("Root node ID (from sync results): ") + rootNodeID.str());
@@ -686,7 +663,7 @@ bool InternodeSyncer::downloadAndSyncNodes()
 
    if(NodesTk::downloadNodes(*mgmtNode, NODETYPE_Storage, storageNodesList, true) )
    {
-      storageNodes->syncNodes(storageNodesList, &addedStorageNodes, &removedStorageNodes, true,
+      storageNodes->syncNodes(storageNodesList, &addedStorageNodes, &removedStorageNodes,
          &localNode);
       printSyncResults(NODETYPE_Storage, &addedStorageNodes, &removedStorageNodes);
    }
@@ -700,7 +677,6 @@ void InternodeSyncer::downloadAndSyncClients(bool requeue)
    NodeStore* mgmtNodes = app->getMgmtNodes();
    NodeStoreClients* clientNodes = app->getClientNodes();
    TimerQueue* timerQ = app->getTimerQueue();
-   Node& localNode = app->getLocalNode();
 
    auto mgmtNode = mgmtNodes->referenceFirstNode();
    if(!mgmtNode)
@@ -712,8 +688,7 @@ void InternodeSyncer::downloadAndSyncClients(bool requeue)
 
    if(NodesTk::downloadNodes(*mgmtNode, NODETYPE_Client, clientNodesList, true) )
    {
-      clientNodes->syncNodes(clientNodesList, &addedClientNodes, &removedClientNodes, true,
-         &localNode);
+      clientNodes->syncNodes(clientNodesList, &addedClientNodes, &removedClientNodes);
       printSyncResults(NODETYPE_Client, &addedClientNodes, &removedClientNodes);
 
       syncClients(clientNodesList, true); // sync client sessions
@@ -721,7 +696,7 @@ void InternodeSyncer::downloadAndSyncClients(bool requeue)
 
    if (requeue)
       timerQ->enqueue(std::chrono::minutes(5),
-            std::bind(InternodeSyncer::downloadAndSyncClients, true));
+            [] { InternodeSyncer::downloadAndSyncClients(true); });
 }
 
 bool InternodeSyncer::downloadAndSyncTargetMappings()
@@ -736,12 +711,9 @@ bool InternodeSyncer::downloadAndSyncTargetMappings()
    if(!mgmtNode)
       return false;
 
-   UInt16List targetIDs;
-   NumNodeIDList nodeIDs;
-
-   bool downloadTargetsRes = NodesTk::downloadTargetMappings(*mgmtNode, &targetIDs, &nodeIDs, true);
-   if(downloadTargetsRes)
-      targetMapper->syncTargetsFromLists(targetIDs, nodeIDs);
+   auto mappings = NodesTk::downloadTargetMappings(*mgmtNode, true);
+   if (mappings.first)
+      targetMapper->syncTargets(std::move(mappings.second));
 
    return true;
 }
@@ -789,23 +761,17 @@ bool InternodeSyncer::downloadAndSyncTargetStatesAndBuddyGroups()
    if(!mgmtNode)
       return false;
 
-   UInt16List targetIDs;
-   UInt8List reachabilityStates;
-   UInt8List consistencyStates;
+   TargetStateMap states;
 
-   UInt16List buddyGroupIDs;
-   UInt16List primaryTargetIDs;
-   UInt16List secondaryTargetIDs;
+   MirrorBuddyGroupMap buddyGroups;
 
    bool downloadRes = NodesTk::downloadStatesAndBuddyGroups(*mgmtNode, NODETYPE_Storage,
-      &buddyGroupIDs, &primaryTargetIDs, &secondaryTargetIDs,
-      &targetIDs, &reachabilityStates, &consistencyStates, true);
+      buddyGroups, states, true);
 
    if ( downloadRes )
    {
-      targetStates->syncStatesAndGroupsFromLists(buddyGroupMapper, targetIDs, reachabilityStates,
-         consistencyStates, buddyGroupIDs, primaryTargetIDs, secondaryTargetIDs,
-         app->getLocalNode().getNumID());
+      targetStates->syncStatesAndGroups(buddyGroupMapper, states,
+         std::move(buddyGroups), app->getLocalNode().getNumID());
 
       downloadFailedLogged = false;
    }
@@ -831,17 +797,17 @@ void InternodeSyncer::printSyncResults(NodeType nodeType, NumNodeIDList* addedNo
    Logger* const logger = Logger::getLogger();
    const int logLevel = nodeType == NODETYPE_Client ? Log_DEBUG : Log_WARNING;
 
-   if(addedNodes->size() )
+   if (!addedNodes->empty())
       logger->log(LogTopic_STATES, logLevel, __func__,
             std::string("Nodes added (sync results): ") +
             StringTk::uintToStr(addedNodes->size() ) +
-            " (Type: " + Node::nodeTypeToStr(nodeType) + ")");
+            " (Type: " + boost::lexical_cast<std::string>(nodeType) + ")");
 
-   if(removedNodes->size() )
+   if (!removedNodes->empty())
       logger->log(LogTopic_STATES, logLevel, __func__,
             std::string("Nodes removed (sync results): ") +
             StringTk::uintToStr(removedNodes->size() ) +
-            " (Type: " + Node::nodeTypeToStr(nodeType) + ")");
+            " (Type: " + boost::lexical_cast<std::string>(nodeType) + ")");
 }
 
 /**
@@ -937,8 +903,8 @@ bool InternodeSyncer::publishNodeStateChange(const TargetConsistencyState oldSta
    }
    else
    {
-      ChangeTargetConsistencyStatesRespMsg* respMsgCast =
-         static_cast<ChangeTargetConsistencyStatesRespMsg*>(rrArgs.outRespMsg);
+      const auto respMsgCast =
+            static_cast<const ChangeTargetConsistencyStatesRespMsg*>(rrArgs.outRespMsg.get());
 
       if ( (FhgfsOpsErr)respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
       {
@@ -1006,7 +972,7 @@ void InternodeSyncer::publishNodeCapacity()
    }
    else
    {
-      SetStorageTargetInfoRespMsg* respMsgCast = (SetStorageTargetInfoRespMsg*)rrArgs.outRespMsg;
+      const auto respMsgCast = (const SetStorageTargetInfoRespMsg*)rrArgs.outRespMsg.get();
       failureLogged = false;
 
       if ( (FhgfsOpsErr)respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
@@ -1053,14 +1019,13 @@ void InternodeSyncer::dropIdleConns()
  *
  * @return number of dropped connections
  */
-unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServersEx* nodes)
+unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServers* nodes)
 {
    App* app = Program::getApp();
 
    unsigned numDroppedConns = 0;
 
-   auto node = nodes->referenceFirstNode();
-   while(node)
+   for (const auto& node : nodes->referenceAllNodes())
    {
       /* don't do any idle disconnect stuff with local node
          (the LocalNodeConnPool doesn't support and doesn't need this kind of treatment) */
@@ -1071,8 +1036,6 @@ unsigned InternodeSyncer::dropIdleConnsByStore(NodeStoreServersEx* nodes)
 
          numDroppedConns += connPool->disconnectAndResetIdleStreams();
       }
-
-      node = nodes->referenceNextNode(node); // iterate to next node
    }
 
    return numDroppedConns;
@@ -1146,28 +1109,20 @@ bool InternodeSyncer::downloadExceededQuotaList(StoragePoolId storagePoolId, Quo
 
    RequestExceededQuotaMsg msg(idType, exType, storagePoolId);
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    RequestExceededQuotaRespMsg* respMsgCast = NULL;
 
-   // connect & communicate
-   commRes = MessagingTk::requestResponse(*mgmtNode, &msg, NETMSGTYPE_RequestExceededQuotaResp,
-      &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+         NETMSGTYPE_RequestExceededQuotaResp);
+   if (!respMsg)
       goto err_exit;
 
    // handle result
-   respMsgCast = (RequestExceededQuotaRespMsg*)respMsg;
+   respMsgCast = (RequestExceededQuotaRespMsg*)respMsg.get();
 
    respMsgCast->getExceededQuotaIDs()->swap(*outIDList);
    error = respMsgCast->getError();
 
    retVal = true;
-
-   // cleanup
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
 err_exit:
    return retVal;
@@ -1218,46 +1173,46 @@ bool InternodeSyncer::downloadAllExceededQuotaLists(const StoragePoolPtr storage
          exceededQuotaStore->updateExceededQuota(&tmpExceededUIDsSize, QuotaDataType_USER,
             QuotaLimitType_SIZE);
       }
+
+      // enable or disable quota enforcement
+      if (error == FhgfsOpsErr_NOTSUPP)
+      {
+         if (cfg->getQuotaEnableEnforcement())
+         {
+            LogContext(logContext).log(Log_DEBUG,
+               "Quota enforcement is enabled in the configuration of this metadata server, "
+                  "but not on the management daemon. "
+                  "The configuration from the management daemon overrides the local setting.");
+         }
+         else
+         {
+            LogContext(logContext).log(Log_DEBUG, "Quota enforcement disabled by management daemon.");
+         }
+
+         cfg->setQuotaEnableEnforcement(false);
+         return true;
+      }
+      else
+      {
+         if (!cfg->getQuotaEnableEnforcement())
+         {
+            LogContext(logContext).log(Log_DEBUG,
+               "Quota enforcement is enabled on the management daemon, "
+                  "but not in the configuration of this metadata server. "
+                  "The configuration from the management daemon overrides the local setting.");
+         }
+         else
+         {
+            LogContext(logContext).log(Log_DEBUG, "Quota enforcement enabled by management daemon.");
+         }
+
+         cfg->setQuotaEnableEnforcement(true);
+      }
    }
    else
    { // error
       LogContext(logContext).logErr("Unable to download exceeded file size quota for users.");
       retVal = false;
-   }
-
-   // enable or disable quota enforcement
-   if (error == FhgfsOpsErr_NOTSUPP)
-   {
-      if (cfg->getQuotaEnableEnforcement())
-      {
-         LogContext(logContext).log(Log_DEBUG,
-            "Quota enforcement is enabled in the configuration of this metadata server, "
-               "but not on the management daemon. "
-               "The configuration from the management daemon overrides the local setting.");
-      }
-      else
-      {
-         LogContext(logContext).log(Log_DEBUG, "Quota enforcement disabled by management daemon.");
-      }
-
-      cfg->setQuotaEnableEnforcement(false);
-      return true;
-   }
-   else
-   {
-      if (!cfg->getQuotaEnableEnforcement())
-      {
-         LogContext(logContext).log(Log_DEBUG,
-            "Quota enforcement is enabled on the management daemon, "
-               "but not in the configuration of this metadata server. "
-               "The configuration from the management daemon overrides the local setting.");
-      }
-      else
-      {
-         LogContext(logContext).log(Log_DEBUG, "Quota enforcement enabled by management daemon.");
-      }
-
-      cfg->setQuotaEnableEnforcement(true);
    }
 
    if (downloadExceededQuotaList(storagePool->getId(), QuotaDataType_GROUP, QuotaLimitType_SIZE,

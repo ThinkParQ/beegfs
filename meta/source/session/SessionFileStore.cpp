@@ -1,6 +1,7 @@
-#include <common/threading/SafeMutexLock.h>
 #include <program/Program.h>
 #include "SessionFileStore.h"
+
+#include <mutex>
 
 /**
  * @param session belongs to the store after calling this method - so do not free it and don't
@@ -9,14 +10,12 @@
  */
 unsigned SessionFileStore::addSession(SessionFile* session)
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    unsigned sessionID = generateNewSessionID();
    session->setSessionID(sessionID);
 
    sessions.insert(SessionFileMapVal(sessionID, new SessionFileReferencer(session) ) );
-
-   mutexLock.unlock();
 
    return sessionID;
 }
@@ -29,14 +28,12 @@ unsigned SessionFileStore::addSession(SessionFile* session)
  */
 bool SessionFileStore::addSession(SessionFile* session, unsigned sessionFileID)
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    session->setSessionID(sessionFileID);
 
    std::pair<SessionFileMapIter, bool> insertRes =
       sessions.insert(SessionFileMapVal(sessionFileID, new SessionFileReferencer(session) ) );
-
-   mutexLock.unlock();
 
    return insertRes.second;
 }
@@ -55,7 +52,7 @@ bool SessionFileStore::addSession(SessionFile* session, unsigned sessionFileID)
  */
 SessionFile* SessionFileStore::addAndReferenceRecoverySession(SessionFile* session)
 {
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    SessionFile* retVal = NULL;
    unsigned sessionID = session->getSessionID();
@@ -74,8 +71,6 @@ SessionFile* SessionFileStore::addAndReferenceRecoverySession(SessionFile* sessi
       retVal = sessionFileRefer->reference();
    }
 
-   mutexLock.unlock(); // U N L O C K
-
    return retVal;
 }
 
@@ -86,24 +81,18 @@ SessionFile* SessionFileStore::addAndReferenceRecoverySession(SessionFile* sessi
  */
 SessionFile* SessionFileStore::referenceSession(unsigned sessionID)
 {
-   SessionFile* session;
-
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    SessionFileMapIter iter = sessions.find(sessionID);
    if(iter == sessions.end() )
    { // not found
-      session = NULL;
+      return NULL;
    }
    else
    {
       SessionFileReferencer* sessionRefer = iter->second;
-      session = sessionRefer->reference();
+      return sessionRefer->reference();
    }
-
-   mutexLock.unlock();
-
-   return session;
 }
 
 void SessionFileStore::releaseSession(SessionFile* session, EntryInfo* entryInfo)
@@ -113,38 +102,38 @@ void SessionFileStore::releaseSession(SessionFile* session, EntryInfo* entryInfo
    unsigned asyncCleanupAccessFlags = 0; // only for asyncCleanup
    MetaFileHandle asyncCleanupFile; // only for asyncCleanup
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   SessionFileMapIter iter = sessions.find(sessionID);
-   if(iter != sessions.end() )
-   { // session exists => decrease refCount
-      SessionFileReferencer* sessionRefer = iter->second;
-      SessionFile* sessionNonRef = sessionRefer->getReferencedObject();
+      SessionFileMapIter iter = sessions.find(sessionID);
+      if(iter != sessions.end() )
+      { // session exists => decrease refCount
+         SessionFileReferencer* sessionRefer = iter->second;
+         SessionFile* sessionNonRef = sessionRefer->getReferencedObject();
 
-      if(unlikely(sessionNonRef->getUseAsyncCleanup() ) )
-      { // marked for async cleanup => check whether we're dropping the last reference
-         if(sessionRefer->getRefCount() == 1)
-         { // we're dropping the last reference => save async cleanup data and trigger cleanup
+         if(unlikely(sessionNonRef->getUseAsyncCleanup() ) )
+         { // marked for async cleanup => check whether we're dropping the last reference
+            if(sessionRefer->getRefCount() == 1)
+            { // we're dropping the last reference => save async cleanup data and trigger cleanup
 
-            asyncCleanup = true;
+               asyncCleanup = true;
 
-            asyncCleanupFile = sessionNonRef->releaseInode();
-            asyncCleanupAccessFlags = sessionNonRef->getAccessFlags();
+               asyncCleanupFile = sessionNonRef->releaseInode();
+               asyncCleanupAccessFlags = sessionNonRef->getAccessFlags();
 
+               sessionRefer->release();
+
+               sessions.erase(iter);
+               delete(sessionRefer);
+            }
+         }
+         else
+         { // the normal case: just release this reference
             sessionRefer->release();
-
-            sessions.erase(iter);
-            delete(sessionRefer);
          }
       }
-      else
-      { // the normal case: just release this reference
-         sessionRefer->release();
-      }
+
    }
-
-   mutexLock.unlock(); // U N L O C K
-
 
    if(unlikely(asyncCleanup) )
       performAsyncCleanup(entryInfo, std::move(asyncCleanupFile), asyncCleanupAccessFlags);
@@ -158,7 +147,7 @@ bool SessionFileStore::removeSession(unsigned sessionID)
 {
    bool delErr = true;
 
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    SessionFileMapIter iter = sessions.find(sessionID);
    if(iter != sessions.end() )
@@ -181,8 +170,6 @@ bool SessionFileStore::removeSession(unsigned sessionID)
       }
    }
 
-   mutexLock.unlock();
-
    return !delErr;
 }
 
@@ -195,7 +182,7 @@ SessionFile* SessionFileStore::removeAndGetSession(unsigned sessionID)
 
    SessionFile* session = NULL;
 
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    SessionFileMapIter iter = sessions.find(sessionID);
    if(iter != sessions.end() )
@@ -211,20 +198,18 @@ SessionFile* SessionFileStore::removeAndGetSession(unsigned sessionID)
       }
    }
 
-   mutexLock.unlock();
-
    return session;
 }
 
 /**
  * Removes all sessions and additionally adds those that had a reference count to the StringList.
- * 
+ *
  * @outRemovedSessions caller is responsible for clean up of contained objects
  */
 void SessionFileStore::removeAllSessions(SessionFileList* outRemovedSessions,
    UIntList* outReferencedSessions)
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    for(SessionFileMapIter iter = sessions.begin(); iter != sessions.end(); iter++)
    {
@@ -241,8 +226,6 @@ void SessionFileStore::removeAllSessions(SessionFileList* outRemovedSessions,
    }
 
    sessions.clear();
-
-   mutexLock.unlock();
 }
 
 /*
@@ -262,13 +245,9 @@ void SessionFileStore::deleteAllSessions()
 
 size_t SessionFileStore::getSize()
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
-   size_t sessionsSize = sessions.size();
-
-   mutexLock.unlock();
-
-   return sessionsSize;
+   return sessions.size();
 }
 
 

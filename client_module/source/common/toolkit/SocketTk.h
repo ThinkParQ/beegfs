@@ -27,8 +27,6 @@ extern bool SocketTk_getHostByName(struct ExternalHelperd* helperd, const char* 
 extern bool SocketTk_getHostByAddrStr(const char* hostAddr, struct in_addr* outIPAddr);
 extern struct in_addr SocketTk_in_aton(const char* hostAddr);
 
-extern bool __SocketTk_pollInterruptedBySignal(void);
-
 extern char* SocketTk_ipaddrToStr(struct in_addr* ipaddress);
 extern char* SocketTk_endpointAddrToString(struct in_addr* ipaddress, unsigned short port);
 extern void SocketTk_endpointAddrToStringNoAlloc(char* buf, unsigned bufLen,

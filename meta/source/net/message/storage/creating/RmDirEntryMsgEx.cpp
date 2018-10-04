@@ -5,11 +5,6 @@
 
 bool RmDirEntryMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("RmDirEntryMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, 4, "Received a RmDirEntryMsg from: " + ctx.peerName() );
-
-
    EntryInfo* parentInfo = getParentInfo();
    std::string entryName = getEntryName();
 

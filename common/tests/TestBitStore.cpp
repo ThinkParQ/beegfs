@@ -1,7 +1,7 @@
 #include <common/toolkit/BitStore.h>
 #include <common/toolkit/Random.h>
 
-#include <math.h>
+#include <cmath>
 
 #include <gtest/gtest.h>
 
@@ -85,7 +85,7 @@ TEST_F(TestBitStore, setSizeAndReset)
 
    while(finished)
    {
-      int higherBitsBlockCount = store.calculateBitBlockCount(size) - 1;
+      int higherBitsBlockCount = BitStore::calculateBitBlockCount(size) - 1;
 
       //set some data to the bit store
       lowerBits(store) = initValue;
@@ -154,7 +154,7 @@ TEST_F(TestBitStore, getter)
 TEST_F(TestBitStore, setter)
 {
    BitStore store(TESTBITSTORE_MAX_BITSTORE_SIZE);
-   int higherBitsBlockCount = store.calculateBitBlockCount(TESTBITSTORE_MAX_BITSTORE_SIZE) - 1;
+   int higherBitsBlockCount = BitStore::calculateBitBlockCount(TESTBITSTORE_MAX_BITSTORE_SIZE) - 1;
 
    // check the setter for all bits
    for(int index = 0; index < TESTBITSTORE_MAX_BITSTORE_SIZE; index++)

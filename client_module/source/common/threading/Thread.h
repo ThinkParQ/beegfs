@@ -38,8 +38,6 @@ static inline bool _Thread_waitForSelfTerminateOrder(Thread* this, int timeoutMS
 // getters & setters
 extern const char* Thread_getName(Thread* this);
 extern void Thread_getCurrentThreadName(char* outBuf);
-extern const char* Thread_getCurrentThreadNameStr(void);
-extern void Thread_yield(void);
 static inline bool Thread_getSelfTerminate(Thread* this);
 static inline void __Thread_setSelfTerminated(Thread* this);
 

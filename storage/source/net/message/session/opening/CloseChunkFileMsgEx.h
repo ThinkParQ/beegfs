@@ -24,6 +24,8 @@ class CloseChunkFileMsgEx : public CloseChunkFileMsg
          DynamicAttribs& outDynAttribs);
       bool getDynamicAttribsByPath(std::string fileHandleID, uint16_t targetID,
          DynamicAttribs& outDynAttribs);
+
+      std::pair<FhgfsOpsErr, DynamicAttribs> close(ResponseContext& ctx);
 };
 
 #endif /*CLOSECHUNKFILEMSGEX_H_*/

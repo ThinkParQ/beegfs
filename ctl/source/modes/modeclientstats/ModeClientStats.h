@@ -17,7 +17,7 @@ class ModeClientStats : public Mode
          allStats(false),
          interval(5),
          perInterval(false),
-         maxLines(20),
+         maxLines(0),
          filter(""),
          rwUnitBytes(false),
          names(false),
@@ -56,7 +56,15 @@ class ModeClientStats : public Mode
       void addNodesToVector();
       void loop();
 
-      void parseAndPrintOpsList(const std::string& id, const ClientOps::OpsList& opsList) const;
+      enum class ParseResult
+      {
+         OK,
+         EMPTY,
+         DIRTY
+      };
+
+      ParseResult parseAndPrintOpsList(
+            const std::string& id, const ClientOps::OpsList& opsList) const;
 
       void makeStdinNonblocking() const;
       void makeStdinBlocking() const;

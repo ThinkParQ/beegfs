@@ -21,16 +21,15 @@ class MessagingTk
 {
    public:
       static bool requestResponse(RequestResponseArgs* rrArgs);
-      static bool requestResponse(Node& node, NetMessage* requestMsg, unsigned respMsgType,
-         char** outRespBuf, NetMessage** outRespMsg);
+      static std::unique_ptr<NetMessage> requestResponse(Node& node, NetMessage& requestMsg,
+            unsigned respMsgType);
       static FhgfsOpsErr requestResponseNode(RequestResponseNode* rrNode,
          RequestResponseArgs* rrArgs);
       static FhgfsOpsErr requestResponseTarget(RequestResponseTarget* rrTarget,
          RequestResponseArgs* rrArgs);
 
-      static unsigned recvMsgBuf(Socket* sock, char** outBuf, int minTimeout = 0);
-      static unsigned recvMsgBuf(Socket* sock, char* bufIn, size_t bufInLen);
-      static std::pair<char*, unsigned> createMsgBuf(NetMessage* msg);
+      static std::vector<char> recvMsgBuf(Socket& socket, int minTimeout = 0);
+      static std::vector<char> createMsgVec(NetMessage& msg);
 
    private:
       MessagingTk() {}

@@ -2,7 +2,7 @@
 #include <program/Program.h>
 #include "Mailer.h"
 
-
+#include <mutex>
 
 /**
  * Adds a node to the list of broken nodes.
@@ -15,7 +15,7 @@
  */
 bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeType)
 {
-   std::string nodeTypeStr = "";
+   std::string nodeTypeStr;
    DownNodeList *list = NULL;
 
    if(nodeType == NODETYPE_Meta)
@@ -54,15 +54,16 @@ bool Mailer::addDownNode(NumNodeID nodeNumID, std::string nodeID, NodeType nodeT
    {
       ExternalJobRunner *jobRunner = Program::getApp()->getJobRunner();
 
+      Job *job(nullptr);
       Mutex mutex;
-      SafeMutexLock mutexLock(&mutex);
+      {
+         const std::lock_guard<Mutex> lock(mutex);
 
-      Job *job = jobRunner->addJob(scriptPath + " " + nodeTypeStr + " " + nodeID, &mutex);
+         job = jobRunner->addJob(scriptPath + " " + nodeTypeStr + " " + nodeID, &mutex);
 
-      while (!job->finished)
-         job->jobFinishedCond.wait(&mutex);
-
-      mutexLock.unlock();
+         while (!job->finished)
+            job->jobFinishedCond.wait(&mutex);
+      }
 
       jobRunner->delJob(job->id);
    }
@@ -494,15 +495,16 @@ int Mailer::sendMailSystem(const std::string& sender, const std::string& recipie
    cmd.append(" -f ").append(runCfg->getMailSender() ); // the sender mail address
    cmd.append(" \"").append(runCfg->getMailRecipient() ).append("\""); // the list of recipients
 
+   Job *job(nullptr);
    Mutex mutex;
-   SafeMutexLock mutexLock(&mutex);
+   {
+      const std::lock_guard<Mutex> lock(mutex);
 
-   Job *job = jobRunner->addJob(cmd, &mutex);
+      job = jobRunner->addJob(cmd, &mutex);
 
-   while (!job->finished)
-      job->jobFinishedCond.wait(&mutex);
-
-   mutexLock.unlock();
+      while (!job->finished)
+         job->jobFinishedCond.wait(&mutex);
+   }
 
    if (job->returnCode != 0)
    {

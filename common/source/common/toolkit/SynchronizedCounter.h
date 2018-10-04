@@ -3,8 +3,9 @@
 
 #include <common/Common.h>
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
+
+#include <mutex>
 
 class SynchronizedCounter
 {
@@ -24,38 +25,30 @@ class SynchronizedCounter
       // inliners
       void waitForCount(unsigned waitCount)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          while(count != waitCount)
             cond.wait(&mutex);
-
-         mutexLock.unlock();
       }
 
       bool timedWaitForCount(unsigned waitCount, int timeoutMS)
       {
-         bool retVal = true;
-
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          if (count != waitCount)
             if ( (!cond.timedwait(&mutex, timeoutMS)) ||  (count < waitCount) )
-               retVal = false;
+               return false;
 
-         mutexLock.unlock();
-
-         return retVal;
+         return true;
       }
 
       void incCount()
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          count++;
 
          cond.broadcast();
-
-         mutexLock.unlock();
       }
 
       void resetUnsynced()

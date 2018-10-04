@@ -15,6 +15,8 @@
 #include <sys/vfs.h>
 #include <toolkit/IoctlTk.h>
 
+#include <boost/lexical_cast.hpp>
+
 
 #define BEEGFS_MAGIC      0x19830326 /* some random number to identify fhgfs (fs type) */
                                     /* (originally defined in client FhgfsOpsSuper.h) */
@@ -113,10 +115,8 @@ bool ModeHelper::registerNode()
    DatagramListener* dgramLis = Program::getApp()->getDatagramListener();
    Node& localNode = Program::getApp()->getLocalNode();
    NicAddressList nicList(localNode.getNicList() );
-   const BitStore* nodeFeatureFlags = localNode.getNodeFeatures();
 
-   HeartbeatMsg msg(localNode.getID(), NumNodeID(), NODETYPE_Client, &nicList, nodeFeatureFlags);
-   msg.setFhgfsVersion(BEEGFS_VERSION_CODE);
+   HeartbeatMsg msg(localNode.getID(), NumNodeID(), NODETYPE_Client, &nicList);
    msg.setPorts(dgramLis->getUDPPort(), 0);
 
    bool nodeRegistered = dgramLis->sendToNodeUDPwithAck(mgmtNode, &msg);
@@ -144,29 +144,25 @@ bool ModeHelper::unregisterNode()
    bool nodeUnregistered = false;
    Node& localNode = Program::getApp()->getLocalNode();
    NumNodeID localNodeNumID = localNode.getNumID();
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    RemoveNodeRespMsg* respMsgCast;
    FhgfsOpsErr serverResult;
 
    RemoveNodeMsg msg(localNodeNumID, NODETYPE_Client);
 
-   // request/response
-   bool commRes = MessagingTk::requestResponse(
-      *mgmtNode, &msg, NETMSGTYPE_RemoveNodeResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg, NETMSGTYPE_RemoveNodeResp);
+   if (!respMsg)
    {
       LogContext(logContext).logErr("Communication error during node deregistration.");
       goto err_cleanup;
    }
 
-   respMsgCast = (RemoveNodeRespMsg*)respMsg;
+   respMsgCast = (RemoveNodeRespMsg*)respMsg.get();
    serverResult = (FhgfsOpsErr)respMsgCast->getValue();
 
    if(serverResult != FhgfsOpsErr_SUCCESS)
    { // deregistration failed
       LogContext(logContext).log(2, std::string("Node deregistration failed: ") +
-         FhgfsOpsErrTk::toErrString(serverResult) );
+         boost::lexical_cast<std::string>(serverResult));
    }
    else
    { // deregistration successful
@@ -176,9 +172,6 @@ bool ModeHelper::unregisterNode()
    }
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return nodeUnregistered;
 }
 
@@ -196,10 +189,7 @@ bool ModeHelper::pathIsOnFhgfs(std::string& path)
     * The ioctl only needs to check the mounted filesystem and to return the FhGFS magic...
     */
    IoctlTk Fhgfsioctl(path);
-   if (Fhgfsioctl.testIsFhGFS() )
-      return true;
-
-   return false;
+   return Fhgfsioctl.testIsFhGFS();
 }
 
 /**
@@ -214,10 +204,7 @@ bool ModeHelper::fdIsOnFhgfs(int fd)
     * The ioctl only needs to check the mounted filesystem and to return the FhGFS magic...
     */
    IoctlTk Fhgfsioctl(fd);
-   if (Fhgfsioctl.testIsFhGFS() )
-      return true;
-
-   return false;
+   return Fhgfsioctl.testIsFhGFS();
 }
 
 
@@ -350,25 +337,19 @@ FhgfsOpsErr ModeHelper::getStorageBuddyResyncStats(uint16_t targetID,
    if (!node)
       return FhgfsOpsErr_UNKNOWNNODE;
 
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-
    GetStorageResyncStatsMsg msg(targetID);
 
-   bool commRes = MessagingTk::requestResponse(
-      *node, &msg, NETMSGTYPE_GetStorageResyncStatsResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg,
+         NETMSGTYPE_GetStorageResyncStatsResp);
+   if (!respMsg)
    {
       retVal = FhgfsOpsErr_COMMUNICATION;
    }
    else
    {
-      GetStorageResyncStatsRespMsg* respMsgCast = (GetStorageResyncStatsRespMsg*)respMsg;
+      GetStorageResyncStatsRespMsg* respMsgCast = (GetStorageResyncStatsRespMsg*)respMsg.get();
       respMsgCast->getJobStats(outStats);
    }
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return retVal;
 }
@@ -386,30 +367,24 @@ FhgfsOpsErr ModeHelper::getMetaBuddyResyncStats(uint16_t nodeID,
    if (!node)
       return FhgfsOpsErr_UNKNOWNNODE;
 
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetMetaResyncStatsMsg msg;
 
-   bool commRes = MessagingTk::requestResponse(
-         *node, &msg, NETMSGTYPE_GetMetaResyncStatsResp, &respBuf, &respMsg);
-   if (!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg, NETMSGTYPE_GetMetaResyncStatsResp);
+   if (!respMsg)
    {
       retVal = FhgfsOpsErr_COMMUNICATION;
    }
    else
    {
-      GetMetaResyncStatsRespMsg* respMsgCast = (GetMetaResyncStatsRespMsg*)respMsg;
+      GetMetaResyncStatsRespMsg* respMsgCast = (GetMetaResyncStatsRespMsg*)respMsg.get();
       respMsgCast->getJobStats(outStats);
    }
-
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 
    return retVal;
 }
 
 bool ModeHelper::getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
-      bool useParent, NodeStoreServers& metaNodes,
+      bool useParent, NodeStoreServers& metaNodes, const RootInfo& metaRoot,
       MirrorBuddyGroupMapper& metaBuddyGroupMapper,
       EntryInfo& outEntryInfo, NodeHandle& outOwnerHandle)
 {
@@ -435,12 +410,12 @@ bool ModeHelper::getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
    else
    {
       FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, useParent, &metaNodes, outOwnerHandle,
-            &outEntryInfo, &metaBuddyGroupMapper);
+            &outEntryInfo, metaRoot, &metaBuddyGroupMapper);
       if(findRes != FhgfsOpsErr_SUCCESS)
       {
          std::cerr << "Unable to find metadata node for path: " << path <<
             std::endl;
-         std::cerr << "Error: " << FhgfsOpsErrTk::toErrString(findRes) << std::endl;
+         std::cerr << "Error: " << findRes << std::endl;
          return false;
       }
    }

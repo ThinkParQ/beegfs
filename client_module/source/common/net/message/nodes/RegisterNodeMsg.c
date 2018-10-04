@@ -11,9 +11,6 @@ void RegisterNodeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 {
    RegisterNodeMsg* thisCast = (RegisterNodeMsg*)this;
 
-   // nodeFeatureFlags
-   BitStore_serialize(thisCast->nodeFeatureFlags, ctx);
-
    // instanceVersion
    Serialization_serializeUInt64(ctx, thisCast->instanceVersion);
 
@@ -29,14 +26,11 @@ void RegisterNodeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    // nodeType
    Serialization_serializeInt(ctx, thisCast->nodeType);
 
-   // fhgfsVersion
-   Serialization_serializeUInt(ctx, thisCast->fhgfsVersion);
-
    // nodeNumID
-   NumNodeID_serialize(&thisCast->nodeNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->nodeNumID);
 
    // rootNumID
-   NumNodeID_serialize(&thisCast->rootNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->rootNumID);
 
    // rootIsBuddyMirrored
    Serialization_serializeBool(ctx, thisCast->rootIsBuddyMirrored);

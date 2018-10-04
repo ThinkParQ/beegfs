@@ -24,8 +24,6 @@ bool MkFileMsgEx::processIncoming(ResponseContext& ctx)
 {
 #ifdef BEEGFS_DEBUG
    const char* logContext = "MkFileMsg incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a MkFileMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
 
    LOG_DEBUG(logContext, Log_DEBUG, "parentEntryID: " +
@@ -35,8 +33,6 @@ bool MkFileMsgEx::processIncoming(ResponseContext& ctx)
       "BuddyMirrored: " + std::string(getParentInfo()->getIsBuddyMirrored() ? "'Yes'" : "'No'") +
       " Secondary: " + std::string(hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond) ?
          "Yes" : "No") );
-
-   App* app = Program::getApp();
 
    if (!hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
       createTime = TimeAbs().getTimeval()->tv_sec;
@@ -55,8 +51,7 @@ bool MkFileMsgEx::processIncoming(ResponseContext& ctx)
 
    BaseType::processIncoming(ctx);
 
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_MKFILE,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_MKFILE);
 
    return true;
 }

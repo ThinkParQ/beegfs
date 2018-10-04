@@ -355,8 +355,7 @@ int ModeStartResync::requestResync(uint16_t syncToTargetID, bool isBuddyGroupID,
          else
             std::cerr << "Could not check for running jobs. nodeID: ";
 
-         std::cerr << syncFromTargetID
-            << "; error: " << FhgfsOpsErrTk::toErrString(getStatsRes) << std::endl;
+         std::cerr << syncFromTargetID << "; error: " << getStatsRes << std::endl;
 
          return APPCODE_RUNTIME_ERROR;
       }
@@ -457,8 +456,7 @@ int ModeStartResync::requestResync(uint16_t syncToTargetID, bool isBuddyGroupID,
    {
       std::cerr << "Resync request not successful; " <<
          (isBuddyGroupID ? "buddy group ID: " : "secondary target ID: ") << syncToTargetID
-         << "; nodeID: " << syncToNodeID << "; Error: "
-         << FhgfsOpsErrTk::toErrString(setResyncStateRes) << std::endl;
+         << "; nodeID: " << syncToNodeID << "; Error: " << setResyncStateRes << std::endl;
 
       return APPCODE_RUNTIME_ERROR;
    }
@@ -495,30 +493,23 @@ FhgfsOpsErr ModeStartResync::setResyncState(uint16_t targetID, NumNodeID nodeID)
    UInt16List targetIDs(1, targetID);
    UInt8List states(1, (uint8_t)TargetConsistencyState_NEEDS_RESYNC);
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    SetTargetConsistencyStatesRespMsg* respMsgCast;
 
    SetTargetConsistencyStatesMsg msg(nodeType, &targetIDs, &states, false);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *node, &msg, NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg,
+         NETMSGTYPE_SetTargetConsistencyStatesResp);
+   if (!respMsg)
    {
       retVal = FhgfsOpsErr_COMMUNICATION;
       goto err_cleanup;
    }
 
-   respMsgCast = (SetTargetConsistencyStatesRespMsg*)respMsg;
+   respMsgCast = (SetTargetConsistencyStatesRespMsg*)respMsg.get();
 
    retVal = respMsgCast->getResult();
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -547,29 +538,22 @@ FhgfsOpsErr ModeStartResync::overrideLastBuddyComm(uint16_t targetID, NumNodeID 
       return FhgfsOpsErr_UNKNOWNNODE;
    }
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    SetLastBuddyCommOverrideRespMsg* respMsgCast;
 
    SetLastBuddyCommOverrideMsg msg(targetID, timestamp, restartResync);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *node, &msg, NETMSGTYPE_SetLastBuddyCommOverrideResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*node, msg,
+         NETMSGTYPE_SetLastBuddyCommOverrideResp);
+   if (!respMsg)
    {
       retVal = FhgfsOpsErr_COMMUNICATION;
       goto err_cleanup;
    }
 
-   respMsgCast = (SetLastBuddyCommOverrideRespMsg*)respMsg;
+   respMsgCast = (SetLastBuddyCommOverrideRespMsg*)respMsg.get();
 
    retVal = (FhgfsOpsErr)respMsgCast->getValue();
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }

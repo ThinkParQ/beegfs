@@ -18,15 +18,12 @@ std::tuple<FileIDLock, DirIDLock> SetXAttrMsgEx::lock(EntryLockStore& store)
 
 bool SetXAttrMsgEx::processIncoming(ResponseContext& ctx)
 {
-   App* app = Program::getApp();
-
 #ifdef BEEGFS_DEBUG
    const char* logContext = "SetXAttrMsg incoming";
    EntryInfo* entryInfo = this->getEntryInfo();
    const std::string& name = this->getName();
 
-   LOG_DEBUG(logContext, Log_DEBUG,
-      "Received a SetXAttrMsg from: " + ctx.peerName() + "; name: " + name + ";");
+   LOG_DEBUG(logContext, Log_DEBUG, "name: " + name + ";");
 
    LOG_DEBUG("SetXAttrMsgEx::processIncoming", Log_DEBUG,
       "ParentID: " + entryInfo->getParentEntryID() + " EntryID: " +
@@ -37,8 +34,7 @@ bool SetXAttrMsgEx::processIncoming(ResponseContext& ctx)
 
    BaseType::processIncoming(ctx);
 
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_SETXATTR,
-      getMsgHeaderUserID() );
+   updateNodeOp(ctx, MetaOpCounter_SETXATTR);
 
    return true;
 }

@@ -2,7 +2,6 @@
 #define SESSIONFILE_H_
 
 #include <common/storage/Path.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/Common.h>
 #include <storage/DirInode.h>
 #include <storage/FileInode.h>

@@ -10,7 +10,7 @@ class MsgHelperStat
 {
    public:
       static FhgfsOpsErr stat(EntryInfo* entryInfo, bool loadFromDisk, unsigned msgUserID,
-         StatData& outStatData, NumNodeID* outParentNodeId = NULL,
+         StatData& outStatData, NumNodeID* outParentNodeID = NULL,
          std::string* outParentEntryID = NULL);
       static FhgfsOpsErr refreshDynAttribs(EntryInfo* entryInfo, bool makePersistent,
          unsigned msgUserID);
@@ -19,9 +19,9 @@ class MsgHelperStat
    private:
       MsgHelperStat() {}
 
-      static FhgfsOpsErr refreshDynAttribsSequential(FileInode& file, const std::string& entryID,
+      static FhgfsOpsErr refreshDynAttribsSequential(FileInode& inode, const std::string& entryID,
          unsigned msgUserID);
-      static FhgfsOpsErr refreshDynAttribsParallel(FileInode& file, const std::string& entryID,
+      static FhgfsOpsErr refreshDynAttribsParallel(FileInode& inode, const std::string& entryID,
          unsigned msgUserID);
 
 

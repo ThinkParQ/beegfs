@@ -10,8 +10,6 @@ bool GetEntryInfoMsgEx::processIncoming(ResponseContext& ctx)
 {
 #ifdef BEEGFS_DEBUG
    const char* logContext = "GetEntryInfoMsg incoming";
-
-   LOG_DEBUG(logContext, 4, "Received a GetEntryInfoMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
 
    EntryInfo* entryInfo = this->getEntryInfo();

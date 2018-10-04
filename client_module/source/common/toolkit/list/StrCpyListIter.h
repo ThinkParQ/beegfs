@@ -8,7 +8,6 @@ struct StrCpyListIter;
 typedef struct StrCpyListIter StrCpyListIter;
 
 static inline void StrCpyListIter_init(StrCpyListIter* this, StrCpyList* list);
-static inline bool StrCpyListIter_hasNext(StrCpyListIter* this);
 static inline void StrCpyListIter_next(StrCpyListIter* this);
 static inline char* StrCpyListIter_value(StrCpyListIter* this);
 static inline bool StrCpyListIter_end(StrCpyListIter* this);
@@ -23,11 +22,6 @@ struct StrCpyListIter
 void StrCpyListIter_init(StrCpyListIter* this, StrCpyList* list)
 {
    StringListIter_init( (StringListIter*)this, (StringList*)list);
-}
-
-bool StrCpyListIter_hasNext(StrCpyListIter* this)
-{
-   return StringListIter_hasNext( (StringListIter*)this);
 }
 
 void StrCpyListIter_next(StrCpyListIter* this)

@@ -52,7 +52,6 @@ extern bool Config_loadStringListFile(const char* filename,
    StrCpyList* outList);
 extern bool Config_loadUInt16ListFile(struct Config* this, const char* filename,
    UInt16List* outList);
-extern const char* __Config_createDefaultCfgFilename(void);
 
 extern bool __Config_initImplicitVals(Config* this);
 extern void __Config_initConnNumCommRetries(Config* this);
@@ -74,14 +73,9 @@ static inline LogType Config_getLogTypeNum(Config* this);
 static inline void Config_setLogTypeNum(Config* this, LogType logType);
 static inline bool Config_getLogClientID(Config* this);
 static inline char* Config_getLogHelperdIP(Config* this);
-static inline bool Config_getConnUseSDP(Config* this);
 static inline bool Config_getConnUseRDMA(Config* this);
 static inline int Config_getConnClientPortUDP(Config* this);
-static inline int Config_getConnMetaPortUDP(Config* this);
-static inline int Config_getConnStoragePortUDP(Config* this);
 static inline int Config_getConnMgmtdPortUDP(Config* this);
-static inline int Config_getConnMetaPortTCP(Config* this);
-static inline int Config_getConnStoragePortTCP(Config* this);
 static inline int Config_getConnHelperdPortTCP(Config* this);
 static inline int Config_getConnMgmtdPortTCP(Config* this);
 static inline unsigned Config_getConnMaxInternodeNum(Config* this);
@@ -94,7 +88,6 @@ static inline unsigned Config_getConnRDMABufSize(Config* this);
 static inline unsigned Config_getConnRDMABufNum(Config* this);
 static inline int Config_getConnRDMATypeOfService(Config* this);
 static inline char* Config_getConnNetFilterFile(Config* this);
-static inline char* Config_getConnAuthFile(Config* this);
 static inline unsigned Config_getConnMaxConcurrentAttempts(Config* this);
 static inline uint64_t Config_getConnAuthHash(Config* this);
 static inline char* Config_getConnTcpOnlyFilterFile(Config* this);
@@ -109,7 +102,6 @@ static inline int Config_getTunePathBufNum(Config* this);
 static inline int Config_getTuneMsgBufSize(Config* this);
 static inline int Config_getTuneMsgBufNum(Config* this);
 static inline unsigned Config_getTunePageCacheValidityMS(Config* this);
-static inline unsigned Config_getTuneAttribCacheValidityMS(Config* this);
 static inline unsigned Config_getTuneDirSubentryCacheValidityMS(Config* this);
 static inline unsigned Config_getTuneFileSubentryCacheValidityMS(Config* this);
 static inline bool Config_getTuneRemoteFSync(Config* this);
@@ -177,14 +169,9 @@ struct Config
 
    int            connPortShift; // shifts all UDP and TCP ports
    int            connClientPortUDP;
-   int            connMetaPortUDP;
-   int            connStoragePortUDP;
    int            connMgmtdPortUDP;
-   int            connMetaPortTCP;
-   int            connStoragePortTCP;
    int            connHelperdPortTCP;
    int            connMgmtdPortTCP;
-   bool     connUseSDP;
    bool     connUseRDMA;
    unsigned       connMaxInternodeNum;
    char*          connInterfacesFile;
@@ -208,7 +195,6 @@ struct Config
    int            tuneFileCacheBufSize;
    int            tuneFileCacheBufNum; // 0 means automatic setting
    unsigned       tunePageCacheValidityMS;
-   unsigned       tuneAttribCacheValidityMS;
    unsigned       tuneDirSubentryCacheValidityMS;
    unsigned       tuneFileSubentryCacheValidityMS;
    int            tunePathBufSize;
@@ -290,30 +276,13 @@ int Config_getConnClientPortUDP(Config* this)
    return this->connClientPortUDP ? (this->connClientPortUDP + this->connPortShift) : 0;
 }
 
-int Config_getConnMetaPortUDP(Config* this)
-{
-   return this->connMetaPortUDP ? (this->connMetaPortUDP + this->connPortShift) : 0;
-}
 
-int Config_getConnStoragePortUDP(Config* this)
-{
-   return this->connStoragePortUDP ? (this->connStoragePortUDP + this->connPortShift) : 0;
-}
 
 int Config_getConnMgmtdPortUDP(Config* this)
 {
    return this->connMgmtdPortUDP ? (this->connMgmtdPortUDP + this->connPortShift) : 0;
 }
 
-int Config_getConnMetaPortTCP(Config* this)
-{
-   return this->connMetaPortTCP ? (this->connMetaPortTCP + this->connPortShift) : 0;
-}
-
-int Config_getConnStoragePortTCP(Config* this)
-{
-   return this->connStoragePortTCP ? (this->connStoragePortTCP + this->connPortShift) : 0;
-}
 
 int Config_getConnHelperdPortTCP(Config* this)
 {
@@ -323,11 +292,6 @@ int Config_getConnHelperdPortTCP(Config* this)
 int Config_getConnMgmtdPortTCP(Config* this)
 {
    return this->connMgmtdPortTCP ? (this->connMgmtdPortTCP + this->connPortShift) : 0;
-}
-
-bool Config_getConnUseSDP(Config* this)
-{
-   return this->connUseSDP;
 }
 
 bool Config_getConnUseRDMA(Config* this)
@@ -383,11 +347,6 @@ int Config_getConnRDMATypeOfService(Config* this)
 char* Config_getConnNetFilterFile(Config* this)
 {
    return this->connNetFilterFile;
-}
-
-char* Config_getConnAuthFile(Config* this)
-{
-   return this->connAuthFile;
 }
 
 unsigned Config_getConnMaxConcurrentAttempts(Config* this)
@@ -458,11 +417,6 @@ int Config_getTuneMsgBufNum(Config* this)
 unsigned Config_getTunePageCacheValidityMS(Config* this)
 {
    return this->tunePageCacheValidityMS;
-}
-
-unsigned Config_getTuneAttribCacheValidityMS(Config* this)
-{
-   return this->tuneAttribCacheValidityMS;
 }
 
 unsigned Config_getTuneDirSubentryCacheValidityMS(Config* this)

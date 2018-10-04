@@ -1,0 +1,828 @@
+%define VER %(echo '%{BEEGFS_VERSION}' | cut -d - -f 1)
+%define BEEGFS_RELEASE_STR %(echo '%{BEEGFS_VERSION}-' | cut -d - -f 2)
+
+%define BEEGFS_MAJOR_VERSION %(echo '%{BEEGFS_VERSION}' | cut -d . -f 1)
+%define CLIENT_DIR /opt/beegfs/src/client/client_module_%{BEEGFS_MAJOR_VERSION}
+%define CLIENT_COMPAT_DIR /opt/beegfs/src/client/client_compat_module_%{BEEGFS_MAJOR_VERSION}
+
+%define is_fedora %(test -e /etc/fedora-release && echo 1 || echo 0)
+%define is_redhat %(test -e /etc/redhat-release && echo 1 || echo 0)
+%define is_suse %(test -e /etc/SuSE-release && echo 1 || echo 0)
+
+%if %is_suse
+%define disttag sles
+%define distver %(relpackage="`rpm -qf /etc/SuSE-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %is_fedora
+%define disttag fc
+%endif
+
+%if %is_redhat
+%define disttag el
+%define distver %(relpackage="`rpm -qf /etc/redhat-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%endif
+
+%if %{defined disttag}
+%define RELEASE %{BEEGFS_RELEASE_STR}%{disttag}%{distver}
+%else
+%define RELEASE %{BEEGFS_RELEASE_STR}generic
+%endif
+
+%define FULL_VERSION %{EPOCH}:%{VER}-%{RELEASE}
+
+
+%define post_package() if [ "$1" = 1 ] \
+then \
+	output=$(systemctl is-system-running 2> /dev/null) \
+	if [ "$?" == 127 ] \
+	then \
+		chkconfig %1 on \
+	elif [ "$?" == 0 ] || ( [ "$output" != "offline" ] && [ "$output" != "unknown" ] ) \
+	then \
+		systemctl enable %1.service \
+	else \
+		chkconfig %1 on \
+	fi \
+fi
+
+%define preun_package() if [ "$1" = 0 ] \
+then \
+	output=$(systemctl is-system-running 2> /dev/null) \
+	if [ "$?" == 127 ] \
+	then \
+		chkconfig %1 off \
+	elif [ "$?" == 0 ] || ( [ "$output" != "offline" ] && [ "$output" != "unknown" ] ) \
+	then \
+		systemctl disable %1.service \
+	else \
+		chkconfig %1 off \
+	fi \
+fi
+
+
+Name: beegfs
+Summary: BeeGFS parallel file syste,
+License: BeeGFS EULA
+Version: %{VER}
+Release: %{RELEASE}
+URL: http://www.beegfs.com
+Source: beegfs-%{BEEGFS_VERSION}.tar
+Vendor: Fraunhofer ITWM
+BuildRoot: %{_tmppath}/beegfs-root
+Epoch: %{EPOCH}
+
+%description
+
+Distribution of the BeeGFS parallel filesystem.
+
+%clean
+rm -rf %{buildroot}
+
+%prep
+%setup -c
+
+%if %is_suse
+%debug_package
+%endif
+
+%define make_j %{?MAKE_CONCURRENCY:-j %{MAKE_CONCURRENCY}}
+
+%build
+
+export BEEGFS_VERSION=%{BEEGFS_VERSION}
+export WITHOUT_COMM_DEBUG=1
+
+make %make_j daemons utils
+
+make -C admon/build admon_gui
+# disabled, doesn't build
+#make -C beeond_thirdparty/build %make_j
+make -C beeond_thirdparty_gpl/build %make_j
+make -C utils/build %make_j java_lib
+
+%install
+
+export BEEGFS_VERSION=%{BEEGFS_VERSION}
+export WITHOUT_COMM_DEBUG=1
+
+# makefiles need some adjustments still
+mkdir -p \
+   ${RPM_BUILD_ROOT}/opt/beegfs/sbin \
+   ${RPM_BUILD_ROOT}/opt/beegfs/lib \
+   ${RPM_BUILD_ROOT}/usr/bin \
+   ${RPM_BUILD_ROOT}/usr/include \
+   ${RPM_BUILD_ROOT}/sbin \
+   ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-devel/examples/ \
+   ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/build \
+   ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/source \
+   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/parallel \
+   ${RPM_BUILD_ROOT}/etc/bash_completion.d
+
+##########
+########## common files
+##########
+
+install -D common_package/scripts/etc/beegfs/lib/start-stop-functions \
+   ${RPM_BUILD_ROOT}/etc/beegfs/lib/start-stop-functions
+install -D common_package/scripts/etc/beegfs/lib/init-multi-mode \
+   ${RPM_BUILD_ROOT}/etc/beegfs/lib/init-multi-mode
+
+##########
+########## libbeegfs-ib files
+##########
+
+install -D common/build/libbeegfs_ib.so \
+   ${RPM_BUILD_ROOT}/opt/beegfs/lib/libbeegfs_ib.so
+
+##########
+########## daemons, utils
+##########
+
+make DESTDIR=${RPM_BUILD_ROOT} daemons-install utils-install
+
+##########
+########## common directories for extra files
+##########
+mkdir -p \
+   ${RPM_BUILD_ROOT}/etc/beegfs \
+   ${RPM_BUILD_ROOT}/etc/init.d \
+   ${RPM_BUILD_ROOT}/opt/beegfs/scripts/grafana
+
+##########
+########## meta extra files
+##########
+
+cp -a meta/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs
+
+# we use the redhat script for all rpm distros, as we now provide our own
+# daemon() and killproc() function library (derived from redhat)
+install -D meta/build/dist/etc/init.d/beegfs-meta.init \
+   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-meta
+
+#add the genric part of the init script from the common package
+cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-meta
+
+#install systemd unit description
+install -D -m644 meta/build/dist/usr/lib/systemd/system/beegfs-meta.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-meta.service
+install -D -m644 meta/build/dist/usr/lib/systemd/system/beegfs-meta@.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-meta@.service
+
+install -D meta/build/dist/sbin/beegfs-setup-meta \
+	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-meta
+
+install -D meta/build/dist/etc/default/beegfs-meta ${RPM_BUILD_ROOT}/etc/default/beegfs-meta
+
+##########
+########## mgmtd extra files
+##########
+
+cp -a mgmtd/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+
+# we use the redhat script for all rpm distros, as we now provide our own
+# daemon() and killproc() function library (derived from redhat)
+install -D mgmtd/build/dist/etc/init.d/beegfs-mgmtd.init \
+   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-mgmtd
+
+#add the genric part of the init script from the common package
+cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-mgmtd
+
+#install systemd unit description
+install -D -m644 mgmtd/build/dist/usr/lib/systemd/system/beegfs-mgmtd.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-mgmtd.service
+install -D -m644 mgmtd/build/dist/usr/lib/systemd/system/beegfs-mgmtd@.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-mgmtd@.service
+
+install -D mgmtd/build/dist/sbin/beegfs-setup-mgmtd \
+	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-mgmtd
+
+install -D mgmtd/build/dist/etc/default/beegfs-mgmtd ${RPM_BUILD_ROOT}/etc/default/beegfs-mgmtd
+
+##########
+########## storage extra files
+##########
+
+cp -a storage/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+mkdir -p ${RPM_BUILD_ROOT}/etc/init.d/
+
+# we use the redhat script for all rpm distros, as we now provide our own
+# daemon() and killproc() function library (derived from redhat)
+install -D storage/build/dist/etc/init.d/beegfs-storage.init \
+   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-storage
+
+#add the genric part of the init script from the common package
+cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-storage
+
+#install systemd unit description
+install -D -m644 storage/build/dist/usr/lib/systemd/system/beegfs-storage.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-storage.service
+install -D -m644 storage/build/dist/usr/lib/systemd/system/beegfs-storage@.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-storage@.service
+
+install -D storage/build/dist/sbin/beegfs-setup-storage \
+	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-storage
+
+install -D storage/build/dist/etc/default/beegfs-storage ${RPM_BUILD_ROOT}/etc/default/beegfs-storage
+
+##########
+########## helperd extra files
+##########
+
+cp -a helperd/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+
+# we use the redhat script for all rpm distros, as we now provide our own
+# daemon() and killproc() function library (derived from redhat)
+install -D helperd/build/dist/etc/init.d/beegfs-helperd.init \
+   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-helperd
+
+#add the genric part of the init script from the common package
+cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-helperd
+
+#install systemd unit description
+install -D -m644 helperd/build/dist/usr/lib/systemd/system/beegfs-helperd.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-helperd.service
+install -D -m644 helperd/build/dist/usr/lib/systemd/system/beegfs-helperd@.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-helperd@.service
+
+install -D helperd/build/dist/etc/default/beegfs-helperd ${RPM_BUILD_ROOT}/etc/default/beegfs-helperd
+
+##########
+########## mon extra files
+##########
+
+cp -a mon/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+
+# we use the redhat script for all rpm distros, as we now provide our own
+# daemon() and killproc() function library (derived from redhat)
+install -D mon/build/dist/etc/init.d/beegfs-mon.init \
+   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-mon
+
+#add the genric part of the init script from the common package
+cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-mon
+
+#install systemd unit description
+install -D -m644 mon/build/dist/usr/lib/systemd/system/beegfs-mon.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-mon.service
+install -D -m644 mon/build/dist/usr/lib/systemd/system/beegfs-mon@.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-mon@.service
+
+install -D mon/build/dist/etc/default/beegfs-mon ${RPM_BUILD_ROOT}/etc/default/beegfs-mon
+install -D mon/scripts/grafana/* ${RPM_BUILD_ROOT}/opt/beegfs/scripts/grafana
+
+##########
+########## admon extra files
+##########
+
+cp -a admon/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+
+#add license file of beegfs-admon and of the beegfs-admon-gui
+mkdir -p ${RPM_BUILD_ROOT}/opt/beegfs/LICENSE/beegfs-admon/gui
+install -D -m644 admon/build/dist/LICENSE ${RPM_BUILD_ROOT}/opt/beegfs/LICENSE/beegfs-admon/
+install -D -m644 admon_gui/license/* ${RPM_BUILD_ROOT}/opt/beegfs/LICENSE/beegfs-admon/gui
+
+install -D admon/build/dist/etc/init.d/beegfs-admon.init ${RPM_BUILD_ROOT}/etc/init.d/beegfs-admon
+
+#add the generic part of the init script from the common package
+cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-admon
+
+#install systemd unit description
+install -D -m644 admon/build/dist/usr/lib/systemd/system/beegfs-admon.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-admon.service
+
+install -D admon/build/dist/sbin/beegfs-setup-admon \
+	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-admon
+
+install -D -m644 admon/build/dist/etc/default/beegfs-admon ${RPM_BUILD_ROOT}/etc/default/beegfs-admon
+
+install -D -m644 common_package/scripts/etc/beegfs/lib/start-stop-functions \
+	${RPM_BUILD_ROOT}/etc/beegfs/lib/start-stop-functions.beegfs-admon
+
+install -D -m644 common_package/scripts/etc/beegfs/lib/init-multi-mode \
+	${RPM_BUILD_ROOT}/etc/beegfs/lib/init-multi-mode.beegfs-admon
+
+#add admon GUI start script
+install -D -m755 admon/build/dist/usr/bin/beegfs-admon-gui ${RPM_BUILD_ROOT}/usr/bin/beegfs-admon-gui
+
+mkdir -p \
+   ${RPM_BUILD_ROOT}/opt/beegfs/setup \
+   ${RPM_BUILD_ROOT}/opt/beegfs/setup/info
+
+cp -R admon/scripts/* ${RPM_BUILD_ROOT}/opt/beegfs/setup
+touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/clients
+touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/ib_nodes
+touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/management
+touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/meta_server
+touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/storage_server
+
+# create a dir for tmp data during script execution
+mkdir -p ${RPM_BUILD_ROOT}/opt/beegfs/setup/tmp
+
+# add admon gui
+DEST_JAR=${RPM_BUILD_ROOT}/opt/beegfs/beegfs-admon-gui/beegfs-admon-gui.jar
+install -D -m644 admon_gui/dist/beegfs-admon-gui.jar ${DEST_JAR}
+
+# we need a directory for the admon db
+mkdir -p ${RPM_BUILD_ROOT}/var/lib/beegfs
+
+# we need a directory for the mongoose document root
+mkdir -p ${RPM_BUILD_ROOT}/var/lib/beegfs/www
+
+##########
+########## utils
+##########
+
+cp -a utils/scripts/fsck.beegfs ${RPM_BUILD_ROOT}/sbin/
+
+ln -s /opt/beegfs/sbin/beegfs-ctl ${RPM_BUILD_ROOT}/usr/bin/beegfs-ctl
+ln -s /opt/beegfs/sbin/beegfs-fsck ${RPM_BUILD_ROOT}/usr/bin/beegfs-fsck
+
+cp -a utils/scripts/beegfs-* ${RPM_BUILD_ROOT}/usr/bin/
+cp utils/build/libjbeegfs.so utils/build/jbeegfs.jar \
+   ${RPM_BUILD_ROOT}/opt/beegfs/lib/
+cp -a utils/scripts/etc/bash_completion.d/beegfs-ctl \
+   ${RPM_BUILD_ROOT}/etc/bash_completion.d/
+
+##########
+########## utils-devel
+##########
+
+cp -a event_listener/include/* ${RPM_BUILD_ROOT}/usr/include/
+cp -a event_listener/build/Makefile \
+   ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/build/
+cp -a event_listener/source/beegfs-event-listener.cpp \
+   ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/source/
+
+##########
+########## client
+##########
+
+make -C client_module/build %make_j \
+   RELEASE_PATH=${RPM_BUILD_ROOT}/opt/beegfs/src/client KDIR="%{KDIR}" V=1 \
+   prepare_release
+cp client_module/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+
+# compat files
+cp -a ${RPM_BUILD_ROOT}/%{CLIENT_DIR} ${RPM_BUILD_ROOT}/%{CLIENT_COMPAT_DIR}
+
+echo beegfs-%{BEEGFS_MAJOR_VERSION} | tr -d . > ${RPM_BUILD_ROOT}/%{CLIENT_COMPAT_DIR}/build/beegfs.fstype
+
+# we use the redhat script for all rpm distros, as we now provide our own
+# daemon() and killproc() function library (derived from redhat)
+install -D client_module/build/dist/etc/init.d/beegfs-client.init ${RPM_BUILD_ROOT}/etc/init.d/beegfs-client
+
+#install systemd unit description
+install -D -m644 client_module/build/dist/usr/lib/systemd/system/beegfs-client.service \
+   ${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-client.service
+
+install -D client_module/build/dist/etc/default/beegfs-client ${RPM_BUILD_ROOT}/etc/default/beegfs-client
+
+install -D client_module/scripts/etc/beegfs/lib/init-multi-mode.beegfs-client \
+   ${RPM_BUILD_ROOT}/etc/beegfs/lib/init-multi-mode.beegfs-client
+
+install -D client_module/build/dist/sbin/beegfs-setup-client \
+   ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-client
+
+install -D client_module/build/dist/etc/beegfs-client-mount-hook.example \
+   ${RPM_BUILD_ROOT}/etc/beegfs/beegfs-client-mount-hook.example
+
+##########
+########## client-devel
+##########
+
+cp -a client_devel/include/beegfs \
+   ${RPM_BUILD_ROOT}/usr/include/
+cp -a client_devel/build/dist/usr/share/doc/beegfs-client-devel/examples/* \
+   ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-devel/examples/
+
+##########
+########## beeond
+##########
+
+install -D beeond/source/beeond ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beeond
+install -D beeond/source/beeond-cp ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beeond-cp
+cp beeond/scripts/lib/* ${RPM_BUILD_ROOT}/opt/beegfs/lib/
+ln -s /opt/beegfs/sbin/beeond ${RPM_BUILD_ROOT}/usr/bin/beeond
+ln -s /opt/beegfs/sbin/beeond-cp ${RPM_BUILD_ROOT}/usr/bin/beeond-cp
+
+# disabled, doesn't build
+###########
+########### beeond-thirdparty
+###########
+#
+#install -D beeond_thirdparty/build/pcopy/pcp.bin \
+#   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/pcopy
+#install -D beeond_thirdparty/build/pcopy/pcp_cleanup \
+#   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/pcopy
+#install -D beeond_thirdparty/build/pcopy/pcp_run \
+#   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/pcopy
+#install -D beeond_thirdparty/build/pcopy/ssh.spawner \
+#   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/pcopy
+#cp beeond_thirdparty/build/pcopy/README.txt \
+#   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/pcopy/
+
+##########
+########## beeond-thirdparty-gpl
+##########
+
+install -D beeond_thirdparty_gpl/build/parallel \
+   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/parallel/
+cp beeond_thirdparty_gpl/build/COPYING \
+   ${RPM_BUILD_ROOT}/opt/beegfs/thirdparty/parallel/
+
+
+
+%package common
+
+Summary: BeeGFS common files
+Group: Software/Other
+BuildArch: noarch
+
+%description common
+The package contains files required by all BeeGFS daemons
+
+%files common
+%defattr(-,root,root)
+%dir /etc/beegfs/lib/
+/etc/beegfs/lib/init-multi-mode
+/etc/beegfs/lib/start-stop-functions
+
+
+
+%package -n libbeegfs-ib
+
+Summary: BeeGFS InfiniBand support
+Group: Software/Other
+Buildrequires: librdmacm-devel, libibverbs-devel
+
+%description -n libbeegfs-ib
+This package contains support libraries for InfiniBand.
+
+%files -n libbeegfs-ib
+/opt/beegfs/lib/libbeegfs_ib.so
+
+
+
+%package meta
+
+Summary: BeeGFS meta server daemon
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description meta
+This package contains the BeeGFS meta server binaries.
+
+%post meta
+%post_package beegfs-meta
+
+%preun meta
+%preun_package beegfs-meta
+
+%files meta
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-meta.conf
+%config(noreplace) /etc/default/beegfs-meta
+/etc/init.d/beegfs-meta
+/opt/beegfs/sbin/beegfs-meta
+/opt/beegfs/sbin/beegfs-setup-meta
+/usr/lib/systemd/system/beegfs-meta.service
+/usr/lib/systemd/system/beegfs-meta@.service
+
+
+
+%package mgmtd
+
+Summary: BeeGFS management daemon
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description mgmtd
+The package contains the BeeGFS management daemon.
+
+%post mgmtd
+%post_package beegfs-mgmtd
+
+%preun mgmtd
+%preun_package beegfs-mgmtd
+
+%files mgmtd
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-mgmtd.conf
+%config(noreplace) /etc/default/beegfs-mgmtd
+/etc/init.d/beegfs-mgmtd
+/opt/beegfs/sbin/beegfs-mgmtd
+/opt/beegfs/sbin/beegfs-setup-mgmtd
+/usr/lib/systemd/system/beegfs-mgmtd.service
+/usr/lib/systemd/system/beegfs-mgmtd@.service
+
+
+
+%package storage
+
+Summary: BeeGFS storage server daemon
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description storage
+This package contains the BeeGFS storage server binaries.
+
+%post storage
+%post_package beegfs-storage
+
+%preun storage
+%preun_package beegfs-storage
+
+%files storage
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-storage.conf
+%config(noreplace) /etc/default/beegfs-storage
+/etc/init.d/beegfs-storage
+/opt/beegfs/sbin/beegfs-storage
+/opt/beegfs/sbin/beegfs-setup-storage
+/usr/lib/systemd/system/beegfs-storage.service
+/usr/lib/systemd/system/beegfs-storage@.service
+
+
+
+%package helperd
+
+Summary: BeeGFS client helper daemon
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description helperd
+The package contains the BeeGFS helper daemon.
+
+%post helperd
+%post_package beegfs-helperd
+
+%preun helperd
+%preun_package beegfs-helperd
+
+%files helperd
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-helperd.conf
+%config(noreplace) /etc/default/beegfs-helperd
+/etc/init.d/beegfs-helperd
+/opt/beegfs/sbin/beegfs-helperd
+/usr/lib/systemd/system/beegfs-helperd.service
+/usr/lib/systemd/system/beegfs-helperd@.service
+
+
+
+%package mon
+
+Summary: BeeGFS mon server daemon
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description mon
+This package contains the BeeGFS mon server binaries.
+
+%post mon
+%post_package beegfs-mon
+
+%preun mon
+%preun_package beegfs-mon
+
+%files mon
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-mon.conf
+%config(noreplace) /etc/default/beegfs-mon
+/etc/init.d/beegfs-mon
+/opt/beegfs/sbin/beegfs-mon
+/opt/beegfs/scripts/grafana/
+/usr/lib/systemd/system/beegfs-mon.service
+/usr/lib/systemd/system/beegfs-mon@.service
+
+
+
+%package admon
+
+Summary: BeeGFS administration and monitoring daemon
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description admon
+The package contains the BeeGFS admon daemon.
+
+%post admon
+%post_package beegfs-admon
+hostname > /opt/beegfs/setup/info/management
+
+%preun admon
+%preun_package beegfs-admon
+
+%files admon
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-admon.conf
+%dir /etc/beegfs/lib/
+%config(noreplace) /etc/beegfs/lib/init-multi-mode.beegfs-admon
+%config(noreplace) /etc/beegfs/lib/start-stop-functions.beegfs-admon
+%config(noreplace) /etc/default/beegfs-admon
+/etc/init.d/beegfs-admon
+/opt/beegfs/sbin/beegfs-admon
+/opt/beegfs/sbin/beegfs-setup-admon
+/usr/bin/beegfs-admon-gui
+/opt/beegfs/beegfs-admon-gui/beegfs-admon-gui.jar
+/opt/beegfs/setup/setup.add_repo.sh
+/opt/beegfs/setup/setup.add_repo_parallel.sh
+/opt/beegfs/setup/setup.check_ssh.sh
+/opt/beegfs/setup/setup.check_ssh_parallel.sh
+/opt/beegfs/setup/setup.check_status.sh
+/opt/beegfs/setup/setup.check_status_parallel.sh
+/opt/beegfs/setup/setup.defaults
+/opt/beegfs/setup/setup.get_remote_file.sh
+/opt/beegfs/setup/setup.get_system_info.sh
+/opt/beegfs/setup/setup.get_system_info_parallel.sh
+/opt/beegfs/setup/setup.install.sh
+/opt/beegfs/setup/setup.install_parallel.sh
+/opt/beegfs/setup/setup.start.sh
+/opt/beegfs/setup/setup.start_parallel.sh
+/opt/beegfs/setup/setup.stop.sh
+/opt/beegfs/setup/setup.stop_parallel.sh
+/opt/beegfs/setup/setup.uninstall.sh
+/opt/beegfs/setup/setup.uninstall_parallel.sh
+/opt/beegfs/setup/setup.write_config.sh
+/opt/beegfs/setup/setup.write_mounts.sh
+%dir /opt/beegfs/LICENSE/
+/opt/beegfs/LICENSE/beegfs-admon/LICENSE
+/opt/beegfs/LICENSE/beegfs-admon/gui/
+%dir /opt/beegfs/setup/info/
+%dir /opt/beegfs/setup/tmp/
+%config(noreplace) /opt/beegfs/setup/info/clients
+%config(noreplace) /opt/beegfs/setup/info/ib_nodes
+%config(noreplace) /opt/beegfs/setup/info/management
+%config(noreplace) /opt/beegfs/setup/info/meta_server
+%config(noreplace) /opt/beegfs/setup/info/storage_server
+%config(noreplace) /opt/beegfs/setup/confs/config
+/usr/lib/systemd/system/beegfs-admon.service
+%dir /var/lib/beegfs/
+
+
+
+%package utils
+
+Summary: BeeGFS utilities
+Group: Software/Other
+requires: beegfs-common = %{FULL_VERSION}
+
+%description utils
+This package contains BeeGFS utilities.
+
+%files utils
+%defattr(-,root,root)
+%attr(0755, root, root) /opt/beegfs/sbin/beegfs-fsck
+%attr(4755, root, root) /opt/beegfs/sbin/beegfs-ctl
+/opt/beegfs/lib/jbeegfs.jar
+/opt/beegfs/lib/libjbeegfs.so
+/usr/bin/beegfs-check-servers
+/usr/bin/beegfs-ctl
+/usr/bin/beegfs-df
+/usr/bin/beegfs-fsck
+/usr/bin/beegfs-net
+/etc/bash_completion.d/beegfs-ctl
+/sbin/fsck.beegfs
+/opt/beegfs/sbin/beegfs-event-listener
+
+
+
+%package utils-devel
+
+Summary: BeeGFS utils devel files
+Group: Software/Other
+BuildArch: noarch
+
+%description utils-devel
+This package contains BeeGFS utils development files and examples.
+
+%files utils-devel
+%defattr(-,root,root)
+/usr/include/beegfs/beegfs_file_event_log.hpp
+/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/*
+
+
+
+%package client
+
+Summary: BeeGFS client kernel module
+License: GPL v2
+Group: Software/Other
+BuildArch: noarch
+requires: make, gcc, gcc-c++
+
+%description client
+This package contains binary objects of the closed source part of BeeGFS and
+open source code to allow to build the client kernel module.
+
+%post client
+%post_package beegfs-client
+
+# make the script to run autobuild
+mkdir -p /var/lib/beegfs/client
+touch /var/lib/beegfs/client/force-auto-build
+
+%preun client
+%preun_package beegfs-client
+
+%files client
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-client-autobuild.conf
+%config(noreplace) /etc/beegfs/beegfs-client-mount-hook.example
+%config(noreplace) /etc/beegfs/beegfs-client.conf
+%config(noreplace) /etc/beegfs/beegfs-mounts.conf
+%dir /etc/beegfs/lib/
+%config(noreplace) /etc/beegfs/lib/init-multi-mode.beegfs-client
+%config(noreplace) /etc/default/beegfs-client
+/etc/init.d/beegfs-client
+/opt/beegfs/sbin/beegfs-setup-client
+/usr/lib/systemd/system/beegfs-client.service
+%{CLIENT_DIR}
+
+
+
+%package client-compat
+
+Summary: BeeGFS client compat module, allows to run two different client versions.
+License: GPL v2
+Group: Software/Other
+requires: make, gcc, gcc-c++
+BuildArch: noarch
+
+%description client-compat
+This package allows to build and to run a compatbility beegfs-client kernel module
+on a system that has a newer beegfs-client version installed.
+
+%files client-compat
+%defattr(-,root,root)
+%{CLIENT_COMPAT_DIR}
+
+
+
+%package client-devel
+
+Summary: BeeGFS client devel files
+Group: Software/Other
+BuildArch: noarch
+
+%description client-devel
+This package contains BeeGFS client development files.
+
+%files client-devel
+%defattr(-,root,root)
+%dir /usr/include/beegfs
+/usr/include/beegfs/beegfs.h
+/usr/include/beegfs/beegfs_ioctl.h
+/usr/include/beegfs/beegfs_ioctl_functions.h
+/usr/share/doc/beegfs-client-devel/examples/createFileWithStripePattern.cpp
+/usr/share/doc/beegfs-client-devel/examples/getStripePatternOfFile.cpp
+
+
+
+%package -n beeond
+
+Summary: BeeOND
+Group: Software/Other
+requires: beeond-thirdparty-gpl = %{FULL_VERSION}, beegfs-utils = %{FULL_VERSION}, beegfs-mgmtd = %{FULL_VERSION}, beegfs-meta = %{FULL_VERSION}, beegfs-storage = %{FULL_VERSION}, beegfs-client = %{FULL_VERSION}, beegfs-helperd = %{FULL_VERSION}
+
+%description -n beeond
+This package contains BeeOND.
+
+%files -n beeond
+%defattr(-,root,root)
+/opt/beegfs/sbin/beeond
+/usr/bin/beeond
+/opt/beegfs/sbin/beeond-cp
+/usr/bin/beeond-cp
+/opt/beegfs/lib/beeond-lib
+/opt/beegfs/lib/beegfs-ondemand-stoplocal
+
+
+
+## disabled, doesn't build
+#%package -n beeond-thirdparty
+#
+#Summary: BeeOND Thirdparty
+#Group: Software/Other
+#
+#%description -n beeond-thirdparty
+#This package contains thirdparty software needed to run BeeOND.
+#
+#%files -n beeond-thirdparty
+#%defattr(-,root,root)
+#/opt/beegfs/thirdparty/pcopy/*
+
+
+
+%package -n beeond-thirdparty-gpl
+
+Summary: BeeOND Thirdparty GPL
+Group: Software/Other
+
+%description -n beeond-thirdparty-gpl
+This package contains thirdparty software (licensed under GPL) needed to run BeeOND.
+
+%files -n beeond-thirdparty-gpl
+%defattr(-,root,root)
+/opt/beegfs/thirdparty/parallel/parallel
+/opt/beegfs/thirdparty/parallel/COPYING

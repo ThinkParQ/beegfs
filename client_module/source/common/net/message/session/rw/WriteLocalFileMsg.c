@@ -34,10 +34,10 @@ void WriteLocalFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeStrAlign4(ctx, thisCast->fileHandleIDLen, thisCast->fileHandleID);
 
    // clientNumID
-   NumNodeID_serialize(&thisCast->clientNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->clientNumID);
 
    // pathInfo
-   PathInfo_serialize(thisCast->pathInfo, ctx);
+   PathInfo_serialize(ctx, thisCast->pathInfo);
 
    // targetID
    Serialization_serializeUShort(ctx, thisCast->targetID);

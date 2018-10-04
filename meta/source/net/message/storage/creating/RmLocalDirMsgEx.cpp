@@ -23,12 +23,6 @@ std::tuple<HashDirLock, DirIDLock> RmLocalDirMsgEx::lock(EntryLockStore& store)
 
 bool RmLocalDirMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "RmLocalDirMsg incoming";
-
-   LOG_DEBUG(logContext, 4, "Received a RmLocalDirMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    rctx = &ctx;
 
    return BaseType::processIncoming(ctx);

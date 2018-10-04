@@ -21,7 +21,6 @@ extern bool __RemoveNodeMsgEx_processIncoming(NetMessage* this, struct App* app,
 static inline NumNodeID RemoveNodeMsgEx_getNodeNumID(RemoveNodeMsgEx* this);
 static inline NodeType RemoveNodeMsgEx_getNodeType(RemoveNodeMsgEx* this);
 static inline const char* RemoveNodeMsgEx_getAckID(RemoveNodeMsgEx* this);
-static inline void RemoveNodeMsgEx_setAckID(RemoveNodeMsgEx* this, const char* ackID);
 
 
 struct RemoveNodeMsgEx
@@ -70,15 +69,6 @@ NodeType RemoveNodeMsgEx_getNodeType(RemoveNodeMsgEx* this)
 const char* RemoveNodeMsgEx_getAckID(RemoveNodeMsgEx* this)
 {
    return this->ackID;
-}
-
-/**
- * @param ackID just a reference
- */
-static inline void RemoveNodeMsgEx_setAckID(RemoveNodeMsgEx* this, const char* ackID)
-{
-   this->ackID = ackID;
-   this->ackIDLen = strlen(ackID);
 }
 
 #endif /* REMOVENODEMSGEX_H_ */

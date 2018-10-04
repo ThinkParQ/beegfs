@@ -7,7 +7,6 @@
 bool RetrieveFsIDsMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("Incoming RetrieveFsIDsMsg");
-   LOG_DEBUG_CONTEXT(log, 4, "Received a RetrieveFsIDsMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
    MetaStore* metaStore = app->getMetaStore();

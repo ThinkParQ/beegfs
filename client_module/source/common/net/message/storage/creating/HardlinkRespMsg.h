@@ -8,7 +8,6 @@ struct HardlinkRespMsg;
 typedef struct HardlinkRespMsg HardlinkRespMsg;
 
 static inline void HardlinkRespMsg_init(HardlinkRespMsg* this);
-static inline void HardlinkRespMsg_initFromValue(HardlinkRespMsg* this, int value);
 
 // getters & setters
 static inline int HardlinkRespMsg_getValue(HardlinkRespMsg* this);
@@ -22,11 +21,6 @@ struct HardlinkRespMsg
 void HardlinkRespMsg_init(HardlinkRespMsg* this)
 {
    SimpleIntMsg_init( (SimpleIntMsg*)this, NETMSGTYPE_HardlinkResp);
-}
-
-void HardlinkRespMsg_initFromValue(HardlinkRespMsg* this, int value)
-{
-   SimpleIntMsg_initFromValue( (SimpleIntMsg*)this, NETMSGTYPE_HardlinkResp, value);
 }
 
 int HardlinkRespMsg_getValue(HardlinkRespMsg* this)

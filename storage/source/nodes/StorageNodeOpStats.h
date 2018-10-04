@@ -3,16 +3,9 @@
 
 
 #include <common/nodes/OpCounter.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/nodes/OpCounter.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/nodes/Node.h>
 #include <common/nodes/NodeOpStats.h>
-
-#ifdef BEEGFS_DEBUG
-   #define STORAGEOPSTATS_SIMULATED_DEBUG_CLIENTS 5000
-#endif
-
 
 /**
  * Per-user storage server operation statistics.
@@ -31,15 +24,6 @@ struct UserStorageOpStats
 class StorageNodeOpStats : public NodeOpStats
 {
    public:
-
-      StorageNodeOpStats()
-      {
-         #ifdef BEEGFS_DEBUG
-            // simulate lots of clients here, to test if their stats appear in fhgfs-ctl
-            for (int ia=1; ia<STORAGEOPSTATS_SIMULATED_DEBUG_CLIENTS; ia++)
-               this->updateNodeOp(ia, StorageOpCounter_ACK, 0);
-         #endif
-      }
 
       /**
        * Update operation counter for the given nodeIP and userID.
@@ -131,4 +115,3 @@ class StorageNodeOpStats : public NodeOpStats
 };
 
 #endif /* STORAGE_NODE_OP_STATS_H_ */
-

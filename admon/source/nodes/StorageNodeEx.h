@@ -8,12 +8,12 @@
 
 
 #include <common/nodes/Node.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/toolkit/HighResolutionStats.h>
 #include <common/net/message/admon/GetNodeInfoRespMsg.h>
 #include <common/storage/StorageTargetInfo.h>
 #include <common/Common.h>
 
+#include <mutex>
 
 // forward declaration
 class Database;
@@ -90,96 +90,78 @@ class StorageNodeEx : public Node
 
       void setHighResStatsList(HighResStatsList stats)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          this->highResStats = stats;
-         mutexLock.unlock();
       }
 
       StorageNodeDataContent getContent()
       {
-         SafeMutexLock mutexLock(&mutex);
-         StorageNodeDataContent res = this->data;
-         mutexLock.unlock();
-         return res;
+         const std::lock_guard<Mutex> lock(mutex);
+         return this->data;
       }
 
       HighResStatsList getHighResData()
       {
-         SafeMutexLock mutexLock(&mutex);
-         HighResStatsList res = this->highResStats;
-         mutexLock.unlock();
-         return res; //this->highResData;
+         const std::lock_guard<Mutex> lock(mutex);
+         return this->highResStats;
       }
 
       void setContent(StorageNodeDataContent content)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          this->data = content;
-         mutexLock.unlock();
       }
 
       double getWrittenData(std::string *outUnit)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          *outUnit = this->writtenData.unit;
-         double res = this->writtenData.amount;
-         mutexLock.unlock();
-         return res;
+         return this->writtenData.amount;
       }
 
       double getReadData(std::string *outUnit)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          *outUnit = this->readData.unit;
-         double res = this->readData.amount;
-         mutexLock.unlock();
-         return res;
+         return this->readData.amount;
       }
 
       double getNetRecv(std::string *outUnit)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          *outUnit = this->netRecv.unit;
-         double res = this->netRecv.amount;
-         mutexLock.unlock();
-         return res;
+         return this->netRecv.amount;
       }
 
       double getNetSend(std::string *outUnit)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          *outUnit = this->netSend.unit;
-         double res = this->netSend.amount;
-         mutexLock.unlock();
-         return res;
+         return this->netSend.amount;
       }
 
       StorageTargetInfoList getStorageTargets()
       {
-         SafeMutexLock mutexLock(&mutex);
-         StorageTargetInfoList outList = data.storageTargets;
-         mutexLock.unlock();
-         return outList;
+         const std::lock_guard<Mutex> lock(mutex);
+         return data.storageTargets;
       }
 
       void setStorageTargets(StorageTargetInfoList storageTargets)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          data.storageTargets = storageTargets;
-         mutexLock.unlock();
       }
 
       void addOrReplaceStorageTarget(StorageTargetInfo target)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          removeStorageTarget(target.getTargetID());
          data.storageTargets.push_back(target);
-         mutexLock.unlock();
       }
 
       void removeStorageTarget(uint16_t targetID)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          StorageTargetInfoListIter iter = data.storageTargets.begin();
          while (iter != data.storageTargets.end())
          {
@@ -189,22 +171,18 @@ class StorageNodeEx : public Node
                break;
             }
          }
-         mutexLock.unlock();
       }
 
       void setGeneralInformation(GeneralNodeInfo& info)
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
          this->generalInfo = info;
-         mutexLock.unlock();
       }
 
       GeneralNodeInfo getGeneralInformation()
       {
-         SafeMutexLock mutexLock(&mutex);
-         GeneralNodeInfo info = this->generalInfo;
-         mutexLock.unlock();
-         return info;
+         const std::lock_guard<Mutex> lock(mutex);
+         return this->generalInfo;
       }
 
 };

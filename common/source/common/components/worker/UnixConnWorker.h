@@ -33,7 +33,7 @@ class UnixConnWorker : public PThread
 
    protected:
       LogContext log;
-      AbstractNetMessageFactory* netMessageFactory;
+      const AbstractNetMessageFactory* netMessageFactory;
       bool available; // == !acquired
 
 

@@ -34,8 +34,6 @@ void Config::loadDefaults(bool addDashes)
    // own definitions
    configMapRedefine("connInterfacesFile",       "");
 
-   configMapRedefine("debugRunComponentThreads", "true");
-
    configMapRedefine("tuneNumWorkers",           "4");
 
    configMapRedefine("runDaemonized",            "false");
@@ -87,8 +85,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       }
       else if (iter->first == std::string("connInterfacesFile"))
          connInterfacesFile = iter->second;
-      else if (iter->first == std::string("debugRunComponentThreads"))
-         debugRunComponentThreads = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("tuneNumWorkers"))
          tuneNumWorkers = StringTk::strToUInt(iter->second);
       else if (iter->first == std::string("runDaemonized"))

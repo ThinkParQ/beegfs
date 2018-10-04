@@ -16,13 +16,10 @@ bool ClientStatsHelper::getStatsFromNodes(NodeStoreServers* serverNodes, ClientS
    std::string rootNodeID;
    bool retVal = true;
 
-   auto node = serverNodes->referenceFirstNode();
-   while (node)
+   for (const auto& node : serverNodes->referenceAllNodes())
    {
       // we ignore the return value as other nodes might be ok
       retVal = doClientStats(*node, stats);
-
-      node = serverNodes->referenceNextNode(node);
    }
 
    return retVal;
@@ -57,7 +54,7 @@ bool ClientStatsHelper::doClientStats(Node& node, ClientStats* stats)
 
       getStatsRes = getIOVec(node, cookieIP, isPerUserStats, &statsVec);
 
-      if (getStatsRes == true)
+      if (getStatsRes)
          parseRes = stats->parseStatsVector(&statsVec);
       else
          parseRes = false;
@@ -75,10 +72,7 @@ bool ClientStatsHelper::doClientStats(Node& node, ClientStats* stats)
       std::cerr << logMessage << std::endl;
    }
 
-   if (!parseRes)
-      return false;
-
-   return true;
+   return parseRes;
 }
 
 /**
@@ -93,9 +87,6 @@ bool ClientStatsHelper::getIOVec(Node& node, uint64_t cookieIP, bool requestPerU
    LogContext log = LogContext("ClientStats (get IO vector) ");
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetClientStatsRespMsg* respMsgCast;
 
    // we start to request a message for cookieIP=0, so no cookie set
@@ -104,10 +95,9 @@ bool ClientStatsHelper::getIOVec(Node& node, uint64_t cookieIP, bool requestPerU
    if(requestPerUserStats)
       getStatsMsg.addMsgHeaderFeatureFlag(GETCLIENTSTATSMSG_FLAG_PERUSERSTATS);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      node, &getStatsMsg, NETMSGTYPE_GetClientStatsResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(node, getStatsMsg,
+         NETMSGTYPE_GetClientStatsResp);
+   if(!respMsg)
    {
       std::string logMessage("Communication with node failed: " + node.getNodeIDWithTypeStr() );
 
@@ -116,14 +106,11 @@ bool ClientStatsHelper::getIOVec(Node& node, uint64_t cookieIP, bool requestPerU
       goto err_cleanup;
    }
 
-   respMsgCast = ((GetClientStatsRespMsg*)respMsg);
+   respMsgCast = ((GetClientStatsRespMsg*)respMsg.get());
    respMsgCast->getStatsVector().swap(*outVec);
 
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }

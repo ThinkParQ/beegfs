@@ -2,6 +2,7 @@
 #define METADATATK_H_
 
 #include <common/nodes/NodeStoreServers.h>
+#include <common/nodes/RootInfo.h>
 #include <common/storage/Metadata.h>
 #include <common/storage/StorageErrors.h>
 #include <common/storage/EntryInfo.h>
@@ -27,8 +28,8 @@ class MetadataTk
 {
    public:
       static FhgfsOpsErr referenceOwner(Path* searchPath, bool referenceParent,
-         NodeStoreServers* nodes, NodeHandle& outReferencedNode, EntryInfo* entryInfo,
-         MirrorBuddyGroupMapper* metaBuddyGroupMapper);
+         NodeStoreServers* nodes, NodeHandle& outReferencedNode, EntryInfo* outEntryInfo,
+         const RootInfo& metaRoot, MirrorBuddyGroupMapper* metaBuddyGroupMapper);
 
    private:
       MetadataTk() {}
@@ -37,7 +38,8 @@ class MetadataTk
          NetMessage* requestMsg, EntryInfoWithDepth* outEntryInfoWDepth);
 
       static FhgfsOpsErr findOwner(Path* searchPath, unsigned searchDepth, NodeStoreServers* nodes,
-         EntryInfo* outEntryInfo, MirrorBuddyGroupMapper* metaBuddyGroupMapper);
+         EntryInfo* outEntryInfo, const RootInfo& metaRoot,
+         MirrorBuddyGroupMapper* metaBuddyGroupMapper);
 
    public:
       // inliners

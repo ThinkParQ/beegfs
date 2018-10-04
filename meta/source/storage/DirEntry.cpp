@@ -379,7 +379,7 @@ FhgfsOpsErr DirEntry::removeDirEntryFile(const std::string& filePath)
    if (errno == ENOENT)
       return FhgfsOpsErr_PATHNOTEXISTS;
 
-   LOG(GENERAL, ERR, "Unable to delete dentry file", filePath, sysErr());
+   LOG(GENERAL, ERR, "Unable to delete dentry file", filePath, sysErr);
    return FhgfsOpsErr_INTERNAL;
 }
 

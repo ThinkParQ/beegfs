@@ -1,12 +1,8 @@
-#include <common/threading/SafeMutexLock.h>
 #include <common/app/log/LogContext.h>
 #include "NodeStoreClients.h"
 
-#include <limits.h>
+#include <climits>
 #include <mutex>
-
-/* maximum number of IDs for client nodes, -1 for reserved value "0" */
-#define NODESTORESCLIENTS_MAX_NODENUMIDS (UINT_MAX-1)
 
 /**
  * Note: Does not initialize the localNode data (the localNode can be set later)
@@ -14,10 +10,9 @@
  * @param channelsDirectDefault false to make all channels indirect by default (only metadata
  *    server should set this to true, all others to false)
  */
-NodeStoreClients::NodeStoreClients(bool channelsDirectDefault) :
+NodeStoreClients::NodeStoreClients():
    AbstractNodeStore(NODETYPE_Client)
 {
-   this->channelsDirectDefault = channelsDirectDefault;
 }
 
 /**
@@ -40,23 +35,18 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
    NumNodeID nodeNumID = node->getNumID();
    std::string nodeID = node->getID();
 
-   std::unique_lock<Mutex> lock(mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
-   // check if numID is given
-
-   if(!nodeNumID)
-   { // no numID yet => generate it
-      nodeNumID = generateNodeNumID(*node);
-      if(unlikely(!nodeNumID) )
-      { // no numID available
-         LogContext(__func__).logErr(
-            std::string("Unable to add new node, ran out of numeric IDs. NodeID: ") + nodeID);
-
-         SAFE_ASSIGN(outNodeNumID, nodeNumID);
+   // check if numID is given. if not, we must generate an id - only mgmt may do that, which it
+   // should do in a subclass.
+   if (!nodeNumID)
+   {
+      auto newID = generateID(*node);
+      if (!newID)
          return false;
-      }
 
-      node->setNumID(nodeNumID); // assign new numeric ID
+      nodeNumID = newID;
+      node->setNumID(nodeNumID);
    }
 
    // is node in any of the stores already?
@@ -79,16 +69,14 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
       else
       {
          active.updateLastHeartbeatT();
-         active.setFhgfsVersion(node->getFhgfsVersion());
          active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList);
-         active.setFeatureFlags(node->getNodeFeatures());
       }
 
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
    }
    else
    { // node not in any store yet
-      node->getConnPool()->setChannelDirect(channelsDirectDefault);
+      node->getConnPool()->setChannelDirect(false);
 
       activeNodes.insert({nodeNumID, std::move(node)});
 
@@ -97,23 +85,7 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
    }
 
-   lock.unlock();
-
-   // set lastUsedNumID if this ID is bigger than lastUsedNumID
-   if (nodeNumID > lastUsedNumID)
-      lastUsedNumID = nodeNumID;
-
    return !nodeWasActive;
-}
-
-bool NodeStoreClients::updateLastHeartbeatT(NumNodeID numNodeID)
-{
-   auto node = referenceNode(numNodeID);
-   if (!node)
-      return false;
-
-   node->updateLastHeartbeatT();
-   return true;
 }
 
 
@@ -143,20 +115,6 @@ NodeHandle NodeStoreClients::referenceFirstNode() const
       return iter->second;
 
    return {};
-}
-
-/**
- * @return NULL if nodeNumID was the last node
- */
-NodeHandle NodeStoreClients::referenceNextNode(const NodeHandle& oldNode) const
-{
-   std::lock_guard<Mutex> lock(mutex);
-
-   auto nextNodeInMap = activeNodes.upper_bound(oldNode->getNumID());
-   if (nextNodeInMap == activeNodes.end())
-      return {};
-   else
-      return nextNodeInMap->second;
 }
 
 /**
@@ -205,12 +163,10 @@ size_t NodeStoreClients::getSize() const
 /**
  * @param masterList must be ordered; contained nodes will be removed and may no longer be
  * accessed after calling this method.
- * @param updateExisting true to call addOrUpdate for nodes that already existed in the store
  * @param appLocalNode (just what you get from app->getLocalNode() )
  */
 void NodeStoreClients::syncNodes(const std::vector<NodeHandle>& masterList,
-   NumNodeIDList* outAddedIDs, NumNodeIDList* outRemovedIDs, bool updateExisting,
-   Node* appLocalNode)
+   NumNodeIDList* outAddedIDs, NumNodeIDList* outRemovedIDs)
 {
    // Note: We have two phases here:
    //    Phase 1 (locked): Identify added/removed nodes.
@@ -250,8 +206,7 @@ void NodeStoreClients::syncNodes(const std::vector<NodeHandle>& masterList,
       }
       else
       { // node unchanged
-         if (updateExisting)
-            addLaterNodes.push_back(*masterIter);
+         addLaterNodes.push_back(*masterIter);
 
          masterIter++;
          activeIter++;
@@ -287,118 +242,11 @@ void NodeStoreClients::syncNodes(const std::vector<NodeHandle>& masterList,
    }
 
 
-   // set supported nic capabilities for added nodes
-   NicListCapabilities localNicCaps;
-
-   if(appLocalNode)
-   {
-      NicAddressList localNicList(appLocalNode->getNicList() );
-      NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-   }
-
    // add nodes
    for (auto iter = addLaterNodes.begin(); iter != addLaterNodes.end(); iter++)
    {
       auto& node = *iter;
 
-      if(appLocalNode)
-         node->getConnPool()->setLocalNicCaps(&localNicCaps);
-
       addOrUpdateNode(node);
    }
-}
-
-/**
- * Generate a new numeric node ID and assign it to the node.
- * This method will also first check whether this node already has a numeric ID assigned and just
- * didn't know of it yet (e.g. because of thread races.)
- *
- * Note: Caller must hold lock.
- * Note: Caller is expected to add the node to the activeNodes map and assign the numeric ID
- *       (because new IDs are picked based on assigned IDs in the activeNodes map).
- *
- * @return 0 if all available numIDs are currently assigned, so none are left
- */
-NumNodeID NodeStoreClients::generateNodeNumID(Node& node)
-{
-   // check whether this node's stringID is already associated with an active or deleted numID
-   NumNodeID previousNumID = retrieveNumIDFromStringID(node.getID() );
-   if(previousNumID)
-      return previousNumID;
-
-   // check if we have a numeric ID left
-   size_t numNodesTotal = activeNodes.size();
-
-   //note: at the moment we restrict server node IDs to 16 bit to be compatible with targetIDs,
-   //client node IDs can be 32 bit
-   if(unlikely(numNodesTotal >= NODESTORESCLIENTS_MAX_NODENUMIDS) )
-      return NumNodeID(); // all numeric IDs currently in use
-
-   // the following code will most likely prevent numeric IDs for clients from collisions, which
-   // can occur if a client gets unmounted and its ID gets re-used before all nodes in the system
-   // know about the client removal. However, in case we have a lot of clients (really a lot, close
-   // to NODESTORESCLIENTS_MAX_NODENUMIDS), collisions can still happen
-
-   // as long as we haven't reachend NODESTORESCLIENTS_MAX_NODENUMIDS (which is pretty unlikely),
-   // this should return the direct successor of lastUsedID.
-   // if NODESTORESCLIENTS_MAX_NODENUMIDS is already reached, we have to find a spot in between
-   for(uint32_t nextID = lastUsedNumID.val() + 1;
-         nextID <= NODESTORESCLIENTS_MAX_NODENUMIDS;
-         nextID++)
-   {
-      if(!checkNodeNumIDCollision(NumNodeID(nextID) ) )
-         return NumNodeID(nextID); // we found an ID that no other node uses
-   }
-
-   // if we came here, we couldn't find a free spot between lastUsedID and
-   // NODESTORESCLIENTS_MAX_NODENUMIDS. In this case we have to try beginning with 1
-   for(uint32_t newNumID = 1; newNumID <= lastUsedNumID.val(); newNumID++)
-   {
-      if(!checkNodeNumIDCollision(NumNodeID(newNumID) ) )
-      {
-         lastUsedNumID = NumNodeID(newNumID); // in this case we have to set lastUsedNumID here
-         return lastUsedNumID; // we found an ID that no other node uses
-      }
-   }
-
-   // still no new ID => all IDs used!
-
-   return NumNodeID();
-}
-
-/**
- * Search activeNodes for a node with the given string ID and return it's associated numeric ID.
- *
- * Note: Caller must hold lock.
- *
- * @return 0 if no node with the given stringID was found, associated numeric ID otherwise.
- */
-NumNodeID NodeStoreClients::retrieveNumIDFromStringID(std::string nodeID) const
-{
-   for (auto iter = activeNodes.begin(); iter != activeNodes.end(); iter++)
-   {
-      Node& currentNode = *iter->second;
-
-      if (currentNode.getID() == nodeID)
-         return currentNode.getNumID();
-   }
-
-   return NumNodeID();
-}
-
-/**
- * Check whether the given numeric ID is already being used.
- *
- * Note: Caller must hold lock.
- *
- * @return true if any of the active or deleted nodes already uses the given numeric ID, false
- * otherwise.
- */
-bool NodeStoreClients::checkNodeNumIDCollision(NumNodeID numID) const
-{
-   auto activeIter = activeNodes.find(numID);
-   if (activeIter != activeNodes.end() )
-      return true; // we found a node with the given numID
-
-   return false; // no node uses the given numID
 }

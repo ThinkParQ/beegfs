@@ -65,7 +65,7 @@ class FsckTkEx
        * @param text The text to be printed
        * @param optionFlags OutputOptions_... flags (mainly for formatiing)
        */
-      static void fsckOutput(std::string text, int options);
+      static void fsckOutput(std::string text, int optionFlags);
       // just print a formatted header with the version to the console
       static void printVersionHeader(bool toStdErr = false, bool noLogFile = false);
       // print the progress meter which goes round and round (-\|/-)
@@ -80,7 +80,6 @@ class FsckTkEx
             bool forceRestart);
       static bool stopModificationLogging(NodeStore* metaNodes);
 
-      static bool testVersions(NodeStore* metaNodes, NodeStore* storageNodes);
       static bool checkConsistencyStates();
 
    private:

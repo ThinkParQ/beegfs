@@ -23,9 +23,7 @@ bool MkLocalDirMsgEx::processIncoming(ResponseContext& ctx)
 {
    EntryInfo* entryInfo = getEntryInfo();
 
-   LOG_DBG(GENERAL, DEBUG, "Received a MkLocalDirMsg", as("peer", ctx.peerName()),
-         as("entryID", entryInfo->getEntryID()),
-         as("entryName", entryInfo->getFileName()));
+   LOG_DBG(GENERAL, DEBUG, "", entryInfo->getEntryID(), entryInfo->getFileName());
    (void) entryInfo;
 
    rctx = &ctx;

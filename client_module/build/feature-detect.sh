@@ -118,11 +118,6 @@ check_symbol() {
    _check_symbol "$name" "$@" | _marker_if_compiles "$marker"
 }
 
-check_struct_field \
-   address_space_operations::launder_page \
-   KERNEL_HAS_LAUNDER_PAGE \
-   linux/fs.h
-
 check_function \
    generic_readlink "int (struct dentry *, char __user *, int)" \
    KERNEL_HAS_GENERIC_READLINK \

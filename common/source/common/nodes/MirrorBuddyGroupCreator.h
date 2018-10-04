@@ -4,6 +4,7 @@
 #include <common/Common.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/NodeStore.h>
+#include <common/nodes/RootInfo.h>
 #include <common/nodes/StoragePoolStore.h>
 
 
@@ -18,7 +19,7 @@ typedef PrimaryTargetCounterMap::value_type PrimaryTargetCounterMapVal;
 class MirrorBuddyGroupCreator
 {
    public:
-      MirrorBuddyGroupCreator(NodeStore* mgmtNodes, NodeStore* metaNodes,
+      MirrorBuddyGroupCreator(NodeStore* mgmtNodes, NodeStore* metaNodes, const RootInfo* metaRoot,
          StoragePoolStore* storagePoolStore)
          : cfgForce(false),
            cfgDryrun(false),
@@ -26,6 +27,7 @@ class MirrorBuddyGroupCreator
            nodeType(NODETYPE_Invalid),
            mgmtNodes(mgmtNodes),
            metaNodes(metaNodes),
+           metaRoot(metaRoot),
            storagePoolStore(storagePoolStore)
       {}
 
@@ -42,6 +44,7 @@ class MirrorBuddyGroupCreator
       NodeType nodeType; // the node type (meta / storage)
       const NodeStore* mgmtNodes; // NodeStore holding the management node
       const NodeStore* metaNodes;
+      const RootInfo* metaRoot;
       const StoragePoolStore* storagePoolStore;
 
       // Note: Derived class is responsible for filling the nodeStore and the targetMappers.
@@ -52,18 +55,18 @@ class MirrorBuddyGroupCreator
                                       // case nodeType == NODETYPE_Storage.
                                       // For nodeType == NODETYPE_Meta, the map is nodeID->nodeID.
 
-      FhgfsOpsErr addGroupComm(uint16_t primaryTargetID, uint16_t secondaryTargetID,
+      FhgfsOpsErr addGroupComm(uint16_t primaryID, uint16_t secondaryID,
          uint16_t forcedGroupID, uint16_t& outNewGroupID) const;
 
-      bool removeTargetsFromExistingMirrorBuddyGroups(const UInt16List* oldPrimaryTargetIDs,
-         const UInt16List* oldSecondaryTargetIDs);
+      bool removeTargetsFromExistingMirrorBuddyGroups(const UInt16List* oldPrimaryIDs,
+         const UInt16List* oldSecondaryIDs);
       uint16_t findNextTarget(NumNodeID nodeNumIdToIgnore,
          StoragePoolId storagePoolId = StoragePoolStore::INVALID_POOL_ID);
       bool checkSizeOfTargets() const;
       FhgfsOpsErr generateMirrorBuddyGroups(UInt16List* outBuddyGroupIDs,
          MirrorBuddyGroupList* outBuddyGroups, const UInt16List* usedMirrorBuddyGroupIDs);
       void selectPrimaryTarget(PrimaryTargetCounterMap* primaryUsed,
-         uint16_t* inOutPrimaryTargetID, uint16_t* inOutSecondaryTargetID) const;
+         uint16_t* inOutPrimaryID, uint16_t* inOutSecondaryID) const;
       bool createMirrorBuddyGroups(FhgfsOpsErr retValGeneration, const UInt16List* buddyGroupIDs,
          const MirrorBuddyGroupList* buddyGroups);
 

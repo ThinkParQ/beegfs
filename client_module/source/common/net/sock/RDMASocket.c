@@ -72,13 +72,6 @@ void _RDMASocket_uninit(Socket* this)
    _PooledSocket_uninit(this);
 }
 
-void _RDMASocket_destruct(Socket* this)
-{
-   _RDMASocket_uninit(this);
-
-   kfree(this);
-}
-
 bool RDMASocket_rdmaDevicesExist(void)
 {
    return IBVSocket_rdmaDevicesExist();
@@ -219,16 +212,6 @@ ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags,
    RELEASE_PROCESS_CONTEXT(oldfs);
 
    return retVal;
-}
-
-/**
- * Note: Don't call this for sockets that have never been connected!
- *
- * @return false on connection error
- */
-bool RDMASocket_checkConnection(RDMASocket* this)
-{
-   return IBVSocket_checkConnection(&this->ibvsock) == 0;
 }
 
 /**

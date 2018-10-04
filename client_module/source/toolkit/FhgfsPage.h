@@ -14,7 +14,6 @@ static inline void FhgfsPage_unmapUnlockReleaseFhgfsPage(FhgfsPage* this);
 static inline loff_t FhgfsPage_getFileOffset(FhgfsPage* this);
 static inline void FhgfsPage_zeroPage(FhgfsPage* this);
 static inline pgoff_t FhgfsPage_getPageIndex(FhgfsPage* this);
-static inline int FhgfsPage_getSize(FhgfsPage* this);
 
 
 struct FhgfsPage
@@ -73,11 +72,6 @@ void FhgfsPage_zeroPage(FhgfsPage* this)
 pgoff_t FhgfsPage_getPageIndex(FhgfsPage* this)
 {
    return this->page->index;
-}
-
-int FhgfsPage_getSize(FhgfsPage* this)
-{
-   return this->length;
 }
 
 #endif // FHGFSPAGE_H_

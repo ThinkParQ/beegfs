@@ -8,28 +8,17 @@
 static FhgfsOpsErr removeGroupOnRemoteNode(Node& node, const uint16_t groupID, const bool onlyCheck,
       const bool force)
 {
-   char* buf = nullptr;
-   NetMessage* resultMsg = nullptr;
-
    RemoveBuddyGroupMsg msg(NODETYPE_Storage, groupID, onlyCheck, force);
 
-   const bool commRes = MessagingTk::requestResponse(node, &msg,
-         NETMSGTYPE_RemoveBuddyGroupResp, &buf, &resultMsg);
-   if (!commRes)
+   const auto resultMsg = MessagingTk::requestResponse(node, msg, NETMSGTYPE_RemoveBuddyGroupResp);
+   if (!resultMsg)
       return FhgfsOpsErr_COMMUNICATION;
 
-   const auto result = static_cast<RemoveBuddyGroupRespMsg*>(resultMsg)->getResult();
-
-   delete resultMsg;
-   free(buf);
-
-   return result;
+   return static_cast<RemoveBuddyGroupRespMsg&>(*resultMsg).getResult();
 }
 
 bool RemoveBuddyGroupMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(MIRRORING, DEBUG, "Received RemoveBuddyGroupMsg.", ctx.peerName());
-
    if (Program::getApp()->isShuttingDown())
    {
       ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));

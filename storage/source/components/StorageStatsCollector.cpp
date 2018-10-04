@@ -13,7 +13,7 @@ void StorageStatsCollector::collectStats()
 
    HighResolutionStats newStats;
 
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    // get stats from first queue as basis
 
@@ -44,7 +44,4 @@ void StorageStatsCollector::collectStats()
 
    // push new stats to front
    statsList.push_front(newStats);
-
-   mutexLock.unlock();
 }
-

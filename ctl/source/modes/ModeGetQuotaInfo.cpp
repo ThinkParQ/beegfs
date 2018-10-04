@@ -58,7 +58,7 @@ int ModeGetQuotaInfo::execute()
    }
 
    //remove all duplicated IDs, the list::unique() needs a sorted list
-   if(this->cfg.cfgIDList.size() > 0)
+   if (!this->cfg.cfgIDList.empty())
    {
       this->cfg.cfgIDList.sort();
       this->cfg.cfgIDList.unique();
@@ -132,8 +132,8 @@ bool ModeGetQuotaInfo::queryAndPrintQuota(const NodeHandle& mgmtNode, StoragePoo
    this->cfg.cfgTargetSelection = GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET;
 
    // query the used quota data
-   if (!this->requestQuotaDataAndCollectResponses(mgmtNode, storageNodes,
-       Program::getApp()->getWorkQueue(), &usedQuotaDataResults, targetMapper, false,
+   if (!this->requestQuotaDataAndCollectResponses(storageNodes,
+       Program::getApp()->getWorkQueue(), &usedQuotaDataResults, targetMapper,
        &quotaInodeSupport, storagePoolStore, storagePoolId))
    {
       return false;
@@ -147,10 +147,8 @@ bool ModeGetQuotaInfo::queryAndPrintQuota(const NodeHandle& mgmtNode, StoragePoo
       QuotaDataMapForTargetMapVal(QUOTADATAMAPFORTARGET_ALL_TARGETS_ID, usedQuotaSum));
 
    // query the quota limits
-   QuotaInodeSupport quotaInodeSupportLimits = QuotaInodeSupport_UNKNOWN;
-   if (!this->requestQuotaDataAndCollectResponses(mgmtNode, storageNodes,
-       Program::getApp()->getWorkQueue(), &quotaDataLimitsResults, targetMapper, true,
-       &quotaInodeSupportLimits, storagePoolStore, storagePoolId))
+   if (!this->requestQuotaLimitsAndCollectResponses(mgmtNode, Program::getApp()->getWorkQueue(),
+            &quotaDataLimitsResults, targetMapper, storagePoolId))
    {
       return false;
    }
@@ -445,32 +443,24 @@ bool ModeGetQuotaInfo::requestDefaultLimits(Node& mgmtNode, QuotaDefaultLimits& 
 {
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    GetDefaultQuotaRespMsg* respMsgCast;
 
    GetDefaultQuotaMsg msg(storagePoolId);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(mgmtNode, &msg, NETMSGTYPE_GetDefaultQuotaResp, &respBuf,
-      &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(mgmtNode, msg, NETMSGTYPE_GetDefaultQuotaResp);
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << mgmtNode.getNodeIDWithTypeStr() <<
          std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (GetDefaultQuotaRespMsg*)respMsg;
+   respMsgCast = (GetDefaultQuotaRespMsg*)respMsg.get();
    defaultLimits.updateLimits(respMsgCast->getDefaultLimits() );
 
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -605,7 +595,7 @@ bool ModeGetQuotaInfo::printQuotaForID(QuotaDataMap* usedQuota, QuotaDataMap* qu
    else
       name = System::getGroupNameFromGID(id);
 
-   if(name.size() == 0)
+   if (name.empty())
       name = StringTk::uintToStr(id);
 
 

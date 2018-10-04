@@ -229,7 +229,7 @@ int ModeResyncStats::getStatsStorage(uint16_t syncToTargetID, bool isBuddyGroupI
    {
       std::cerr << "Statistics could not be retrieved; primary target ID: " << syncFromTargetID
          << "; secondary target ID: " << syncToTargetID;
-      std::cerr << "; Error: " << FhgfsOpsErrTk::toErrString(getStatsRes) << std::endl;
+      std::cerr << "; Error: " << getStatsRes << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 
@@ -277,7 +277,7 @@ int ModeResyncStats::getStatsMeta(uint16_t nodeID, bool isBuddyGroupID)
    {
       std::cerr << "Statistics could not be retrieved; primary node ID: " << syncFromNodeID
          << "; secondary node ID: " << syncToNodeID;
-      std::cerr << "; Error: " << FhgfsOpsErrTk::toErrString(getStatsRes) << std::endl;
+      std::cerr << "; Error: " << getStatsRes << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 
@@ -288,7 +288,7 @@ int ModeResyncStats::getStatsMeta(uint16_t nodeID, bool isBuddyGroupID)
 
 void ModeResyncStats::printStats(StorageBuddyResyncJobStatistics& jobStats)
 {
-   printStats((BuddyResyncJobStatistics)jobStats);
+   printStats((BuddyResyncJobStatistics)jobStats); // NOLINT(cppcoreguidelines-slicing)
    std::cout << "# of discovered dirs: " << jobStats.getDiscoveredDirs() << std::endl;
    std::cout << "# of discovered files: " << jobStats.getDiscoveredFiles() << std::endl;
    std::cout << "# of dir sync candidates: " << jobStats.getMatchedDirs() << std::endl;
@@ -301,7 +301,7 @@ void ModeResyncStats::printStats(StorageBuddyResyncJobStatistics& jobStats)
 
 void ModeResyncStats::printStats(MetaBuddyResyncJobStatistics& jobStats)
 {
-   printStats((BuddyResyncJobStatistics)jobStats);
+   printStats((BuddyResyncJobStatistics)jobStats); // NOLINT(cppcoreguidelines-slicing)
 
    std::cout << "# of discovered dirs: " << jobStats.getDirsDiscovered() << std::endl;
    std::cout << "# of discovery errors: " << jobStats.getGatherErrors() << std::endl;

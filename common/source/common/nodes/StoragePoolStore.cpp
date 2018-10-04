@@ -9,7 +9,7 @@ const StoragePoolId StoragePoolStore::MAX_POOL_ID = std::numeric_limits<StorageP
 
 StoragePoolStore::StoragePoolStore(MirrorBuddyGroupMapper* buddyGroupMapper,
                                    TargetMapper* targetMapper, bool skipDefPoolCreation):
-   mappingsDirty(false), buddyGroupMapper(buddyGroupMapper), targetMapper(targetMapper)
+   buddyGroupMapper(buddyGroupMapper), targetMapper(targetMapper)
 {
    if (!skipDefPoolCreation)
    {
@@ -80,7 +80,7 @@ std::pair<FhgfsOpsErr, StoragePoolId> StoragePoolStore::createPool(StoragePoolId
             {
                LOG(STORAGEPOOLS, WARNING, "Couldn't move buddy group to newly created storage pool,"
                             " because buddy group ID is not a member of the default pool.",
-                            as("newPoolId", poolId), as("buddyGroupId", *groupIter));
+                            ("newPoolId", poolId), ("buddyGroupId", *groupIter));
 
                ++failedMoves;
             }
@@ -105,14 +105,12 @@ std::pair<FhgfsOpsErr, StoragePoolId> StoragePoolStore::createPool(StoragePoolId
             {
                LOG(STORAGEPOOLS, WARNING, "Couldn't move target to newly created storage pool, "
                                           "because target ID is not a member of the default pool.",
-                                          as("newPoolId", poolId), as("targetId", *targetIter));
+                                          ("newPoolId", poolId), ("targetId", *targetIter));
 
                ++failedMoves;
             }
          }
       }
-
-      mappingsDirty = true;
 
       if (failedMoves > 0)
          return std::make_pair(FhgfsOpsErr_INVAL, poolId);
@@ -168,7 +166,7 @@ bool StoragePoolStore::moveTargetUnlocked(StoragePoolPtr fromPool, StoragePoolPt
    {
       LOG(STORAGEPOOLS, WARNING, "Could not move target from one storage pool to another. "
          "Target does not exist in old pool.",
-         as("oldPoolID", fromPool->getId()), as("newPoolID", toPool->getId()), targetId);
+         ("oldPoolID", fromPool->getId()), ("newPoolID", toPool->getId()), targetId);
 
       return false;
    }
@@ -177,8 +175,6 @@ bool StoragePoolStore::moveTargetUnlocked(StoragePoolPtr fromPool, StoragePoolPt
    // this doesn't happen frequently it's ok
    const NumNodeID nodeId = targetMapper->getNodeID(targetId);
    toPool->addTarget(targetId, nodeId);
-
-   mappingsDirty = true;
 
    return true;
 }
@@ -220,14 +216,12 @@ bool StoragePoolStore::moveBuddyGroupUnlocked(StoragePoolPtr fromPool, StoragePo
    {
       LOG(STORAGEPOOLS, WARNING, "Could not move buddy group from one storage pool to another, "
          "because buddy group doesn't exist in old pool.",
-         as("oldPoolID", fromPool->getId()), as("newPoolID", toPool->getId()), buddyGroupId);
+         ("oldPoolID", fromPool->getId()), ("newPoolID", toPool->getId()), buddyGroupId);
 
       return false;
    }
 
    toPool->addBuddyGroupUnlocked(buddyGroupId);
-
-   mappingsDirty = true;
 
    if (buddyGroupMapper)
    {
@@ -256,8 +250,8 @@ bool StoragePoolStore::moveBuddyGroupUnlocked(StoragePoolPtr fromPool, StoragePo
       {
          LOG(STORAGEPOOLS, WARNING, "Could not move targets of buddy group from one storage pool to another, "
             "because at least one target doesn't exist in old pool.",
-            as("oldPoolID", fromPool->getId()), as("newPoolID", toPool->getId()), buddyGroupId,
-            as("primaryTargetId", mbg.firstTargetID), as("secondaryTargetId", mbg.secondTargetID));
+            ("oldPoolID", fromPool->getId()), ("newPoolID", toPool->getId()), buddyGroupId,
+            ("primaryTargetId", mbg.firstTargetID), ("secondaryTargetId", mbg.secondTargetID));
 
          return false;
       }
@@ -306,7 +300,7 @@ FhgfsOpsErr StoragePoolStore::addTarget(uint16_t targetId, NumNodeID nodeId, Sto
          {
             LOG(STORAGEPOOLS, ERR, "Requested to add target to storage pool store, "
                      "but target is already member of a storage pool.",
-                     targetId, as("storagePoolId", poolsIter->second->getId()));
+                     targetId, ("storagePoolId", poolsIter->second->getId()));
 
             return FhgfsOpsErr_EXISTS;
          }
@@ -324,8 +318,6 @@ FhgfsOpsErr StoragePoolStore::addTarget(uint16_t targetId, NumNodeID nodeId, Sto
    }
 
    pool->addTarget(targetId, nodeId);
-
-   mappingsDirty = true;
 
    return FhgfsOpsErr_SUCCESS;
 }
@@ -345,10 +337,7 @@ StoragePoolId StoragePoolStore::removeTarget(uint16_t targetId)
       const bool rmRes = pool->removeTarget(targetId);
 
       if (rmRes) // target found; no need to search more pools
-      {
-         mappingsDirty = true;
          return pool->getId();
-      }
    }
 
    return StoragePoolStore::INVALID_POOL_ID;
@@ -384,7 +373,7 @@ FhgfsOpsErr StoragePoolStore::addBuddyGroup(uint16_t buddyGroupId, StoragePoolId
          {
             LOG(STORAGEPOOLS, ERR, "Requested to add buddy group to storage pool store, "
                "but buddy group is already member of a storage pool.", buddyGroupId,
-               as("storagePoolId", poolsIter->second->getId()));
+               ("storagePoolId", poolsIter->second->getId()));
 
             return FhgfsOpsErr_EXISTS;
          }
@@ -402,8 +391,6 @@ FhgfsOpsErr StoragePoolStore::addBuddyGroup(uint16_t buddyGroupId, StoragePoolId
    }
 
    pool->addBuddyGroup(buddyGroupId);
-
-   mappingsDirty = true;
 
    return FhgfsOpsErr_EXISTS;
 }
@@ -425,10 +412,7 @@ StoragePoolId StoragePoolStore::removeBuddyGroup(uint16_t buddyGroupId)
       const bool rmRes = pool->removeBuddyGroup(buddyGroupId);
 
       if (rmRes) // target found; no need to search more pools
-      {
-         mappingsDirty = true;
          return pool->getId();
-      }
    }
 
    return StoragePoolStore::INVALID_POOL_ID;
@@ -528,10 +512,7 @@ bool StoragePoolStore::poolExists(StoragePoolId id) const
 
    auto it = storagePools.find(id);
 
-   if (it != storagePools.end())
-      return true;
-   else
-      return false;
+   return it != storagePools.end();
 }
 
 void StoragePoolStore::syncFromVector(const StoragePoolPtrVec& storagePoolVec)
@@ -544,171 +525,10 @@ void StoragePoolStore::syncFromVector(const StoragePoolPtrVec& storagePoolVec)
       storagePools[(*it)->getId()] = *it;
 }
 
-/**
- * @return true if successfully loaded, false if not
- *
- * Note: setStorePath must be called before using this.
- */
-bool StoragePoolStore::loadFromFile()
-{
-   RWLockGuard lock(rwlock, SafeRWLock_WRITE);
-
-   if (storePath.empty())
-      return false;
-
-   // create/trunc file
-   const int openFlags = O_RDONLY;
-
-   int fd = open(storePath.c_str(), openFlags, 0);
-   if (fd == -1)
-   { // error
-      LOG(STORAGEPOOLS, ERR, "Could not open storage pool mappings file.", storePath, sysErr());
-
-      return false;
-   }
-
-   // file open -> read contents
-   bool retVal;
-
-   try
-   {
-      // determine buffer length
-      struct stat statBuf;
-      int statRes = fstat(fd, &statBuf);
-
-      if (statRes != 0)
-      { // stat failed
-         LOG(STORAGEPOOLS, ERR, "Could not stat storage pool mappings file.", storePath, sysErr());
-
-         retVal = false;
-         goto cleanup_and_exit;
-      }
-
-      // allocate memory for contents
-      boost::scoped_array<char> buf(new char[statBuf.st_size]);
-
-      // read from file
-      const ssize_t readRes = read(fd, buf.get(), statBuf.st_size);
-
-      if(readRes == -1)
-      { // reading failed
-         LOG(STORAGEPOOLS, ERR, "Could not read from storage pool mappings file.",
-             storePath, sysErr());
-
-         retVal = false;
-         goto cleanup_and_exit;
-      }
-      else
-      {  // do the actual deserialization
-         Deserializer des(buf.get(), readRes);
-         deserialize(des);
-         retVal = des.good();
-
-         if (!retVal)
-            LOG(STORAGEPOOLS, ERR, "Could not deserialize storage pool mappings file.", storePath);
-      }
-   }
-   catch (const std::bad_alloc& e)
-   {
-      LOG(STORAGEPOOLS, ERR,
-          "Could not allocate memory for contents of storage pool mappings file.", storePath);
-      retVal = false;
-   }
-
-cleanup_and_exit:
-   close (fd);
-
-   return retVal;
-}
-
-/**
- * @return true if successfully stored, false if not
- *
- * Note: setStorePath must be called before using this.
- */
-bool StoragePoolStore::saveToFile()
-{
-   RWLockGuard lock(rwlock, SafeRWLock_READ);
-
-   if (storePath.empty())
-      return false;
-
-   // create/trunc file
-   const int openFlags = O_CREAT | O_TRUNC | O_WRONLY;
-
-   int fd = open(storePath.c_str(), openFlags, 0660);
-   if (fd == -1)
-   { // error
-      LOG(STORAGEPOOLS, ERR, "Could not open storage pool mappings file.", storePath, sysErr());
-
-      return false;
-   }
-
-   // file open -> write contents
-   bool retVal = true;
-
-   try
-   {
-      // determine buffer length
-      Serializer lengthSerializer;
-      serialize(lengthSerializer);
-      const unsigned bufLen = lengthSerializer.size();
-
-      // do the actual serialization
-      boost::scoped_array<char> buf(new char[bufLen]);
-
-      Serializer ser(buf.get(), bufLen);
-      serialize(ser);
-
-      if (!ser.good())
-      {
-         LOG(STORAGEPOOLS, ERR, "Could not serialize storage pool mappings file.", storePath);
-         retVal = false;
-
-         goto cleanup_and_exit;
-      }
-
-      const ssize_t writeRes = write(fd, buf.get(), bufLen);
-      if ( (writeRes == -1) || (static_cast<size_t>(writeRes) != bufLen))
-      {
-         LOG(STORAGEPOOLS, ERR, "Could not store storage pool mappings file.", storePath, sysErr());
-         retVal = false;
-
-         goto cleanup_and_exit;
-      }
-   }
-   catch (const std::bad_alloc& e)
-   {
-      LOG(STORAGEPOOLS, ERR, "Could not allocate memory for storage pool mappings file.",
-          storePath);
-      retVal = false;
-   }
-
-   mappingsDirty = false;
-
-cleanup_and_exit:
-   close (fd);
-
-   return retVal;
-}
-
-bool StoragePoolStore::isMapperDirty() const
-{
-   RWLockGuard lock(rwlock, SafeRWLock_READ);
-
-   return mappingsDirty;
-}
-
-void StoragePoolStore::setStorePath(const std::string& storePath)
-{
-   RWLockGuard lock(rwlock, SafeRWLock_WRITE);
-
-   this->storePath = storePath;
-}
-
 size_t StoragePoolStore::getSize() const
 {
    RWLockGuard lock(rwlock, SafeRWLock_READ);
 
    return storagePools.size();
 }
+

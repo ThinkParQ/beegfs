@@ -9,6 +9,12 @@ class Config : public AbstractConfig
    public:
       Config(int argc, char** argv);
 
+      enum DbTypes
+      {
+         INFLUXDB,
+         CASSANDRA
+      };
+
    private:
       // configurables
       std::string connInterfacesFile;
@@ -17,12 +23,15 @@ class Config : public AbstractConfig
       std::string pidFile;
 
       // mon-specific configurables
+      DbTypes dbType;
       std::string dbHostName;
       unsigned dbHostPort;
       std::string dbDatabase;
-      unsigned dbMaxPointsPerRequest;
-      bool dbSetRetentionPolicy;
-      std::string dbRetentionDuration;
+      unsigned influxdbMaxPointsPerRequest;
+      bool influxdbSetRetentionPolicy;
+      std::string influxdbRetentionDuration;
+      unsigned cassandraMaxInsertsPerBatch;
+      unsigned cassandraTTLSecs;
       bool collectClientOpsByNode;
       bool collectClientOpsByUser;
       std::chrono::milliseconds httpTimeout;
@@ -56,6 +65,10 @@ class Config : public AbstractConfig
          return pidFile;
       }
 
+      DbTypes getDbType() const
+      {
+         return dbType;
+      }
 
       const std::string& getDbHostName() const
       {
@@ -72,19 +85,29 @@ class Config : public AbstractConfig
          return dbDatabase;
       }
 
-      unsigned getDbMaxPointsPerRequest() const
+      unsigned getInfluxdbMaxPointsPerRequest() const
       {
-         return dbMaxPointsPerRequest;
+         return influxdbMaxPointsPerRequest;
       }
 
-      bool getDbSetRetentionPolicy() const
+      bool getInfluxDbSetRetentionPolicy() const
       {
-         return dbSetRetentionPolicy;
+         return influxdbSetRetentionPolicy;
       }
 
-      const std::string& getDbRetentionDuration() const
+      const std::string& getInfluxDbRetentionDuration() const
       {
-         return dbRetentionDuration;
+         return influxdbRetentionDuration;
+      }
+
+      unsigned getCassandraMaxInsertsPerBatch() const
+      {
+         return cassandraMaxInsertsPerBatch;
+      }
+
+      unsigned getCassandraTTLSecs() const
+      {
+         return cassandraTTLSecs;
       }
 
       bool getCollectClientOpsByNode() const

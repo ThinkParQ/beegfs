@@ -39,7 +39,7 @@ class StringTk
       static std::string uint64ToStr(uint64_t a);
       static std::string doubleToStr(double a);
       static std::string doubleToStr(double a, int precision);
-      static std::string timespanToStr(int64_t timespan_secs);
+      static std::string timespanToStr(int64_t timespan_seconds);
 
       static std::string uint16VecToStr(const UInt16Vector* vec);
       static void strToUint16Vec(std::string& s, UInt16Vector* outVec);
@@ -171,7 +171,8 @@ class StringTk
       }
       
       /*
-       * creates a delimiter-seperated list from an input container of elements
+       * creates a delimiter-seperated list from an input container of elements and sptils lines if
+       * longer than maxLineLength
        *
        * @param delimiter a char to be used as delimiter
        * @param elements the input container
@@ -180,7 +181,8 @@ class StringTk
        * contained if input was empty)
        */
       template<typename Container>
-      static StringVector implode(const Container& elements, char delimiter, unsigned maxLineLength)
+      static StringVector implodeMultiLine(const Container& elements, char delimiter,
+                                           unsigned maxLineLength)
       {
          StringVector result;
          std::string line;

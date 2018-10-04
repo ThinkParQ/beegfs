@@ -8,11 +8,19 @@
 #include "MapTargetsMsgEx.h"
 
 
+static void MapTargetsMsgEx_release(NetMessage* msg)
+{
+   MapTargetsMsgEx* this = container_of(msg, struct MapTargetsMsgEx, netMessage);
+
+   BEEGFS_KFREE_LIST(&this->poolMappings, struct TargetPoolMapping, _list);
+}
+
 const struct NetMessageOps MapTargetsMsgEx_Ops = {
    .serializePayload = _NetMessage_serializeDummy,
    .deserializePayload = MapTargetsMsgEx_deserializePayload,
    .processIncoming = __MapTargetsMsgEx_processIncoming,
    .getSupportedHeaderFeatureFlagsMask = NetMessage_getSupportedHeaderFeatureFlagsMask,
+   .release = MapTargetsMsgEx_release,
 };
 
 bool MapTargetsMsgEx_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
@@ -20,7 +28,7 @@ bool MapTargetsMsgEx_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
    MapTargetsMsgEx* thisCast = (MapTargetsMsgEx*)this;
 
    // targets
-   if(!Serialization_deserializeTargetPoolPairListPreprocess(ctx, &thisCast->rawTargetsList) )
+   if (!TargetPoolMappingList_deserialize(ctx, &thisCast->poolMappings))
       return false;
 
    // nodeID
@@ -45,9 +53,8 @@ bool __MapTargetsMsgEx_processIncoming(NetMessage* this, struct App* app,
    const char* peer;
 
    TargetMapper* targetMapper = App_getTargetMapper(app);
-   UInt16List targetIDs;
-   UInt16ListIter iter;
    NumNodeID nodeID = MapTargetsMsgEx_getNodeID(thisCast);
+   struct TargetPoolMapping* mapping;
 
 
    peer = fromAddr ?
@@ -58,31 +65,19 @@ bool __MapTargetsMsgEx_processIncoming(NetMessage* this, struct App* app,
    IGNORE_UNUSED_VARIABLE(log);
    IGNORE_UNUSED_VARIABLE(logContext);
 
-
-   UInt16List_init(&targetIDs);
-
-   MapTargetsMsgEx_parseTargetIDs(thisCast, &targetIDs);
-
-   for(UInt16ListIter_init(&iter, &targetIDs);
-       !UInt16ListIter_end(&iter);
-       UInt16ListIter_next(&iter) )
+   list_for_each_entry(mapping, &thisCast->poolMappings, _list)
    {
-      uint16_t targetID = UInt16ListIter_value(&iter);
-
-      bool wasNewTarget = TargetMapper_mapTarget(targetMapper, targetID, nodeID);
+      bool wasNewTarget = TargetMapper_mapTarget(targetMapper, mapping->targetID, nodeID);
       if(wasNewTarget)
       {
          LOG_DEBUG_FORMATTED(log, Log_WARNING, logContext, "Mapping target %hu => node %hu",
-            targetID, nodeID);
+            mapping->targetID, nodeID);
       }
    }
 
    // send ack
    MsgHelperAck_respondToAckRequest(app, MapTargetsMsgEx_getAckID(thisCast), fromAddr, sock,
       respBuf, bufLen);
-
-   // clean-up
-   UInt16List_uninit(&targetIDs);
 
    return true;
 }

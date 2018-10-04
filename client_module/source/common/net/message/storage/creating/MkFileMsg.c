@@ -39,11 +39,11 @@ void MkFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    if(NetMessage_isMsgHeaderFeatureFlagSet( (NetMessage*)this, MKFILEMSG_FLAG_STORAGEPOOLID) )
    {
       // storagePoolId
-      StoragePoolId_serialize(&thisCast->storagePoolId, ctx);
+      StoragePoolId_serialize(ctx, &thisCast->storagePoolId);
    }
 
    // parentInfoPtr
-   EntryInfo_serialize(thisCast->parentInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->parentInfoPtr);
 
    // newFileName
    Serialization_serializeStrAlign4(ctx, thisCast->newFileNameLen, thisCast->newFileName);
@@ -52,5 +52,5 @@ void MkFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeUInt16List(ctx, thisCast->preferredTargets);
 
    if (this->msgHeader.msgFeatureFlags & MKFILEMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

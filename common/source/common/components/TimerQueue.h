@@ -118,8 +118,6 @@ class TimerQueue : public PThread
 
       TimerWorkList workList;
 
-      void start() { PThread::start(); }
-
       // these have to be pointers instead of values because older libstdc++ versions do not have
       // map::emplace.
       std::map<unsigned, std::shared_ptr<TimerWorker>> workerPool;

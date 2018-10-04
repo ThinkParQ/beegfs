@@ -7,8 +7,6 @@
 
 bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STATES, DEBUG, "Received a SetTargetConsistencyStatesMsg.", ctx.peerName() );
-
    App* app = Program::getApp();
 
    if (app->isShuttingDown())
@@ -30,10 +28,7 @@ bool SetTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
          stateStore = app->getMetaStateStore();
          break;
       default:
-         LOG(STATES, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(nodeType)),
-               as("Sender", ctx.peerName())
-            );
+         LOG(STATES, ERR, "Invalid node type.", nodeType, ("Sender", ctx.peerName()));
          return false;
    }
 

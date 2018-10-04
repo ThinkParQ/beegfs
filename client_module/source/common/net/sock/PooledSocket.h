@@ -10,9 +10,7 @@ typedef struct PooledSocket PooledSocket;
 
 
 static inline void _PooledSocket_init(PooledSocket* this, NicAddrType_t nicType);
-static inline PooledSocket* _PooledSocket_construct(NicAddrType_t nicType);
 static inline void _PooledSocket_uninit(Socket* this);
-static inline void _PooledSocket_destruct(Socket* this);
 
 // inliners
 static inline bool PooledSocket_getHasExpired(PooledSocket* this, unsigned expireSecs);
@@ -54,30 +52,9 @@ void _PooledSocket_init(PooledSocket* this, NicAddrType_t nicType)
    this->nicType = nicType;
 }
 
-
-PooledSocket* _PooledSocket_construct(NicAddrType_t nicType)
-{
-   PooledSocket* this = (PooledSocket*)os_kmalloc(sizeof(*this) );
-
-   _PooledSocket_init(this, nicType);
-
-   return this;
-}
-
 void _PooledSocket_uninit(Socket* this)
 {
-   PooledSocket* thisCast = (PooledSocket*)this;
-
-   Time_uninit(&thisCast->expireTimeStart);
-
    _Socket_uninit(this);
-}
-
-void _PooledSocket_destruct(Socket* this)
-{
-   _PooledSocket_uninit(this);
-
-   kfree(this);
 }
 
 /**

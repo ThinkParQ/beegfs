@@ -3,20 +3,18 @@
 #include <common/app/log/LogContext.h>
 #include <common/net/message/nodes/storagepools/ModifyStoragePoolRespMsg.h>
 #include <common/net/message/control/GenericResponseMsg.h>
-#include <common/nodes/StoragePoolStore.h>
+#include <nodes/StoragePoolStoreEx.h>
 #include <program/Program.h>
 
 bool ModifyStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STORAGEPOOLS, DEBUG, "Received a ModifyStoragePoolMsg", ctx.peerName());
-
    if (Program::getApp()->isShuttingDown())
    {
       ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
       return true;
    }
 
-   StoragePoolStore* storagePoolStore = Program::getApp()->getStoragePoolStore();
+   StoragePoolStoreEx* storagePoolStore = Program::getApp()->getStoragePoolStore();
 
    if (Program::getApp()->isShuttingDown())
    {
@@ -77,7 +75,7 @@ bool ModifyStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
             LOG(STORAGEPOOLS, WARNING,
                "Could not add target to storage pool. "
                "Probably the target doesn't exist or is not a member of the default storage pool.",
-               poolId, as("targetId",*it));
+               poolId, ("targetId",*it));
 
             result = FhgfsOpsErr_INTERNAL;
 
@@ -103,7 +101,7 @@ bool ModifyStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
             LOG(STORAGEPOOLS, WARNING,
                "Could not remove target from storage pool. "
                "Probably the target doesn't exist or is not a member of the storage pool.",
-               poolId, as("targetId",*it));
+               poolId, ("targetId",*it));
 
             result = FhgfsOpsErr_INTERNAL;
 
@@ -129,7 +127,7 @@ bool ModifyStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
                "Could not add buddy group to storage pool. "
                "Probably the buddy group doesn't exist "
                "or is not a member of the default storage pool.",
-               poolId, as("buddyGroupId",*it));
+               poolId, ("buddyGroupId",*it));
 
             result = FhgfsOpsErr_INTERNAL;
 
@@ -155,7 +153,7 @@ bool ModifyStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
             LOG(STORAGEPOOLS, WARNING,
                "Could not remove buddy group from storage pool. "
                "Probably the buddy group doesn't exist or is not a member of the storage pool.",
-               poolId, as("buddy group",*it));
+               poolId, ("buddy group",*it));
 
             result = FhgfsOpsErr_INTERNAL;
 

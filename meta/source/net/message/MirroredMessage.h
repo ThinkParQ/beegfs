@@ -17,9 +17,6 @@
 template<typename BaseT, typename LockStateT>
 class MirroredMessage : public BaseT
 {
-   template<typename T1, typename T2>
-   friend class MirroredMessage;
-
    protected:
       typedef MirroredMessage BaseType;
 
@@ -344,7 +341,9 @@ class MirroredMessage : public BaseT
             // of sync.
             LOG_CTX(MIRRORING, NOTICE, mirrorLogContext(),
                   "Different return codes from primary and secondary buddy. "
-                  "Setting secondary to needs-reync");
+                  "Setting secondary to needs-resync.",
+                  ("Expected response", expectedResult),
+                  ("Received response", respMsgRes));
             setBuddyNeedsResync();
          }
       }
@@ -404,15 +403,22 @@ class MirroredMessage : public BaseT
          }
       }
 
+      void updateNodeOp(NetMessage::ResponseContext& ctx, MetaOpCounterTypes type)
+      {
+         const auto counter = isMirrored() && this->hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond)
+            ? MetaOpCounter_MIRROR
+            : type;
+
+         Program::getApp()->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(),
+               counter, this->getMsgHeaderUserID());
+      }
+
    private:
       std::shared_ptr<MirrorStateSlot> mirrorState;
 
       void setBuddyNeedsResync()
       {
-         auto* app = Program::getApp();
-         auto* buddyGroups = app->getMetaBuddyGroupMapper();
-         NumNodeID buddyNodeID(buddyGroups->getBuddyTargetID(app->getLocalNodeNumID().val()));
-         BuddyCommTk::setBuddyNeedsResync(Program::getApp()->getMetaPath(), true, buddyNodeID);
+         BuddyCommTk::setBuddyNeedsResync(Program::getApp()->getMetaPath(), true);
       }
 };
 

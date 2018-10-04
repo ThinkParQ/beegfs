@@ -4,10 +4,10 @@
 #include <common/fsck/FsckDirEntry.h>
 #include <toolkit/BuddyCommTk.h>
 
+#include <boost/lexical_cast.hpp>
+
 bool DeleteDirEntriesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("DeleteDirEntriesMsg incoming", 4,
-      "Received a DeleteDirEntriesMsg from: " + ctx.peerName() );
    LogContext log("DeleteDirEntriesMsgEx");
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();
@@ -55,7 +55,7 @@ bool DeleteDirEntriesMsgEx::processIncoming(ResponseContext& ctx)
       if (unlinkRes != FhgfsOpsErr_SUCCESS )
       {
          log.logErr("Failed to delete directory entry; ParentID: " + parentID + "; EntryName: " +
-            entryName + "; Err: " + FhgfsOpsErrTk::toErrString(unlinkRes));
+            entryName + "; Err: " + boost::lexical_cast<std::string>(unlinkRes));
           failedEntries.push_back(*iter);
       }
    }

@@ -9,8 +9,6 @@ bool StatMsgEx::processIncoming(ResponseContext& ctx)
 {
 #ifdef BEEGFS_DEBUG
    const char* logContext = "StatMsgEx incoming";
-
-   LOG_DEBUG(logContext, 4, "Received a StatMsg from: " + ctx.peerName() );
 #endif // BEEGFS_DEBUG
 
    App* app = Program::getApp();
@@ -37,7 +35,7 @@ bool StatMsgEx::processIncoming(ResponseContext& ctx)
          &parentEntryID);
    }
 
-   LOG_DEBUG(logContext, 4, std::string("statRes: ") + FhgfsOpsErrTk::toErrString(statRes) );
+   LOG_DBG(GENERAL, DEBUG, "", statRes);
 
    StatRespMsg respMsg(statRes, statData);
 

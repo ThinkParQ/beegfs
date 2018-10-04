@@ -45,7 +45,6 @@ void AckManager_uninit(AckManager* this)
    }
 
    PointerList_uninit(&this->ackQueue);
-   Condition_uninit(&this->ackQueueAddedCond);
    Mutex_uninit(&this->ackQueueMutex);
 
    vfree(this->ackMsgBuf);
@@ -237,8 +236,6 @@ void __AckManager_processAckQueue(AckManager* this)
 void __AckManager_freeQueueEntry(AckManager* this, AckQueueEntry* ackEntry)
 {
    kfree(ackEntry->ackID);
-
-   Time_uninit(&ackEntry->ageT);
 
    kfree(ackEntry);
 }

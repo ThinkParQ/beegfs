@@ -17,9 +17,6 @@
 
 bool GetQuotaInfoMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("GetQuotaInfoMsg incoming", Log_DEBUG, "Received a GetQuotaInfoMsg from: "
-      + ctx.peerName() );
-
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
 
@@ -29,11 +26,11 @@ bool GetQuotaInfoMsgEx::processIncoming(ResponseContext& ctx)
    {
       QuotaManager* quotaManager = app->getQuotaManager();
 
-      if(getQueryType() == GetQuotaInfo_QUERY_TYPE_SINGLE_ID)
+      if(getQueryType() == QUERY_TYPE_SINGLE_ID)
          requestQuotaForID(getIDRangeStart(), getType(), quotaManager, outQuotaDataList);
-      else if(getQueryType() == GetQuotaInfo_QUERY_TYPE_ID_RANGE)
+      else if(getQueryType() == QUERY_TYPE_ID_RANGE)
          requestQuotaForRange(quotaManager, outQuotaDataList);
-      else if(getQueryType() == GetQuotaInfo_QUERY_TYPE_ID_LIST)
+      else if(getQueryType() == QUERY_TYPE_ID_LIST)
          requestQuotaForList(quotaManager, outQuotaDataList);
    }
 

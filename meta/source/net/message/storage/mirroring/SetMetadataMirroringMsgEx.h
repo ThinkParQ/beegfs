@@ -15,7 +15,6 @@ class SetMetadataMirroringMsgEx : public SetMetadataMirroringMsg
    private:
       static FhgfsOpsErr moveRootInode(bool revertMove);
       static FhgfsOpsErr moveRootDirectory(bool revertMove);
-      static FhgfsOpsErr informMgmt(uint16_t newRootNodeID);
 };
 
 #endif /*SETMETADATAMIRRORINGMSGEX_H_*/

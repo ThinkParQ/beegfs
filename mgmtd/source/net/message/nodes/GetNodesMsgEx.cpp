@@ -2,28 +2,24 @@
 #include <program/Program.h>
 #include "GetNodesMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
 {
    LogContext log("GetNodes incoming");
 
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a GetNodesMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
    NodeType nodeType = getNodeType();
 
-   LOG_DEBUG_CONTEXT(log, Log_SPAM, std::string("NodeType: ") + Node::nodeTypeToStr(nodeType) );
+   LOG_DEBUG_CONTEXT(log, Log_SPAM, "NodeType: " + boost::lexical_cast<std::string>(nodeType));
 
 
    // get corresponding node store
 
    AbstractNodeStore* nodes = app->getAbstractNodeStoreFromType(nodeType);
    if(!nodes)
-
    {
-      LOG(GENERAL, ERR, "Invalid node type.",
-            as("Node Type", Node::nodeTypeToStr(nodeType)),
-            as("Sender", ctx.peerName())
-         );
+      LOG(GENERAL, ERR, "Invalid node type.", nodeType, ("Sender", ctx.peerName()));
       return false;
    }
 
@@ -34,8 +30,8 @@ bool GetNodesMsgEx::processIncoming(ResponseContext& ctx)
 
    if(nodeType == NODETYPE_Meta)
    {
-      rootNumID = app->getMetaNodes()->getRootNodeNumID();
-      rootIsBuddyMirrored = app->getMetaNodes()->getRootIsBuddyMirrored();
+      rootNumID = app->getMetaRoot().getID();
+      rootIsBuddyMirrored = app->getMetaRoot().getIsMirrored();
    }
    // reference/retrieve all nodes from the given store and send them
 

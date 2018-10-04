@@ -12,10 +12,6 @@
  */
 bool GetClientStatsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("GetClientStatsMsgEx incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a GetClientStatsMsg from: " + ctx.peerName() );
-
    uint64_t cookieIP = getCookieIP(); // requested is cookie+1
 
    // get stats

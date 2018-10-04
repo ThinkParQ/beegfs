@@ -31,36 +31,6 @@ void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicList
    }
 }
 
-/**
- * Returns a cloned version of a list with only standard NICs in it.
- * (Non-standard elements in the source will just be ignored.)
- */
-void ListTk_cloneStandardNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone)
-{
-   NicAddressListIter iter;
-
-   NicAddressList_init(nicListClone);
-
-   NicAddressListIter_init(&iter, nicList);
-
-   for( ; !NicAddressListIter_end(&iter); NicAddressListIter_next(&iter) )
-   {
-      NicAddress* nicAddr = NicAddressListIter_value(&iter);
-      NicAddress* nicAddrClone;
-
-      // ignore non-standard NICs
-      if(nicAddr->nicType != NICADDRTYPE_STANDARD)
-         continue;
-
-      // clone
-      nicAddrClone = (NicAddress*)os_kmalloc(sizeof(NicAddress) );
-      memcpy(nicAddrClone, nicAddr, sizeof(NicAddress) );
-
-      // append to the clone list
-      NicAddressList_append(nicListClone, nicAddrClone);
-   }
-}
-
 
 /**
  * Returns a sorted clone of a nicList.
@@ -122,20 +92,6 @@ void ListTk_kfreeNicAddressListElems(NicAddressList* nicList)
    {
       NicAddress* nicAddr = NicAddressListIter_value(&nicIter);
       kfree(nicAddr);
-   }
-}
-
-void ListTk_copyStrCpyListToVec(StrCpyList* srcList, StrCpyVec* destVec)
-{
-   StrCpyListIter listIter;
-
-   StrCpyListIter_init(&listIter, srcList);
-
-   for( ; !StrCpyListIter_end(&listIter); StrCpyListIter_next(&listIter) )
-   {
-      char* currentElem = StrCpyListIter_value(&listIter);
-
-      StrCpyVec_append(destVec, currentElem);
    }
 }
 

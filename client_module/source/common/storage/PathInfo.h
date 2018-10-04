@@ -26,14 +26,13 @@ static inline void PathInfo_init(PathInfo *this,
 static inline void PathInfo_uninit(PathInfo* this);
 
 static inline void PathInfo_dup(const PathInfo *inPathInfo, PathInfo *outPathInfo);
-static inline void PathInfo_copy(const PathInfo *inPathInfo, PathInfo *outPathInfo);
 static inline void PathInfo_update(PathInfo* this, const PathInfo* newPathInfo);
 
 static inline void PathInfo_setOrigUID(PathInfo* this, unsigned origParentUID);
 static inline void PathInfo_setOrigParentEntryID(PathInfo* this, const char* origParentEntryID);
 static inline void PathInfo_setFlags(PathInfo *this, unsigned flags);
 
-extern void PathInfo_serialize(const PathInfo* this, SerializeCtx* ctx);
+extern void PathInfo_serialize(SerializeCtx* ctx, const PathInfo* this);
 extern bool PathInfo_deserialize(DeserializeCtx* ctx, PathInfo* outThis);
 
 
@@ -133,21 +132,6 @@ void PathInfo_update(PathInfo* this, const PathInfo* newPathInfo)
       PathInfo_dup(newPathInfo, this);
    }
 }
-
-/**
- * Just copy the values of entryInfo. Caller has to be very very cautious, the memory pointers
- * will be invalid once the original object is freed!
- */
-void PathInfo_copy(const PathInfo* inPathInfo, PathInfo *outPathInfo)
-{
-   int outFlags                     = inPathInfo->flags;
-
-   unsigned outOrigUID              = inPathInfo->origParentUID;
-   const char* outOrigParentEntryID = inPathInfo->origParentEntryID;
-
-   PathInfo_init(outPathInfo, outOrigUID, outOrigParentEntryID, outFlags);
-}
-
 
 void PathInfo_setFlags(PathInfo* this, unsigned flags)
 {

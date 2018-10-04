@@ -203,13 +203,6 @@ void _StandardSocket_uninit(Socket* this)
       sock_release(thisCast->sock);
 }
 
-void _StandardSocket_destruct(Socket* this)
-{
-   _StandardSocket_uninit(this);
-
-   kfree(this);
-}
-
 bool _StandardSocket_initSock(StandardSocket* this, int domain, int type, int protocol)
 {
    int createRes;
@@ -343,22 +336,6 @@ bool StandardSocket_setSoBroadcast(StandardSocket* this, bool enable)
       SO_BROADCAST,
       (char*)&broadcastVal,
       sizeof(broadcastVal) );
-
-   if(setRes != 0)
-      return false;
-
-   return true;
-}
-
-bool StandardSocket_setSoReuseAddr(StandardSocket* this, bool enable)
-{
-   int reuseVal = (enable ? 1 : 0);
-
-   int setRes = _StandardSocket_setsockopt(this,
-      SOL_SOCKET,
-      SO_REUSEADDR,
-      (char*)&reuseVal,
-      sizeof(reuseVal) );
 
    if(setRes != 0)
       return false;
@@ -806,18 +783,4 @@ ssize_t StandardSocket_recvfromT(StandardSocket* this, struct iov_iter* iter, in
          thisBase->peername, pollRes);
 
    return -ECOMM;
-}
-
-ssize_t StandardSocket_broadcast(StandardSocket* this, void *buf, size_t len, int flags,
-   struct in_addr* broadcastIP, unsigned short port)
-{
-   Socket* thisBase = (Socket*)this;
-
-   struct fhgfs_sockaddr_in broadcastAddr =
-   {
-      .addr = *broadcastIP,
-      .port = htons(port),
-   };
-
-   return Socket_sendto(thisBase, buf, len, flags, &broadcastAddr);
 }

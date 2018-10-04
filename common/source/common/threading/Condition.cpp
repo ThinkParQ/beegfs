@@ -55,7 +55,7 @@ bool Condition::testClockID()
    while (true)
    {
       bool testTimeRes = Time::testClockID(clockID);
-      if (testTimeRes == false)
+      if (!testTimeRes)
       {
          clockID = TIME_SAFE_CLOCK_ID;
          continue;
@@ -82,7 +82,7 @@ bool Condition::testClockID()
          {
             clockID = TIME_SAFE_CLOCK_ID;
             bool testTimeRes = Time::testClockID(clockID);
-            if (testTimeRes == false)
+            if (!testTimeRes)
             {
                throw TimeException("Time::testClock(SAFE_CLOCK_ID) failed!");
                return false;

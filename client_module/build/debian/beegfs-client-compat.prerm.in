@@ -1,8 +1,0 @@
-#!/bin/sh
-
-CLIENT_COMPAT_DIR=/opt/beegfs/src/client/client_compat_module___BEEGFS_DEB_MAJOR__
-
-# try to clean up, but do not fail if it does not work
-make -C ${CLIENT_COMPAT_DIR}/build/ clean --silent || true
-
-#DEBHELPER#

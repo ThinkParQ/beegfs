@@ -10,21 +10,17 @@
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/NodeStoreClients.h>
 #include <common/nodes/NodeStoreServers.h>
+#include <common/nodes/RootInfo.h>
 #include <common/nodes/StoragePoolStore.h>
 #include <common/nodes/TargetMapper.h>
 #include <common/toolkit/AcknowledgmentStore.h>
 #include <common/toolkit/NetFilter.h>
 #include <components/DatagramListener.h>
-#include <components/HeartbeatManager.h>
 #include <net/message/NetMessageFactory.h>
 
 
 #ifndef BEEGFS_VERSION
    #error BEEGFS_VERSION undefined
-#endif
-
-#if !defined(BEEGFS_VERSION_CODE) || (BEEGFS_VERSION_CODE == 0)
-   #error BEEGFS_VERSION_CODE undefined
 #endif
 
 // program return codes
@@ -51,10 +47,10 @@ class App : public AbstractApp
       App(int argc, char** argv);
       virtual ~App();
 
-      virtual void run();
+      virtual void run() override;
 
-      void stopComponents();
-      void handleComponentException(std::exception& e);
+      virtual void stopComponents() override;
+      virtual void handleComponentException(std::exception& e) override;
 
    private:
       int appResult;
@@ -75,6 +71,8 @@ class App : public AbstractApp
       NodeStoreServers* storageNodes;
       NodeStoreClients* clientNodes;
 
+      RootInfo metaRoot;
+
       TargetMapper* targetMapper;
       MirrorBuddyGroupMapper* mirrorBuddyGroupMapper;
       MirrorBuddyGroupMapper* metaMirrorBuddyGroupMapper;
@@ -87,7 +85,6 @@ class App : public AbstractApp
       NetMessageFactory* netMessageFactory;
 
       DatagramListener* dgramListener;
-      HeartbeatManager* heartbeatMgr;
       WorkerList workerList;
 
       void runNormal();
@@ -165,22 +162,22 @@ class App : public AbstractApp
 
       // getters & setters
 
-      virtual ICommonConfig* getCommonConfig()
+      virtual const ICommonConfig* getCommonConfig() const override
       {
          return cfg;
       }
 
-      virtual NetFilter* getNetFilter()
+      virtual const NetFilter* getNetFilter() const override
       {
          return netFilter;
       }
 
-      virtual NetFilter* getTcpOnlyFilter()
+      virtual const NetFilter* getTcpOnlyFilter() const override
       {
          return tcpOnlyFilter;
       }
 
-      virtual AbstractNetMessageFactory* getNetMessageFactory()
+      virtual const AbstractNetMessageFactory* getNetMessageFactory() const override
       {
          return netMessageFactory;
       }
@@ -255,11 +252,6 @@ class App : public AbstractApp
          return ackStore;
       }
 
-      HeartbeatManager* getHeartbeatMgr() const
-      {
-         return heartbeatMgr;
-      }
-
       DatagramListener* getDatagramListener() const
       {
          return dgramListener;
@@ -270,6 +262,8 @@ class App : public AbstractApp
          return appResult;
       }
 
+      const RootInfo& getMetaRoot() const { return metaRoot; }
+      RootInfo& getMetaRoot() { return metaRoot; }
 };
 
 

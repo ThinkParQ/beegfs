@@ -12,8 +12,7 @@ bool ListXAttrMsgEx::processIncoming(ResponseContext& ctx)
    EntryInfo* entryInfo = this->getEntryInfo();
    size_t listSize = 0;
 
-   LOG_DEBUG(logContext, Log_DEBUG, "Received a ListXAttrMsg from: " + ctx.peerName()
-      + "; size: " + StringTk::intToStr(this->getSize()) + ";");
+   LOG_DEBUG(logContext, Log_DEBUG, "size: " + StringTk::intToStr(this->getSize()) + ";");
 
    StringVector xAttrVec;
    FhgfsOpsErr listXAttrRes;

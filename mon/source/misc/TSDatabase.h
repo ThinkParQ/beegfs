@@ -2,58 +2,33 @@
 #define TS_DATABASE_H_
 
 #include <common/nodes/NodeType.h>
-#include <common/threading/Mutex.h>
 #include <nodes/MetaNodeEx.h>
 #include <nodes/StorageNodeEx.h>
-#include <misc/CurlWrapper.h>
 #include <app/Config.h>
-
-class App;
 
 class TSDatabase
 {
    public:
-      TSDatabase(Config* config);
+      static const unsigned connectionRetries = 3;
 
-      void setupDatabase() const;
+      TSDatabase() {};
+      virtual ~TSDatabase() {};
 
-      void insertMetaNodeData(std::shared_ptr<Node> node, const MetaNodeDataContent& data);
-      void insertStorageNodeData(std::shared_ptr<Node> node, const StorageNodeDataContent& data);
-      void insertHighResMetaNodeData(std::shared_ptr<Node> node, const HighResolutionStats& data);
-      void insertHighResStorageNodeData(std::shared_ptr<Node> node,
-            const HighResolutionStats& data);
-      void insertStorageTargetsData(std::shared_ptr<Node> node, const StorageTargetInfo& data);
+      virtual void insertMetaNodeData(
+            std::shared_ptr<Node> node, const MetaNodeDataContent& data) = 0;
+      virtual void insertStorageNodeData(
+            std::shared_ptr<Node> node, const StorageNodeDataContent& data) = 0;
+      virtual void insertHighResMetaNodeData(
+            std::shared_ptr<Node> node, const HighResolutionStats& data) = 0;
+      virtual void insertHighResStorageNodeData(
+            std::shared_ptr<Node> node, const HighResolutionStats& data) = 0;
+      virtual void insertStorageTargetsData(
+            std::shared_ptr<Node> node, const StorageTargetInfo& data) = 0;
+      virtual void insertClientNodeData(
+            const std::string& id, const NodeType nodeType,
+            const std::map<std::string, uint64_t>& opMap, bool perUser) = 0;
 
-      void insertClientNodeData(const std::string& id, const NodeType nodeType,
-            const std::map<std::string, uint64_t>& opMap, bool perUser);
-
-      void writePoints();
-
-      static std::string escapeStringForWrite(const std::string& str);
-
-   private:
-      Config* const config;
-
-      std::unique_ptr<CurlWrapper> curlWrapper;
-
-      std::string points;
-      unsigned numPoints;
-      unsigned maxPointsPerRequest;
-
-      mutable Mutex pointsMutex;
-      mutable Mutex curlMutex;
-
-      std::string host;
-      int port;
-      std::string database;
-
-      void appendPoint(const std::string& point);
-      void writePointsUnlocked();
-      void sendWrite(const std::string& data) const;
-      void sendQuery(const std::string& data) const;
-      bool sendPing() const;
-
-
+      virtual void write() = 0;
 };
 
 #endif

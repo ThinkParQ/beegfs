@@ -41,13 +41,12 @@ class QuotaBlockDevice
          this->storageTargetPath = normalizedStoragePath;
       }
 
-      static QuotaBlockDevice getBlockDeviceOfTarget(std::string& targetPath, uint16_t targetNumID);
+      static QuotaBlockDevice getBlockDeviceOfTarget(const std::string& targetPath,
+            uint16_t targetNumID);
       static void getBlockDevicesOfTargets(TargetPathMap* targetPaths,
          QuotaBlockDeviceMap* outBlockDevices);
 
-      static QuotaInodeSupport updateQuotaInodeSupport(QuotaInodeSupport currentQuotaInodeSupport,
-         QuotaBlockDeviceFsType fsTypeBlockDevice);
-      QuotaInodeSupport quotaInodeSupportFromBlockDevice();
+      QuotaInodeSupport quotaInodeSupportFromBlockDevice() const;
 
       static QuotaBlockDeviceFsType getFsType(const std::string& path);
 
@@ -94,6 +93,11 @@ class QuotaBlockDevice
       void setFsType(QuotaBlockDeviceFsType fsType)
       {
          this->fsType = fsType;
+      }
+
+      bool supportsInodeQuota() const
+      {
+         return quotaInodeSupportFromBlockDevice() == QuotaInodeSupport_ALL_BLOCKDEVICES;
       }
 };
 

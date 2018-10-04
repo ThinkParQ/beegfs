@@ -386,7 +386,7 @@ class FsckDBDirInodesTable
       {
       }
 
-      void insert(FsckDirInodeList& fileInodes, const BulkHandle* handle = NULL);
+      void insert(FsckDirInodeList& dirInodes, const BulkHandle* handle = NULL);
       void update(FsckDirInodeList& inodes);
       void remove(FsckDirInodeList& dirInodes);
 

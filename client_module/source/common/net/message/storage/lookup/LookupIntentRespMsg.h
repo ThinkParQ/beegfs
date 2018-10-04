@@ -32,26 +32,6 @@ static inline void LookupIntentRespMsg_init(LookupIntentRespMsg* this);
 // virtual functions
 extern bool LookupIntentRespMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx);
 
-// getters & setters
-static inline int LookupIntentRespMsg_getResponseFlags(LookupIntentRespMsg* this);
-
-static inline FhgfsOpsErr LookupIntentRespMsg_getLookupResult(LookupIntentRespMsg* this);
-static inline EntryInfo* LookupIntentRespMsg_getEntryInfo(LookupIntentRespMsg* this);
-
-static inline FhgfsOpsErr LookupIntentRespMsg_getRevalidateResult(LookupIntentRespMsg* this);
-
-static inline FhgfsOpsErr LookupIntentRespMsg_getOpenResult(LookupIntentRespMsg* this);
-static inline const char* LookupIntentRespMsg_getFileHandleID(LookupIntentRespMsg* this);
-
-static inline FhgfsOpsErr LookupIntentRespMsg_getCreateResult(LookupIntentRespMsg* this);
-
-static inline FhgfsOpsErr LookupIntentRespMsg_getStatResult(LookupIntentRespMsg* this);
-static inline StatData* LookupIntentRespMsg_getStatData(LookupIntentRespMsg* this);
-
-static inline void LookupIntentRespMsg_toEntryInfo(LookupIntentRespMsg* this, EntryInfo*
-   outEntryInfo);
-static inline void LookupIntentRespMsg_toPathInfo(LookupIntentRespMsg* this, PathInfo* outPathInfo);
-
 struct LookupIntentRespMsg
 {
    NetMessage netMessage;
@@ -74,8 +54,8 @@ struct LookupIntentRespMsg
    const char* fileHandleID;
 
    // for deserialization
-   struct StripePatternHeader patternHeader; // (open file data)
    const char* patternStart; // (open file data)
+   uint32_t patternLength; // (open file data)
    PathInfo pathInfo;
 };
 
@@ -84,70 +64,6 @@ extern const struct NetMessageOps LookupIntentRespMsg_Ops;
 void LookupIntentRespMsg_init(LookupIntentRespMsg* this)
 {
    NetMessage_init(&this->netMessage, NETMSGTYPE_LookupIntentResp, &LookupIntentRespMsg_Ops);
-}
-
-int LookupIntentRespMsg_getResponseFlags(LookupIntentRespMsg* this)
-{
-   return this->responseFlags;
-}
-
-
-FhgfsOpsErr LookupIntentRespMsg_getLookupResult(LookupIntentRespMsg* this)
-{
-   return (FhgfsOpsErr)this->lookupResult;
-}
-
-EntryInfo* LookupIntentRespMsg_getEntryInfo(LookupIntentRespMsg* this)
-{
-   return &this->entryInfo;
-}
-
-
-FhgfsOpsErr LookupIntentRespMsg_getRevalidateResult(LookupIntentRespMsg* this)
-{
-   return (FhgfsOpsErr)this->revalidateResult;
-}
-
-FhgfsOpsErr LookupIntentRespMsg_getOpenResult(LookupIntentRespMsg* this)
-{
-   return (FhgfsOpsErr)this->openResult;
-}
-
-const char* LookupIntentRespMsg_getFileHandleID(LookupIntentRespMsg* this)
-{
-   return this->fileHandleID;
-}
-
-FhgfsOpsErr LookupIntentRespMsg_getCreateResult(LookupIntentRespMsg* this)
-{
-   return (FhgfsOpsErr)this->createResult;
-}
-
-FhgfsOpsErr LookupIntentRespMsg_getStatResult(LookupIntentRespMsg* this)
-{
-   return (FhgfsOpsErr)this->statResult;
-}
-
-StatData* LookupIntentRespMsg_getStatData(LookupIntentRespMsg* this)
-{
-   return &this->statData;
-}
-
-
-/**
- * Initialize EntryInfo with values from LookupIntentRespMsg
- */
-void LookupIntentRespMsg_toEntryInfo(LookupIntentRespMsg* this, EntryInfo* outEntryInfo)
-{
-   EntryInfo_dup(&this->entryInfo, outEntryInfo);
-}
-
-/**
- * Initialize EntryInfo with values from LookupIntentRespMsg
- */
-void LookupIntentRespMsg_toPathInfo(LookupIntentRespMsg* this, PathInfo* outPathInfo)
-{
-   PathInfo_dup(&this->pathInfo, outPathInfo);
 }
 
 #endif /* LOOKUPINTENTRESPMSG_H_ */

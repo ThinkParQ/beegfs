@@ -2,6 +2,7 @@
 #define FDHANDLE_H
 
 #include <algorithm>
+#include <errno.h>
 #include <unistd.h>
 
 class FDHandle
@@ -14,7 +15,7 @@ class FDHandle
       ~FDHandle()
       {
          if (fd >= 0)
-            close(fd);
+            ::close(fd);
       }
 
       FDHandle(const FDHandle&) = delete;
@@ -39,6 +40,17 @@ class FDHandle
       int get() const { return fd; }
       int operator*() const { return fd; }
       bool valid() const { return fd >= 0; }
+
+      int close()
+      {
+         if (fd < 0)
+            return 0;
+
+         const int result = ::close(fd);
+         fd = -1;
+
+         return result < 0 ? errno : 0;
+      }
 
    private:
       int fd;

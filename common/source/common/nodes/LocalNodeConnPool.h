@@ -22,7 +22,6 @@ class LocalNodeConnPool : public NodeConnPool
 {
    public:
       LocalNodeConnPool(Node& parentNode, NicAddressList& nicList);
-      LocalNodeConnPool(Node& parentNode, std::string namedSocketPath);
       virtual ~LocalNodeConnPool();
 
       Socket* acquireStreamSocketEx(bool allowWaiting);
@@ -36,8 +35,6 @@ class LocalNodeConnPool : public NodeConnPool
       unsigned availableConns; // available established conns
       unsigned establishedConns; // not equal to connList.size!!
       unsigned maxConns;
-
-      std::string namedSocketPath;
 
       int numCreatedWorkers;
 

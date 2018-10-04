@@ -1,8 +1,8 @@
 #ifndef MESSAGINGTKARGS_H_
 #define MESSAGINGTKARGS_H_
 
-#include <common/nodes/TargetStateInfo.h>
 #include <common/Common.h>
+#include <common/Types.h>
 #include <toolkit/NoAllocBufferStore.h>
 
 

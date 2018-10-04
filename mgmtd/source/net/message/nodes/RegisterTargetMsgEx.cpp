@@ -8,10 +8,6 @@
 
 bool RegisterTargetMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("RegisterTargetMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a RegisterTargetMsg from: " + ctx.peerName() );
-
    const App* app = Program::getApp();
 
    if (app->isShuttingDown())
@@ -35,8 +31,8 @@ bool RegisterTargetMsgEx::processIncoming(ResponseContext& ctx)
    { // target doesn't exist, but no new targets allowed => reject
       // target is new => reject
       LOG(GENERAL, WARNING, "Registration of new targets disabled.",
-         as("candidate target", targetID),
-         as("from", ctx.peerName()));
+         ("candidate target", targetID),
+         ("from", ctx.peerName()));
 
       ctx.sendResponse(RegisterTargetRespMsg(0)); // send response with 0 as new target ID
       return true;

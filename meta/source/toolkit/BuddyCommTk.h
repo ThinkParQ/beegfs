@@ -4,6 +4,10 @@
 #include <string>
 
 #include <common/storage/StorageErrors.h>
+#include <common/nodes/NumNodeID.h>
+
+class MirrorBuddyGroupMapper;
+class TimerQueue;
 
 /**
  * This contains all the functions regarding the communication with the mirror buddy.
@@ -12,14 +16,12 @@
  */
 namespace BuddyCommTk
 {
-   void checkBuddyNeedsResync();
-   void setBuddyNeedsResync(const std::string& path, bool needsResync, NumNodeID buddyNodeID);
-   void setBuddyNeedsResyncState(bool needsResync);
-   bool getBuddyNeedsResync();
+   void prepareBuddyNeedsResyncState(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm,
+         TimerQueue& timerQ, NumNodeID localNodeID);
 
-   void createBuddyNeedsResyncFile(const std::string& path, bool& outFileCreated,
-         NumNodeID buddyNodeID);
-   void removeBuddyNeedsResyncFile(const std::string& path);
+   void checkBuddyNeedsResync();
+   void setBuddyNeedsResync(const std::string& path, bool needsResync);
+   bool getBuddyNeedsResync();
 };
 
 #endif

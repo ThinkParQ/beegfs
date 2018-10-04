@@ -72,8 +72,6 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("connInterfacesFile", "", addDashes);
    configMapRedefine("connFsckPortUDP", "0", addDashes);
 
-   configMapRedefine("debugRunComponentThreads", "true", addDashes);
-
    configMapRedefine("tuneNumWorkers", "32", addDashes);
    configMapRedefine("tunePreferredNodesFile", "", addDashes);
    configMapRedefine("tuneDbFragmentSize", "0", addDashes);
@@ -176,8 +174,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          connInterfacesFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "connFsckPortUDP", addDashes))
          connFsckPortUDP = StringTk::strToInt(iter->second);
-      else if (testConfigMapKeyMatch(iter, "debugRunComponentThreads", addDashes))
-         debugRunComponentThreads = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "tuneNumWorkers", addDashes))
          tuneNumWorkers = StringTk::strToUInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "tunePreferredNodesFile", addDashes))

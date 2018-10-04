@@ -5,7 +5,6 @@
 bool CreateEmptyContDirsMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "CreateEmptyContDirsMsg incoming";
-   LOG_DEBUG(logContext, 4, "Received a CreateEmptyContDirsMsg from: " + ctx.peerName() );
 
    App* app = Program::getApp();
    MetaStore* metaStore = app->getMetaStore();
@@ -27,7 +26,7 @@ bool CreateEmptyContDirsMsgEx::processIncoming(ResponseContext& ctx)
 
       if ( mkRes != 0 )
       { // error
-         LOG(GENERAL, ERR, "Unable to create contents directory.", contentsDirStr, sysErr());
+         LOG(GENERAL, ERR, "Unable to create contents directory.", contentsDirStr, sysErr);
          failedIDs.push_back(dirID);
          continue;
       }

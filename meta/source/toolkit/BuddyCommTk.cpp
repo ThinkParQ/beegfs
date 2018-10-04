@@ -2,12 +2,155 @@
 #include <components/buddyresyncer/BuddyResyncer.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
+#include <common/toolkit/PreallocatedFile.h>
 
 #include "BuddyCommTk.h"
 
+// TODO: file handling here is duplicated from storage::StorageTarget, unify the two at some point
+
+#define BUDDY_NEEDS_RESYNC_FILENAME        ".buddyneedsresync"
+
+namespace {
+
+enum {
+   BUDDY_RESYNC_UNACKED_FLAG = 1,
+   BUDDY_RESYNC_REQUIRED_FLAG = 2,
+
+   BUDDY_RESYNC_NOT_REQUIRED = 0,
+   BUDDY_RESYNC_NOT_REQUIRED_UNACKED = BUDDY_RESYNC_UNACKED_FLAG,
+   BUDDY_RESYNC_REQUIRED = BUDDY_RESYNC_REQUIRED_FLAG,
+   BUDDY_RESYNC_REQUIRED_UNACKED = BUDDY_RESYNC_REQUIRED_FLAG | BUDDY_RESYNC_UNACKED_FLAG,
+};
+
+RWLock buddyNeedsResyncLock;
+std::unique_ptr<PreallocatedFile<uint8_t>> buddyNeedsResyncFile;
+boost::optional<TimerQueue::EntryHandle> setBuddyNeedsResyncEntry;
+
+bool setBuddyNeedsResyncComm(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm, TimerQueue& timerQ,
+      NumNodeID localNodeID);
+
+void retrySetBuddyNeedsResyncComm(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm,
+      TimerQueue& timerQ, const NumNodeID localNodeID)
+{
+   const RWLockGuard lock(buddyNeedsResyncLock, SafeRWLock_WRITE);
+   setBuddyNeedsResyncComm(mgmtNode, bgm, timerQ, localNodeID);
+}
+
+void setBuddyNeedsResync(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm, TimerQueue& timerQ,
+      const NumNodeID localNodeID, const bool needsResync)
+{
+   const RWLockGuard lock(buddyNeedsResyncLock, SafeRWLock_WRITE);
+
+   const auto oldState = buddyNeedsResyncFile->read().get_value_or(BUDDY_RESYNC_NOT_REQUIRED);
+   const auto newState = needsResync
+      ? BUDDY_RESYNC_REQUIRED_UNACKED
+      : BUDDY_RESYNC_NOT_REQUIRED_UNACKED;
+
+   // if the change has already been requested by some other thread, we should not request it
+   // again - even if the change is unacked, as retrying immediately after a failed communication
+   // attempt is not likely to be successful, we must handle externally started resyncs however,
+   // which *do not* change the buddyneedsresync file contents but *do* use this mechanism to
+   // communicate that a resync has finished and the buddy is good again - these only use us to
+   // set the buddy to "needs no resync" though, so we can still skip setting needs-resync when that
+   // is already pending.
+   if (needsResync
+         && (oldState & BUDDY_RESYNC_REQUIRED_FLAG) == (newState & BUDDY_RESYNC_REQUIRED_FLAG))
+      return;
+
+   // cancel any pending retries, we will send a message to mgmt anyway.
+   if (setBuddyNeedsResyncEntry)
+      setBuddyNeedsResyncEntry->cancel();
+
+   buddyNeedsResyncFile->write(newState);
+
+   if (!setBuddyNeedsResyncComm(mgmtNode, bgm, timerQ, localNodeID))
+      LOG(GENERAL, CRITICAL, "Could not reach mgmt for state update, will retry.",
+            ("buddyNeedsResync", needsResync));
+}
+
+bool getBuddyNeedsResync()
+{
+   const RWLockGuard lock(buddyNeedsResyncLock, SafeRWLock_READ);
+
+   const auto state = buddyNeedsResyncFile->read().get_value_or(BUDDY_RESYNC_NOT_REQUIRED);
+   return state & BUDDY_RESYNC_REQUIRED_FLAG;
+}
+
+bool setBuddyNeedsResyncComm(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm, TimerQueue& timerQ,
+      const NumNodeID localNodeID)
+{
+   // this is a timer callback. as such we must be prepared to deal with the fact that we were
+   // cancelled *after* we were dequeued and started executing, but were blocked on the lock in
+   // retrySetBuddyNeedsResyncComm. always reading the current state and sending that fixes this:
+   // if the state is not unacked we can return without doing anything, and if it is nobody can
+   // change it while we are using it.
+   const auto state = buddyNeedsResyncFile->read().get_value_or(BUDDY_RESYNC_NOT_REQUIRED);
+   const bool needsResync = state & BUDDY_RESYNC_REQUIRED_FLAG;
+
+   if (!(state & BUDDY_RESYNC_UNACKED_FLAG))
+      return true;
+
+   const TargetConsistencyState stateToSet = needsResync
+      ? TargetConsistencyState_NEEDS_RESYNC
+      : TargetConsistencyState_GOOD;
+
+   bool currentIsPrimary;
+   const uint16_t buddyTargetID = bgm.getBuddyTargetID(localNodeID.val(), &currentIsPrimary);
+
+   // until mgmt handles resync decision, refuse to set a primary to needs-resync locally.
+   if (!currentIsPrimary)
+      return true;
+
+   UInt16List targetIDList(1, buddyTargetID);
+   UInt8List stateList(1, stateToSet);
+
+   SetTargetConsistencyStatesMsg msg(NODETYPE_Meta, &targetIDList, &stateList, false);
+
+   const auto respMsg = MessagingTk::requestResponse(mgmtNode, msg,
+         NETMSGTYPE_SetTargetConsistencyStatesResp);
+
+   if (!respMsg)
+   {
+      setBuddyNeedsResyncEntry = timerQ.enqueue(std::chrono::seconds(5), [&, localNodeID] {
+         retrySetBuddyNeedsResyncComm(mgmtNode, bgm, timerQ, localNodeID);
+      });
+      return false;
+   }
+
+   auto* respMsgCast = (SetTargetConsistencyStatesRespMsg*)respMsg.get();
+
+   if (respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
+   {
+      LOG(GENERAL, CRITICAL, "Management node did not accept target states.", buddyTargetID,
+            needsResync);
+      return true;
+   }
+
+   buddyNeedsResyncFile->write(state & ~BUDDY_RESYNC_UNACKED_FLAG);
+   if (state & BUDDY_RESYNC_REQUIRED_FLAG)
+      LOG(GENERAL, CRITICAL, "Marked secondary buddy for needed resync.",
+            ("primary node", localNodeID.val()));
+   return true;
+}
+
+}
+
 namespace BuddyCommTk
 {
-   static const std::string BUDDY_NEEDS_RESYNC_FILENAME        = "buddyneedsresync";
+
+   void prepareBuddyNeedsResyncState(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm,
+         TimerQueue& timerQ, const NumNodeID localNodeID)
+   {
+      buddyNeedsResyncFile = std::make_unique<PreallocatedFile<uint8_t>>(
+            BUDDY_NEEDS_RESYNC_FILENAME, S_IRUSR | S_IWUSR);
+
+      if (buddyNeedsResyncFile->read().get_value_or(0) & BUDDY_RESYNC_UNACKED_FLAG)
+      {
+         setBuddyNeedsResyncEntry = timerQ.enqueue(std::chrono::seconds(0), [&, localNodeID] {
+            retrySetBuddyNeedsResyncComm(mgmtNode, bgm, timerQ, localNodeID);
+         });
+      }
+   }
 
    void checkBuddyNeedsResync()
    {
@@ -23,25 +166,6 @@ namespace BuddyCommTk
 
       if (isPrimary) // Only do the check if we are the primary.
       {
-         const bool buddyNeedsResyncFileExists = getBuddyNeedsResync();
-
-         if (buddyNeedsResyncFileExists)
-         {
-            LOG_DEBUG(__func__, Log_NOTICE, "buddyneedsresync file found.");
-
-            CombinedTargetState state = CombinedTargetState(TargetReachabilityState_ONLINE,
-               TargetConsistencyState_NEEDS_RESYNC);
-            metaNodeStates->getState(buddyID.val(), state);
-
-            // Only send message if buddy was still reported as GOOD before (otherwise the mgmtd
-            // already knows it needs a resync, or it's BAD and shouldn't be resynced anyway).
-            if (state.consistencyState == TargetConsistencyState_GOOD)
-            {
-               setBuddyNeedsResyncState(true);
-               LogContext(__func__).log(Log_NOTICE, "Set needs-resync state for buddy node.");
-            }
-         }
-
          // check if the secondary is set to needs-resync by the mgmtd.
          TargetConsistencyState consistencyState = internodeSyncer->getNodeConsistencyState();
 
@@ -70,136 +194,34 @@ namespace BuddyCommTk
             if (resyncRes == FhgfsOpsErr_SUCCESS)
             {
                LOG(MIRRORING, WARNING,
-                     "Starting buddy resync job.", as("Buddy node ID", buddyID.val()));
+                     "Starting buddy resync job.", ("Buddy node ID", buddyID.val()));
             }
             else if (resyncRes == FhgfsOpsErr_INUSE)
             {
                LOG(MIRRORING, WARNING,
-                     "Resync job currently running.", as("Buddy node ID", buddyID.val()));
+                     "Resync job currently running.", ("Buddy node ID", buddyID.val()));
             }
             else
             {
                LOG(MIRRORING, WARNING,
-                     "Starting buddy resync job failed.", as("Buddy node ID", buddyID.val()));
+                     "Starting buddy resync job failed.", ("Buddy node ID", buddyID.val()));
             }
          }
       }
    }
 
-   /**
-    * Creates the buddyneedsresync file, and tells the buddy about the state.
-    */
-   void setBuddyNeedsResync(const std::string& path, bool needsResync, NumNodeID buddyNodeID)
+   void setBuddyNeedsResync(const std::string& path, bool needsResync)
    {
-      if (needsResync)
-      {
-         bool fileCreated;
-         createBuddyNeedsResyncFile(path, fileCreated, buddyNodeID);
-         if (fileCreated)
-            setBuddyNeedsResyncState(needsResync);
-      }
-      else
-      {
-         removeBuddyNeedsResyncFile(path);
-         setBuddyNeedsResyncState(needsResync);
-      }
-   }
+      auto* const app = Program::getApp();
 
-   /**
-    * Tells the buddy about the state, does NOT create the buddyneedsresync file.
-    */
-   void setBuddyNeedsResyncState(bool needsResync)
-   {
-      App* app = Program::getApp();
-      NodeStore* mgmtNodes = app->getMgmtNodes();
-      MirrorBuddyGroupMapper* mbg = app->getMetaBuddyGroupMapper();
-
-      const NumNodeID localNodeID = app->getLocalNodeNumID();
-      const NumNodeID buddyNodeID(mbg->getBuddyTargetID(localNodeID.val() ) );
-
-      auto mgmtNode = mgmtNodes->referenceFirstNode();
-      if (!mgmtNode)
-      {
-         LogContext(__func__).logErr("Management node not defined.");
-         return;
-      }
-
-      TargetConsistencyState stateToSet = needsResync
-         ? TargetConsistencyState_NEEDS_RESYNC
-         : TargetConsistencyState_GOOD;
-
-      UInt16List targetIDList(1, buddyNodeID.val() );
-      UInt8List stateList(1, stateToSet);
-
-      SetTargetConsistencyStatesMsg msg(NODETYPE_Meta, &targetIDList, &stateList, false);
-
-      char* respBuf = NULL;
-      NetMessage* respMsg = NULL;
-      bool sendRes = MessagingTk::requestResponse(*mgmtNode, &msg,
-         NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-
-      if (!sendRes)
-      {
-         LogContext(__func__).log(Log_WARNING,
-            "Could not reach managemend node trying to set needs-resync state for node "
-            + buddyNodeID.str() + ".");
-      }
-      else
-      {
-         SetTargetConsistencyStatesRespMsg* respMsgCast =
-            static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg);
-
-         if ( (FhgfsOpsErr)respMsgCast->getValue() != FhgfsOpsErr_SUCCESS)
-            LogContext(__func__).log(Log_CRITICAL,
-               "Management node did not accept needs-resync state for node "
-               + buddyNodeID.str() + ".");
-
-         SAFE_FREE(respBuf);
-         SAFE_DELETE(respMsg);
-      }
-   }
-
-   /**
-    * @param outFileCreated set to true if file didn't exist before and was actually created.
-    */
-   void createBuddyNeedsResyncFile(const std::string& path, bool& outFileCreated,
-         NumNodeID buddyNodeID)
-   {
-      std::string fileName = path + "/" + BUDDY_NEEDS_RESYNC_FILENAME;
-
-      int createErrno = 0;
-      bool createRes = StorageTk::createFile(fileName, &createErrno, &outFileCreated);
-
-      if (!createRes)
-      {
-         LogContext(__func__).logErr("Unable to create file for needed buddy resync."
-            " SysErr: " + System::getErrString(createErrno) );
-         return;
-      }
-
-      if (outFileCreated)
-      {
-         // File wasn't there before - inform user about newly needed resync.
-         LOG(MIRRORING, CRITICAL, "Secondary mirror buddy needs to be resynced.", buddyNodeID);
-      }
-   }
-
-   void removeBuddyNeedsResyncFile(const std::string& path)
-   {
-      const std::string filename = path + "/" + BUDDY_NEEDS_RESYNC_FILENAME;
-      const int unlinkRes = unlink(filename.c_str() );
-      if (unlinkRes != 0 && errno != ENOENT)
-      {
-         LogContext(__func__).logErr("Unable to remove file for needed buddy resync."
-            " SysErr: " + System::getErrString(errno) );
-      }
+      ::setBuddyNeedsResync(*app->getMgmtNodes()->referenceFirstNode(),
+            *app->getMetaBuddyGroupMapper(), *app->getTimerQueue(),
+            app->getLocalNode().getNumID(), needsResync);
    }
 
    bool getBuddyNeedsResync()
    {
-      const std::string metaPath = Program::getApp()->getMetaPath();
-      const std::string fileName = metaPath + "/" + BUDDY_NEEDS_RESYNC_FILENAME;
-      return StorageTk::pathExists(fileName);
+      return ::getBuddyNeedsResync();
    }
 };
 

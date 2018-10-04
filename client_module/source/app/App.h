@@ -45,9 +45,7 @@ typedef struct App App;
 
 
 extern void App_init(App* this, MountConfig* mountConfig);
-extern App* App_construct(MountConfig* mountConfig);
 extern void App_uninit(App* this);
-extern void App_destruct(App* this);
 
 extern int App_run(App* this);
 extern void App_stop(App* this);
@@ -55,7 +53,6 @@ extern void App_stop(App* this);
 extern bool __App_initDataObjects(App* this, MountConfig* mountConfig);
 extern bool __App_initInodeOperations(App* this);
 extern bool __App_initLocalNodeInfo(App* this);
-extern bool __App_initStorage(App* this);
 extern bool __App_initComponents(App* this);
 extern void __App_startComponents(App* this);
 extern void __App_stopComponents(App* this);
@@ -65,10 +62,6 @@ extern void __App_waitForComponentTermination(App* this, Thread* component);
 extern void __App_logInfos(App* this);
 
 extern bool __App_mountServerCheck(App* this);
-
-extern unsigned __App_featuresGetHighestNum(const unsigned* featuresArray, unsigned numArrayElems);
-extern void __App_featuresToBitStore(const unsigned* featuresArray, unsigned numArrayElems,
-   BitStore* outBitStore);
 
 
 // external getters & setters
@@ -102,7 +95,6 @@ static inline struct StatFsCache* App_getStatFsCache(App* this);
 static inline struct DatagramListener* App_getDatagramListener(App* this);
 static inline struct InternodeSyncer* App_getInternodeSyncer(App* this);
 static inline struct AckManager* App_getAckManager(App* this);
-static inline struct Flusher* App_getFlusher(App* this);
 static inline AtomicInt* App_getLockAckAtomicCounter(App* this);
 static inline bool App_getConnRetriesEnabled(App* this);
 static inline void App_setConnRetriesEnabled(App* this, bool connRetriesEnabled);
@@ -314,11 +306,6 @@ struct InternodeSyncer* App_getInternodeSyncer(App* this)
 struct AckManager* App_getAckManager(App* this)
 {
    return this->ackManager;
-}
-
-struct Flusher* App_getFlusher(App* this)
-{
-   return this->flusher;
 }
 
 AtomicInt* App_getLockAckAtomicCounter(App* this)

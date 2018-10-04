@@ -19,11 +19,10 @@ struct BuddySequenceNumber
 
 struct MirrorBuddyGroup
 {
+   uint16_t groupID;
+
    uint16_t firstTargetID;
    uint16_t secondTargetID;
-
-   // used by the mapper to find groups that have gone away. not used for anything else.
-   bool marked;
 
    uint64_t sequence;
 
@@ -40,10 +39,16 @@ struct MirrorBuddyGroup
    struct mutex mtx;
 
    struct kref refs;
+
+/* private */
+   union {
+      struct rb_node _rb_node;
+      struct list_head _list;
+   };
 };
 
-extern struct MirrorBuddyGroup* MirrorBuddyGroup_constructFromTargetIDs(uint16_t doneBufferSize,
-   uint16_t firstTargetID, uint16_t secondTargetID);
+extern struct MirrorBuddyGroup* MirrorBuddyGroup_constructFromTargetIDs(uint16_t groupID,
+      uint16_t doneBufferSize, uint16_t firstTargetID, uint16_t secondTargetID);
 extern void MirrorBuddyGroup_put(MirrorBuddyGroup* this);
 
 extern int MirrorBuddyGroup_acquireSequenceNumber(MirrorBuddyGroup* this,

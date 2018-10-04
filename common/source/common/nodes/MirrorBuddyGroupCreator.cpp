@@ -7,6 +7,7 @@
 
 #include "MirrorBuddyGroupCreator.h"
 
+#include <boost/lexical_cast.hpp>
 
 /**
  * @return FhgfsOpsErr_...
@@ -21,7 +22,7 @@ FhgfsOpsErr MirrorBuddyGroupCreator::addGroup(uint16_t primaryTargetID, uint16_t
    // disallow meta buddy group creation if the selected secondary target would have the root inode,
    // not the primary. while we could copy the root inode from secondary to primary, forcing the
    // non-mirrored root inode owner to be the primary of a group is much less error-prone.
-   if (nodeType == NODETYPE_Meta && secondaryTargetID == metaNodes->getRootNodeNumID().val())
+   if (nodeType == NODETYPE_Meta && secondaryTargetID == metaRoot->getID().val())
       return FhgfsOpsErr_NOTOWNER;
 
    uint16_t newGroupID;
@@ -36,7 +37,7 @@ FhgfsOpsErr MirrorBuddyGroupCreator::addGroup(uint16_t primaryTargetID, uint16_t
          errStr = "One of the targets is already mapped to a buddy group.";
       else
       if (addRes == FhgfsOpsErr_UNKNOWNTARGET || addRes == FhgfsOpsErr_UNKNOWNNODE)
-         errStr = FhgfsOpsErrTk::toErrString(addRes);
+         errStr = boost::lexical_cast<std::string>(addRes);
       else
       if (addRes == FhgfsOpsErr_EXISTS)
          errStr = "Mirror buddy group with ID " + StringTk::uintToStr(forcedGroupID)
@@ -77,23 +78,19 @@ FhgfsOpsErr MirrorBuddyGroupCreator::addGroupComm(uint16_t primaryID, uint16_t s
 
    const auto mgmtNode = this->mgmtNodes->referenceFirstNode();
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    SetMirrorBuddyGroupRespMsg* respMsgCast;
 
    SetMirrorBuddyGroupMsg msg(nodeType, primaryID, secondaryID, forcedGroupID, false);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *mgmtNode, &msg, NETMSGTYPE_SetMirrorBuddyGroupResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+         NETMSGTYPE_SetMirrorBuddyGroupResp);
+   if(!respMsg)
    {
       retVal = FhgfsOpsErr_COMMUNICATION;
       goto err_cleanup;
    }
 
-   respMsgCast = (SetMirrorBuddyGroupRespMsg*)respMsg;
+   respMsgCast = (SetMirrorBuddyGroupRespMsg*)respMsg.get();
 
    retVal = (FhgfsOpsErr)respMsgCast->getResult();
 
@@ -103,9 +100,6 @@ FhgfsOpsErr MirrorBuddyGroupCreator::addGroupComm(uint16_t primaryID, uint16_t s
       outNewGroupID = respMsgCast->getBuddyGroupID();
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -180,14 +174,10 @@ uint16_t MirrorBuddyGroupCreator::findNextTarget(NumNodeID nodeNumIdToIgnore,
    uint16_t retVal = 0;
    size_t maxNumTargets = 0;
 
-   auto node = this->nodes->referenceFirstNode();
-   while (node != NULL)
+   for (const auto& node : this->nodes->referenceAllNodes())
    {
       if (node->getNumID() == nodeNumIdToIgnore)
-      {
-         node = this->nodes->referenceNextNode(node);
          continue;
-      }
 
       UInt16List targetList;
 
@@ -218,7 +208,6 @@ uint16_t MirrorBuddyGroupCreator::findNextTarget(NumNodeID nodeNumIdToIgnore,
          maxNumTargets = targetList.size();
          retVal = targetList.front();
       }
-      node = this->nodes->referenceNextNode(node);
    }
 
    this->localTargetMapper.unmapTarget(retVal);
@@ -323,9 +312,11 @@ bool MirrorBuddyGroupCreator::checkSizeOfTargets() const
 
 
    // Retrieve the statStoragePath information from all storage servers
-   auto node = this->nodes->referenceFirstNode();
-   while (node && retVal)
+   for (const auto& node : this->nodes->referenceAllNodes())
    {
+      if (!retVal)
+         break;
+
       UInt16List targets;
       this->systemTargetMapper.getTargetsByNode(node->getNumID(), targets);
 
@@ -342,7 +333,8 @@ bool MirrorBuddyGroupCreator::checkSizeOfTargets() const
          if(statRes != FhgfsOpsErr_SUCCESS)
          {
             const std::string logMessage("An error occurred when connecting to server: "
-               + node->getNodeIDWithTypeStr() + " Error: " + FhgfsOpsErrTk::toErrString(statRes) );
+               + node->getNodeIDWithTypeStr() + " Error: "
+               + boost::lexical_cast<std::string>(statRes));
             std::cerr << logMessage << std::endl;
             LOG(MIRRORING, ERR, logMessage);
 
@@ -358,9 +350,6 @@ bool MirrorBuddyGroupCreator::checkSizeOfTargets() const
             break;
          }
       }
-
-      if (retVal)
-         node = this->nodes->referenceNextNode(node);
    }
 
    // report a warning, because the size of all targets is not equal
@@ -508,7 +497,7 @@ FhgfsOpsErr MirrorBuddyGroupCreator::generateMirrorBuddyGroups(UInt16List* outBu
 
       // if we have selected the owner of the root inode as secondary, just switch primary and
       // secondary to fix that.
-      if (nodeType == NODETYPE_Meta && secondaryTarget == metaNodes->getRootNodeNumID().val())
+      if (nodeType == NODETYPE_Meta && secondaryTarget == metaRoot->getID().val())
          std::swap(primaryTarget, secondaryTarget);
 
       if (this->cfgUnique)

@@ -371,10 +371,7 @@ RWLOCK_TEST(randomOnReader)
       bool tmpDoReadLock;
 
       // random initialization: is reader or writer
-      if (randomizer.getNextInRange(0, 1) == 1)
-         tmpDoReadLock = true;
-      else
-         tmpDoReadLock = false;
+      tmpDoReadLock = randomizer.getNextInRange(0, 1) == 1;
 
       // random initialization: sleep time
       int tmpSleepTimeMS = randomizer.getNextInRange(
@@ -448,10 +445,7 @@ RWLOCK_TEST(randomOnWriter)
       bool tmpDoReadLock;
 
       // random initialization: is reader or writer
-      if (randomizer.getNextInRange(0, 1) == 1)
-         tmpDoReadLock = true;
-      else
-         tmpDoReadLock = false;
+      tmpDoReadLock = randomizer.getNextInRange(0, 1) == 1;
 
       // random initialization: sleep time
       int tmpSleepTimeMS = randomizer.getNextInRange(
@@ -710,10 +704,7 @@ RWLOCK_TEST(randomTryOnReader)
       bool tmpDoReadLock;
 
       // random initialization: is reader or writer
-      if (randomizer.getNextInRange(0, 1) == 1)
-         tmpDoReadLock = true;
-      else
-         tmpDoReadLock = false;
+      tmpDoReadLock = randomizer.getNextInRange(0, 1) == 1;
 
       // random initialization: sleep time
       int tmpSleepTimeMS = randomizer.getNextInRange(
@@ -787,10 +778,7 @@ RWLOCK_TEST(randomTryOnWriter)
       bool tmpDoReadLock;
 
       // random initialization: is reader or writer
-      if (randomizer.getNextInRange(0, 1) == 1)
-         tmpDoReadLock = true;
-      else
-         tmpDoReadLock = false;
+      tmpDoReadLock = randomizer.getNextInRange(0, 1) == 1;
 
       // random initialization: sleep time
       int tmpSleepTimeMS = randomizer.getNextInRange(

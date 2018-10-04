@@ -5,7 +5,8 @@
 #include <common/nodes/Node.h>
 #include <common/storage/StorageErrors.h>
 #include <common/threading/PThread.h>
-#include <common/threading/SafeMutexLock.h>
+
+#include <mutex>
 
 class BuddyResyncerFileSyncSlave : public PThread
 {
@@ -42,13 +43,9 @@ class BuddyResyncerFileSyncSlave : public PThread
       // getters & setters
       bool getIsRunning()
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
-         bool retVal = this->isRunning;
-
-         safeLock.unlock();
-
-         return retVal;
+         return this->isRunning;
       }
 
       void setOnlyTerminateIfIdle(bool value)
@@ -82,12 +79,10 @@ class BuddyResyncerFileSyncSlave : public PThread
 
       void setIsRunning(bool isRunning)
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
          this->isRunning = isRunning;
          isRunningChangeCond.broadcast();
-
-         safeLock.unlock();
       }
 
       bool getSelfTerminateNotIdle()

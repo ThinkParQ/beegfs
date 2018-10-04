@@ -31,7 +31,7 @@ class GetNodeInfoWork : public Work
       NodeType nodeType;
       LogContext log;
 
-      bool sendMsg(Node *node, GeneralNodeInfo *info);
+      bool sendMsg(Node *node, GeneralNodeInfo *outInfo);
 };
 
 #endif /*GETNODEINFOWORK_H_*/

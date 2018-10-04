@@ -17,9 +17,6 @@ struct FsObjectInfo;
 typedef struct FsObjectInfo FsObjectInfo;
 
 static inline void FsObjectInfo_init(FsObjectInfo* this, App* app, FsObjectType objectType);
-static inline FsObjectInfo* FsObjectInfo_construct(App* app, FsObjectType objectType);
-static inline void FsObjectInfo_uninit(FsObjectInfo* this);
-static inline void FsObjectInfo_destruct(FsObjectInfo* this);
 
 static inline void FsObjectInfo_virtualDestruct(FsObjectInfo* this);
 
@@ -46,29 +43,6 @@ void FsObjectInfo_init(FsObjectInfo* this, App* app, FsObjectType objectType)
 
    // clear virtual function pointer
    this->uninit = NULL;
-}
-
-struct FsObjectInfo* FsObjectInfo_construct(App* app, FsObjectType objectType)
-{
-   struct FsObjectInfo* this =
-      (FsObjectInfo*)os_kmalloc(sizeof(*this) );
-
-   if(likely(this) )
-      FsObjectInfo_init(this, app, objectType);
-
-   return this;
-}
-
-void FsObjectInfo_uninit(FsObjectInfo* this)
-{
-   // nothing to be done here
-}
-
-void FsObjectInfo_destruct(FsObjectInfo* this)
-{
-   FsObjectInfo_uninit(this);
-
-   kfree(this);
 }
 
 /**

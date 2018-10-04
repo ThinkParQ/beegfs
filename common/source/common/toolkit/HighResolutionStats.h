@@ -13,20 +13,21 @@ struct HighResolutionStats
    // raw values (just copied at the end of each query interval)
    struct RawVals
    {
-      uint64_t statsTimeMS; // set by the StatsCollector (result of TimeAbs.getTimeMS() )
+      uint64_t statsTimeMS    = 0; // set by the StatsCollector (result of TimeAbs.getTimeMS() )
 
-      unsigned busyWorkers; // busy workers at the time of a stats reset (updated by WorkQ)
-      unsigned queuedRequests; // queued requests at the time of a stats reset (updated by WorkQ)
+      unsigned busyWorkers    = 0; // busy workers at the time of a stats reset (updated by WorkQ)
+      unsigned queuedRequests = 0; // queued requests at the time of a stats reset
+                                   //  (updated by WorkQ)
    } rawVals;
 
    // incremental values (added up after each request until end of query interval)
    struct IncrementalVals
    {
-      uint64_t diskWriteBytes; // ususally updated during processing of work
-      uint64_t diskReadBytes; // ususally updated during processing of work
-      uint64_t netSendBytes; // ususally updated by a socket
-      uint64_t netRecvBytes; // ususally updated by a socket
-      unsigned workRequests; // finished work requests; usually updated by a worker
+      uint64_t diskWriteBytes = 0; // ususally updated during processing of work
+      uint64_t diskReadBytes  = 0; // ususally updated during processing of work
+      uint64_t netSendBytes   = 0; // ususally updated by a socket
+      uint64_t netRecvBytes   = 0; // ususally updated by a socket
+      unsigned workRequests   = 0; // finished work requests; usually updated by a worker
    } incVals;
 
    template<typename This, typename Ctx>

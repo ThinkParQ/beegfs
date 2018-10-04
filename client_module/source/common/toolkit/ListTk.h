@@ -10,10 +10,7 @@
 
 
 extern void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone);
-extern void ListTk_cloneStandardNicAddressList(NicAddressList* nicList,
-   NicAddressList* nicListClone);
 extern void ListTk_cloneSortNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone);
-extern void ListTk_copyStrCpyListToVec(StrCpyList* srcList, StrCpyVec* destVec);
 extern void ListTk_copyUInt16ListToVec(UInt16List* srcList, UInt16Vec* destVec);
 
 extern void ListTk_kfreeNicAddressListElems(NicAddressList* nicList);

@@ -7,12 +7,14 @@
 
 bool FSyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "FSyncLocalFileMsg incoming";
+   ctx.sendResponse(FSyncLocalFileRespMsg(fsync()));
 
-   #ifdef BEEGFS_DEBUG
-      LOG_DEBUG(logContext, Log_DEBUG,
-         "Received a FSyncLocalFileMsg from: " + ctx.peerName() );
-   #endif // BEEGFS_DEBUG
+   return true;
+}
+
+FhgfsOpsErr FSyncLocalFileMsgEx::fsync()
+{
+   const char* logContext = "FSyncLocalFileMsg incoming";
 
    FhgfsOpsErr clientRes = FhgfsOpsErr_SUCCESS;
    bool isMirrorSession = isMsgHeaderFeatureFlagSet(FSYNCLOCALFILEMSG_FLAG_BUDDYMIRROR);
@@ -23,7 +25,7 @@ bool FSyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
 
    App* app = Program::getApp();
    SessionStore* sessions = app->getSessions();
-   Session* session = sessions->referenceSession(getSessionID(), true);
+   auto session = sessions->referenceOrAddSession(getSessionID());
    SessionLocalFileStore* sessionLocalFiles = session->getLocalFiles();
 
    // select the right targetID
@@ -44,17 +46,17 @@ bool FSyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
             StringTk::uintToStr(getTargetID() ) );
    }
 
-   SessionLocalFile* sessionLocalFile =
+   auto sessionLocalFile =
       sessionLocalFiles->referenceSession(getFileHandleID(), targetID, isMirrorSession);
 
    if(sessionLocalFile)
    { // sessionLocalFile exists => check if open and perform fsync
       if (!isMsgHeaderFeatureFlagSet(FSYNCLOCALFILEMSG_FLAG_NO_SYNC) )
       {
-         int fd = sessionLocalFile->getFD();
-         if(fd != -1)
+         auto& fd = sessionLocalFile->getFD();
+         if (fd.valid())
          { // file open => sync
-            int fsyncRes = MsgHelperIO::fsync(fd);
+            int fsyncRes = MsgHelperIO::fsync(*fd);
 
             if(fsyncRes)
             {
@@ -76,8 +78,6 @@ bool FSyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
             "The session is marked as dirty.");
          clientRes = FhgfsOpsErr_STORAGE_SRV_CRASHED;
       }
-
-      sessionLocalFiles->releaseSession(sessionLocalFile);
    }
    else
    if (useSessionCheck)
@@ -90,11 +90,5 @@ bool FSyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
       clientRes = FhgfsOpsErr_STORAGE_SRV_CRASHED;
    }
 
-   sessions->releaseSession(session);
-
-   ctx.sendResponse(FSyncLocalFileRespMsg(clientRes) );
-
-   return true;
+   return clientRes;
 }
-
-

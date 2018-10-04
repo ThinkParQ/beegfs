@@ -1,0 +1,213 @@
+Source: beegfs
+Section: misc
+Priority: optional
+Maintainer: BeeGFS Maintainers <packages@beegfs.com>
+Build-Depends: debhelper (>= 9.0.0), lsb-release, librdmacm-dev, libibverbs-dev, java6-sdk, ant, kmod
+Standards-Version: 4.1.4.1
+
+
+
+Package: libbeegfs-ib
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: BeeGFS InfiniBand support
+ This package contains support libraries for InfiniBand.
+
+
+
+Package: beegfs-common
+Architecture: any
+Depends: ${misc:Depends}
+Description: BeeGFS common files
+ The package contains files required by all BeeGFS daemon packages
+
+
+
+Package: beegfs-helperd
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-common (= ${binary:Version})
+Recommends: libbeegfs-ib (= ${binary:Version})
+Description: BeeGFS helper daemon
+ The package contains the BeeGFS helper daemon. The helper daemon is responsible
+ to write (kernel) client messages to the client log file.
+
+Package: beegfs-helperd-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-helperd (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-helperd
+ The package contains the debugging symbols for beegfs-helperd
+
+
+
+Package: beegfs-meta
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-common (= ${binary:Version})
+Recommends: libbeegfs-ib (= ${binary:Version})
+Description: BeeGFS metadata server daemon
+ The package contains the BeeGFS metadata daemon.
+
+Package: beegfs-meta-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-meta (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-meta
+ The package contains the debugging symbols for beegfs-meta
+
+
+
+Package: beegfs-storage
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-common (= ${binary:Version})
+Recommends: libbeegfs-ib (= ${binary:Version})
+Description: BeeGFS storage server daemon
+ This package contains the BeeGFS storage server binaries.
+
+Package: beegfs-storage-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-storage (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-storage
+ The package contains the debugging symbols for beegfs-storage
+
+
+
+Package: beegfs-mgmtd
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-common (= ${binary:Version})
+Recommends: libbeegfs-ib (= ${binary:Version})
+Description: BeeGFS management server daemon
+ The package contains the BeeGFS management daemon.
+
+Package: beegfs-mgmtd-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-mgmtd (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-mgmtd
+ The package contains the debugging symbols for beegfs-mgmtd
+
+
+
+Package: beegfs-mon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-common (= ${binary:Version})
+Recommends: libbeegfs-ib (= ${binary:Version})
+Description: BeeGFS mon daemon
+ The package contains the BeeGFS mon daemon.
+
+Package: beegfs-mon-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-mon (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-mon
+ The package contains the debugging symbols for beegfs-mon
+
+
+
+Package: beegfs-admon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: beegfs-debian
+Description: BeeGFS admon daemon and java frontend.
+ This package contains the optional BeeGFS admon daemon and java frontend.
+ Admon and java frontend allow one to configure and monitor BeeGFS.
+
+Package: beegfs-admon-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-admon (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-admon
+ The package contains the debugging symbols for beegfs-admon
+
+
+
+Package: beegfs-mirror-md
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: BeeGFS metadata mirroring utility
+ This package contains the migration utility for unmirrored to
+ mirrored BeeGFS metadata.
+
+Package: beegfs-mirror-md-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-mirror-md (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-mirror-md
+ The package contains the debugging symbols for beegfs-mirror-md
+
+
+
+Package: beegfs-utils
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, beegfs-common (= ${binary:Version})
+Recommends: libbeegfs-ib (= ${binary:Version})
+Description: BeeGFS utils
+ This package contains BeeGFS utilities.
+
+Package: beegfs-utils-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Depends: beegfs-utils (= ${binary:Version}), ${misc:Depends}
+Description: debugging symbols for beegfs-utils
+ The package contains the debugging symbols for beegfs-utils
+
+Package: beegfs-utils-dev
+Architecture: any
+Depends: ${misc:Depends}
+Description: BeeGFS utils devel files
+ This package contains BeeGFS development files and examples.
+
+
+
+Package: beeond-thirdparty-gpl
+Architecture: any
+Depends: ${perl:Depends}, ${misc:Depends}
+Description: BeeOND thirdparty utilities (GPL licensed)
+ Thirdparty tools used for BeeOND, which are licensed under the GPL
+
+# does not build on most systems we support
+#Package: beeond-thirdparty
+#Architecture: any
+#Depends: ${shlibs:Depends}, ${misc:Depends}
+#Description: BeeOND thirdparty utilitites
+# Thirdparty tools used for BeeOND
+
+Package: beeond
+Architecture: any
+Depends: ${misc:Depends}, beeond-thirdparty-gpl (= ${binary:Version}),
+  beegfs-utils (= ${binary:Version}), beegfs-mgmtd (= ${binary:Version}), beegfs-meta (= ${binary:Version}),
+  beegfs-storage (= ${binary:Version}), beegfs-client (= ${binary:Version}), beegfs-helperd (= ${binary:Version})
+Description: BeeOND
+ This package contains BeeOND.
+
+
+
+Package: beegfs-client
+Architecture: all
+Depends: ${misc:Depends}, build-essential
+Recommends: linux-headers-amd64
+Description: BeeGFS client
+ This package contains scripts, config and source files to build and
+ start beegfs-client.
+
+Package: beegfs-client-compat
+Architecture: all
+Description: BeeGFS client compat module, allows one to run two different client versions.
+ This package allows one to build and to run a compatibility client
+ kernel module on a system that has a newer beegfs-client version
+ installed.
+Depends: ${misc:Depends}, build-essential
+
+Package: beegfs-client-dev
+Architecture: any
+Depends: ${misc:Depends}
+Description: BeeGFS client development files
+ This package contains BeeGFS client development files.

@@ -5,8 +5,8 @@
 #include <common/net/message/session/rw/WriteLocalFileRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/SocketTk.h>
-#include <common/nodes/TargetStateInfo.h>
 #include <common/Common.h>
+#include <common/Types.h>
 #include <net/filesystem/RemotingIOInfo.h>
 #include <nodes/NodeStoreEx.h>
 

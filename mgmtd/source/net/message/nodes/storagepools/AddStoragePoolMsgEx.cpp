@@ -8,8 +8,6 @@
 
 bool AddStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STORAGEPOOLS, DEBUG, "Received a AddStoragePoolMsg", ctx.peerName());
-
    StoragePoolStore* storagePoolStore = Program::getApp()->getStoragePoolStore();
 
    if (Program::getApp()->isShuttingDown())

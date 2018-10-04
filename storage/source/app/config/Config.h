@@ -29,11 +29,8 @@ class Config : public AbstractConfig
       std::string connInterfacesFile; // implicitly generates connInterfacesList
       std::string connInterfacesList; // comma-separated list
 
-      bool        debugRunComponentThreads;
-
-      std::string storeStorageDirectory;
+      std::list<Path> storageDirectories;
       bool        storeAllowFirstRunInit;
-      bool        storeInitHashDirs; // true to force hash dirs creation on startup
 
       unsigned    tuneNumStreamListeners;
       unsigned    tuneNumWorkers;
@@ -81,24 +78,11 @@ class Config : public AbstractConfig
          return connInterfacesList;
       }
 
-      bool getDebugRunComponentThreads() const
-      {
-         return debugRunComponentThreads;
-      }
-
-      const std::string& getStoreStorageDirectoryV2() const
-      {
-         return storeStorageDirectory;
-      }
+      const std::list<Path>& getStorageDirectories() const { return storageDirectories; }
 
       bool getStoreAllowFirstRunInit() const
       {
          return storeAllowFirstRunInit;
-      }
-
-      bool getStoreInitHashDirs() const
-      {
-         return storeInitHashDirs;
       }
 
       unsigned getTuneNumStreamListeners() const

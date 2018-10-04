@@ -8,7 +8,6 @@ struct UInt8ListIter;
 typedef struct UInt8ListIter UInt8ListIter;
 
 static inline void UInt8ListIter_init(UInt8ListIter* this, UInt8List* list);
-static inline bool UInt8ListIter_hasNext(UInt8ListIter* this);
 static inline void UInt8ListIter_next(UInt8ListIter* this);
 static inline uint8_t UInt8ListIter_value(UInt8ListIter* this);
 static inline bool UInt8ListIter_end(UInt8ListIter* this);
@@ -23,11 +22,6 @@ struct UInt8ListIter
 void UInt8ListIter_init(UInt8ListIter* this, UInt8List* list)
 {
    PointerListIter_init( (PointerListIter*)this, (PointerList*)list);
-}
-
-bool UInt8ListIter_hasNext(UInt8ListIter* this)
-{
-   return PointerListIter_hasNext( (PointerListIter*)this);
 }
 
 void UInt8ListIter_next(UInt8ListIter* this)

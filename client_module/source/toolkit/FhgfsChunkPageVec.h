@@ -45,7 +45,6 @@ static inline size_t FhgfsChunkPageVec_getCurrentListVecIterIdx(FhgfsChunkPageVe
 
 static inline size_t FhgfsChunkPageVec_getCurrentListVecIterIdx(FhgfsChunkPageVec* this);
 
-static inline size_t FhgfsChunkPageVec_getLastPageUsedLen(FhgfsChunkPageVec* this);
 static inline size_t FhgfsChunkPageVec_getDataSize(FhgfsChunkPageVec* this);
 static inline size_t FhgfsChunkPageVec_getRemainingDataSize(FhgfsChunkPageVec* this);
 
@@ -391,15 +390,6 @@ void FhgfsChunkPageVec_resetIterator(FhgfsChunkPageVec* this)
 size_t FhgfsChunkPageVec_getCurrentListVecIterIdx(FhgfsChunkPageVec* this)
 {
    return this->currentListVecIterIdx;
-}
-
-
-/**
- * Get the (used) size of the last page
- */
-size_t FhgfsChunkPageVec_getLastPageUsedLen(FhgfsChunkPageVec* this)
-{
-   return this->lastPageUsedDataSize;
 }
 
 

@@ -93,7 +93,7 @@ void webtk::sendHttpError(struct mg_connection *conn,
    const struct mg_request_info *request_info, const int errorCode, std::string errorMessage)
 {
    std::string errorText = "Error";
-   if (errorMessage.size() != 0)
+   if (!errorMessage.empty())
       errorText = errorMessage;
 
    mg_printf(conn, "HTTP/1.1 %d Error\r\n\r\n%s", errorCode, errorText.c_str());
@@ -186,7 +186,7 @@ void webtk::serveFile(struct mg_connection *conn, const struct mg_request_info *
 std::string webtk::getVarStringBuffer(struct mg_connection *conn, const char* postBuf,
    size_t postBufLen)
 {
-   std::string query = "";
+   std::string query;
    const struct mg_request_info *requestInfo = mg_get_request_info(conn);
 
    if (strcmp(requestInfo->request_method, "GET") == 0)
@@ -219,7 +219,7 @@ std::string webtk::getVarStringBuffer(struct mg_connection *conn, const char* po
  */
 std::string webtk::getVarFromBuf(const char *buf, size_t bufLen, std::string name)
 {
-   std::string retVal = "";
+   std::string retVal;
    char *charVal = (char*) malloc(sizeof(char) * smallBufferSize);
 
    int length = mg_get_var(buf, bufLen, name.c_str(), charVal, sizeof(char) * smallBufferSize);
@@ -277,7 +277,7 @@ std::string webtk::getVar(struct mg_connection *conn, std::string name,
       varValue = getVarFromBuf(postBuf, postBufLen, name);
    }
 
-   if (varValue.size() == 0)
+   if (varValue.empty())
       throw HttpVarException(std::string("The parameter '") + name + std::string(
          "' is invalid or empty"));
 
@@ -334,7 +334,7 @@ void webtk::getVarList(struct mg_connection *conn, std::string name, StringList 
 {
    // get the request into a string variable to parse it
    std::string query = getVarStringBuffer(conn, postBuf, postBufLen);
-   if(query.size() == 0)
+   if(query.empty())
       return;
 
    // split up the parametes and look for parameters matching the search parameter
@@ -370,7 +370,7 @@ void webtk::getVarList(struct mg_connection *conn, std::string name, UInt16List 
 {
    // get the request into a string variable to parse it
    std::string query = getVarStringBuffer(conn, postBuf, postBufLen);
-   if(query.size() == 0)
+   if(query.empty())
       return;
 
    // split up the parametes and look for parameters matching the search parameter
@@ -425,7 +425,7 @@ void webtk::paramsToMap(struct mg_connection *conn, StringMap *outParamsMap,
    std::string ignoreParam, const char* postBuf, size_t postBufLen)
 {
    std::string query = getVarStringBuffer(conn, postBuf, postBufLen);
-   if(query.size() == 0)
+   if(query.empty())
       return;
 
    StringList partsList;

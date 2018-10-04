@@ -41,7 +41,6 @@ ZfsSession::~ZfsSession()
 bool ZfsSession::initZfsSession(void* dlOpenHandleLib)
 {
    App* app = Program::getApp();
-   Logger* log = Logger::getLogger();
 
    if(this->isValid)
       return true;
@@ -67,8 +66,7 @@ bool ZfsSession::initZfsSession(void* dlOpenHandleLib)
    this->zfs_open = (void* (*)(void*, const char*, int))dlsym(this->dlOpenHandleLibZfs, "zfs_open");
    if ( (dlErrorString = dlerror() ) != NULL)
    {
-      log->logErr("ZfsSession", "error during dynamic load of function zfs_open: " +
-         std::string(dlErrorString) );
+      LOG(QUOTA, ERR, "Error during dynamic load of function zfs_open.", dlErrorString);
       app->setLibZfsErrorReported(true);
       this->isValid = false;
       return false;
@@ -79,8 +77,8 @@ bool ZfsSession::initZfsSession(void* dlOpenHandleLib)
       this->dlOpenHandleLibZfs, "zfs_prop_get_userquota_int");
    if ( (dlErrorString = dlerror() ) != NULL)
    {
-      log->logErr("ZfsSession", "error during dynamic load of function "
-         "zfs_prop_get_userquota_int: " + std::string(dlErrorString) );
+      LOG(QUOTA, ERR, "Error during dynamic load of function zfs_prop_get_userquota_int.",
+            dlErrorString);
       app->setLibZfsErrorReported(true);
       this->isValid = false;
       return false;
@@ -91,8 +89,8 @@ bool ZfsSession::initZfsSession(void* dlOpenHandleLib)
       "libzfs_error_description");
    if ( (dlErrorString = dlerror() ) != NULL)
    {
-      log->logErr("ZfsSession", "error during dynamic load of function libzfs_error_description: " +
-         std::string(dlErrorString) );
+      LOG(QUOTA, ERR, "Error during dynamic load of function libzfs_error_description.",
+            dlErrorString);
       app->setLibZfsErrorReported(true);
       this->isValid = false;
       return false;
@@ -103,8 +101,8 @@ bool ZfsSession::initZfsSession(void* dlOpenHandleLib)
       "libzfs_error_action");
    if ( (dlErrorString = dlerror() ) != NULL)
    {
-      log->logErr("ZfsSession", "error during dynamic load of function libzfs_error_action: " +
-         std::string(dlErrorString) );
+      LOG(QUOTA, ERR, "Error during dynamic load of function libzfs_error_action.",
+         dlErrorString);
       app->setLibZfsErrorReported(true);
       this->isValid = false;
       return false;
@@ -135,12 +133,9 @@ void* ZfsSession::getZfsDeviceHandle(uint16_t targetNumID, std::string path)
       void* newFsHandle = (*this->zfs_open)(this->libZfsHandle, path.c_str(), ZFSSESSION_ZFS_TYPE);
       if(!newFsHandle)
       {
-         Logger* log = Logger::getLogger();
-
-         std::string errorDec( (*this->libzfs_error_description)(this->libZfsHandle) );
-         std::string errorAct( (*this->libzfs_error_action)(this->libZfsHandle) );
-         log->logErr("openZfsPool", "error during create of zfs pool handle " + errorAct +
-            "; " + errorDec);
+         LOG(QUOTA, ERR, "Error during create of zfs pool handle.",
+               ("ErrorAction", (*this->libzfs_error_action)(this->libZfsHandle)),
+               ("ErrorDescription", (*this->libzfs_error_description)(this->libZfsHandle)));
       }
       else
       {

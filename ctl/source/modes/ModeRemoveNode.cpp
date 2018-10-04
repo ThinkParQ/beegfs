@@ -174,7 +174,7 @@ int ModeRemoveNode::removeSingleNode(NumNodeID nodeNumID, NodeType nodeType)
    if(removeRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Failed to remove node: " << cfgNodeID <<
-         " (Error: " << FhgfsOpsErrTk::toErrString(removeRes) << ")" << std::endl;
+         " (Error: " << removeRes << ")" << std::endl;
    }
    else
    {
@@ -232,7 +232,7 @@ int ModeRemoveNode::removeUnreachableNodes(NodeType nodeType)
       else
       {
          std::cerr << "Removal of node failed: " << node.getTypedNodeID() <<
-            " (Error: " << FhgfsOpsErrTk::toErrString(removeRes) << ")" << std::endl;
+            " (Error: " << removeRes << ")" << std::endl;
 
          numRemoveErrors++;
          retVal = APPCODE_RUNTIME_ERROR;
@@ -260,17 +260,12 @@ FhgfsOpsErr ModeRemoveNode::removeNodeComm(NumNodeID nodeNumID, NodeType nodeTyp
    NodeStore* mgmtNodes = app->getMgmtNodes();
    auto mgmtNode = mgmtNodes->referenceFirstNode();
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    RemoveNodeRespMsg* respMsgCast;
 
    RemoveNodeMsg msg(nodeNumID, nodeType);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      *mgmtNode, &msg, NETMSGTYPE_RemoveNodeResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg, NETMSGTYPE_RemoveNodeResp);
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << mgmtNode->getNodeIDWithTypeStr() <<
          std::endl;
@@ -278,14 +273,11 @@ FhgfsOpsErr ModeRemoveNode::removeNodeComm(NumNodeID nodeNumID, NodeType nodeTyp
       goto err_cleanup;
    }
 
-   respMsgCast = (RemoveNodeRespMsg*)respMsg;
+   respMsgCast = (RemoveNodeRespMsg*)respMsg.get();
 
    retVal = (FhgfsOpsErr)respMsgCast->getValue();
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 
@@ -347,15 +339,13 @@ FhgfsOpsErr ModeRemoveNode::isPartOfMirrorBuddyGroup(Node& mgmtNode, NumNodeID n
 
       // download targets
 
-      UInt16List mappedTargetIDs;
-      NumNodeIDList mappedNodeIDs;
-
-      if(!NodesTk::downloadTargetMappings(mgmtNode, &mappedTargetIDs, &mappedNodeIDs, false) )
+      auto mappings = NodesTk::downloadTargetMappings(mgmtNode, false);
+      if (!mappings.first)
       {
          std::cerr << "Target mappings download failed." << std::endl;
          return FhgfsOpsErr_COMMUNICATION;
       }
-      targetMapper->syncTargetsFromLists(mappedTargetIDs, mappedNodeIDs);
+      targetMapper->syncTargets(std::move(mappings.second));
 
 
       UInt16List targetList;

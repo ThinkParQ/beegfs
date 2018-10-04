@@ -4,9 +4,9 @@
 #include <common/nodes/NodeCapacityPools.h>
 #include <common/nodes/TargetMapper.h>
 #include <common/threading/SafeRWLock.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/Common.h>
 #include <common/nodes/NodeStore.h>
+#include <common/nodes/MirrorBuddyGroup.h>
 
 #include <limits.h>
 #include <algorithm>
@@ -14,34 +14,6 @@
 
 #define MIRRORBUDDYGROUPMAPPER_MAX_GROUPIDS (USHRT_MAX-1) /* -1 for reserved value "0" */
 
-
-struct MirrorBuddyGroup
-{
-      uint16_t firstTargetID;
-      uint16_t secondTargetID;
-
-      MirrorBuddyGroup()
-      {
-         this->firstTargetID = 0;
-         this->secondTargetID = 0;
-      }
-
-      MirrorBuddyGroup(uint16_t firstTargetID, uint16_t secondTargetID)
-      {
-         this->firstTargetID = firstTargetID;
-         this->secondTargetID = secondTargetID;
-      }
-};
-
-
-typedef std::list<MirrorBuddyGroup> MirrorBuddyGroupList;
-typedef MirrorBuddyGroupList::iterator MirrorBuddyGroupListIter;
-typedef MirrorBuddyGroupList::const_iterator MirrorBuddyGroupListCIter;
-
-typedef std::map<uint16_t, MirrorBuddyGroup> MirrorBuddyGroupMap; // keys: MBG-IDs, values: MBGs
-typedef MirrorBuddyGroupMap::iterator MirrorBuddyGroupMapIter;
-typedef MirrorBuddyGroupMap::const_iterator MirrorBuddyGroupMapCIter;
-typedef MirrorBuddyGroupMap::value_type MirrorBuddyGroupMapVal;
 
 enum MirrorBuddyState
 {
@@ -60,8 +32,8 @@ class MirrorBuddyGroupMapper
       MirrorBuddyGroupMapper(TargetMapper* targetMapper);
       MirrorBuddyGroupMapper();
 
-      FhgfsOpsErr mapMirrorBuddyGroup(uint16_t buddyGroupID, uint16_t primaryTarget,
-         uint16_t secondaryTarget, NumNodeID localNodeID, bool allowUpdate,
+      FhgfsOpsErr mapMirrorBuddyGroup(uint16_t buddyGroupID, uint16_t primaryTargetID,
+         uint16_t secondaryTargetID, NumNodeID localNodeID, bool allowUpdate,
          uint16_t* outNewBuddyGroup);
       bool unmapMirrorBuddyGroup(uint16_t buddyGroupID, NumNodeID localNodeID);
 
@@ -75,9 +47,6 @@ class MirrorBuddyGroupMapper
       void getMappingAsLists(UInt16List& outBuddyGroupIDs, UInt16List& outPrimaryTargets,
                              UInt16List& outSecondaryTargets) const;
 
-      bool loadFromFile();
-      bool saveToFile();
-
       uint16_t getBuddyGroupID(uint16_t targetID) const;
       uint16_t getBuddyGroupID(uint16_t targetID, bool* outTargetIsPrimary) const;
       uint16_t getBuddyTargetID(uint16_t targetID, bool* outTargetIsPrimary = NULL) const;
@@ -85,12 +54,12 @@ class MirrorBuddyGroupMapper
       MirrorBuddyState getBuddyState(uint16_t targetID) const;
       MirrorBuddyState getBuddyState(uint16_t targetID, uint16_t buddyGroupID) const;
 
-      void attachMetaCapacityPools(NodeCapacityPools* metaCapacityPools);
+      void attachMetaCapacityPools(NodeCapacityPools* capacityPools);
 
       void attachStoragePoolStore(StoragePoolStore* storagePools);
       void attachNodeStore(NodeStore* usableNodes);
 
-   private:
+   protected:
       TargetMapper* targetMapper;
       NodeCapacityPools* metaCapacityPools;
 
@@ -102,13 +71,7 @@ class MirrorBuddyGroupMapper
       mutable RWLock rwlock;
       MirrorBuddyGroupMap mirrorBuddyGroups;
 
-      bool mappingsDirty; // true if saved mappings file needs to be updated
-      std::string storePath; // set to enable load/save methods (setting is not thread-safe)
-
       uint16_t localGroupID; // the groupID the local node belongs to; 0 if not part of a group
-
-      void exportToStringMap(StringMap& outExportMap) const;
-      void importFromStringMap(StringMap& importMap);
 
       uint16_t generateID() const;
 
@@ -118,8 +81,6 @@ class MirrorBuddyGroupMapper
          MirrorBuddyGroupList& outBuddyGroups) const;
       void getMappingAsListsUnlocked(UInt16List& outBuddyGroupIDs, UInt16List& outPrimaryTargets,
          UInt16List& outSecondaryTargets) const;
-
-      void switchover(uint16_t buddyGroupID);
 
    public:
       // getters & setters
@@ -157,18 +118,6 @@ class MirrorBuddyGroupMapper
          return mirrorBuddyGroups.size();
       }
 
-      void setStorePath(std::string storePath)
-      {
-         this->storePath = storePath;
-      }
-
-      bool isMapperDirty() const
-      {
-         RWLockGuard safeLock(rwlock, SafeRWLock_READ);
-
-         return mappingsDirty;
-      }
-
       void getMirrorBuddyGroups(MirrorBuddyGroupMap& outMirrorBuddyGroups) const
       {
          RWLockGuard safeLock(rwlock, SafeRWLock_READ);
@@ -189,6 +138,12 @@ class MirrorBuddyGroupMapper
 
          const uint16_t localGroupID = getLocalGroupIDUnlocked();
          return getMirrorBuddyGroupUnlocked(localGroupID);
+      }
+
+      MirrorBuddyGroupMap getMapping() const
+      {
+         RWLockGuard safeLock(rwlock, SafeRWLock_READ);
+         return mirrorBuddyGroups;
       }
 
    private:

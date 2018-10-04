@@ -18,12 +18,11 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
        * @param nodeNumID set to 0 if no numeric ID was assigned yet and the numeric ID will be set
        * in the reponse
        * @param nicList just a reference, so do not free it as long as you use this object!
-       * @param nodeFeatureFlags just a reference, so do not free it as long as you use this object
        * @param portUDP 0 means undefined
        * @param portTCP 0 means undefined
        */
       RegisterNodeMsg(const std::string& nodeID, NumNodeID nodeNumID, NodeType nodeType,
-         NicAddressList* nicList, const BitStore* nodeFeatureFlags,
+         NicAddressList* nicList,
          uint16_t portUDP, uint16_t portTCP) : BaseType(NETMSGTYPE_RegisterNode)
       {
          this->nodeID = nodeID;
@@ -31,13 +30,10 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
          this->nodeNumID = nodeNumID;
 
          this->nodeType = nodeType;
-         this->fhgfsVersion = 0; // set via setFhgfsVersion()
 
          this->rootIsBuddyMirrored = false;
 
          this->instanceVersion = 0; // reserved for future use
-
-         this->nodeFeatureFlags = nodeFeatureFlags;
 
          this->nicListVersion = 0; // reserved for future use
          this->nicList = nicList;
@@ -57,13 +53,11 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % serdes::backedPtr(obj->nodeFeatureFlags, obj->parsed.nodeFeatureFlags)
             % obj->instanceVersion
             % obj->nicListVersion
             % obj->nodeID
             % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
             % obj->nodeType
-            % obj->fhgfsVersion
             % obj->nodeNumID
             % obj->rootNumID
             % obj->rootIsBuddyMirrored
@@ -74,7 +68,6 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
    private:
       std::string nodeID;
       int32_t nodeType;
-      uint32_t fhgfsVersion;
       NumNodeID nodeNumID; // 0 means "undefined"
       NumNodeID rootNumID; // 0 means "undefined"
       bool rootIsBuddyMirrored;
@@ -84,12 +77,10 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
       uint16_t portTCP; // 0 means "undefined"
 
       // for serialization
-      const BitStore* nodeFeatureFlags; // not owned by this object
       NicAddressList* nicList; // not owned by this object!
 
       // for deserialization
       struct {
-         BitStore nodeFeatureFlags;
          NicAddressList nicList;
       } parsed;
 
@@ -98,11 +89,6 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
       NicAddressList& getNicList()
       {
          return *nicList;
-      }
-
-      const BitStore& getNodeFeatureFlags() const
-      {
-         return *nodeFeatureFlags;
       }
 
       const std::string& getNodeID() const
@@ -118,16 +104,6 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
       NodeType getNodeType() const
       {
          return (NodeType)nodeType;
-      }
-
-      unsigned getFhgfsVersion() const
-      {
-         return fhgfsVersion;
-      }
-
-      void setFhgfsVersion(unsigned fhgfsVersion)
-      {
-         this->fhgfsVersion = fhgfsVersion;
       }
 
       NumNodeID getRootNumID() const

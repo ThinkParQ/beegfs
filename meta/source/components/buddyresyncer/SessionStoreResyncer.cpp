@@ -16,7 +16,7 @@ void SessionStoreResyncer::doSync()
 {
    App* app = Program::getApp();
    SessionStore* sessions = app->getMirroredSessions();
-   NodeStoreServersEx* metaNodes = app->getMetaNodes();
+   NodeStoreServers* metaNodes = app->getMetaNodes();
    const uint64_t numSessions = sessions->getSize();
 
    numSessionsToSync.set(numSessions);
@@ -31,7 +31,7 @@ void SessionStoreResyncer::doSync()
       return;
    }
 
-   LOG(MIRRORING, DEBUG, "Serialized session store", as("size", sessionStoreSerBuf.second));
+   LOG(MIRRORING, DEBUG, "Serialized session store", ("size", sessionStoreSerBuf.second));
 
    ResyncSessionStoreMsg msg(sessionStoreSerBuf.first.get(), sessionStoreSerBuf.second);
    RequestResponseArgs rrArgs(NULL, &msg, NETMSGTYPE_ResyncSessionStoreResp);
@@ -47,7 +47,7 @@ void SessionStoreResyncer::doSync()
       return;
    }
 
-   ResyncSessionStoreRespMsg* resp = (ResyncSessionStoreRespMsg*)rrArgs.outRespMsg;
+   ResyncSessionStoreRespMsg* resp = (ResyncSessionStoreRespMsg*)rrArgs.outRespMsg.get();
    FhgfsOpsErr retVal = resp->getResult();
 
    LOG(MIRRORING, DEBUG, "ResyncSessionStoreRespMsg", retVal);

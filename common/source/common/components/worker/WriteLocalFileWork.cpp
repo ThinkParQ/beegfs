@@ -23,14 +23,13 @@ void WriteLocalFileWork::process(
    }
    else
    { // got node reference => begin communication
-      *nodeResult = communicate(*node, bufIn, bufInLen, bufOut, bufOutLen);
+      *nodeResult = communicate(*node, bufOut, bufOutLen);
    }
 
    writeInfo->counter->incCount();
 }
 
-int64_t WriteLocalFileWork::communicate(Node& node, char* bufIn, unsigned bufInLen,
-   char* bufOut, unsigned bufOutLen)
+int64_t WriteLocalFileWork::communicate(Node& node, char* bufOut, unsigned bufOutLen)
 {
    const char* logContext = "WriteFile Work (communication)";
    AbstractApp* app = PThread::getCurrentThreadApp();
@@ -39,7 +38,6 @@ int64_t WriteLocalFileWork::communicate(Node& node, char* bufIn, unsigned bufInL
 
    int64_t retVal = -FhgfsOpsErr_COMMUNICATION;
    Socket* sock = NULL;
-   NetMessage* respMsg = NULL;
 
    try
    {
@@ -59,15 +57,15 @@ int64_t WriteLocalFileWork::communicate(Node& node, char* bufIn, unsigned bufInL
       writeMsg.sendData(buf, sock);
 
       // receive response
-      unsigned respLength = MessagingTk::recvMsgBuf(sock, bufIn, bufInLen);
-      if(!respLength)
+      auto resp = MessagingTk::recvMsgBuf(*sock);
+      if (resp.empty())
       { // error
          LogContext log(logContext);
          log.log(Log_WARNING, "Did not receive a response from: " + sock->getPeername() );
       }
       else
       { // got response => deserialize it
-         respMsg = app->getNetMessageFactory()->createFromBuf(bufIn, respLength);
+         auto respMsg = app->getNetMessageFactory()->createFromBuf(std::move(resp));
 
          if(respMsg->getMsgType() != NETMSGTYPE_WriteLocalFileResp)
          { // response invalid (wrong msgType)
@@ -82,12 +80,8 @@ int64_t WriteLocalFileWork::communicate(Node& node, char* bufIn, unsigned bufInL
          { // correct response => return it
             connPool->releaseStreamSocket(sock);
 
-            WriteLocalFileRespMsg* writeRespMsg = (WriteLocalFileRespMsg*)respMsg;
-            long long writeRespValue = writeRespMsg->getValue();
-
-            SAFE_DELETE(respMsg);
-
-            return writeRespValue;
+            WriteLocalFileRespMsg* writeRespMsg = (WriteLocalFileRespMsg*)respMsg.get();
+            return writeRespMsg->getValue();
          }
       }
    }
@@ -111,7 +105,6 @@ int64_t WriteLocalFileWork::communicate(Node& node, char* bufIn, unsigned bufInL
    // clean up
    if(sock)
       connPool->invalidateStreamSocket(sock);
-   SAFE_DELETE(respMsg);
 
    return retVal;
 }

@@ -22,7 +22,7 @@ class ModeResyncStats : public Mode
       NodeType nodeType;
 
       int getStatsStorage(uint16_t syncToTargetID, bool isBuddyGroupID);
-      int getStatsMeta(uint16_t syncToNodeID, bool isBuddyGroupID);
+      int getStatsMeta(uint16_t nodeID, bool isBuddyGroupID);
       void printStats(StorageBuddyResyncJobStatistics& jobStats);
       void printStats(MetaBuddyResyncJobStatistics& jobStats);
       void printStats(BuddyResyncJobStatistics jobStats);

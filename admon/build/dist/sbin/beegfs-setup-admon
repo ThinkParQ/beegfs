@@ -7,18 +7,18 @@
 
 DEFAULT_CFG_PATH="/etc/beegfs/beegfs-admon.conf"
 MGMTD_CFG_KEY="sysMgmtdHost"
+DB_CFG_KEY="databaseFile"
 
 # show help text
 print_usage()
 {
 	echo
-	echo "DESCRIPTION: Initialize management storage directory for beegfs-mgmtd server"
-	echo "daemon and update the beegfs-mgmtd config file."
+	echo "DESCRIPTION: Configure the beegfs-admon server."
 	echo
-	echo "USAGE: `basename $0` -p <management_path> [options]"
+	echo "USAGE: `basename $0`-m <management host> [options]"
 	echo
 	echo " Mandatory Options:"
-	echo 
+	echo
 	echo "   -m <host> - Hostname (or IP address) of management server."
 	echo "               (Will be stored in server config file.)"
 	echo
@@ -28,6 +28,10 @@ print_usage()
 	echo
 	echo "   -c <path> - Path to server config file."
 	echo "               (Default: ${DEFAULT_CFG_PATH})"
+	echo
+	echo "   -d <path> - Path to the database"
+	echo "               (Will be created on first run,"
+	echo "                Default: /var/lib/beegfs/beegfs-admon.db)"
 	echo
 	echo "   -f        - Force actions, ignore warnings."
 	echo
@@ -59,6 +63,11 @@ update_config_file()
 		echo " * Setting management host: ${MGMTD_HOST}"
 		sed -i "s/\(^${MGMTD_CFG_KEY}.*=\).*/\1 ${MGMTD_HOST}/" ${CFG_PATH}
 	fi
+
+   if [ -n "${DB_FILE}" ]; then
+      echo " * Setting abmon database: ${DB_FILE}"
+		sed -i "s|\(^${DB_CFG_KEY}.*=\).*$|\1 ${DB_FILE}|" ${CFG_PATH}
+   fi
 }
 
 ################## end of function definitions ##############
@@ -70,11 +79,12 @@ update_config_file()
 CFG_PATH="$DEFAULT_CFG_PATH" # empty path means "don't update cfg file"
 FORCE_ACTIONS=""
 MGMTD_HOST=""
+DB_FILE=""
 
 # parse command line arguments
 # (see print_usage() for description of parameters)
 
-while getopts "Cc:fhm:" opt; do
+while getopts "Cc:fhm:d:" opt; do
         case $opt in
 	C)
 		CFG_PATH=""
@@ -88,6 +98,9 @@ while getopts "Cc:fhm:" opt; do
    m)
 		MGMTD_HOST="$OPTARG"
 		;;
+   d)
+      DB_FILE="$OPTARG"
+      ;;
 	h)
 		print_usage
 		exit 0

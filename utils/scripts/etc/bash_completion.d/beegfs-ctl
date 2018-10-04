@@ -35,7 +35,7 @@ _beegfs-ctl()
 
             --listtargets)
                opts="$mclh --nodesfirst --longnodes --state --pools --nodetype= --spaceinfo \
-                  --mirrorgroups --errorcodes --storagepools --storagepool="
+                  --mirrorgroups --errorcodes --storagepools --storagepoolid="
                ;;
 
             --removenode)
@@ -51,7 +51,7 @@ _beegfs-ctl()
                ;;
 
             --mirrormd)
-               opts="$mclh"
+               opts="$mclh --force"
                ;;
 
             --disposeunused)
@@ -74,7 +74,7 @@ _beegfs-ctl()
 
             --getquota)
                opts="$mclh --uid --gid --defaultlimits --all --list --range --withzero \
-                  --withsystem --default --csv --storagepool="
+                  --withsystem --default --csv --storagepoolid="
                ;;
 
             --getentryinfo)
@@ -82,7 +82,7 @@ _beegfs-ctl()
                ;;
 
             --setpattern)
-               opts="$mclh --chunksize= --numtargets= --pattern= --unmounted --force --storagepool="
+               opts="$mclh --chunksize= --numtargets= --pattern= --unmounted --force --storagepoolid="
                ;;
 
             --find)
@@ -108,7 +108,7 @@ _beegfs-ctl()
 
             --setquota)
                opts="$mclh --uid --gid --all --list --range --file= --withzero --sizelimit= \
-                  --inodelimit= --default --storagepool="
+                  --inodelimit= --default --storagepoolid="
                ;;
 
             --addmirrorgroup)

@@ -38,9 +38,6 @@ class StoragePoolStore
          bool ignoreExisting = false);
       virtual StoragePoolId removeBuddyGroup(uint16_t buddyGroupId);
 
-      bool loadFromFile();
-      bool saveToFile();
-
       void syncFromVector(const StoragePoolPtrVec& storagePoolVec);
 
       StoragePoolPtr getPool(StoragePoolId id) const;
@@ -49,8 +46,6 @@ class StoragePoolStore
       StoragePoolPtrVec getPoolsAsVec() const;
       bool poolExists(StoragePoolId id) const;
 
-      bool isMapperDirty() const;
-      void setStorePath(const std::string& storePath);
       size_t getSize() const;
 
    protected:
@@ -58,9 +53,6 @@ class StoragePoolStore
 
       mutable RWLock rwlock; // protecting the storage pool map
       StoragePoolPtrMap storagePools;
-
-      bool mappingsDirty; // true if saved mappings file needs to be updated
-      std::string storePath; // set to enable load/save methods (setting is not thread-safe)
 
       MirrorBuddyGroupMapper* buddyGroupMapper;
       TargetMapper* targetMapper;

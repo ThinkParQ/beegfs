@@ -13,7 +13,7 @@ void GetNodeInfoWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
    NodeStoreServers* nodes = app->getServerStoreFromType(nodeType);
    if(!nodes)
    {
-      LOG(GENERAL, ERR, "Invalid node type.", as("Node Type", Node::nodeTypeToStr(nodeType)));
+      LOG(GENERAL, ERR, "Invalid node type.", nodeType);
       return;
    }
 
@@ -50,17 +50,12 @@ void GetNodeInfoWork::process(char* bufIn, unsigned bufInLen, char* bufOut,
 
 bool GetNodeInfoWork::sendMsg(Node *node, GeneralNodeInfo *outInfo)
 {
-   bool commRes;
    GetNodeInfoMsg getNodeInfoMsg;
-   char *outBuf = NULL;
-   NetMessage *respMsg = NULL;
 
-   // send a GetNodeInfoMsg to the node
+   const auto respMsg = MessagingTk::requestResponse(*node, getNodeInfoMsg,
+         NETMSGTYPE_GetNodeInfoResp);
 
-   commRes = MessagingTk::requestResponse(*node, &getNodeInfoMsg,
-      NETMSGTYPE_GetNodeInfoResp, &outBuf, &respMsg);
-
-   if(!commRes)
+   if (!respMsg)
    { // comm failed
       log.logErr(std::string("Communication failed with node: ") +
          node->getNodeIDWithTypeStr() );
@@ -69,11 +64,8 @@ bool GetNodeInfoWork::sendMsg(Node *node, GeneralNodeInfo *outInfo)
 
    // comm succeeded
 
-   GetNodeInfoRespMsg* getNodeInfoRespMsg = (GetNodeInfoRespMsg*)respMsg;
+   GetNodeInfoRespMsg* getNodeInfoRespMsg = (GetNodeInfoRespMsg*)respMsg.get();
    *outInfo = getNodeInfoRespMsg->getInfo();
-
-   delete(respMsg);
-   free(outBuf);
 
    return true;
 }

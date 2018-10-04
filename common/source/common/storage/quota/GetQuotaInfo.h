@@ -36,10 +36,13 @@ class GetQuotaInfo
          cfg.cfgDefaultLimits = false;
       }
 
-      bool requestQuotaDataAndCollectResponses(const NodeHandle& mgmtNode,
-         NodeStoreServers* storageNodes, MultiWorkQueue* workQ, QuotaDataMapForTarget* quotaResults,
-         TargetMapper* mapper, bool requestLimits, QuotaInodeSupport* quotaInodeSupport,
-         StoragePoolStore* storagePoolStore = NULL,
+      bool requestQuotaLimitsAndCollectResponses(const NodeHandle& mgmtNode,
+         MultiWorkQueue* workQ, QuotaDataMapForTarget* outQuotaResults, const TargetMapper* mapper,
+         StoragePoolId storagePoolId = StoragePoolStore::INVALID_POOL_ID);
+
+      bool requestQuotaDataAndCollectResponses(const NodeStoreServers* storageNodes,
+         MultiWorkQueue* workQ, QuotaDataMapForTarget* outQuotaResults, const TargetMapper* mapper,
+         QuotaInodeSupport* quotaInodeSupport, StoragePoolStore* storagePoolStore = NULL,
          StoragePoolId storagePoolId = StoragePoolStore::INVALID_POOL_ID);
 
    protected:

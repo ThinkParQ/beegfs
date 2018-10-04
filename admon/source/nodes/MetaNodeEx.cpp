@@ -5,7 +5,7 @@
 
 MetaNodeEx::MetaNodeEx(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
    unsigned short portTCP, NicAddressList& nicList) :
-   Node(nodeID, nodeNumID, portUDP, portTCP, nicList)
+   Node(NODETYPE_Meta, nodeID, nodeNumID, portUDP, portTCP, nicList)
 {
    initialize();
 }
@@ -33,21 +33,21 @@ void MetaNodeEx::initialize()
 
 void MetaNodeEx::setNotResponding()
 {
-   SafeMutexLock mutexLock(&mutex);
-   this->data.isResponding = false;
-   this->data.directWorkListSize = 0;
-   this->data.indirectWorkListSize = 0;
-   this->data.isRoot = false;
-   this->data.sessionCount = 0;
-
-   mutexLock.unlock();
+   {
+      const std::lock_guard<Mutex> lock(mutex);
+      this->data.isResponding = false;
+      this->data.directWorkListSize = 0;
+      this->data.indirectWorkListSize = 0;
+      this->data.isRoot = false;
+      this->data.sessionCount = 0;
+   }
 
    Program::getApp()->getMailer()->addDownNode(getNumID(), getID(), NODETYPE_Meta);
 }
 
 void MetaNodeEx::initializeDBData()
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    // create the tables for this node
    // add the node to the list of storage nodes (only happens if not already in there)
@@ -86,8 +86,6 @@ void MetaNodeEx::initializeDBData()
       long offset = 86400 - (now - firstHourly);
       dailyData.nextUpdate = now + offset;
    }
-
-   mutexLock.unlock();
 }
 
 void MetaNodeEx::average(std::list<MetaNodeDataContent> *originalData,
@@ -97,7 +95,7 @@ void MetaNodeEx::average(std::list<MetaNodeDataContent> *originalData,
    TimeAbs t;
    t.setToNow();
    content.time = t.getTimeval()->tv_sec; // seconds since the epoch
-   content.isResponding = 1; //fixed!
+   content.isResponding = true; //fixed!
 
    unsigned aggregatedIndirectWorkListSize = 0;
    unsigned aggregatedDirectWorkListSize = 0;
@@ -138,7 +136,7 @@ void MetaNodeEx::average(std::list<MetaNodeDataContent> *originalData,
 
 void MetaNodeEx::update(MetaNodeEx* newNode)
 {
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
    // if old data is too big delete the oldest entry
    if (oldData.data.size() >= maxSizeOldData) //
    {
@@ -199,8 +197,6 @@ void MetaNodeEx::update(MetaNodeEx* newNode)
       this->db->insertMetaNodeData(this->getID(), this-> getNumID(), TABTYPE_Daily,
          this->dailyData.data.front());
    }
-
-   mutexLock.unlock();
 }
 
 void MetaNodeEx::addHighResStatsList(HighResStatsList stats)
@@ -217,7 +213,7 @@ void MetaNodeEx::addHighResStatsList(HighResStatsList stats)
    }
 
    // calculate a average for this measurement
-   if (stats.size() != 0)
+   if (!stats.empty())
    {
       this->data.queuedRequests = (unsigned) (queuedRequestsSum / stats.size());
       this->data.workRequests = (unsigned) (workRequestsSum / stats.size());

@@ -25,10 +25,10 @@ void ReadLocalFileV2Msg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeStrAlign4(ctx, thisCast->fileHandleIDLen, thisCast->fileHandleID);
 
    // clientNumID
-   NumNodeID_serialize(&thisCast->clientNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->clientNumID);
 
    // pathInfo
-   PathInfo_serialize(thisCast->pathInfoPtr, ctx);
+   PathInfo_serialize(ctx, thisCast->pathInfoPtr);
 
    // targetID
    Serialization_serializeUShort(ctx, thisCast->targetID);

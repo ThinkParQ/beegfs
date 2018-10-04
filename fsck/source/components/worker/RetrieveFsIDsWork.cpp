@@ -11,7 +11,6 @@
 
 RetrieveFsIDsWork::RetrieveFsIDsWork(FsckDB* db, Node& node, SynchronizedCounter* counter,
       AtomicUInt64& errors, unsigned hashDirStart, unsigned hashDirEnd) :
-   Work(),
    log("RetrieveFsIDsWork"), node(node), counter(counter), errors(&errors),
    hashDirStart(hashDirStart), hashDirEnd(hashDirEnd),
    table(db->getFsIDsTable()), bulkHandle(table->newBulkHandle())
@@ -61,25 +60,20 @@ void RetrieveFsIDsWork::doWork(bool isBuddyMirrored)
 
          int64_t hashDirOffset = 0;
          int64_t contDirOffset = 0;
-         std::string currentContDirID = "";
+         std::string currentContDirID;
          int resultCount = 0;
 
          do
          {
-            bool commRes;
-            char *respBuf = NULL;
-            NetMessage *respMsg = NULL;
-
             RetrieveFsIDsMsg retrieveFsIDsMsg(hashDirNum, isBuddyMirrored, currentContDirID,
                RETRIEVE_FSIDS_PACKET_SIZE, hashDirOffset, contDirOffset);
 
-            commRes = MessagingTk::requestResponse(node, &retrieveFsIDsMsg,
-               NETMSGTYPE_RetrieveFsIDsResp, &respBuf, &respMsg);
+            const auto respMsg = MessagingTk::requestResponse(node, retrieveFsIDsMsg,
+               NETMSGTYPE_RetrieveFsIDsResp);
 
-            if ( commRes )
+            if (respMsg)
             {
-               RetrieveFsIDsRespMsg* retrieveFsIDsRespMsg =
-                  (RetrieveFsIDsRespMsg*) respMsg;
+               auto* retrieveFsIDsRespMsg = (RetrieveFsIDsRespMsg*) respMsg.get();
 
                // set new parameters
                currentContDirID = retrieveFsIDsRespMsg->getCurrentContDirID();
@@ -104,10 +98,10 @@ void RetrieveFsIDsWork::doWork(bool isBuddyMirrored)
                   }
 
                   LOG(GENERAL, ERR, "Found fsid file with invalid entry IDs.",
-                        as("node", it->getSaveNodeID()),
-                        as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                        as("entryID", it->getID()),
-                        as("parentEntryID", it->getParentDirID()));
+                        ("node", it->getSaveNodeID()),
+                        ("isBuddyMirrored", it->getIsBuddyMirrored()),
+                        ("entryID", it->getID()),
+                        ("parentEntryID", it->getParentDirID()));
 
                   ++it;
                   errors->increase();
@@ -115,14 +109,9 @@ void RetrieveFsIDsWork::doWork(bool isBuddyMirrored)
                }
 
                this->table->insert(fsIDs, this->bulkHandle);
-
-               SAFE_FREE(respBuf);
-               SAFE_DELETE(respMsg);
             }
             else
             {
-               SAFE_FREE(respBuf);
-               SAFE_DELETE(respMsg);
                throw FsckException("Communication error occured with node " + node.getID());
             }
 

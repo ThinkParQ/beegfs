@@ -9,18 +9,19 @@
 #include <common/net/message/nodes/RegisterTargetRespMsg.h>
 #include <common/net/sock/RDMASocket.h>
 #include <common/nodes/LocalNode.h>
-#include <common/nodes/NodeFeatureFlags.h>
 #include <common/nodes/TargetStateInfo.h>
 #include <common/storage/striping/Raid0Pattern.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/NodesTk.h>
+#include <common/toolkit/OfflineWaitTimeoutTk.h>
+#include <common/toolkit/ZipIterator.h>
 #include <components/streamlistenerv2/StorageStreamListenerV2.h>
-#include <opentk/logging/SyslogLogger.h>
 #include <program/Program.h>
 #include <toolkit/StorageTkEx.h>
 #include "App.h"
 
-#include <signal.h>
+#include <csignal>
+#include <syslog.h>
 #include <sys/resource.h>
 #include <dlfcn.h>
 
@@ -33,23 +34,12 @@
 
 #define APP_LIB_ZFS_NAME "libzfs.so"
 
-
-/**
- * Array of the feature bit numbers that are supported by this node/service.
- */
-unsigned const APP_FEATURES[] =
-{
-   STORAGE_FEATURE_DUMMY,
-};
-
-
 App::App(int argc, char** argv)
 {
    this->argc = argc;
    this->argv = argv;
 
    this->appResult = APPCODE_NO_ERROR;
-   this->pidFileLockFD = -1;
 
    this->cfg = NULL;
    this->storageTargets = NULL;
@@ -77,7 +67,7 @@ App::App(int argc, char** argv)
    this->connAcceptor = NULL;
    this->statsCollector = NULL;
    this->internodeSyncer = NULL;
-   this->timerQueue = NULL;
+   this->timerQueue = new TimerQueue();
 
    this->nextNumaBindTarget = 0;
 
@@ -97,7 +87,6 @@ App::~App()
 
    workersDelete();
 
-   SAFE_DELETE(this->timerQueue);
    SAFE_DELETE(this->internodeSyncer);
    SAFE_DELETE(this->statsCollector);
    SAFE_DELETE(this->connAcceptor);
@@ -128,24 +117,23 @@ App::~App()
    SAFE_DELETE(this->log);
    SAFE_DELETE(this->tcpOnlyFilter);
    SAFE_DELETE(this->netFilter);
-   SAFE_DELETE(this->storageTargets); /* implicitly unlocks storage dirs */
+   SAFE_DELETE(this->storageTargets);
    SAFE_DELETE(this->storageBenchOperator);
    SAFE_DELETE(this->chunkLockStore);
 
-
-   unlockAndDeletePIDFile(pidFileLockFD, cfg->getPIDFile()); // ignored if fd is -1
-
    SAFE_DELETE(this->cfg);
 
+   delete timerQueue;
+
    Logger::destroyLogger();
-   SyslogLogger::destroyOnce();
+   closelog();
 }
 
 void App::run()
 {
    try
    {
-      SyslogLogger::initOnce(APP_SYSLOG_IDENTIFIER);
+      openlog(APP_SYSLOG_IDENTIFIER, LOG_NDELAY | LOG_PID | LOG_CONS, LOG_DAEMON);
 
       this->cfg = new Config(argc, argv);
 
@@ -258,9 +246,11 @@ void App::runNormal()
       throw InvalidConfigException("Failed to retrieve numeric local node ID from mgmt");
 
 
-   bool preregisterTargetsRes = preregisterTargets(localNodeNumID);
+   auto preregisterTargetsRes = preregisterTargets(localNodeNumID);
    if(!preregisterTargetsRes)
       throw InvalidConfigException("Target pre-registration at management node failed");
+
+   storageTargets = new StorageTargets(std::move(*preregisterTargetsRes));
 
    initPostTargetRegistration();
 
@@ -324,17 +314,14 @@ void App::initLogging()
 {
    // check absolute log path to avoid chdir() problems
    Path logStdPath(cfg->getLogStdFile() );
-   Path logErrPath(cfg->getLogErrFile() );
 
-   if( (!logStdPath.empty() && !logStdPath.absolute() ) ||
-       (!logErrPath.empty() && !logErrPath.absolute() ) )
+   if(!logStdPath.empty() && !logStdPath.absolute())
    {
       throw InvalidConfigException("Path to log file must be absolute");
    }
 
-   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogErrsToStdlog(),
-      cfg->getLogNoDate(), cfg->getLogStdFile(), cfg->getLogErrFile(), cfg->getLogNumLines(),
-      cfg->getLogNumRotatedFiles());
+   Logger::createLogger(cfg->getLogLevel(), cfg->getLogType(), cfg->getLogNoDate(),
+         cfg->getLogStdFile(), cfg->getLogNumLines(), cfg->getLogNumRotatedFiles());
    this->log = new LogContext("App");
 }
 
@@ -343,8 +330,8 @@ void App::initLogging()
  */
 void App::initDataObjects()
 {
-   this->mgmtNodes = new NodeStoreServersEx(NODETYPE_Mgmt);
-   this->storageNodes = new NodeStoreServersEx(NODETYPE_Storage);
+   this->mgmtNodes = new NodeStoreServers(NODETYPE_Mgmt, true);
+   this->storageNodes = new NodeStoreServers(NODETYPE_Storage, true);
 
    this->targetMapper = new TargetMapper();
    this->storageNodes->attachTargetMapper(targetMapper);
@@ -355,7 +342,7 @@ void App::initDataObjects()
    this->targetStateStore = new TargetStateStore(NODETYPE_Storage);
    this->targetMapper->attachStateStore(targetStateStore);
 
-   this->metaNodes = new NodeStoreEx(NODETYPE_Meta);
+   this->metaNodes = new NodeStoreServers(NODETYPE_Meta, true);
 
    this->ackStore = new AcknowledgmentStore();
 
@@ -395,7 +382,7 @@ void App::initBasicNetwork()
    }
 
    // discover local NICs and filter them
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, cfg->getConnUseSDP(), localNicList);
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
 
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
@@ -411,9 +398,9 @@ void App::initBasicNetwork()
  */
 void App::initLocalNodeIDs(std::string& outLocalNodeID, NumNodeID& outLocalNodeNumID)
 {
-   // load nodeID file (from primary storage dir)
+   // load nodeID file (from first storage dir)
 
-   Path storagePath(storageTargets->getPrimaryPath());
+   const auto& storagePath = cfg->getStorageDirectories().front();
    Path nodeIDPath = storagePath / STORAGETK_NODEID_FILENAME;
    StringList nodeIDList; // actually, the file would contain only a single line
 
@@ -431,17 +418,12 @@ void App::initLocalNodeIDs(std::string& outLocalNodeID, NumNodeID& outLocalNodeN
 
    // check targets for nodeID changes
 
-   StringList targetPaths;
-
-   storageTargets->getRawTargetPathsList(&targetPaths);
-
-   for(StringListIter iter = targetPaths.begin(); iter != targetPaths.end(); iter++)
-      StorageTk::checkOrCreateOrigNodeIDFile(*iter, outLocalNodeID);
+   for (const auto& path : cfg->getStorageDirectories())
+      StorageTk::checkOrCreateOrigNodeIDFile(path.str(), outLocalNodeID);
 
    // load nodeNumID file (from primary storage dir)
 
-   StorageTk::readNumIDFile(storageTargets->getPrimaryPath(), STORAGETK_NODENUMID_FILENAME,
-      &outLocalNodeNumID);
+   StorageTk::readNumIDFile(storagePath.str(), STORAGETK_NODENUMID_FILENAME, &outLocalNodeNumID);
 
    // note: localNodeNumID is still 0 here if it wasn't loaded from the file
 }
@@ -456,17 +438,8 @@ void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
    unsigned portTCP = cfg->getConnStoragePortTCP();
 
    // create localNode object
-   this->localNode = std::make_shared<LocalNode>(localNodeID, localNodeNumID, portUDP, portTCP,
-         localNicList);
-
-   localNode->setNodeType(NODETYPE_Storage);
-   localNode->setFhgfsVersion(BEEGFS_VERSION_CODE);
-
-   // nodeFeatureFlags
-   BitStore nodeFeatureFlags;
-
-   featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);
-   localNode->setFeatureFlags(&nodeFeatureFlags);
+   this->localNode = std::make_shared<LocalNode>(NODETYPE_Storage, localNodeID, localNodeNumID,
+         portUDP, portTCP, localNicList);
 
    // attach to storageNodes store
    storageNodes->setLocalNode(this->localNode);
@@ -477,16 +450,8 @@ void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
  */
 void App::initLocalNodeNumIDFile(NumNodeID localNodeNumID)
 {
-   StringList targetPaths;
-
-   storageTargets->getRawTargetPathsList(&targetPaths);
-
-   // walk all storage dirs and create numID file in each of them
-   for(StringListIter iter = targetPaths.begin(); iter != targetPaths.end(); iter++)
-   {
-      StorageTk::createNumIDFile(*iter, STORAGETK_NODENUMID_FILENAME, localNodeNumID.val());
-   }
-
+   for (const auto& path : cfg->getStorageDirectories())
+      StorageTk::createNumIDFile(path.str(), STORAGETK_NODENUMID_FILENAME, localNodeNumID.val());
 }
 
 /**
@@ -500,7 +465,25 @@ void App::preinitStorage()
 {
    this->pidFileLockFD = createAndLockPIDFile(cfg->getPIDFile() ); // ignored if pidFile not defined
 
-   this->storageTargets = new StorageTargets(cfg); // implicitly locks storage dirs
+   if (cfg->getStorageDirectories().empty())
+      throw InvalidConfigException("No storage target directories defined");
+
+   for (const auto& path: cfg->getStorageDirectories())
+   {
+      if (!path.absolute()) /* (check to avoid problems after chdir) */
+         throw InvalidConfigException("Path to storage target directory must be absolute: " +
+            path.str());
+
+      if (!cfg->getStoreAllowFirstRunInit() && !StorageTarget::isTargetDir(path))
+         throw InvalidConfigException(std::string("Found uninitialized storage target directory "
+            "and initialization has been disabled: ") + path.str());
+
+      auto lockFD = StorageTk::lockWorkingDirectory(path.str());
+      if (!lockFD.valid())
+         throw InvalidConfigException("Invalid storage directory: locking failed");
+
+      storageTargetLocks.push_back(std::move(lockFD));
+   }
 }
 
 void App::initStorage()
@@ -518,7 +501,8 @@ void App::initStorage()
    }
 
    // storage target dirs (create subdirs, storage format file etc)
-   storageTargets->prepareTargetDirs(cfg);
+   for (const auto& path : cfg->getStorageDirectories())
+      StorageTarget::prepareTargetDir(path);
 
    // raise file descriptor limit
    if(cfg->getTuneProcessFDLimit() )
@@ -541,35 +525,24 @@ void App::initStorage()
  */
 void App::initPostTargetRegistration()
 {
-   /* init the quota block devices.
-      we need the targetPaths for this, which are initialized in preregisterTargets() */
-
-   this->storageTargets->initQuotaBlockDevices();
-
    /* init workQueueMap with one queue per targetID.
       requires targetIDs, so can only happen after preregisterTargets(). */
 
-   UInt16List targetIDs;
+   const auto addWQ = [&] (const auto& mapping) {
+      workQueueMap[mapping.first] = new MultiWorkQueue();
 
-   if(cfg->getTuneUsePerTargetWorkers() )
-      this->storageTargets->getAllTargetIDs(&targetIDs);
+      if (cfg->getTuneUsePerUserMsgQueues())
+         workQueueMap[mapping.first]->setIndirectWorkList(new UserWorkContainer());
+   };
+
+   if (cfg->getTuneUsePerTargetWorkers())
+      std::for_each(storageTargets->getTargets().begin(), storageTargets->getTargets().end(), addWQ);
    else
-      targetIDs.push_back(0); // global worker set => create single targetID 0
-
-   for(UInt16ListIter iter = targetIDs.begin(); iter != targetIDs.end(); iter++)
-   {
-      workQueueMap[*iter] = new MultiWorkQueue();
-
-      if(cfg->getTuneUsePerUserMsgQueues() )
-         workQueueMap[*iter]->setIndirectWorkList(new UserWorkContainer() );
-   }
+      addWQ(std::make_pair(0, nullptr)); // global worker set => create single targetID 0
 
    // init exceeded quota stores
-   UInt16List targetIdList;
-   storageTargets->getAllTargetIDs(&targetIdList);
-
-   for (auto iter = targetIdList.begin(); iter != targetIdList.end(); iter++)
-      exceededQuotaStores.add(*iter);
+   for (const auto& mapping : storageTargets->getTargets())
+      exceededQuotaStores.add(mapping.first);
 }
 
 void App::initComponents()
@@ -592,8 +565,6 @@ void App::initComponents()
 
    this->internodeSyncer = new InternodeSyncer();
 
-   this->timerQueue = new TimerQueue(1, 1);
-
    this->storageBenchOperator = new StorageBenchOperator();
 
    this->chunkFetcher = new ChunkFetcher();
@@ -611,6 +582,8 @@ void App::startComponents()
 
    // make sure child threads don't receive SIGINT/SIGTERM (blocked signals are inherited)
    PThread::blockInterruptSignals();
+
+   timerQueue->start();
 
    this->dgramListener->start();
 
@@ -796,9 +769,8 @@ void App::workersStart()
          (*iter)->start();
    }
 
-   SafeMutexLock lock(&this->mutexWorkersRunning); // L O C K
+   const std::lock_guard<Mutex> lock(mutexWorkersRunning);
    this->workersRunning = true;
-   lock.unlock(); // U N L O C K
 }
 
 void App::streamListenersStop()
@@ -859,9 +831,8 @@ void App::workersJoin()
       waitForComponentTermination(*iter);
    }
 
-   SafeMutexLock lock(&this->mutexWorkersRunning); // L O C K
+   const std::lock_guard<Mutex> lock(mutexWorkersRunning);
    this->workersRunning = false;
-   lock.unlock(); // U N L O C K
 }
 
 void App::logInfos()
@@ -917,7 +888,7 @@ void App::logInfos()
 
    // storage tragets
    log->log(Log_WARNING, std::string("Storage targets: ") +
-      StringTk::uintToStr(storageTargets->getNumTargets() ) );
+      StringTk::uintToStr(storageTargets->getTargets().size()));
 
    // print numa info
    // (getTuneBindToNumaZone==-1 means disable binding)
@@ -1025,7 +996,8 @@ void App::signalHandler(int sig)
  */
 bool App::waitForMgmtNode()
 {
-   int waitTimeoutMS = 0; // infinite wait
+   const unsigned waitTimeoutMS = 0; // infinite wait
+   const unsigned nameResolutionRetries = 3;
 
    unsigned udpListenPort = cfg->getConnStoragePortUDP();
    unsigned udpMgmtdPort = cfg->getConnMgmtdPortUDP();
@@ -1040,7 +1012,7 @@ bool App::waitForMgmtNode()
 
 
    bool gotMgmtd = NodesTk::waitForMgmtHeartbeat(
-      this, &regDGramLis, mgmtNodes, mgmtdHost, udpMgmtdPort, waitTimeoutMS);
+      this, &regDGramLis, mgmtNodes, mgmtdHost, udpMgmtdPort, waitTimeoutMS, nameResolutionRetries);
 
    regDGramLis.selfTerminate();
    regDGramLis.sendDummyToSelfUDP(); // for faster termination
@@ -1067,19 +1039,12 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
       return false;
    }
 
-   BitStore nodeFeatureFlags;
-   featuresToBitStore(APP_FEATURES, APP_FEATURES_ARRAY_LEN, &nodeFeatureFlags);
-
    RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Storage, &localNicList,
-      &nodeFeatureFlags, cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
-   msg.setFhgfsVersion(BEEGFS_VERSION_CODE);
+      cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
 
    Time startTime;
    Time lastRetryTime;
    unsigned nextRetryDelayMS = 0;
-
-   char* respBuf;
-   NetMessage* respMsg;
 
    // wait for mgmt node to appear and periodically resend request
    /* note: we usually expect not to loop here, because we already waited for mgmtd in
@@ -1094,14 +1059,12 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
             break;
       }
 
-      // time to (re-)send request
+      const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+            NETMSGTYPE_RegisterNodeResp);
 
-      bool commRes = MessagingTk::requestResponse(
-         *mgmtNode, &msg, NETMSGTYPE_RegisterNodeResp, &respBuf, &respMsg);
-
-      if(commRes)
+      if (respMsg)
       { // communication successful
-         RegisterNodeRespMsg* respMsgCast = (RegisterNodeRespMsg*)respMsg;
+         RegisterNodeRespMsg* respMsgCast = (RegisterNodeRespMsg*)respMsg.get();
 
          outLocalNodeNumID = respMsgCast->getNodeNumID();
 
@@ -1112,9 +1075,6 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
          }
          else
             log->log(Log_WARNING, "Node ID reservation successful.");
-
-         delete(respMsg);
-         free(respBuf);
 
          break;
       }
@@ -1134,7 +1094,7 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
       nextRetryDelayMS = NodesTk::getRetryDelayMS(startTime.elapsedMS() );
    }
 
-   return (outLocalNodeNumID != 0);
+   return bool(outLocalNodeNumID);
 }
 
 /**
@@ -1143,51 +1103,46 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
  * @return true if pre-registration successful
  * @throw InvalidConfigException on target access error
  */
-bool App::preregisterTargets(const NumNodeID localNodeNumID)
+boost::optional<std::map<uint16_t, std::unique_ptr<StorageTarget>>> App::preregisterTargets(
+      const NumNodeID localNodeNumID)
 {
-   bool retVal = true;
-
    auto mgmtNode = mgmtNodes->referenceFirstNode();
    if(!mgmtNode)
    {
       log->logErr("Unexpected: No management node found in store during target pre-registration.");
-      return false;
+      return boost::none;
    }
 
    // validate IDs for mapped targets (i.e. targets that already have a numID)
 
-   StringList targetPaths;
+   std::map<uint16_t, std::unique_ptr<StorageTarget>> targets;
 
-   storageTargets->getRawTargetPathsList(&targetPaths);
-
-   for(StringListIter iter = targetPaths.begin(); iter != targetPaths.end(); iter++)
+   for (const auto& path : cfg->getStorageDirectories())
    {
       std::string targetID;
       uint16_t targetNumID;
       uint16_t newTargetNumID;
 
       // read or create target string ID file
-      StorageTk::readOrCreateTargetIDFile(*iter, localNodeNumID, &targetID);
+      StorageTk::readOrCreateTargetIDFile(path.str(), localNodeNumID, &targetID);
 
       // read target numeric ID file
-      StorageTk::readNumTargetIDFile(*iter, STORAGETK_TARGETNUMID_FILENAME, &targetNumID);
+      StorageTk::readNumTargetIDFile(path.str(), STORAGETK_TARGETNUMID_FILENAME, &targetNumID);
 
       // sanity check: make sure we don't have numID without stringID
       if(targetNumID && targetID.empty() )
       {
          log->logErr("Target sanity problem: "
-            "Found targetNumID, but no corresponding string ID: " + *iter);
+            "Found targetNumID, but no corresponding string ID: " + path.str());
 
-         retVal = false;
-         break;
+         return boost::none;
       }
 
 
       bool registerRes = preregisterTarget(*mgmtNode, targetID, targetNumID, &newTargetNumID);
       if(!registerRes)
       { // registration rejected
-         retVal = false;
-         break;
+         return boost::none;
       }
 
       if(!targetNumID)
@@ -1195,19 +1150,24 @@ bool App::preregisterTargets(const NumNodeID localNodeNumID)
          log->log(Log_DEBUG, "Retrieved new numeric target ID: " +
             targetID + " -> " + StringTk::uintToStr(newTargetNumID) );
 
-         StorageTk::createNumIDFile(*iter, STORAGETK_TARGETNUMID_FILENAME, newTargetNumID);
+         StorageTk::createNumIDFile(path.str(), STORAGETK_TARGETNUMID_FILENAME, newTargetNumID);
       }
 
-      // map targetNumID/path pair
-      bool addRes = storageTargets->addTargetDir(newTargetNumID, *iter);
-      if (!addRes)
-      { // adding the target failed
-         retVal = false;
-         break;
+      try
+      {
+         targets[newTargetNumID] = boost::make_unique<StorageTarget>(path, newTargetNumID,
+               *timerQueue, *mgmtNodes, *mirrorBuddyGroupMapper);
+      }
+      catch (const std::system_error& e)
+      {
+         LOG(GENERAL, ERR, "Error while initializing target directory.",
+               ("component", e.what()),
+               ("error", e.code().message()));
+         return boost::none;
       }
    }
 
-   return retVal;
+   return std::move(targets);
 }
 
 /**
@@ -1229,9 +1189,6 @@ bool App::preregisterTarget(Node& mgmtNode, std::string targetID, uint16_t targe
    Time lastRetryTime;
    unsigned nextRetryDelayMS = 0;
 
-   char* respBuf;
-   NetMessage* respMsg;
-
    // wait for mgmt node response and periodically resend request
    /* note: we usually expect not to loop here, because we already waited for mgmtd in
       waitForMgmtNode(), so mgmt should respond immediately. */
@@ -1245,14 +1202,12 @@ bool App::preregisterTarget(Node& mgmtNode, std::string targetID, uint16_t targe
             break;
       }
 
-      // time to (re-)send request
+      const auto respMsg = MessagingTk::requestResponse(mgmtNode, msg,
+            NETMSGTYPE_RegisterTargetResp);
 
-      bool commRes = MessagingTk::requestResponse(
-         mgmtNode, &msg, NETMSGTYPE_RegisterTargetResp, &respBuf, &respMsg);
-
-      if(commRes)
+      if (respMsg)
       { // communication successful
-         RegisterTargetRespMsg* respMsgCast = (RegisterTargetRespMsg*)respMsg;
+         RegisterTargetRespMsg* respMsgCast = (RegisterTargetRespMsg*)respMsg.get();
 
          *outNewTargetNumID = respMsgCast->getTargetNumID();
 
@@ -1263,9 +1218,6 @@ bool App::preregisterTarget(Node& mgmtNode, std::string targetID, uint16_t targe
          }
          else
             log->log(Log_DEBUG, "Target ID reservation successful.");
-
-         delete(respMsg);
-         free(respBuf);
 
          break;
       }
@@ -1343,18 +1295,35 @@ bool App::registerAndDownloadMgmtInfo()
       TargetStateMap localChangedStates;
       storageTargets->decideResync(statesFromMgmtd, localChangedStates);
 
-      StorageTargets::updateTargetStateLists(localChangedStates, targetIDs, reachabilityStates,
-         consistencyStates);
+      for (ZipIterRange<UInt16List, UInt8List, UInt8List>
+               it(targetIDs, reachabilityStates, consistencyStates);
+            !it.empty(); ++it)
+      {
+         const auto change = localChangedStates.find(*it()->first);
+         if (change != localChangedStates.end())
+         {
+            *it()->second = change->second.reachabilityState;
+            *it()->third = change->second.consistencyState;
+         }
+      }
+
 
       targetStateStore->syncStatesFromLists(targetIDs, reachabilityStates, consistencyStates);
 
-      // If a local primary target needs a resync, wait for poffline timeout.
-      storageTargets->addStartupTimeout();
+      // If a local primary target needs a resync, wait for poffline timeout before reporting the
+      // target to mgmt. this ensures that the target will never be use by clients that haven't yet
+      // seen the state update to needs-resync.
+      const std::chrono::milliseconds timeout(OfflineWaitTimeoutTk<Config>::calculate(cfg));
+      for (const auto& mapping : storageTargets->getTargets())
+      {
+         auto& target = *mapping.second;
 
-      UInt16List localTargets;
-      storageTargets->getAllTargetIDs(&localTargets);
+         if (target.getConsistencyState() == TargetConsistencyState_NEEDS_RESYNC &&
+               mirrorBuddyGroupMapper->getBuddyState(target.getID()) == BuddyState_PRIMARY)
+            target.setOfflineTimeout(timeout);
+      }
 
-      if(!InternodeSyncer::downloadAllExceededQuotaLists(localTargets) )
+      if (!InternodeSyncer::downloadAllExceededQuotaLists(storageTargets->getTargets()))
          continue;
 
       // all done
@@ -1383,31 +1352,21 @@ bool App::restoreSessions()
 {
    bool retVal = true;
 
-   UInt16List allTargetIDs;
-   this->storageTargets->getAllTargetIDs(&allTargetIDs);
-
-   for(UInt16ListIter iter = allTargetIDs.begin(); iter != allTargetIDs.end(); iter++)
+   for (const auto& mapping : storageTargets->getTargets())
    {
-      std::string path;
-      if(this->storageTargets->getPath(*iter, &path) )
+      auto& target = *mapping.second;
+
+      const auto path = target.getPath().str() + "/" + STORAGETK_SESSIONS_BACKUP_FILE_NAME;
+
+      bool pathRes = StorageTk::pathExists(path);
+      if(!pathRes)
+         continue;
+
+      bool loadRes = this->sessions->loadFromFile(path, mapping.first);
+      if(!loadRes)
       {
-         path += "/" + std::string(STORAGETK_SESSIONS_BACKUP_FILE_NAME);
-
-         bool pathRes = StorageTk::pathExists(path);
-         if(!pathRes)
-            continue;
-
-         bool loadRes = this->sessions->loadFromFile(path, *iter);
-         if(!loadRes)
-         {
-            this->log->logErr("Could not restore all sessions from file " + path + " ; targetID: " +
-               StringTk::uintToStr(*iter) );
-            retVal = false;
-         }
-      }
-      else
-      { // should actually never happen
-         this->log->logErr("No path available for targetID " + StringTk::uintToStr(*iter) );
+         this->log->logErr("Could not restore all sessions from file " + path + " ; targetID: " +
+            StringTk::uintToStr(mapping.first) );
          retVal = false;
       }
    }
@@ -1422,31 +1381,21 @@ bool App::storeSessions()
 {
    bool retVal = true;
 
-   UInt16List allTargetIDs;
-   this->storageTargets->getAllTargetIDs(&allTargetIDs);
-
-   for(UInt16ListIter iter = allTargetIDs.begin(); iter != allTargetIDs.end(); iter++)
+   for (const auto& mapping : storageTargets->getTargets())
    {
-      std::string path;
-      if(this->storageTargets->getPath(*iter, &path) )
+      auto& target = *mapping.second;
+
+      const auto path = target.getPath().str() + "/" + STORAGETK_SESSIONS_BACKUP_FILE_NAME;
+
+      bool pathRes = StorageTk::pathExists(path);
+      if(pathRes)
+         this->log->log(Log_WARNING, "Overwriting existing session file: " + path);
+
+      bool saveRes = this->sessions->saveToFile(path, mapping.first);
+      if(!saveRes)
       {
-         path += "/" + std::string(STORAGETK_SESSIONS_BACKUP_FILE_NAME);
-
-         bool pathRes = StorageTk::pathExists(path);
-         if(pathRes)
-            this->log->log(Log_WARNING, "Overwriting existing session file: " + path);
-
-         bool saveRes = this->sessions->saveToFile(path, *iter);
-         if(!saveRes)
-         {
-            this->log->logErr("Could not store all sessions to file " + path + "; "
-               "targetID: " + StringTk::uintToStr(*iter) );
-            retVal = false;
-         }
-      }
-      else
-      { // should actually never happens
-         this->log->logErr("No path available for targetID " + StringTk::uintToStr(*iter) );
+         this->log->logErr("Could not store all sessions to file " + path + "; "
+            "targetID: " + StringTk::uintToStr(mapping.first) );
          retVal = false;
       }
    }
@@ -1464,30 +1413,20 @@ bool App::deleteSessionFiles()
 {
    bool retVal = true;
 
-   UInt16List allTargetIDs;
-   this->storageTargets->getAllTargetIDs(&allTargetIDs);
-
-   for(UInt16ListIter iter = allTargetIDs.begin(); iter != allTargetIDs.end(); iter++)
+   for (const auto& mapping : storageTargets->getTargets())
    {
-      std::string path;
-      if(this->storageTargets->getPath(*iter, &path) )
+      auto& target = *mapping.second;
+
+      const auto path = target.getPath().str() + "/" + STORAGETK_SESSIONS_BACKUP_FILE_NAME;
+
+      bool pathRes = StorageTk::pathExists(path);
+      if(!pathRes)
+         continue;
+
+      if(remove(path.c_str() ) )
       {
-         path += "/" + std::string(STORAGETK_SESSIONS_BACKUP_FILE_NAME);
-
-         bool pathRes = StorageTk::pathExists(path);
-         if(!pathRes)
-            continue;
-
-         if(remove(path.c_str() ) )
-         {
-            this->log->logErr("Could not remove session file " + path + " ; targetID: "
-               + StringTk::uintToStr(*iter) + "; SysErr: " + System::getErrString() );
-            retVal = false;
-         }
-      }
-      else
-      { // should actually never happens
-         this->log->logErr("No path available for targetID " + StringTk::uintToStr(*iter) );
+         this->log->logErr("Could not remove session file " + path + " ; targetID: "
+            + StringTk::uintToStr(mapping.first) + "; SysErr: " + System::getErrString() );
          retVal = false;
       }
    }
@@ -1505,7 +1444,7 @@ bool App::openLibZfs()
       {
          LOG(GENERAL, ERR, "Error loading " + std::string(APP_LIB_ZFS_NAME) + ". "
               "Please make sure the libzfs2 development packages are installed.",
-              as("System error", dlerror()));
+              ("System error", dlerror()));
          libZfsErrorReported = true;
 
          return false;
@@ -1522,7 +1461,7 @@ bool App::closeLibZfs()
       if(dlclose(dlOpenHandleLibZfs) )
       {
          LOG(GENERAL, ERR, "Error closing " + std::string(APP_LIB_ZFS_NAME) + ".",
-               as("System error", dlerror()));
+               ("System error", dlerror()));
          libZfsErrorReported = true;
          return false;
       }

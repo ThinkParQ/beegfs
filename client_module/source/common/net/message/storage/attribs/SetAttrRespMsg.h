@@ -8,7 +8,6 @@ struct SetAttrRespMsg;
 typedef struct SetAttrRespMsg SetAttrRespMsg;
 
 static inline void SetAttrRespMsg_init(SetAttrRespMsg* this);
-static inline void SetAttrRespMsg_initFromValue(SetAttrRespMsg* this, int value);
 
 // getters & setters
 static inline int SetAttrRespMsg_getValue(SetAttrRespMsg* this);
@@ -22,11 +21,6 @@ struct SetAttrRespMsg
 void SetAttrRespMsg_init(SetAttrRespMsg* this)
 {
    SimpleIntMsg_init( (SimpleIntMsg*)this, NETMSGTYPE_SetAttrResp);
-}
-
-void SetAttrRespMsg_initFromValue(SetAttrRespMsg* this, int value)
-{
-   SimpleIntMsg_initFromValue( (SimpleIntMsg*)this, NETMSGTYPE_SetAttrResp, value);
 }
 
 int SetAttrRespMsg_getValue(SetAttrRespMsg* this)

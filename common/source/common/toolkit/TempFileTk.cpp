@@ -26,7 +26,7 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
    if (!fd.valid())
    {
       auto e = errno;
-      LOG(GENERAL, ERR, "Could not open temporary file.", tmpname, sysErr());
+      LOG(GENERAL, ERR, "Could not open temporary file.", tmpname, sysErr);
       return FhgfsOpsErrTk::fromSysErr(e);
    }
 
@@ -41,7 +41,7 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
             if (unlink(file) == 0)
                return;
 
-            LOG(GENERAL, ERR, "Failed to unlink tmpfile after error.", as("tmpname", file), sysErr());
+            LOG(GENERAL, ERR, "Failed to unlink tmpfile after error.", ("tmpname", file), sysErr);
          }
       } deleteOnExit = { tmpname.c_str() };
 
@@ -53,7 +53,7 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
          if (writeRes == -1)
          {
             auto e = errno;
-            LOG(GENERAL, ERR, "Could not write to temporary file", tmpname, sysErr());
+            LOG(GENERAL, ERR, "Could not write to temporary file", tmpname, sysErr);
             return FhgfsOpsErrTk::fromSysErr(e);
          }
 
@@ -62,7 +62,7 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
 
       if (fsync(*fd) < 0)
       {
-         LOG(GENERAL, ERR, "Could not write to temporary file", tmpname, sysErr());
+         LOG(GENERAL, ERR, "Could not write to temporary file", tmpname, sysErr);
          return FhgfsOpsErr_INTERNAL;
       }
 
@@ -71,7 +71,7 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
       if (renameRes == -1)
       {
          auto e = errno;
-         LOG(GENERAL, ERR, "Renaming failed.", as("from", tmpname), as("to", filename), sysErr());
+         LOG(GENERAL, ERR, "Renaming failed.", ("from", tmpname), ("to", filename), sysErr);
          return FhgfsOpsErrTk::fromSysErr(e);
       }
 
@@ -84,13 +84,13 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
    if (!dirFd.valid())
    {
       auto e = errno;
-      LOG(GENERAL, ERR, "Could not write to temporary file", tmpname, sysErr());
+      LOG(GENERAL, ERR, "Could not write to temporary file", tmpname, sysErr);
       return FhgfsOpsErrTk::fromSysErr(e);
    }
 
    if (fsync(*dirFd) < 0)
    {
-      LOG(GENERAL, WARNING, "fsync of directory failed.", tmpname, sysErr());
+      LOG(GENERAL, WARNING, "fsync of directory failed.", tmpname, sysErr);
       // do not return an error here. the alternative would be to try and restore the old state,
       // but that too might fail. it's easier and more reliable to just hope for the best now.
       return FhgfsOpsErr_SUCCESS;

@@ -35,8 +35,8 @@ class QuotaManager : public PThread
       bool getQuotaLimitsForID(StoragePoolId storagePoolId, QuotaData& inOutQuotaData) const;
       bool getQuotaLimitsForRange(unsigned rangeStart, unsigned rangeEnd, QuotaDataType type,
          StoragePoolId storagePoolId, QuotaDataList& outQuotaDataList) const;
-      std::string usedQuotaUserToString(bool mergeTargets);
-      std::string usedQuotaGroupToString(bool mergeTargets);
+      std::string usedQuotaUserToString(bool mergeTargets) const;
+      std::string usedQuotaGroupToString(bool mergeTargets) const;
 
 
    private:
@@ -48,14 +48,11 @@ class QuotaManager : public PThread
 
       StoragePoolStoreEx* storagePoolStore;
 
-      RWLock usedQuotaUserRWLock; // syncs access to the usedQuotaUser
-      RWLock usedQuotaGroupRWLock; // syncs access to the usedQuotaGroup
+      mutable RWLock usedQuotaUserRWLock; // syncs access to the usedQuotaUser
+      mutable RWLock usedQuotaGroupRWLock; // syncs access to the usedQuotaGroup
 
       QuotaDataMapForTarget usedQuotaUser;
       QuotaDataMapForTarget usedQuotaGroup;
-
-      bool usedQuotaUserStoreDirty;
-      bool usedQuotaGroupStoreDirty;
 
 
       // QuotaManager will have its own workqueue
@@ -88,7 +85,7 @@ class QuotaManager : public PThread
       bool updateDefaultGroupLimits(StoragePoolId storagePoolId, size_t inodeLimit,
          size_t sizeLimit);
       bool getDefaultLimits(StoragePoolId storagePoolId,
-         QuotaDefaultLimits& outLimits);
+         QuotaDefaultLimits& outLimits) const;
 };
 
 #endif /* QUOTAMANAGER_H_ */

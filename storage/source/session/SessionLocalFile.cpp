@@ -1,11 +1,27 @@
 #include <common/toolkit/serialization/Serialization.h>
 #include <common/storage/quota/ExceededQuotaStore.h>
 #include <net/msghelpers/MsgHelperIO.h>
-#include <nodes/NodeStoreEx.h>
 #include <program/Program.h>
 #include <storage/ChunkStore.h>
 
 #include "SessionLocalFile.h"
+
+bool SessionLocalFile::Handle::close()
+{
+   if (!fd.valid())
+      return true;
+
+   if (const int err = fd.close())
+   {
+      LOG(GENERAL, ERR, "Unable to close local file.", sysErr(err), id);
+      return false;
+   }
+   else
+   {
+      LOG(GENERAL, DEBUG, "Local file closed.", id);
+      return true;
+   }
+}
 
 void SessionLocalFile::serializeNodeID(SessionLocalFile* obj, Deserializer& des)
 {
@@ -17,7 +33,7 @@ void SessionLocalFile::serializeNodeID(SessionLocalFile* obj, Deserializer& des)
 
    if(mirrorNodeID)
    {
-      NodeStoreServersEx* nodeStore = Program::getApp()->getStorageNodes();
+      NodeStoreServers* nodeStore = Program::getApp()->getStorageNodes();
       auto node = nodeStore->referenceNode(NumNodeID(mirrorNodeID) );
 
       if(!node)
@@ -43,14 +59,14 @@ FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
    const char* logContext = "SessionLocalFile (open)";
 
 
-   if(this->fileDescriptor != -1) // no lock here as optimization, with lock below
+   if (handle->fd.valid()) // no lock here as optimization, with lock below
       return FhgfsOpsErr_SUCCESS; // file already open
 
 
-   SafeMutexLock safeMutex(&this->sessionMutex); // L O C K
+   std::lock_guard<Mutex> const lock(sessionMutex);
 
 
-   if(this->fileDescriptor != -1)
+   if (handle->fd.valid())
    {
       // file already open (race with another thread) => nothing more to do here
    }
@@ -113,8 +129,9 @@ FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
             // we ignore ENOENT (file does not exist), as that's not an error
             if(errCode != ENOENT)
             {
-               log->logErr(logContext, "Unable to open file: " + chunkFilePathStr + ". " +
-                  "SysErr: " + System::getErrString(errCode) );
+               LOG(SESSIONS, ERR, "Unable to open file.",
+                     ("Chunk File Path", chunkFilePathStr),
+                     ("SysErr", System::getErrString(errCode)));
 
                retVal = FhgfsOpsErrTk::fromSysErr(errCode);
 
@@ -123,14 +140,11 @@ FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
       }
 
       // prepare session data...
-      setFDUnlocked(fd);
-      setOffsetUnlocked(0);
+      handle->fd = FDHandle(fd);
+      offset = 0;
 
       log->log(Log_DEBUG, logContext, "File created. ID: " + getFileID() );
    }
-
-
-   safeMutex.unlock(); // U N L O C K
 
    return retVal;
 }
@@ -144,15 +158,11 @@ FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
  */
 NodeHandle SessionLocalFile::setMirrorNodeExclusive(NodeHandle mirrorNode)
 {
-   SafeMutexLock safeMutex(&this->sessionMutex); // L O C K
+   std::lock_guard<Mutex> const lock(sessionMutex);
 
    if (!this->mirrorNode)
       this->mirrorNode = mirrorNode;
 
-   NodeHandle retVal = this->mirrorNode;
-
-   safeMutex.unlock(); // U N L O C K
-
-   return retVal;
+   return this->mirrorNode;
 }
 

@@ -19,7 +19,7 @@ void ListDirFromOffsetMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeUInt(ctx, thisCast->maxOutNames);
 
    // EntryInfo
-   EntryInfo_serialize(thisCast->entryInfoPtr, ctx);
+   EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
 
    // filterDots
    Serialization_serializeBool(ctx, thisCast->filterDots);

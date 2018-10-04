@@ -9,17 +9,13 @@ bool GetChunkFileAttribsMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "GetChunkFileAttribsMsg incoming";
 
-   #ifdef BEEGFS_DEBUG
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a GetChunkFileAttribsMsg from: " + ctx.peerName());
-   #endif // BEEGFS_DEBUG
-   
    App* app = Program::getApp();
 
    std::string entryID(getEntryID() );
 
    FhgfsOpsErr clientErrRes = FhgfsOpsErr_SUCCESS;
    int targetFD;
-   struct stat statbuf;
+   struct stat statbuf{};
    uint64_t storageVersion = 0;
 
    // select the right targetID
@@ -40,12 +36,29 @@ bool GetChunkFileAttribsMsgEx::processIncoming(ResponseContext& ctx)
             StringTk::uintToStr(getTargetID() ) );
    }
 
+   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   if (!target)
+   {
+      if (isMsgHeaderFeatureFlagSet(GETCHUNKFILEATTRSMSG_FLAG_BUDDYMIRROR))
+      { /* buddy mirrored file => fail with GenericResp to make the caller retry.
+           mgmt will mark this target as (p)offline in a few moments. */
+         LOG(GENERAL, NOTICE, "Unknown target ID, refusing request.", targetID);
+         ctx.sendResponse(
+               GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, "Unknown target ID"));
+         return true;
+      }
+
+      LOG(GENERAL, ERR, "Unknown target ID.", targetID);
+      clientErrRes = FhgfsOpsErr_UNKNOWNTARGET;
+      goto send_response;
+   }
+
    { // get targetFD and check consistency state
       bool skipResponse = false;
 
-      targetFD = getTargetFD(ctx, targetID, &skipResponse);
+      targetFD = getTargetFD(*target, ctx, &skipResponse);
       if(unlikely(targetFD == -1) )
-      { // failed => either unknown targetID or consistency state not good
+      { // failed => consistency state not good
          memset(&statbuf, 0, sizeof(statbuf) ); // (just to mute clang warning)
 
          if(skipResponse)
@@ -106,56 +119,30 @@ skip_response:
 /**
  * @param outResponseSent true if a response was sent from within this method; can only be true if
  * -1 is returned.
- * @return -1 if no such target exists or if consistency state was not good (in which case a special
- * response is sent within this method), otherwise the file descriptor to chunks dir (or mirror
- * dir).
+ * @return -1 if consistency state was not good (in which case a special response is sent within
+ * this method), otherwise the file descriptor to chunks dir (or mirror dir).
  */
-int GetChunkFileAttribsMsgEx::getTargetFD(ResponseContext& ctx, uint16_t actualTargetID,
-   bool* outResponseSent)
+int GetChunkFileAttribsMsgEx::getTargetFD(const StorageTarget& target, ResponseContext& ctx,
+      bool* outResponseSent)
 {
-   const char* logContext = "TruncChunkFileMsg (get target FD)";
-
-   App* app = Program::getApp();
-
    bool isBuddyMirrorChunk = isMsgHeaderFeatureFlagSet(GETCHUNKFILEATTRSMSG_FLAG_BUDDYMIRROR);
-   TargetConsistencyState consistencyState = TargetConsistencyState_BAD; // silence gcc
 
    *outResponseSent = false;
 
    // get targetFD and check consistency state
 
-   int targetFD = app->getTargetFDAndConsistencyState(actualTargetID, isBuddyMirrorChunk,
-      &consistencyState);
-
-   if(unlikely(targetFD == -1) )
-   { // unknown targetID
-      if(isBuddyMirrorChunk)
-      { /* buddy mirrored file => fail with GenericResp to make the caller retry.
-           mgmt will mark this target as (p)offline in a few moments. */
-         std::string respMsgLogStr = "Refusing request. "
-            "Unknown targetID: " + StringTk::uintToStr(actualTargetID);
-
-         ctx.sendResponse(
-               GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, respMsgLogStr.c_str() ) );
-
-         *outResponseSent = true;
-         return -1;
-      }
-
-      LogContext(logContext).logErr("Unknown targetID: " + StringTk::uintToStr(actualTargetID) );
-
-      return -1;
-   }
+   const auto consistencyState = target.getConsistencyState();
+   const int targetFD = isBuddyMirrorChunk ? *target.getMirrorFD() : *target.getChunkFD();
 
    if(unlikely(consistencyState != TargetConsistencyState_GOOD) &&
       isBuddyMirrorChunk &&
       !isMsgHeaderFeatureFlagSet(GETCHUNKFILEATTRSMSG_FLAG_BUDDYMIRROR_SECOND) )
    { // this is a msg to a non-good primary
       std::string respMsgLogStr = "Refusing request. Target consistency is not good. "
-         "targetID: " + StringTk::uintToStr(actualTargetID);
+         "targetID: " + StringTk::uintToStr(target.getID());
 
       ctx.sendResponse(
-            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, respMsgLogStr.c_str() ) );
+            GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR, std::move(respMsgLogStr)));
 
       *outResponseSent = true;
       return -1;

@@ -68,7 +68,7 @@ int ModeRefreshEntryInfo::execute()
       EntryInfo entryInfo;
 
       if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, false,
-            *metaNodes, *metaBuddyGroupMapper,
+            *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
             entryInfo, ownerNode))
       {
          retVal = APPCODE_RUNTIME_ERROR;
@@ -131,28 +131,23 @@ bool ModeRefreshEntryInfo::refreshEntryInfo(Node& ownerNode, EntryInfo* entryInf
 {
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    RefreshEntryInfoRespMsg* respMsgCast;
 
    FhgfsOpsErr refreshInfoRes;
 
    RefreshEntryInfoMsg refreshInfoMsg(entryInfo);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &refreshInfoMsg, NETMSGTYPE_RefreshEntryInfoResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, refreshInfoMsg,
+         NETMSGTYPE_RefreshEntryInfoResp);
+   if (!respMsg)
       goto err_cleanup;
 
-   respMsgCast = (RefreshEntryInfoRespMsg*)respMsg;
+   respMsgCast = (RefreshEntryInfoRespMsg*)respMsg.get();
 
    refreshInfoRes = (FhgfsOpsErr)respMsgCast->getValue();
    if(refreshInfoRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Server encountered an error: " << FhgfsOpsErrTk::toErrString(refreshInfoRes) <<
-         std::endl;
+      std::cerr << "Server encountered an error: " << refreshInfoRes << std::endl;
       goto err_cleanup;
    }
 
@@ -162,9 +157,6 @@ bool ModeRefreshEntryInfo::refreshEntryInfo(Node& ownerNode, EntryInfo* entryInf
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }
 

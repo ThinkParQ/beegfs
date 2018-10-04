@@ -6,13 +6,6 @@
 
 bool GetMetaResyncStatsMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "GetMetaResyncStatsMsg incoming";
-
-   LOG_DEBUG(logContext, Log_DEBUG,
-      "Received a GetMetasResyncStatsMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    BuddyResyncer* resyncer = Program::getApp()->getBuddyResyncer();
 
    MetaBuddyResyncJobStatistics stats;

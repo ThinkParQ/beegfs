@@ -7,9 +7,6 @@
 
 bool LinkToLostAndFoundMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("LinkToLostAndFoundMsg incoming", 4,
-      "Received a LinkToLostAndFoundMsg from: " + ctx.peerName() );
-
    if (FsckDirEntryType_ISDIR(this->getEntryType()))
    {
       FsckDirEntryList createdDirEntries;
@@ -20,7 +17,7 @@ bool LinkToLostAndFoundMsgEx::processIncoming(ResponseContext& ctx)
    else
    {
       LOG(COMMUNICATION, ERR, "LinkToLostAndFoundMsg received for non-inlined file inode.",
-            as("from", ctx.peerName()));
+            ("from", ctx.peerName()));
       return false;
    }
 

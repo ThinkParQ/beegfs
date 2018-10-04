@@ -16,7 +16,6 @@ typedef struct FsDirInfo FsDirInfo;
 static inline void FsDirInfo_init(FsDirInfo* this, App* app);
 static inline FsDirInfo* FsDirInfo_construct(App* app);
 static inline void FsDirInfo_uninit(FsObjectInfo* this);
-static inline void FsDirInfo_destruct(FsObjectInfo* this);
 
 // getters & setters
 static inline loff_t FsDirInfo_getServerOffset(FsDirInfo* this);
@@ -82,17 +81,7 @@ void FsDirInfo_uninit(FsObjectInfo* this)
    UInt8Vec_uninit(&thisCast->dirContentsTypes);
    StrCpyVec_uninit(&thisCast->entryIDs);
    Int64CpyVec_uninit(&thisCast->serverOffsets);
-
-   FsObjectInfo_uninit( (FsObjectInfo*)this);
 }
-
-void FsDirInfo_destruct(FsObjectInfo* this)
-{
-   FsDirInfo_uninit( (FsObjectInfo*)this);
-
-   kfree(this);
-}
-
 
 loff_t FsDirInfo_getServerOffset(FsDirInfo* this)
 {

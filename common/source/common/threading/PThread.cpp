@@ -3,7 +3,7 @@
 #include <common/system/System.h>
 #include "PThread.h"
 
-#include <signal.h>
+#include <csignal>
 #include <execinfo.h>
 #include <sys/resource.h>
 
@@ -96,7 +96,7 @@ void PThread::signalHandler(int sig)
       case SIGSEGV:
       {
          signal(sig, SIG_DFL); // reset the handler to its default
-         log->logErr(logContext, "Received a SIGSEGV. Trying to shut down...");
+         LOG(GENERAL, ERR, "Received a SIGSEGV. Trying to shut down...");
          log->logBacktrace(logContext, backtraceLength, backtraceSymbols);
          app->stopComponents();
          throw SignalException("Segmentation fault");
@@ -105,7 +105,7 @@ void PThread::signalHandler(int sig)
       case SIGFPE:
       {
          signal(sig, SIG_DFL); // reset the handler to its default
-         log->logErr(logContext, "Received a SIGFPE. Trying to shut down...");
+         LOG(GENERAL, ERR, "Received a SIGFPE. Trying to shut down...");
          log->logBacktrace(logContext, backtraceLength, backtraceSymbols);
          app->stopComponents();
          throw SignalException("Floating point exception");
@@ -114,7 +114,7 @@ void PThread::signalHandler(int sig)
       case SIGBUS:
       {
          signal(sig, SIG_DFL); // reset the handler to its default
-         log->logErr(logContext, "Received a SIGBUS. Trying to shut down...");
+         LOG(GENERAL, ERR, "Received a SIGBUS. Trying to shut down...");
          log->logBacktrace(logContext, backtraceLength, backtraceSymbols);
          app->stopComponents();
          throw SignalException("Bus error (bad memory access)");
@@ -123,7 +123,7 @@ void PThread::signalHandler(int sig)
       case SIGILL:
       {
          signal(sig, SIG_DFL); // reset the handler to its default
-         log->logErr(logContext, "Received a SIGILL. Trying to shut down...");
+         LOG(GENERAL, ERR, "Received a SIGILL. Trying to shut down...");
          log->logBacktrace(logContext, backtraceLength, backtraceSymbols);
          app->stopComponents();
          throw SignalException("Illegal instruction");
@@ -132,7 +132,7 @@ void PThread::signalHandler(int sig)
       case SIGABRT:
       { // note: SIGABRT is special: after signal handler returns the process dies immediately
          signal(sig, SIG_DFL); // reset the handler to its default
-         log->logErr(logContext, "Received a SIGABRT. Trying to shut down...");
+         LOG(GENERAL, ERR, "Received a SIGABRT. Trying to shut down...");
          log->logBacktrace(logContext, backtraceLength, backtraceSymbols);
          app->stopComponents();
 

@@ -2,7 +2,6 @@
 #define NODEOPSTATS_H_
 
 #include <common/nodes/OpCounter.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/SafeRWLock.h>
 #include <common/nodes/Node.h>
 
@@ -64,7 +63,7 @@ class NodeOpStats
 {
    public:
       bool mapToUInt64Vec(uint64_t cookieIP, size_t bufLen, bool wantPerUserStats,
-         UInt64Vector *vec);
+         UInt64Vector *outVec);
 
    private:
       int getMaxIPsPerVector(OpCounter *opCounter, size_t bufLen);

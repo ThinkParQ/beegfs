@@ -73,7 +73,7 @@ class FileInodeStoreData
             this->inodeFeatureFlags |= FILEINODE_FEATURE_HAS_ORIG_UID;
       }
 
-      bool operator==(const FileInodeStoreData& other) const;
+      bool operator==(const FileInodeStoreData& second) const;
 
       bool operator!=(const FileInodeStoreData& other) const { return !(*this == other); }
 

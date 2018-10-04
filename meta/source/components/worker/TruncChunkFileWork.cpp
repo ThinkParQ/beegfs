@@ -7,6 +7,8 @@
 #include <components/worker/TruncChunkFileWork.h>
 #include <program/Program.h>
 
+#include <boost/lexical_cast.hpp>
+
 
 void TruncChunkFileWork::process(char* bufIn, unsigned bufInLen, char* bufOut, unsigned bufOutLen)
 {
@@ -67,7 +69,7 @@ FhgfsOpsErr TruncChunkFileWork::communicate()
    }
 
    // correct response type received
-   TruncLocalFileRespMsg* truncRespMsg = (TruncLocalFileRespMsg*)rrArgs.outRespMsg;
+   TruncLocalFileRespMsg* truncRespMsg = (TruncLocalFileRespMsg*)rrArgs.outRespMsg.get();
 
    FhgfsOpsErr truncRespVal = truncRespMsg->getResult();
 
@@ -91,7 +93,7 @@ FhgfsOpsErr TruncChunkFileWork::communicate()
          std::string(pattern->getPatternType() == StripePatternType_BuddyMirror ? "Mirror " : "") +
          "TargetID: " + StringTk::uintToStr(targetID) + "; "
          "EntryID: " + entryID + "; "
-         "Error: " + FhgfsOpsErrTk::toErrString(truncRespVal) );
+         "Error: " + boost::lexical_cast<std::string>(truncRespVal) );
 
       return truncRespVal;
    }

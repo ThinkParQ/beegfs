@@ -7,7 +7,6 @@ struct PointerListIter;
 typedef struct PointerListIter PointerListIter;
 
 static inline void PointerListIter_init(PointerListIter* this, PointerList* list);
-static inline bool PointerListIter_hasNext(PointerListIter* this);
 static inline void PointerListIter_next(PointerListIter* this);
 static inline void* PointerListIter_value(PointerListIter* this);
 static inline bool PointerListIter_end(PointerListIter* this);
@@ -23,11 +22,6 @@ void PointerListIter_init(PointerListIter* this, PointerList* list)
 {
    this->list = list;
    this->elem = list->head;
-}
-
-bool PointerListIter_hasNext(PointerListIter* this)
-{
-   return (this->elem && (this->elem->next) );
 }
 
 void PointerListIter_next(PointerListIter* this)

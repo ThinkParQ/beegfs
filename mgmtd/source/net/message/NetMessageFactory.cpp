@@ -29,7 +29,6 @@
 #include <net/message/nodes/RemoveBuddyGroupMsgEx.h>
 #include <net/message/nodes/RemoveNodeMsgEx.h>
 #include <net/message/nodes/SetMirrorBuddyGroupMsgEx.h>
-#include <net/message/nodes/SetRootNodeIDMsgEx.h>
 #include <net/message/nodes/SetTargetConsistencyStatesMsgEx.h>
 #include <net/message/nodes/UnmapTargetMsgEx.h>
 #include <net/message/nodes/storagepools/AddStoragePoolMsgEx.h>
@@ -38,10 +37,11 @@
 #include <net/message/nodes/storagepools/RemoveStoragePoolMsgEx.h>
 
 // storage messages
+#include <common/net/message/storage/mirroring/SetMetadataMirroringRespMsg.h>
 #include <common/net/message/storage/quota/GetQuotaInfoRespMsg.h>
 #include <common/net/message/storage/quota/SetExceededQuotaRespMsg.h>
-#include <common/net/message/storage/GetStorageTargetInfoRespMsg.h>
 #include <common/net/message/storage/StatStoragePathRespMsg.h>
+#include <net/message/storage/mirroring/SetMetadataMirroringMsgEx.h>
 #include <net/message/storage/quota/GetDefaultQuotaMsgEx.h>
 #include <net/message/storage/quota/SetDefaultQuotaMsgEx.h>
 #include <net/message/storage/quota/SetQuotaMsgEx.h>
@@ -61,7 +61,7 @@
  * @return NetMessage that must be deleted by the caller
  * (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
+std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short msgType) const
 {
    NetMessage* msg;
 
@@ -90,7 +90,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_GetNodesResp: { msg = new GetNodesRespMsg(); } break;
       case NETMSGTYPE_GetStatesAndBuddyGroups: { msg = new GetStatesAndBuddyGroupsMsgEx(); } break;
       case NETMSGTYPE_GetStoragePools: { msg = new GetStoragePoolsMsgEx(); } break;
-      case NETMSGTYPE_GetStorageTargetInfoResp: { msg = new GetStorageTargetInfoRespMsg(); } break;
       case NETMSGTYPE_GetTargetMappings: { msg = new GetTargetMappingsMsgEx(); } break;
       case NETMSGTYPE_GetTargetStates: { msg = new GetTargetStatesMsgEx(); } break;
       case NETMSGTYPE_HeartbeatRequest: { msg = new HeartbeatRequestMsgEx(); } break;
@@ -106,7 +105,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_RemoveNodeResp: { msg = new RemoveNodeRespMsg(); } break;
       case NETMSGTYPE_RemoveStoragePool: { msg = new RemoveStoragePoolMsgEx(); } break;
       case NETMSGTYPE_SetMirrorBuddyGroup: { msg = new SetMirrorBuddyGroupMsgEx(); } break;
-      case NETMSGTYPE_SetRootNodeID: { msg = new SetRootNodeIDMsgEx(); } break;
       case NETMSGTYPE_SetTargetConsistencyStates: { msg = new SetTargetConsistencyStatesMsgEx(); } break;
       case NETMSGTYPE_SetTargetConsistencyStatesResp: { msg = new SetTargetConsistencyStatesRespMsg(); } break;
       case NETMSGTYPE_UnmapTarget: { msg = new UnmapTargetMsgEx(); } break;
@@ -122,6 +120,8 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       case NETMSGTYPE_GetQuotaInfoResp: { msg = new GetQuotaInfoRespMsg(); } break;
       case NETMSGTYPE_GetDefaultQuota: { msg = new GetDefaultQuotaMsgEx(); } break;
       case NETMSGTYPE_SetDefaultQuota: { msg = new SetDefaultQuotaMsgEx(); } break;
+      case NETMSGTYPE_SetMetadataMirroring: { msg = new SetMetadataMirroringMsgEx(); } break;
+      case NETMSGTYPE_SetMetadataMirroringResp: { msg = new SetMetadataMirroringRespMsg(); } break;
 
       // admon messages
       case NETMSGTYPE_GetNodeInfo: { msg = new GetNodeInfoMsgEx(); } break;
@@ -132,6 +132,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       } break;
    }
 
-   return msg;
+   return std::unique_ptr<NetMessage>(msg);
 }
 

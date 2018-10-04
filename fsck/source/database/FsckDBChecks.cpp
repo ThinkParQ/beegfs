@@ -114,7 +114,7 @@ struct IgnoreByID
    }
 };
 
-static IgnoreByID ignoreByID(SetFragmentCursor<db::ModificationEvent> ids)
+IgnoreByID ignoreByID(SetFragmentCursor<db::ModificationEvent> ids)
 {
    IgnoreByID result = { ids };
    return result;

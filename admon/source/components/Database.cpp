@@ -3,6 +3,8 @@
 
 #include <sys/stat.h>
 
+#include <boost/lexical_cast.hpp>
+
 /*
  * @param clearDatabase whether the database should be cleared (the app will start with a fresh one)
  * normally this param is read from config in constructor, but manual override is used when testing
@@ -125,7 +127,7 @@ void Database::createInitialTables()
    WritingQuery(query);
 
    // try to get the pw for the two permission groups; if not set, set defaults
-   if (getPassword("information") == "")
+   if (getPassword("information").empty())
    {
       std::string pw = SecurityTk::DoMD5(DEFAULT_PASS_INFORMATION);
       std::string insertQueryStr = "INSERT INTO '" +
@@ -134,7 +136,7 @@ void Database::createInitialTables()
       WritingQuery(insertQueryStr);
    }
 
-   if (getPassword("admin") == "")
+   if (getPassword("admin").empty())
    {
       std::string pw = SecurityTk::DoMD5(DEFAULT_PASS_ADMIN);
       std::string insertQueryStr = "INSERT INTO '" +
@@ -276,7 +278,7 @@ int Database::writeRuntimeConfig()
    StringMap runtimeCfg;
    app->getRuntimeConfig()->exportAsMap(&runtimeCfg);
 
-   std::string query = "";
+   std::string query;
    for (StringMapIter iter = runtimeCfg.begin(); iter != runtimeCfg.end(); iter++)
    {
       std::string param = (*iter).first;
@@ -413,7 +415,7 @@ void Database::createStatisticsTables(NodeType nodeType)
    else
    {
       throw DatabaseException(DB_QUERY_ERROR, (std::string("Useless NodeType for statistics "
-         "tables: " + Node::nodeTypeToStr(nodeType))).c_str());
+         "tables: " + boost::lexical_cast<std::string>(nodeType))).c_str());
    }
 
    // create a table for each aggregation level and some indexes for performance reasons
@@ -714,7 +716,7 @@ void Database::getMetaNodeSets(NumNodeID nodeNumID, TabType tabType, long minTim
          break;
    }
 
-   if (nodeNumID != 0)
+   if (nodeNumID)
    {
       // assemble the query
       std::ostringstream query;
@@ -793,7 +795,7 @@ void Database::getStorageNodeSets(NumNodeID nodeNumID, TabType tabType, long min
          break;
    }
 
-   if (nodeNumID != 0)
+   if (nodeNumID)
    {
       // assemble the query
       std::ostringstream query;
@@ -878,7 +880,7 @@ void Database::getAllStorageNodeSets(TabType tabType, long minTime, long maxTime
 std::string Database::getPassword(std::string username)
 {
    sqlite3_stmt *stmt;
-   std::string pw = "";
+   std::string pw;
 
    // assemble the query
    std::string queryStr = std::string("SELECT password FROM '" + tableNames[TableNames_users] +
@@ -1277,7 +1279,7 @@ int Database::addMetaNodeToGroup(std::string nodeID, NumNodeID nodeNumID, int gr
    }
 
    // check if groupID and nodeID are valid
-   if ((groupID >= 0) && (nodeNumID != 0))
+   if ((groupID >= 0) && nodeNumID)
    {
       std::string query = "INSERT INTO '" + tableNames[TableNames_groupmembersMeta] +
          "' VALUES ('" + StringTk::intToStr(groupID) + "','" + nodeID + "'," +
@@ -1353,7 +1355,7 @@ int Database::addStorageNodeToGroup(std::string nodeID, NumNodeID nodeNumID, int
    {
       return 0;
    }
-   if ((groupID >= 0) && (nodeNumID != 0))
+   if ((groupID >= 0) && nodeNumID)
    {
       std::string query = "INSERT INTO '" + tableNames[TableNames_groupmembersStorage] +
          "' VALUES ('" + StringTk::intToStr(groupID) + "','" + nodeID + "'," +
@@ -1460,7 +1462,7 @@ int Database::getGroupID(std::string groupName)
 /* get the name to a given group ID */
 std::string Database::getGroupName(int groupID)
 {
-   std::string groupName = "";
+   std::string groupName;
 
    // assemble the query
    std::string queryStr = "SELECT name FROM '" + tableNames[TableNames_groups] +

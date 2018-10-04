@@ -39,6 +39,7 @@ unsigned NetMessage_getSupportedHeaderFeatureFlagsMask(NetMessage* this)
 void __NetMessage_deserializeHeader(DeserializeCtx* ctx, NetMessageHeader* outHeader)
 {
    size_t totalLength = ctx->length;
+   uint64_t prefix = 0;
    // check min buffer length
 
    if(unlikely(ctx->length < NETMSG_HEADER_LENGTH) )
@@ -63,8 +64,8 @@ void __NetMessage_deserializeHeader(DeserializeCtx* ctx, NetMessageHeader* outHe
    Serialization_deserializeUInt8(ctx, &outHeader->msgFlags);
 
    // check message prefix
-
-   if(unlikely(strncmp(NETMSG_PREFIX_STR, ctx->data, ctx->length) ) )
+   Serialization_deserializeUInt64(ctx, &prefix);
+   if (prefix != NETMSG_PREFIX)
    {
       outHeader->msgType = NETMSGTYPE_Invalid;
       return;
@@ -76,9 +77,6 @@ void __NetMessage_deserializeHeader(DeserializeCtx* ctx, NetMessageHeader* outHe
       outHeader->msgType = NETMSGTYPE_Invalid;
       return;
    }
-
-   ctx->data += NETMSG_PREFIX_STR_LEN; // position after msgPrefix
-   ctx->length -= NETMSG_PREFIX_STR_LEN; // position after msgPrefix
 
    // message type
    Serialization_deserializeUShort(ctx, &outHeader->msgType);
@@ -115,7 +113,7 @@ void __NetMessage_serializeHeader(NetMessage* this, SerializeCtx* ctx, bool zero
    Serialization_serializeChar(ctx, this->msgHeader.msgFlags);
 
    // message prefix
-   Serialization_serializeBlock(ctx, NETMSG_PREFIX_STR, NETMSG_PREFIX_STR_LEN);
+   Serialization_serializeUInt64(ctx, NETMSG_PREFIX);
 
    // message type
    Serialization_serializeUShort(ctx, this->msgHeader.msgType);

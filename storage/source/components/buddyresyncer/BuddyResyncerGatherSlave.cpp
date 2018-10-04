@@ -1,29 +1,30 @@
 #include <app/App.h>
 #include <toolkit/StorageTkEx.h>
+#include <storage/StorageTargets.h>
 
 #include <program/Program.h>
+
+#include <mutex>
 
 #include "BuddyResyncerGatherSlave.h"
 
 Mutex BuddyResyncerGatherSlave::staticGatherSlavesMutex;
 std::map<std::string, BuddyResyncerGatherSlave*> BuddyResyncerGatherSlave::staticGatherSlaves;
 
-BuddyResyncerGatherSlave::BuddyResyncerGatherSlave(uint16_t targetID,
+BuddyResyncerGatherSlave::BuddyResyncerGatherSlave(const StorageTarget& target,
    ChunkSyncCandidateStore* syncCandidates, BuddyResyncerGatherSlaveWorkQueue* workQueue,
    uint8_t slaveID) :
-   PThread("BuddyResyncerGatherSlave_" + StringTk::uintToStr(targetID) + "-" +
-      StringTk::uintToStr(slaveID))
+   PThread("BuddyResyncerGatherSlave_" + StringTk::uintToStr(target.getID()) + "-" +
+      StringTk::uintToStr(slaveID)),
+   target(target)
 {
    this->isRunning = false;
-   this->targetID = targetID;
    this->syncCandidates = syncCandidates;
    this->workQueue = workQueue;
 
-   SafeMutexLock staticGatherSlavesLock(&staticGatherSlavesMutex);
+   const std::lock_guard<Mutex> lock(staticGatherSlavesMutex);
 
    staticGatherSlaves[this->getName()] = this;
-
-   staticGatherSlavesLock.unlock();
 }
 
 BuddyResyncerGatherSlave::~BuddyResyncerGatherSlave()
@@ -90,20 +91,19 @@ void BuddyResyncerGatherSlave::workLoop()
 int BuddyResyncerGatherSlave::handleDiscoveredEntry(const char* path,
    const struct stat* statBuf, int ftwEntryType, struct FTW* ftwBuf)
 {
-   std::string targetPath;
    std::string chunksPath;
 
-   SafeMutexLock staticGatherSlavesLock(&staticGatherSlavesMutex);
+   BuddyResyncerGatherSlave* thisStatic = nullptr;
+   {
+      const std::lock_guard<Mutex> lock(staticGatherSlavesMutex);
 
-   BuddyResyncerGatherSlave* thisStatic = staticGatherSlaves[PThread::getCurrentThreadName()];
-
-   staticGatherSlavesLock.unlock();
+      thisStatic = staticGatherSlaves[PThread::getCurrentThreadName()];
+   }
 
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
-   StorageTargets* storageTargets = app->getStorageTargets();
 
-   storageTargets->getPath(thisStatic->getTargetID(), &targetPath);
+   const auto& targetPath = thisStatic->target.getPath().str();
    chunksPath = targetPath + "/" + CONFIG_BUDDYMIRROR_SUBDIR_NAME;
 
    if (strlen(path) <= chunksPath.length())
@@ -114,9 +114,10 @@ int BuddyResyncerGatherSlave::handleDiscoveredEntry(const char* path,
    if ( relPathStr.empty() )
       return FTW_CONTINUE;
 
-   bool buddyCommIsOverride = false; // silence warning
-   int64_t lastBuddyCommTimeSecs =
-      storageTargets->readLastBuddyCommTimestamp(thisStatic->getTargetID(), &buddyCommIsOverride);
+   const auto lastBuddyComm = thisStatic->target.getLastBuddyComm();
+
+   const bool buddyCommIsOverride = lastBuddyComm.first;
+   int64_t lastBuddyCommTimeSecs = std::chrono::system_clock::to_time_t(lastBuddyComm.second);
    int64_t lastBuddyCommSafetyThresholdSecs = cfg->getSysResyncSafetyThresholdMins()*60;
    if ( (lastBuddyCommSafetyThresholdSecs == 0) && (!buddyCommIsOverride) ) // ignore timestamp file
       lastBuddyCommTimeSecs = 0;
@@ -132,7 +133,7 @@ int BuddyResyncerGatherSlave::handleDiscoveredEntry(const char* path,
 
       if(dirModificationTime > lastBuddyCommTimeSecs)
       { // sync candidate
-         ChunkSyncCandidateDir candidate(relPathStr, thisStatic->getTargetID());
+         ChunkSyncCandidateDir candidate(relPathStr, thisStatic->target.getID());
          thisStatic->syncCandidates->add(candidate, thisStatic);
          thisStatic->numDirsMatched.increase();
       }
@@ -150,7 +151,7 @@ int BuddyResyncerGatherSlave::handleDiscoveredEntry(const char* path,
       {  // sync candidate
          std::string relPathStr = path + chunksPath.size() + 1;
 
-         ChunkSyncCandidateFile candidate(relPathStr, thisStatic->getTargetID());
+         ChunkSyncCandidateFile candidate(relPathStr, thisStatic->target.getID());
          thisStatic->syncCandidates->add(candidate, thisStatic);
 
          thisStatic->numChunksMatched.increase();

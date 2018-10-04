@@ -66,7 +66,7 @@ class LogContext
          if(unlikely(!logger) )
             return;
 
-         logger->logErr(contextStr.c_str(), msg);
+         logger->log(Log_ERR, contextStr.c_str(), msg);
       }
 
       void logErr(const std::string& msg)

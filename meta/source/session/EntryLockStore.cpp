@@ -1,5 +1,3 @@
-#include <common/threading/SafeMutexLock.h>
-
 #include "EntryLockStore.h"
 
 ParentNameLockData* EntryLockStore::lock(const std::string& parentID, const std::string& name)

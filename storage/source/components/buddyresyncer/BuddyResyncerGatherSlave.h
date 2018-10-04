@@ -8,6 +8,8 @@
 
 #include <ftw.h>
 
+class StorageTarget;
+
 #define GATHERSLAVEQUEUE_MAXSIZE 5000
 
 class BuddyResyncerGatherSlaveWorkQueue
@@ -31,7 +33,7 @@ class BuddyResyncerGatherSlaveWorkQueue
       {
          unsigned waitTimeoutMS = 3000;
 
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          while (gatherSlavesWorkQueueLen > GATHERSLAVEQUEUE_MAXSIZE)
          {
@@ -43,61 +45,45 @@ class BuddyResyncerGatherSlaveWorkQueue
          paths.push_back(path);
          gatherSlavesWorkQueueLen++;
          pathAddedCond.signal();
-
-         mutexLock.unlock();
       }
 
       std::string fetch(PThread* caller)
       {
          unsigned waitTimeoutMS = 3000;
 
-         std::string retVal;
-
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          while (paths.empty())
          {
             if((caller) && (unlikely(caller->getSelfTerminate())))
             {
-               retVal = "";
-               goto unlock_and_return;
+               return "";
             }
 
             pathAddedCond.timedwait(&mutex, waitTimeoutMS);
          }
 
-         retVal = paths.front();
+         std::string retVal = paths.front();
          paths.pop_front();
          gatherSlavesWorkQueueLen--;
          pathFetchedCond.signal();
-
-         unlock_and_return:
-         mutexLock.unlock();
 
          return retVal;
       }
 
       bool queueEmpty()
       {
-         bool retVal;
+         const std::lock_guard<Mutex> lock(mutex);
 
-         SafeMutexLock mutexLock(&mutex);
-
-         retVal = (gatherSlavesWorkQueueLen == 0);
-
-         mutexLock.unlock();
-
-         return retVal;
+         return gatherSlavesWorkQueueLen == 0;
       }
 
       void clear()
       {
-         SafeMutexLock mutexLock(&mutex);
+         const std::lock_guard<Mutex> lock(mutex);
 
          paths.clear();
          gatherSlavesWorkQueueLen = 0;
-
-         mutexLock.unlock();
       }
 };
 
@@ -107,7 +93,7 @@ class BuddyResyncerGatherSlave : public PThread
    friend class BuddyResyncJob; // (to grant access to internal mutex)
 
    public:
-      BuddyResyncerGatherSlave(uint16_t targetID, ChunkSyncCandidateStore* syncCandidates,
+      BuddyResyncerGatherSlave(const StorageTarget& target, ChunkSyncCandidateStore* syncCandidates,
          BuddyResyncerGatherSlaveWorkQueue* workQueue, uint8_t slaveID);
       virtual ~BuddyResyncerGatherSlave();
 
@@ -119,7 +105,7 @@ class BuddyResyncerGatherSlave : public PThread
       Mutex statusMutex; // protects isRunning
       Condition isRunningChangeCond;
 
-      uint16_t targetID;
+      const StorageTarget& target;
 
       AtomicUInt64 numChunksDiscovered;
       AtomicUInt64 numChunksMatched;
@@ -145,18 +131,9 @@ class BuddyResyncerGatherSlave : public PThread
       // getters & setters
       bool getIsRunning()
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
-         bool retVal = this->isRunning;
-
-         safeLock.unlock();
-
-         return retVal;
-      }
-
-      uint16_t getTargetID()
-      {
-         return targetID;
+         return this->isRunning;
       }
 
       void getCounters(uint64_t& outNumChunksDiscovered, uint64_t& outNumChunksMatched,
@@ -189,12 +166,10 @@ class BuddyResyncerGatherSlave : public PThread
 
       void setIsRunning(bool isRunning)
       {
-         SafeMutexLock safeLock(&statusMutex);
+         const std::lock_guard<Mutex> lock(statusMutex);
 
          this->isRunning = isRunning;
          isRunningChangeCond.broadcast();
-
-         safeLock.unlock();
       }
 
       bool getSelfTerminateNotIdle()

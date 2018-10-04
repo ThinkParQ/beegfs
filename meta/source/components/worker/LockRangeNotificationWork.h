@@ -4,9 +4,7 @@
 
 #include <common/components/worker/Work.h>
 #include <common/components/AbstractDatagramListener.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/Common.h>
-
 
 typedef std::list<RangeLockDetails> LockRangeNotifyList;
 typedef LockRangeNotifyList::iterator LockRangeNotifyListIter;

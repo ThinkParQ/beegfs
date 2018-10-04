@@ -35,7 +35,7 @@ class ModeCreateDir : public Mode
       bool initDirSettings(DirSettings* settings);
       void freeDirSettings(DirSettings* settings);
       std::string generateServerPath(DirSettings* settings, std::string entryID);
-      bool communicate(Node& ownerNode, EntryInfo* entryInfo, DirSettings* settings);
+      bool communicate(Node& ownerNode, EntryInfo* parentInfo, DirSettings* settings);
 
 };
 

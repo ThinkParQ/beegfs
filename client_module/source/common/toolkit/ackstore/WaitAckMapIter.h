@@ -7,7 +7,6 @@ struct WaitAckMapIter;
 typedef struct WaitAckMapIter WaitAckMapIter;
 
 static inline void WaitAckMapIter_init(WaitAckMapIter* this, WaitAckMap* map, RBTreeElem* treeElem);
-static inline bool WaitAckMapIter_hasNext(WaitAckMapIter* this);
 static inline WaitAck* WaitAckMapIter_next(WaitAckMapIter* this);
 static inline char* WaitAckMapIter_key(WaitAckMapIter* this);
 static inline WaitAck* WaitAckMapIter_value(WaitAckMapIter* this);
@@ -21,11 +20,6 @@ struct WaitAckMapIter
 void WaitAckMapIter_init(WaitAckMapIter* this, WaitAckMap* map, RBTreeElem* treeElem)
 {
    PointerRBTreeIter_init( (RBTreeIter*)this, (RBTree*)map, (RBTreeElem*)treeElem);
-}
-
-bool WaitAckMapIter_hasNext(WaitAckMapIter* this)
-{
-   return PointerRBTreeIter_hasNext( (RBTreeIter*)this);
 }
 
 WaitAck* WaitAckMapIter_next(WaitAckMapIter* this)

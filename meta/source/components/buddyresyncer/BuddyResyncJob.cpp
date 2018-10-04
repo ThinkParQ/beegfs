@@ -32,10 +32,10 @@ BuddyResyncJob::BuddyResyncJob() :
 
    for (size_t i = 0; i < numSyncSlaves; i++)
       bulkSyncSlaves.emplace_back(
-            boost::make_unique<BuddyResyncerBulkSyncSlave>(&syncCandidates, i, buddyNodeID, *this));
+            boost::make_unique<BuddyResyncerBulkSyncSlave>(*this, &syncCandidates, i, buddyNodeID));
 
    sessionStoreResyncer = boost::make_unique<SessionStoreResyncer>(buddyNodeID);
-   modSyncSlave = boost::make_unique<BuddyResyncerModSyncSlave>(&syncCandidates, 1, buddyNodeID);
+   modSyncSlave = boost::make_unique<BuddyResyncerModSyncSlave>(*this, &syncCandidates, 1, buddyNodeID);
 }
 
 BuddyResyncJob::~BuddyResyncJob() = default;
@@ -57,8 +57,6 @@ void BuddyResyncJob::run()
 
    syncCandidates.clear();
 
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    auto buddyNode = metaNodes->referenceNode(buddyNodeID);
 
    if (!buddyNode)
@@ -82,10 +80,10 @@ void BuddyResyncJob::run()
    {
       // Notify buddy that resync started and wait for confirmation
       StorageResyncStartedMsg msg(buddyNodeID.val());
-      const bool commRes = MessagingTk::requestResponse(*buddyNode, &msg,
-            NETMSGTYPE_StorageResyncStartedResp, &respBuf, &respMsg);
+      const auto respMsg = MessagingTk::requestResponse(*buddyNode, msg,
+            NETMSGTYPE_StorageResyncStartedResp);
 
-      if (!commRes)
+      if (!respMsg)
       {
          LogContext(logContext).logErr("Unable to notify buddy about resync attempt. "
                "Resync will not start.");
@@ -93,9 +91,6 @@ void BuddyResyncJob::run()
          workerBarrier.wait();
          goto cleanup;
       }
-
-      SAFE_DELETE(respMsg);
-      SAFE_DELETE(respBuf);
 
       // resync could have been aborted before we got here. if so, exit as soon as possible without
       // setting the resync job state to something else.
@@ -220,7 +215,7 @@ cleanup:
          setState(BuddyResyncJobState_SUCCESS);
 
       // delete timestamp override file if it exists.
-      BuddyCommTk::setBuddyNeedsResync(metaPath, false, buddyNodeID);
+      BuddyCommTk::setBuddyNeedsResync(metaPath, false);
 
       const TargetConsistencyState buddyState = newBuddyState();
       informBuddy(buddyState);
@@ -446,28 +441,23 @@ void BuddyResyncJob::informBuddy(const TargetConsistencyState newTargetState)
       return;
    }
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-
    UInt16List nodeIDs(1, buddyNodeID.val());
    UInt8List states(1, newTargetState);
    SetTargetConsistencyStatesMsg msg(NODETYPE_Meta, &nodeIDs, &states, false);
 
-   commRes = MessagingTk::requestResponse(*metaNode, &msg,
-         NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-   if (!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*metaNode, msg,
+         NETMSGTYPE_SetTargetConsistencyStatesResp);
+   if (!respMsg)
    {
       LogContext(__func__).logErr(
          "Unable to inform buddy about finished resync. "
          "BuddyNodeID: " + buddyNodeID.str() + "; "
          "error: Communication Error");
-      goto err_cleanup;
+      return;
    }
 
    {
-      SetTargetConsistencyStatesRespMsg* respMsgCast =
-         static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg);
+      auto* respMsgCast = static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg.get());
       FhgfsOpsErr result = respMsgCast->getResult();
 
       if (result != FhgfsOpsErr_SUCCESS)
@@ -475,13 +465,9 @@ void BuddyResyncJob::informBuddy(const TargetConsistencyState newTargetState)
          LogContext(__func__).logErr(
             "Error while informing buddy about finished resync. "
             "BuddyNodeID: " + buddyNodeID.str() + "; "
-            "error: " + FhgfsOpsErrTk::toErrString(result) );
+            "error: " + boost::lexical_cast<std::string>(result) );
       }
    }
-
-err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 }
 
 void BuddyResyncJob::informMgmtd(const TargetConsistencyState newTargetState)
@@ -497,37 +483,24 @@ void BuddyResyncJob::informMgmtd(const TargetConsistencyState newTargetState)
       return;
    }
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
-
    UInt16List nodeIDs(1, buddyNodeID.val());
    UInt8List states(1, newTargetState);
    SetTargetConsistencyStatesMsg msg(NODETYPE_Meta, &nodeIDs, &states, false);
 
-   commRes = MessagingTk::requestResponse(*mgmtNode, &msg,
-         NETMSGTYPE_SetTargetConsistencyStatesResp, &respBuf, &respMsg);
-   if (!commRes)
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg,
+         NETMSGTYPE_SetTargetConsistencyStatesResp);
+   if (!respMsg)
    {
       LOG(MIRRORING, ERR,
             "Unable to inform management node about finished resync: Communication error.");
-      goto err_cleanup;
+      return;
    }
 
    {
-      SetTargetConsistencyStatesRespMsg* respMsgCast =
-         static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg);
+      auto* respMsgCast = static_cast<SetTargetConsistencyStatesRespMsg*>(respMsg.get());
       FhgfsOpsErr result = respMsgCast->getResult();
 
       if (result != FhgfsOpsErr_SUCCESS)
-      {
-         LOG(MIRRORING, ERR,
-               "Error informing management node about finished resync.",
-               as("Error", FhgfsOpsErrTk::toErrString(result)));
-      }
+         LOG(MIRRORING, ERR, "Error informing management node about finished resync.", result);
    }
-
-err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
 }

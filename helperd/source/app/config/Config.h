@@ -14,8 +14,6 @@ class Config : public AbstractConfig
 
       std::string connInterfacesFile;
 
-      bool        debugRunComponentThreads;
-
       unsigned    tuneNumWorkers;
 
       bool        runDaemonized;
@@ -36,11 +34,6 @@ class Config : public AbstractConfig
       const std::string& getConnInterfacesFile() const
       {
          return connInterfacesFile;
-      }
-
-      bool getDebugRunComponentThreads() const
-      {
-         return debugRunComponentThreads;
       }
 
       unsigned getTuneNumWorkers() const

@@ -1,4 +1,3 @@
-#include <common/nodes/NodeFeatureFlags.h>
 #include <os/OsCompat.h>
 #include "Node.h"
 
@@ -22,9 +21,6 @@ void Node_init(Node* this, struct App* app, const char* nodeID, NumNodeID nodeNu
    this->nodeType = NODETYPE_Invalid; // set by NodeStore::addOrUpdate()
    this->nodeIDWithTypeStr = NULL; // will by initialized on demand by getNodeIDWithTypeStr()
 
-   this->fhgfsVersion = 0;
-   BitStore_initWithSizeAndReset(&this->nodeFeatureFlags, NODE_FEATURES_MAX_INDEX);
-
    this->portUDP = portUDP;
 
    this->connPool = NodeConnPool_construct(app, this, portTCP, nicList);
@@ -45,15 +41,11 @@ Node* Node_construct(struct App* app, const char* nodeID, NumNodeID nodeNumID,
 
 void Node_uninit(Node* this)
 {
-   Time_uninit(&this->lastHeartbeatT);
-
    SAFE_DESTRUCT(this->connPool, NodeConnPool_destruct);
 
    SAFE_KFREE(this->nodeIDWithTypeStr);
    SAFE_KFREE(this->id);
 
-   BitStore_uninit(&this->nodeFeatureFlags);
-   Condition_uninit(&this->changeCond);
    Mutex_uninit(&this->mutex);
 }
 
@@ -73,47 +65,6 @@ void Node_updateLastHeartbeatT(Node* this)
    Condition_broadcast(&this->changeCond);
 
    Mutex_unlock(&this->mutex);
-}
-
-void Node_getLastHeartbeatT(Node* this, Time* outT)
-{
-   Mutex_lock(&this->mutex);
-
-   Time_setFromOther(outT, &this->lastHeartbeatT);
-
-   Mutex_unlock(&this->mutex);
-}
-
-bool Node_waitForNewHeartbeatT(Node* this, Time* oldT, int timeoutMS)
-{
-   bool heartbeatChanged;
-   int remainingTimeoutMS = timeoutMS;
-
-   Time startT;
-
-   Time_init(&startT);
-
-
-   Mutex_lock(&this->mutex);
-
-
-   while( (remainingTimeoutMS > 0) && Time_equals(oldT, &this->lastHeartbeatT) )
-   {
-      if(!Condition_timedwait(&this->changeCond, &this->mutex, remainingTimeoutMS) )
-         break; // timeout
-
-      remainingTimeoutMS = timeoutMS - Time_elapsedMS(&startT);
-   }
-
-   heartbeatChanged = Time_notequals(oldT, &this->lastHeartbeatT);
-
-
-   Mutex_unlock(&this->mutex);
-
-   Time_uninit(&startT);
-
-   return heartbeatChanged;
-
 }
 
 /**
@@ -184,16 +135,6 @@ const char* Node_nodeTypeToStr(NodeType nodeType)
       case NODETYPE_Admon:
       {
          return "beegfs-admon";
-      } break;
-
-      case NODETYPE_CacheDaemon:
-      {
-         return "beegfs-cached";
-      } break;
-
-      case NODETYPE_CacheLib:
-      {
-         return "beegfs-cache-lib";
       } break;
 
       default:

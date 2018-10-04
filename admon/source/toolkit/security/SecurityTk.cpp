@@ -1,8 +1,8 @@
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/toolkit/StringTk.h>
 #include "SecurityTk.h"
 
+#include <mutex>
 
 std::map<int,int64_t> SecurityTk::nonces;
 Mutex SecurityTk::nonceMutex;
@@ -33,7 +33,7 @@ std::string SecurityTk::DoSHA(std::string str1)
 
    unsigned char *str;
    str = (unsigned char *) malloc(strlen(str1.c_str()) + 100);
-   strcpy((char *) str, str1.c_str());
+   strcpy((char *) str, str1.c_str()); // NOLINT
 
    int current_length = strlen((const char *) str);
    int original_length = current_length;
@@ -163,7 +163,7 @@ int SecurityTk::createNonce(int64_t *outNonce)
    int64_t intNonce = rand();
    int id = 0;
 
-   SafeMutexLock nonceMutexLock(&nonceMutex);
+   const std::lock_guard<Mutex> lock(nonceMutex);
 
    std::map<int,int64_t>::iterator iter = SecurityTk::nonces.find(id);
    while (iter != SecurityTk::nonces.end())
@@ -174,16 +174,13 @@ int SecurityTk::createNonce(int64_t *outNonce)
    SecurityTk::nonces[id] = intNonce;
    *outNonce = intNonce;
 
-   nonceMutexLock.unlock();
-
    return id;
 }
 
 void SecurityTk::clearNonceLocked(int nonceID)
 {
-   SafeMutexLock nonceMutexLock(&nonceMutex);
+   const std::lock_guard<Mutex> lock(nonceMutex);
    SecurityTk::nonces.erase(nonceID);
-   nonceMutexLock.unlock();
 }
 
 void SecurityTk::clearNonce(int nonceID)
@@ -193,30 +190,27 @@ void SecurityTk::clearNonce(int nonceID)
 
 bool SecurityTk::checkReply(std::string reply, std::string secret, int nonceID)
 {
-   SafeMutexLock nonceMutexLock(&nonceMutex);
+   const std::lock_guard<Mutex> lock(nonceMutex);
 
    std::string expected = SecurityTk::DoMD5(secret + StringTk::int64ToStr(SecurityTk::nonces[nonceID] ) );
    SecurityTk::clearNonce(nonceID);
-
-   nonceMutexLock.unlock();
 
    return (reply.compare(expected) == 0);
 }
 
 std::string SecurityTk::cryptWithNonce(std::string str, int nonceID)
 {
-   SafeMutexLock nonceMutexLock(&nonceMutex);
+   const std::lock_guard<Mutex> lock(nonceMutex);
 
    std::string crypted = SecurityTk::DoMD5(str + StringTk::int64ToStr(SecurityTk::nonces[nonceID] ) );
    SecurityTk::clearNonce(nonceID);
 
-   nonceMutexLock.unlock();
    return crypted;
 }
 
 void SecurityTk::cryptWithNonce(StringList *inList, StringList *outList, int nonceID)
 {
-   SafeMutexLock nonceMutexLock(&nonceMutex);
+   const std::lock_guard<Mutex> lock(nonceMutex);
 
    for (StringListIter iter = inList->begin(); iter != inList->end(); iter++)
    {
@@ -225,6 +219,4 @@ void SecurityTk::cryptWithNonce(StringList *inList, StringList *outList, int non
       outList->push_back(crypted);
    }
    SecurityTk::clearNonce(nonceID);
-
-   nonceMutexLock.unlock();
 }

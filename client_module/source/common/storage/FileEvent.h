@@ -47,7 +47,7 @@ static inline void FileEvent_setTargetStr(struct FileEvent* event, const char* t
 
 void FileEvent_setTargetDentry(struct FileEvent* event, struct dentry* dentry);
 
-void FileEvent_serialize(const struct FileEvent* event, SerializeCtx* ctx);
+void FileEvent_serialize(SerializeCtx* ctx, const struct FileEvent* event);
 
 /* the empty file event object is a valid event that may be destroyed, but that holds no
  * state itself. thus, it may also be reinitialized without being destroyed first. */

@@ -46,10 +46,10 @@ Work* MultiWorkQueue::waitForDirectWork(HighResolutionStats& newStats,
       const auto workAgeMS = work->getAgeTime()->elapsedMS();
       if (workAgeMS > 10)
          LOG(WORKQUEUES, DEBUG, "Fetching personal work item.", work,
-               as("age (ms)", workAgeMS));
+               ("age (ms)", workAgeMS));
       else
          LOG(WORKQUEUES, DEBUG, "Fetching personal work item.", work,
-               as("age (us)", work->getAgeTime()->elapsedMicro()));
+               ("age (us)", work->getAgeTime()->elapsedMicro()));
 #endif
       return work;
    }
@@ -61,10 +61,10 @@ Work* MultiWorkQueue::waitForDirectWork(HighResolutionStats& newStats,
       const auto workAgeMS = work->getAgeTime()->elapsedMS();
       if (workAgeMS > 10)
          LOG(WORKQUEUES, DEBUG, "Fetching direct work item.",
-               work, as("age (ms)", workAgeMS));
+               work, ("age (ms)", workAgeMS));
       else
          LOG(WORKQUEUES, DEBUG, "Fetching direct work item.",
-               work, as("age (us)", work->getAgeTime()->elapsedMicro()));
+               work, ("age (us)", work->getAgeTime()->elapsedMicro()));
 #endif
       return work;
    }
@@ -112,10 +112,10 @@ Work* MultiWorkQueue::waitForAnyWork(HighResolutionStats& newStats,
       const auto workAgeMS = work->getAgeTime()->elapsedMS();
       if (workAgeMS > 10)
          LOG(WORKQUEUES, DEBUG, "Fetching personal work item.",
-               work, as("age (ms)", workAgeMS));
+               work, ("age (ms)", workAgeMS));
       else
          LOG(WORKQUEUES, DEBUG, "Fetching personal work item.",
-               work, as("age (us)", work->getAgeTime()->elapsedMicro()));
+               work, ("age (us)", work->getAgeTime()->elapsedMicro()));
 #endif
       return work;
    }
@@ -142,10 +142,10 @@ Work* MultiWorkQueue::waitForAnyWork(HighResolutionStats& newStats,
             const auto workAgeMS = work->getAgeTime()->elapsedMS();
             if (workAgeMS > 10)
                LOG(WORKQUEUES, DEBUG, "Fetching direct work item.",
-                  work, as("age (ms)", workAgeMS));
+                  work, ("age (ms)", workAgeMS));
             else
                LOG(WORKQUEUES, DEBUG, "Fetching direct work item.",
-                  work, as("age (us)", work->getAgeTime()->elapsedMicro()));
+                  work, ("age (us)", work->getAgeTime()->elapsedMicro()));
 #endif
 
             return work;

@@ -1,7 +1,6 @@
 #ifndef FILEDESCRIPTOR_H_
 #define FILEDESCRIPTOR_H_
 
-#include <common/threading/SafeMutexLock.h>
 #include <common/Common.h>
 #include "poll/Pollable.h"
 

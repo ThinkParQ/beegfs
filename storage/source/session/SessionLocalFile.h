@@ -7,9 +7,9 @@
 #include <common/storage/PathInfo.h>
 #include <common/storage/quota/QuotaData.h>
 #include <common/threading/Mutex.h>
-#include <common/threading/SafeMutexLock.h>
-#include <nodes/NodeStoreServersEx.h>
+#include <common/toolkit/FDHandle.h>
 
+#include <atomic>
 
 /**
  * Represents the client session information for an open chunk file.
@@ -17,23 +17,49 @@
 class SessionLocalFile
 {
    public:
+      class Handle
+      {
+         friend class SessionLocalFile;
+
+         public:
+            Handle() = default;
+
+            Handle(const std::string& id, FDHandle fd):
+               id(id), fd(std::move(fd)), claimed(0)
+            {
+            }
+
+            bool close();
+
+            const FDHandle& getFD() const { return fd; }
+            const std::string& getID() const { return id; }
+
+         private:
+            std::string id;
+            FDHandle fd;
+            // for use by SessionLocalFile::releaseLastReference. only one caller may receive the
+            // handle if multiple threads try to release the last reference concurrently. we could
+            // also do this under a lock in SessionLocalFileStore but don't since we don't expect
+            // contention on the release path.
+            std::atomic<bool> claimed;
+      };
+
+   public:
       /**
        * @param fileHandleID format: <ownerID>#<fileID>
        * @param openFlags system flags for open()
        * @param serverCrashed true if session was created after a server crash, mark session as
        * dirty
        */
-      SessionLocalFile(std::string fileHandleID, uint16_t targetID, std::string fileID,
-         int openFlags, bool serverCrashed) : fileHandleID(fileHandleID), targetID(targetID),
+      SessionLocalFile(const std::string& fileHandleID, uint16_t targetID, std::string fileID,
+            int openFlags, bool serverCrashed) :
+         handle(std::make_shared<Handle>(fileHandleID, FDHandle())), targetID(targetID),
          fileID(fileID)
       {
-         this->fileDescriptor = -1; // initialize as invalid file descriptor
          this->openFlags = openFlags;
          this->offset = -1; // initialize as invalid offset (will be set on file open)
 
          this->isMirrorSession = false;
-
-         this->removeOnRelease = false;
 
          this->writeCounter = 0;
          this->readCounter = 0;
@@ -45,9 +71,9 @@ class SessionLocalFile
       /**
        * For dezerialisation only
        */
-      SessionLocalFile()
+      SessionLocalFile():
+         handle(std::make_shared<Handle>())
       {
-         this->fileDescriptor = -1; // initialize as invalid file descriptor
          this->offset = -1; // initialize as invalid offset (will be set on file open)
       }
 
@@ -55,8 +81,7 @@ class SessionLocalFile
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % obj->removeOnRelease
-            % obj->fileHandleID
+            % obj->handle->id
             % obj->targetID
             % obj->fileID
             % obj->openFlags
@@ -89,14 +114,21 @@ class SessionLocalFile
       static void serializeNodeID(SessionLocalFile* obj, Deserializer& des);
 
    private:
-      bool removeOnRelease; // remove on last ref drop (for internal use by the sessionstore only!)
+      // holds information about the underlying filesystem state this session file refers to for
+      // clients. this handle may be referenced by outsiders to separate removal of session files
+      // from their respective stores and closing of underlying fs objects. the protocol for such
+      // a close operation should be as follows:
+      //  1. remove the session file from its store, retain a shared_ptr
+      //  2. copy this handle to a temporary
+      //  3. move the session file reference to a weak_ptr. if the weak_ptr is expired after the
+      //     move, the handle may be closed
+      //  4. claim the handle, and close() the handle if claiming succeeded
+      std::shared_ptr<Handle> handle;
 
-      std::string fileHandleID;
       uint16_t targetID;
       std::string fileID;
       int32_t openFlags; // system flags for open()
 
-      int fileDescriptor; // file descriptor -1 for invalid (=not opened yet)
       int64_t offset; // negative value for unspecified/invalid offset
 
       NodeHandle mirrorNode; // the node to which all writes should be mirrored
@@ -110,22 +142,35 @@ class SessionLocalFile
 
       bool serverCrashed; // true if session was created after a server crash, mark session as dirty
 
-   public:
-
-      // getters & setters
-      bool getRemoveOnRelease()
+      static std::shared_ptr<Handle> releaseLastReference(std::shared_ptr<SessionLocalFile> file)
       {
-         return removeOnRelease;
+         auto handle = file->handle;
+         std::weak_ptr<SessionLocalFile> weak(file);
+
+         // see Handle::claimed for explanation
+         file.reset();
+         if (weak.expired() && !handle->claimed.exchange(true))
+            return handle;
+         else
+            return nullptr;
       }
 
-      void setRemoveOnRelease(bool removeOnRelease)
+   public:
+      bool close()
       {
-         this->removeOnRelease = removeOnRelease;
+         std::lock_guard<Mutex> lock(sessionMutex);
+
+         return handle->close();
+      }
+
+      friend std::shared_ptr<Handle> releaseLastReference(std::shared_ptr<SessionLocalFile>&& file)
+      {
+         return SessionLocalFile::releaseLastReference(std::move(file));
       }
 
       std::string getFileHandleID() const
       {
-         return fileHandleID;
+         return handle->id;
       }
 
       uint16_t getTargetID() const
@@ -138,23 +183,14 @@ class SessionLocalFile
          return fileID;
       }
 
-      int getFD()
+      const FDHandle& getFD()
       {
-         if (this->fileDescriptor != -1) // optimization: try without a lock first
-            return this->fileDescriptor;
+         if (handle->fd.valid()) // optimization: try without a lock first
+            return handle->fd;
 
-         SafeMutexLock safeMutex(&this->sessionMutex); // L O C K
+         std::lock_guard<Mutex> const lock(sessionMutex);
 
-         int fd = this->fileDescriptor;
-
-         safeMutex.unlock(); // U N L O C K
-
-         return fd;
-      }
-      
-      void setFDUnlocked(int fd)
-      {
-         this->fileDescriptor = fd;
+         return handle->fd;
       }
 
       int getOpenFlags() const
@@ -169,26 +205,15 @@ class SessionLocalFile
 
       int64_t getOffset()
       {
-         SafeMutexLock safeMutex(&this->sessionMutex); // L O C K
-
-         int64_t offset = this->offset;
-
-         safeMutex.unlock(); // U N L O C K
+         std::lock_guard<Mutex> const lock(sessionMutex);
 
          return offset;
       }
 
       void setOffset(int64_t offset)
       {
-         SafeMutexLock safeMutex(&this->sessionMutex); // L O C K
+         std::lock_guard<Mutex> const lock(sessionMutex);
 
-         setOffsetUnlocked(offset);
-
-         safeMutex.unlock(); // U N L O C K
-      }
-
-      void setOffsetUnlocked(int64_t offset)
-      {
          this->offset = offset;
       }
 

@@ -22,7 +22,6 @@ struct MountConfig
 {
    char* cfgFile;
    char* logStdFile;
-   char* logErrFile;
    char* sysMgmtdHost;
    char* tunePreferredMetaFile;
    char* tunePreferredStorageFile;
@@ -59,7 +58,6 @@ void MountConfig_uninit(MountConfig* this)
 {
    SAFE_KFREE(this->cfgFile);
    SAFE_KFREE(this->logStdFile);
-   SAFE_KFREE(this->logErrFile);
    SAFE_KFREE(this->sysMgmtdHost);
    SAFE_KFREE(this->tunePreferredMetaFile);
    SAFE_KFREE(this->tunePreferredStorageFile);

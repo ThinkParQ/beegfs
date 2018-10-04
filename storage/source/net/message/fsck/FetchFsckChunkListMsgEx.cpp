@@ -4,11 +4,6 @@
 
 bool FetchFsckChunkListMsgEx::processIncoming(ResponseContext& ctx)
 {
-#ifdef BEEGFS_DEBUG
-   const char* logContext = "FetchFsckChunkListMsg incoming";
-   LOG_DEBUG(logContext, 4, "Received a FetchFsckChunkListMsg from: " + ctx.peerName() );
-#endif // BEEGFS_DEBUG
-
    App* app = Program::getApp();
    ChunkFetcher* chunkFetcher = app->getChunkFetcher();
 
@@ -24,7 +19,7 @@ bool FetchFsckChunkListMsgEx::processIncoming(ResponseContext& ctx)
          if (!getForceRestart())
          {
             LOG(GENERAL, NOTICE, "Received request to start fsck although previous run is not finished. "
-                  "Not starting.", as("From", ctx.peerName()));
+                  "Not starting.", ("From", ctx.peerName()));
 
             ctx.sendResponse(FetchFsckChunkListRespMsg(&chunkList,
                      FetchFsckChunkListStatus_NOTSTARTED));
@@ -33,7 +28,7 @@ bool FetchFsckChunkListMsgEx::processIncoming(ResponseContext& ctx)
          else
          {
             LOG(GENERAL, NOTICE, "Aborting previous fsck chunk fetcher run by user request.",
-                  as("From", ctx.peerName()));
+                  ("From", ctx.peerName()));
 
             chunkFetcher->stopFetching();
             chunkFetcher->waitForStopFetching();

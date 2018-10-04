@@ -40,7 +40,7 @@ int ModeCreateDir::execute()
    EntryInfo entryInfo;
 
    if(!ModeHelper::getEntryAndOwnerFromPath(*(settings.path), settings.useMountedPath, true,
-         *metaNodes, *metaBuddyGroupMapper, entryInfo, ownerNode))
+         *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper, entryInfo, ownerNode))
    {
       retVal = APPCODE_RUNTIME_ERROR;
       goto cleanup_settings;
@@ -230,9 +230,6 @@ bool ModeCreateDir::communicate(Node& ownerNode, EntryInfo* parentInfo, DirSetti
 {
    bool retVal = false;
 
-   bool commRes;
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    MkDirRespMsg* respMsgCast;
 
    FhgfsOpsErr mkDirRes;
@@ -247,31 +244,25 @@ bool ModeCreateDir::communicate(Node& ownerNode, EntryInfo* parentInfo, DirSetti
    if(settings->noMirroring)
       msg.addMsgHeaderFeatureFlag(MKDIRMSG_FLAG_NOMIRROR);
 
-   // request/response
-   commRes = MessagingTk::requestResponse(
-      ownerNode, &msg, NETMSGTYPE_MkDirResp, &respBuf, &respMsg);
-   if(!commRes)
+   const auto respMsg = MessagingTk::requestResponse(ownerNode, msg, NETMSGTYPE_MkDirResp);
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << ownerNode.getNodeIDWithTypeStr() <<
          std::endl;
       goto err_cleanup;
    }
 
-   respMsgCast = (MkDirRespMsg*)respMsg;
+   respMsgCast = (MkDirRespMsg*)respMsg.get();
 
    mkDirRes = (FhgfsOpsErr)respMsgCast->getResult();
    if(mkDirRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Node encountered an error: " << FhgfsOpsErrTk::toErrString(mkDirRes) <<
-         std::endl;
+      std::cerr << "Node encountered an error: " << mkDirRes << std::endl;
       goto err_cleanup;
    }
 
    retVal = true;
 
 err_cleanup:
-   SAFE_DELETE(respMsg);
-   SAFE_FREE(respBuf);
-
    return retVal;
 }

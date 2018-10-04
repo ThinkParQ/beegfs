@@ -32,24 +32,6 @@ ConnAcceptor::ConnAcceptor(AbstractApp* app, NicAddressList& localNicList,
       throw ComponentInitException("Unable to initialize socket");
 }
 
-ConnAcceptor::ConnAcceptor(AbstractApp* app, std::string namedSocketPath)
- : PThread("ConnAccept"),
-   app(app),
-   log("ConnAccept")
-{
-   int epollCreateSize = 10; // size "10" is just a hint (and is actually ignored since Linux 2.6.8)
-
-   this->epollFD = epoll_create(epollCreateSize);
-   if(epollFD == -1)
-   {
-      throw ComponentInitException(std::string("Error during epoll_create(): ") +
-         System::getErrString() );
-   }
-
-   if(!initNamedSocket(namedSocketPath) )
-      throw ComponentInitException("Unable to initialize socket");
-}
-
 ConnAcceptor::~ConnAcceptor()
 {
    if(epollFD != -1)
@@ -58,17 +40,15 @@ ConnAcceptor::~ConnAcceptor()
    SAFE_DELETE(tcpListenSock);
    SAFE_DELETE(sdpListenSock);
    SAFE_DELETE(rdmaListenSock);
-   SAFE_DELETE(namedListenSock);
 }
 
 bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* localNicCaps)
 {
-   ICommonConfig* cfg = PThread::getCurrentThreadApp()->getCommonConfig();
+   auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
 
    rdmaListenSock = NULL;
    sdpListenSock = NULL;
    tcpListenSock = NULL;
-   namedListenSock = NULL;
 
 
    // RDMA
@@ -77,7 +57,7 @@ bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* loc
    { // RDMA usage is enabled
       try
       {
-         rdmaListenSock = new RDMASocket();
+         rdmaListenSock = RDMASocket::create().release();
          rdmaListenSock->bind(listenPort);
          rdmaListenSock->listen();
 
@@ -167,57 +147,6 @@ bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* loc
    return true;
 }
 
-/**
- * initialize a named socket
- */
-bool ConnAcceptor::initNamedSocket(std::string namedSocketPath)
-{
-   ICommonConfig* cfg = PThread::getCurrentThreadApp()->getCommonConfig();
-
-   rdmaListenSock = NULL;
-   sdpListenSock = NULL;
-   tcpListenSock = NULL;
-   namedListenSock = NULL;
-
-   try
-   {
-      // unlink named socket file of an crashed cached
-      struct stat sourceStat;
-      int statRes = stat(namedSocketPath.c_str(), &sourceStat);
-      if(!statRes)
-         unlink(namedSocketPath.c_str() );
-
-
-      namedListenSock = new NamedSocket(namedSocketPath);
-      namedListenSock->setSoReuseAddr(true);
-      namedListenSock->setSoRcvBuf(cfg->getConnRDMABufNum() * cfg->getConnRDMABufSize() ); /* note:
-         we're re-using rdma buffer settings here. should later be changed.
-         note 2: these buf settings will automatically be applied to accepted socks. */
-      namedListenSock->bindToPath();
-      namedListenSock->listen();
-
-      struct epoll_event epollEvent;
-      epollEvent.events = EPOLLIN;
-      epollEvent.data.ptr = namedListenSock;
-      if(epoll_ctl(epollFD, EPOLL_CTL_ADD, namedListenSock->getFD(), &epollEvent) == -1)
-      {
-         log.logErr(std::string("Unable to add named listen sock to epoll set: ") +
-            System::getErrString() );
-         return false;
-      }
-
-      log.log(Log_NOTICE, std::string("Listening for named socket connections: ") +
-         namedSocketPath);
-   }
-   catch(SocketException& e)
-   {
-      log.logErr(std::string("named socket: ") + e.what() );
-      return false;
-   }
-
-   return true;
-}
-
 
 void ConnAcceptor::run()
 {
@@ -246,7 +175,6 @@ void ConnAcceptor::listenLoop()
    RDMASocket* rdmaListenSock = this->rdmaListenSock;
    StandardSocket* sdpListenSock = this->sdpListenSock;
    StandardSocket* tcpListenSock = this->tcpListenSock;
-   NamedSocket* namedListenSocket = this->namedListenSock;
 
    // wait for incoming events and handle them...
 
@@ -284,9 +212,6 @@ void ConnAcceptor::listenLoop()
          if(currentPollable == sdpListenSock)
             onIncomingStandardConnection(sdpListenSock);
          else
-         if(currentPollable == namedListenSocket)
-            onIncomingNamedConnection(namedListenSocket);
-         else
          { // unknown connection => should never happen
             log.log(Log_WARNING, "Should never happen: Ignoring event for unknown connection. "
                "FD: " + StringTk::uintToStr(currentPollable->getFD() ) );
@@ -318,42 +243,6 @@ void ConnAcceptor::onIncomingStandardConnection(StandardSocket* sock)
          std::string("]") );
 
       applySocketOptions(acceptedSock);
-
-      // hand the socket over to a stream listener
-
-      StreamListenerV2* listener = app->getStreamListenerByFD(acceptedSock->getFD() );
-      StreamListenerV2::SockReturnPipeInfo returnInfo(
-         StreamListenerV2::SockPipeReturn_NEWCONN, acceptedSock);
-
-      listener->getSockReturnFD()->write(&returnInfo, sizeof(returnInfo) );
-
-   }
-   catch(SocketException& se)
-   {
-      log.logErr(std::string("Trying to continue after connection accept error: ") +
-         se.what() );
-   }
-}
-
-/**
- * Accept the incoming connection and add new socket to StreamListenerV2 queue.
- *
- * Note: This is for named sockets.
- */
-void ConnAcceptor::onIncomingNamedConnection(NamedSocket* sock)
-{
-   try
-   {
-      struct sockaddr_un peerAddr;
-      socklen_t peerAddrLen = sizeof(peerAddr);
-
-      NamedSocket* acceptedSock =
-         (NamedSocket*)sock->accept( (struct sockaddr*)&peerAddr, &peerAddrLen);
-
-      // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
-      log.log(Log_DEBUG, std::string("Accepted new named connection. ") +
-         std::string(" [SockFD: ") + StringTk::intToStr(acceptedSock->getFD() ) +
-         std::string("]") );
 
       // hand the socket over to a stream listener
 

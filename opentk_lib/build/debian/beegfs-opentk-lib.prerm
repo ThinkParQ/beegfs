@@ -1,9 +1,0 @@
-#!/bin/sh
-
-set -e
-
-# cleanup the IB RDMA symlink
-beegfs-setup-rdma -R
-
-
-#DEBHELPER#

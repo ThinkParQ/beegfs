@@ -16,7 +16,6 @@ typedef struct RDMASocket RDMASocket;
 extern __must_check bool RDMASocket_init(RDMASocket* this);
 extern RDMASocket* RDMASocket_construct(void);
 extern void _RDMASocket_uninit(Socket* this);
-extern void _RDMASocket_destruct(Socket* this);
 
 extern bool RDMASocket_rdmaDevicesExist(void);
 
@@ -33,11 +32,9 @@ extern ssize_t _RDMASocket_recvT(Socket* this, struct iov_iter* iter, int flags,
 extern ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags,
    fhgfs_sockaddr_in *to);
 
-extern bool  RDMASocket_checkConnection(RDMASocket* this);
 extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finishPoll);
 
 // inliners
-static inline char* RDMASocket_getPeername(RDMASocket* this);
 static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
 
@@ -49,13 +46,6 @@ struct RDMASocket
 
    IBVCommConfig commCfg;
 };
-
-char* RDMASocket_getPeername(RDMASocket* this)
-{
-   Socket* thisBase = (Socket*)this;
-
-   return thisBase->peername;
-}
 
 /**
  * Note: Only has an effect for unconnected sockets.

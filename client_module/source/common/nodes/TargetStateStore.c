@@ -1,11 +1,14 @@
 #include "TargetStateStore.h"
 
+BEEGFS_RBTREE_FUNCTIONS(static, _TargetStateStore, struct TargetStateStore, states,
+      uint16_t,
+      struct TargetStateInfo, targetID, _node,
+      BEEGFS_RB_KEYCMP_LT_INTEGRAL)
 
 void TargetStateStore_init(TargetStateStore* this)
 {
    RWLock_init(&this->rwlock);
-
-   TargetStateInfoMap_init(&this->states);
+   this->states = RB_ROOT;
 }
 
 TargetStateStore* TargetStateStore_construct(void)
@@ -20,21 +23,7 @@ TargetStateStore* TargetStateStore_construct(void)
 
 void TargetStateStore_uninit(TargetStateStore* this)
 {
-   // map elements have to be destructed
-   TargetStateInfoMapIter statesMapIter;
-
-   statesMapIter = TargetStateInfoMap_begin(&this->states);
-   for(/* iter init'ed above */;
-       !TargetStateInfoMapIter_end(&statesMapIter);
-       TargetStateInfoMapIter_next(&statesMapIter) )
-   {
-      TargetStateInfo* stateInfo = TargetStateInfoMapIter_value(&statesMapIter);
-      TargetStateInfo_destruct(stateInfo);
-   }
-
-   TargetStateInfoMap_uninit(&this->states);
-
-   RWLock_uninit(&this->rwlock);
+   BEEGFS_KFREE_RBTREE(&this->states, struct TargetStateInfo, _node);
 }
 
 void TargetStateStore_destruct(TargetStateStore* this)
@@ -52,84 +41,39 @@ void TargetStateStore_destruct(TargetStateStore* this)
  * getStatesAndGroupsAsLists() through GetStatesAndBuddyGroupsMsg.
  */
 void TargetStateStore_syncStatesAndGroupsFromLists(TargetStateStore* this, Config* config,
-   MirrorBuddyGroupMapper* buddyGroups, UInt16List* targetIDs, UInt8List* reachabilityStates,
-   UInt8List* consistencyStates, UInt16List* buddyGroupIDs, UInt16List* primaryTargets,
-   UInt16List* secondaryTargets)
+   MirrorBuddyGroupMapper* buddyGroups, struct list_head* states, struct list_head* groups)
 {
    RWLock_writeLock(&this->rwlock); // L O C K targetStates
    RWLock_writeLock(&buddyGroups->rwlock); // L O C K buddyGroups
 
-   __TargetStateStore_syncStatesFromListsUnlocked(this, targetIDs,
-      reachabilityStates, consistencyStates);
+   __TargetStateStore_syncStatesUnlocked(this, states);
 
-   __MirrorBuddyGroupMapper_syncGroupsFromListsUnlocked(buddyGroups, config, buddyGroupIDs,
-      primaryTargets, secondaryTargets);
+   __MirrorBuddyGroupMapper_syncGroupsUnlocked(buddyGroups, config, groups);
 
    RWLock_writeUnlock(&buddyGroups->rwlock); // U N L O C K buddyGroups
    RWLock_writeUnlock(&this->rwlock); // U N L O C K targetStates
 }
 
-
-void TargetStateStore_syncStatesFromLists(TargetStateStore* this, UInt16List* targetIDs,
-   UInt8List* reachabilityStates, UInt8List* consistencyStates)
-{
-   RWLock_writeLock(&this->rwlock); // L O C K
-
-   __TargetStateStore_syncStatesFromListsUnlocked(this, targetIDs,
-      reachabilityStates, consistencyStates);
-
-   RWLock_writeUnlock(&this->rwlock); // U N L O C K
-}
-
 /**
  * Note: Caller must hold writelock.
  */
-void __TargetStateStore_syncStatesFromListsUnlocked(TargetStateStore* this, UInt16List* targetIDs,
-   UInt8List* reachabilityStates, UInt8List* consistencyStates)
+void __TargetStateStore_syncStatesUnlocked(TargetStateStore* this, struct list_head* states)
 {
-   TargetStateInfoMapIter statesMapIter;
-   UInt16ListIter targetIDsIter;
-   UInt8ListIter reachabilityStatesIter;
-   UInt8ListIter consistencyStatesIter;
+   struct TargetStateMapping* state;
 
-   UInt16ListIter_init(&targetIDsIter, targetIDs);
-   UInt8ListIter_init(&reachabilityStatesIter, reachabilityStates);
-   UInt8ListIter_init(&consistencyStatesIter, consistencyStates);
+   // clear existing map
+   BEEGFS_KFREE_RBTREE(&this->states, struct TargetStateInfo, _node);
 
-   // clear map (elements have to be destructed)
-   statesMapIter = TargetStateInfoMap_begin(&this->states);
-   for(/* iter init'ed above */;
-       !TargetStateInfoMapIter_end(&statesMapIter);
-       TargetStateInfoMapIter_next(&statesMapIter) )
+   list_for_each_entry(state, states, _list)
    {
-      TargetStateInfo* stateInfo = TargetStateInfoMapIter_value(&statesMapIter);
-      TargetStateInfo_destruct(stateInfo);
-   }
+      CombinedTargetState currentState = { state->reachabilityState, state->consistencyState };
 
-   TargetStateInfoMap_clear(&this->states);
+      TargetStateInfo* stateInfo = kmalloc(sizeof(TargetStateInfo), GFP_NOFS | __GFP_NOFAIL);
 
-   for(/* iters init'ed above */;
-       !UInt16ListIter_end(&targetIDsIter);
-       UInt16ListIter_next(&targetIDsIter), UInt8ListIter_next(&reachabilityStatesIter),
-         UInt8ListIter_next(&consistencyStatesIter) )
-   {
-      uint16_t currentTargetID = UInt16ListIter_value(&targetIDsIter);
-      CombinedTargetState currentState = {
-         (TargetReachabilityState) UInt8ListIter_value(&reachabilityStatesIter),
-         (TargetConsistencyState) UInt8ListIter_value(&consistencyStatesIter)
-      };
+      stateInfo->targetID = state->targetID;
+      stateInfo->state = currentState;
 
-      TargetStateInfo* stateInfo = TargetStateInfo_constructFromState(currentState);
-
-      if (unlikely(!stateInfo) )
-      {
-         printk_fhgfs(KERN_INFO, "%s:%d: Failed to allocate memory for TargetStateInfo; some "
-            "entries could not be processed", __func__, __LINE__);
-         // doesn't make sense to go further here
-         break;
-      }
-
-      TargetStateInfoMap_insert(&this->states, currentTargetID, stateInfo);
+      kfree(_TargetStateStore_insertOrReplace(this, stateInfo));
    }
 }
 
@@ -178,19 +122,12 @@ const char* TargetStateStore_consistencyStateToStr(TargetConsistencyState state)
 void TargetStateStore_getStatesAsLists(TargetStateStore* this, UInt16List* outTargetIDs,
    UInt8List* outReachabilityStates, UInt8List* outConsistencyStates)
 {
-   TargetStateInfo* stateInfo = NULL;
-   TargetStateInfoMapIter iter;
-
+   struct TargetStateInfo* stateInfo;
    RWLock_readLock(&this->rwlock); // L O C K
 
-   for(iter = TargetStateInfoMap_begin(&this->states);
-       !TargetStateInfoMapIter_end(&iter);
-       TargetStateInfoMapIter_next(&iter) )
+   BEEGFS_RBTREE_FOR_EACH_ENTRY(stateInfo, &this->states, _node)
    {
-      uint16_t targetID = TargetStateInfoMapIter_key(&iter);
-      UInt16List_append(outTargetIDs, targetID);
-
-      stateInfo = TargetStateInfoMapIter_value(&iter);
+      UInt16List_append(outTargetIDs, stateInfo->targetID);
       UInt8List_append(outReachabilityStates, stateInfo->state.reachabilityState);
       UInt8List_append(outConsistencyStates, stateInfo->state.consistencyState);
    }
@@ -200,17 +137,14 @@ void TargetStateStore_getStatesAsLists(TargetStateStore* this, UInt16List* outTa
 
 bool TargetStateStore_setAllStates(TargetStateStore* this, TargetReachabilityState state)
 {
-   TargetStateInfoMapIter statesMapIter;
    bool res = false;
+   struct TargetStateInfo* stateInfo;
 
    RWLock_writeLock(&this->rwlock); // L O C K
 
-   for(statesMapIter = TargetStateInfoMap_begin(&this->states);
-      !TargetStateInfoMapIter_end(&statesMapIter);
-      TargetStateInfoMapIter_next(&statesMapIter) )
+   BEEGFS_RBTREE_FOR_EACH_ENTRY(stateInfo, &this->states, _node)
    {
-      TargetStateInfo* stateInfo = TargetStateInfoMapIter_value(&statesMapIter);
-      if(stateInfo->state.reachabilityState != state)
+      if (stateInfo->state.reachabilityState != state)
       {
          res = true;
          stateInfo->state.reachabilityState = state;
@@ -218,6 +152,33 @@ bool TargetStateStore_setAllStates(TargetStateStore* this, TargetReachabilitySta
    }
 
    RWLock_writeUnlock(&this->rwlock); // U N L O C K
+
+   return res;
+}
+
+bool TargetStateStore_getState(TargetStateStore* this, uint16_t targetID,
+   CombinedTargetState* state)
+{
+   TargetStateInfo* stateInfo;
+   bool res;
+
+   RWLock_readLock(&this->rwlock); // L O C K
+
+   stateInfo = _TargetStateStore_find(this, targetID);
+
+   if(likely(stateInfo) )
+   {
+      *state = stateInfo->state;
+      res = true;
+   }
+   else
+   {
+      state->reachabilityState = TargetReachabilityState_OFFLINE;
+      state->consistencyState = TargetConsistencyState_GOOD;
+      res = false;
+   }
+
+   RWLock_readUnlock(&this->rwlock); // U N L O C K
 
    return res;
 }

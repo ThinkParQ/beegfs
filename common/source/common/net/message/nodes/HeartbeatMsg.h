@@ -4,7 +4,6 @@
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
 #include <common/nodes/Node.h>
-#include <common/toolkit/BitStore.h>
 #include <common/Common.h>
 
 class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
@@ -13,23 +12,19 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
 
       /**
        * @param nicList just a reference, so do not free it as long as you use this object
-       * @param nodeFeatureFlags just a reference, so do not free it as long as you use this object
        */
       HeartbeatMsg(const std::string& nodeID, NumNodeID nodeNumID, NodeType nodeType,
-         NicAddressList* nicList, const BitStore* nodeFeatureFlags)
+         NicAddressList* nicList)
          : BaseType(NETMSGTYPE_Heartbeat)
       {
          this->nodeID = nodeID;
          this->nodeNumID = nodeNumID;
 
          this->nodeType = nodeType;
-         this->fhgfsVersion = 0;
 
          this->rootIsBuddyMirrored = false;
 
          this->instanceVersion = 0; // reserved for future use
-
-         this->nodeFeatureFlags = nodeFeatureFlags;
 
          this->nicListVersion = 0; // reserved for future use
          this->nicList = nicList;
@@ -49,11 +44,9 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
       static void serialize(This obj, Ctx& ctx)
       {
          ctx
-            % serdes::backedPtr(obj->nodeFeatureFlags, obj->parsed.nodeFeatureFlags)
             % obj->instanceVersion
             % obj->nicListVersion
             % obj->nodeType
-            % obj->fhgfsVersion
             % obj->nodeID;
 
          obj->serializeAckID(ctx, 4);
@@ -70,7 +63,6 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
    private:
       std::string nodeID;
       int32_t nodeType;
-      uint32_t fhgfsVersion;
       NumNodeID nodeNumID;
       NumNodeID rootNumID; // 0 means unknown/undefined
       bool rootIsBuddyMirrored;
@@ -80,12 +72,10 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
       uint16_t portTCP; // 0 means "undefined"
 
       // for serialization
-      const BitStore* nodeFeatureFlags; // not owned by this object
       NicAddressList* nicList; // not owned by this object
 
       // for deserialization
       struct {
-         BitStore nodeFeatureFlags;
          NicAddressList nicList;
       } parsed;
 
@@ -94,11 +84,6 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
       NicAddressList& getNicList()
       {
          return *nicList;
-      }
-
-      const BitStore& getNodeFeatureFlags() const
-      {
-         return *nodeFeatureFlags;
       }
 
       const std::string& getNodeID() const
@@ -114,16 +99,6 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
       NodeType getNodeType() const
       {
          return (NodeType)nodeType;
-      }
-
-      unsigned getFhgfsVersion() const
-      {
-         return fhgfsVersion;
-      }
-
-      void setFhgfsVersion(const unsigned fhgfsVersion)
-      {
-         this->fhgfsVersion = fhgfsVersion;
       }
 
       NumNodeID getRootNumID() const

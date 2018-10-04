@@ -120,13 +120,12 @@ void LookupIntentInfoOut_initFromRespMsg(LookupIntentInfoOut* this,
       if (respMsg->openResult == FhgfsOpsErr_SUCCESS)
       {
          this->fileHandleIDLen = respMsg->fileHandleIDLen;
-         this->fileHandleID    = StringTk_strnDup(respMsg->fileHandleID,
-            respMsg->fileHandleIDLen);
+         this->fileHandleID = kstrndup(respMsg->fileHandleID, respMsg->fileHandleIDLen, GFP_NOFS);
 
          PathInfo_dup(&respMsg->pathInfo, &this->pathInfo);
 
          this->stripePattern =
-            StripePattern_createFromBuf(respMsg->patternStart, &respMsg->patternHeader);
+            StripePattern_createFromBuf(respMsg->patternStart, respMsg->patternLength);
       }
    }
 }

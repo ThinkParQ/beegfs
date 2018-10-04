@@ -16,7 +16,6 @@ class AbstractNodeStore
       virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) = 0;
 
       virtual NodeHandle referenceFirstNode() const = 0;
-      virtual NodeHandle referenceNextNode(const NodeHandle& oldNode) const = 0;
 
       virtual std::vector<NodeHandle> referenceAllNodes() const = 0;
 
@@ -41,11 +40,6 @@ class AbstractNodeStore
       NodeType getStoreType() const
       {
          return storeType;
-      }
-
-      std::string getStoreTypeStr() const
-      {
-         return Node::nodeTypeToStr(storeType);
       }
 };
 

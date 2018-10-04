@@ -6,10 +6,6 @@
 
 bool RefreshTargetStatesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("RefreshTargetStatesMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, 4, "Received a RefreshTargetStatesMsg from: " + ctx.peerName() );
-
    App* app = Program::getApp();
    InternodeSyncer* syncer = app->getInternodeSyncer();
 

@@ -7,7 +7,6 @@
 bool UpdateDirAttribsMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "UpdateDirAttribsMsg incoming";
-   LOG_DEBUG(logContext, 4, "Received a UpdateDirAttribsMsg from: " + ctx.peerName() );
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    EntryLockStore* entryLockStore = Program::getApp()->getMirroredSessions()->getEntryLockStore();

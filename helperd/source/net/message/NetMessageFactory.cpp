@@ -17,7 +17,7 @@
  * @return NetMessage that must be deleted by the caller
  * (msg->msgType is NETMSGTYPE_Invalid on error)
  */
-NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
+std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short msgType) const
 {
    NetMessage* msg;
 
@@ -45,6 +45,6 @@ NetMessage* NetMessageFactory::createFromMsgType(unsigned short msgType)
       } break;
    }
 
-   return msg;
+   return std::unique_ptr<NetMessage>(msg);
 }
 

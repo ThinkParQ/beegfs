@@ -140,20 +140,13 @@ int ModeAddStoragePool::execute()
    }
 
    // send the actual message
-   char* respBuf = NULL;
-   NetMessage* respMsg = NULL;
    AddStoragePoolRespMsg* respMsgCast;
 
    AddStoragePoolMsg msg(poolId, description, &targets, &buddyGroups);
 
-   // request/response
-   bool commRes = MessagingTk::requestResponse(*mgmtNode,
-      &msg, NETMSGTYPE_AddStoragePoolResp, &respBuf, &respMsg);
+   const auto respMsg = MessagingTk::requestResponse(*mgmtNode, msg, NETMSGTYPE_AddStoragePoolResp);
 
-   std::unique_ptr<NetMessage> respMsg_free(respMsg);
-   std::unique_ptr<char, void (*)(void*)> respBuf_free(respBuf, free);
-
-   if (!commRes)
+   if (!respMsg)
    {
       std::cerr << "Communication with server failed: " << mgmtNode->getNodeIDWithTypeStr()
          << std::endl;
@@ -161,7 +154,7 @@ int ModeAddStoragePool::execute()
       return APPCODE_RUNTIME_ERROR;
    }
 
-   respMsgCast = static_cast<AddStoragePoolRespMsg*>(respMsg);
+   respMsgCast = static_cast<AddStoragePoolRespMsg*>(respMsg.get());
 
    FhgfsOpsErr addRes = respMsgCast->getResult();
 

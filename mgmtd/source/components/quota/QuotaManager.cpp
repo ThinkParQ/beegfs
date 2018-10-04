@@ -1,7 +1,7 @@
 #include <app/App.h>
 #include <common/components/worker/DummyWork.h>
 #include <common/threading/PThread.h>
-#include <common/threading/SafeRWLock.h>
+#include <common/threading/RWLockGuard.h>
 #include <common/toolkit/SynchronizedCounter.h>
 #include <common/storage/quota/QuotaData.h>
 #include <components/worker/SetExceededQuotaWork.h>
@@ -196,28 +196,17 @@ void QuotaManager::requestLoop()
  */
 void QuotaManager::removeTargetFromQuotaDataStores(uint16_t targetNumID)
 {
-   SafeRWLock lockUser(&this->usedQuotaUserRWLock, SafeRWLock_WRITE);            //W R I T E L O C K
-
-   QuotaDataMapForTargetIter iterUser = usedQuotaUser.find(targetNumID);
-   if(iterUser != this->usedQuotaUser.end() )
    {
-      this->usedQuotaUser.erase(iterUser);
-      this->usedQuotaUserStoreDirty = true;
+      RWLockGuard const lock(usedQuotaUserRWLock, SafeRWLock_WRITE);
+
+      usedQuotaUser.erase(targetNumID);
    }
 
-   lockUser.unlock();                                                            // U N L O C K
-
-
-   SafeRWLock lockGroup(&this->usedQuotaGroupRWLock, SafeRWLock_WRITE);          //W R I T E L O C K
-
-   QuotaDataMapForTargetIter iterGroup = usedQuotaGroup.find(targetNumID);
-   if(iterGroup != this->usedQuotaGroup.end() )
    {
-      this->usedQuotaGroup.erase(iterGroup);
-      this->usedQuotaGroupStoreDirty = true;
-   }
+      RWLockGuard const lock(usedQuotaGroupRWLock, SafeRWLock_WRITE);
 
-   lockGroup.unlock();                                                           // U N L O C K
+      usedQuotaGroup.erase(targetNumID);
+   }
 }
 
 /**
@@ -372,15 +361,13 @@ bool QuotaManager::updateUsedQuota(UIntList& uidList, UIntList& gidList)
    }
 
 
-   retValUser = requestorUser->requestQuota(&usedQuotaUser, &this->usedQuotaUserRWLock,
-      &this->usedQuotaUserStoreDirty);
+   retValUser = requestorUser->requestQuota(&usedQuotaUser, &this->usedQuotaUserRWLock);
 
    if (!retValUser)
       log.log(Log_ERR, "Could not update user quota data.");
 
 
-   retValGroup = requestorGroup->requestQuota(&usedQuotaGroup, &this->usedQuotaGroupRWLock,
-      &this->usedQuotaGroupStoreDirty);
+   retValGroup = requestorGroup->requestQuota(&usedQuotaGroup, &this->usedQuotaGroupRWLock);
 
    if (!retValGroup)
       log.log(Log_ERR, "Could not update group quota data.");
@@ -427,70 +414,70 @@ void QuotaManager::calculateExceededQuota(StoragePoolEx& storagePool, UIntList& 
    // calculate exceeded quota for users
    QuotaDataMap userLimits = storagePool.quotaUserLimits->getAllQuotaLimits();
 
-   SafeRWLock lockUser(&this->usedQuotaUserRWLock, SafeRWLock_READ);        // R E A D L O C K
+   {
+      RWLockGuard const lock(usedQuotaUserRWLock, SafeRWLock_READ);
 
-   if(defaultLimitsConfigured)
-   { // default quota is configured, requires to check every UID
-      if( (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM) ||
-         (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_FILE) )
-      { // use the users of the system
-         const auto& list = cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM
-            ? systemUIDs
-            : uidList;
+      if(defaultLimitsConfigured)
+      { // default quota is configured, requires to check every UID
+         if( (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM) ||
+            (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_FILE) )
+         { // use the users of the system
+            const auto& list = cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM
+               ? systemUIDs
+               : uidList;
 
-         for (auto iter = list.begin(); iter != list.end(); iter++)
-         {
-            if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_SIZE, usedQuotaUser,
-                userLimits, defaultLimits.getDefaultUserQuotaSize() ) )
+            for (auto iter = list.begin(); iter != list.end(); iter++)
             {
-               exceededUIDsSize.push_back(*iter);
+               if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_SIZE,
+                        usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaSize()))
+               {
+                  exceededUIDsSize.push_back(*iter);
+               }
+
+               if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_INODE,
+                   usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaInodes()))
+               {
+                  exceededUIDsInodes.push_back(*iter);
+               }
             }
-
-            if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_INODE,
-                usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaInodes()))
+         }
+         else
+         { // use the users from a configured range
+            for(unsigned index = cfg->getQuotaQueryUIDRangeStart();
+               index <= cfg->getQuotaQueryUIDRangeEnd(); index++)
             {
-               exceededUIDsInodes.push_back(*iter);
+               if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_SIZE,
+                        usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaSize()))
+               {
+                  exceededUIDsSize.push_back(index);
+               }
+
+               if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_INODE,
+                   usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaInodes()))
+               {
+                  exceededUIDsInodes.push_back(index);
+               }
             }
          }
       }
       else
-      { // use the users from a configured range
-         for(unsigned index = cfg->getQuotaQueryUIDRangeStart();
-            index <= cfg->getQuotaQueryUIDRangeEnd(); index++)
+      { // no default quota configured, check only UIDs which has a configured limit
+         for(QuotaDataMapIter iter = userLimits.begin(); iter != userLimits.end(); iter++)
          {
-            if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_SIZE, usedQuotaUser,
-                userLimits, defaultLimits.getDefaultUserQuotaSize()))
+            if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_SIZE,
+                usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaSize()))
             {
-               exceededUIDsSize.push_back(index);
+               exceededUIDsSize.push_back(iter->first);
             }
 
-            if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_INODE,
+            if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_INODE,
                 usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaInodes()))
             {
-               exceededUIDsInodes.push_back(index);
+               exceededUIDsInodes.push_back(iter->first);
             }
          }
       }
    }
-   else
-   { // no default quota configured, check only UIDs which has a configured limit
-      for(QuotaDataMapIter iter = userLimits.begin(); iter != userLimits.end(); iter++)
-      {
-         if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_SIZE,
-             usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaSize()))
-         {
-            exceededUIDsSize.push_back(iter->first);
-         }
-
-         if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_INODE,
-             usedQuotaUser, userLimits, defaultLimits.getDefaultUserQuotaInodes()))
-         {
-            exceededUIDsInodes.push_back(iter->first);
-         }
-      }
-   }
-
-   lockUser.unlock();                                                       // U N L O C K
 
    storagePool.exceededQuotaStore.updateExceededQuota(&exceededUIDsSize, QuotaDataType_USER,
       QuotaLimitType_SIZE);
@@ -504,70 +491,70 @@ void QuotaManager::calculateExceededQuota(StoragePoolEx& storagePool, UIntList& 
    QuotaDataMap groupLimits = storagePool.quotaGroupLimits->getAllQuotaLimits();
 
    // calculate exceeded quota for groups
-   SafeRWLock lockGroup(&this->usedQuotaGroupRWLock, SafeRWLock_READ);       // R E A D L O C K
+   {
+      RWLockGuard const lock(usedQuotaGroupRWLock, SafeRWLock_READ);
 
-   if(defaultLimitsConfigured)
-   { // default quota is configured, requires to check every GID
-      if( (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM) ||
-         (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_FILE) )
-      { // use the groups of the system
-         const auto& list = cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM
-            ? systemGIDs
-            : gidList;
+      if(defaultLimitsConfigured)
+      { // default quota is configured, requires to check every GID
+         if( (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM) ||
+            (cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_FILE) )
+         { // use the groups of the system
+            const auto& list = cfg->getQuotaQueryTypeNum() == MgmtQuotaQueryType_SYSTEM
+               ? systemGIDs
+               : gidList;
 
-         for (auto iter = list.begin(); iter != list.end(); iter++)
-         {
-            if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_SIZE,
-               usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaSize()))
+            for (auto iter = list.begin(); iter != list.end(); iter++)
             {
-               exceededGIDsSize.push_back(*iter);
+               if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_SIZE,
+                  usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaSize()))
+               {
+                  exceededGIDsSize.push_back(*iter);
+               }
+
+               if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_INODE,
+                  usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaInodes()))
+               {
+                  exceededGIDsInodes.push_back(*iter);
+               }
             }
-
-            if (isQuotaExceededForIDunlocked(storagePool, *iter, QuotaLimitType_INODE,
-               usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaInodes()))
+         }
+         else
+         { // use the groups from a configured range
+            for(unsigned index = cfg->getQuotaQueryGIDRangeStart();
+               index <= cfg->getQuotaQueryGIDRangeEnd(); index++)
             {
-               exceededGIDsInodes.push_back(*iter);
+               if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_SIZE,
+                  usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaSize()))
+               {
+                  exceededGIDsSize.push_back(index);
+               }
+
+               if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_INODE,
+                  usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaInodes()))
+               {
+                  exceededGIDsInodes.push_back(index);
+               }
             }
          }
       }
       else
-      { // use the groups from a configured range
-         for(unsigned index = cfg->getQuotaQueryGIDRangeStart();
-            index <= cfg->getQuotaQueryGIDRangeEnd(); index++)
+      { // no default quota configured, check only GIDs which has a configured limit
+         for(QuotaDataMapIter iter = groupLimits.begin(); iter != groupLimits.end(); iter++)
          {
-            if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_SIZE,
+            if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_SIZE,
                usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaSize()))
             {
-               exceededGIDsSize.push_back(index);
+               exceededGIDsSize.push_back(iter->first);
             }
 
-            if (isQuotaExceededForIDunlocked(storagePool, index, QuotaLimitType_INODE,
+            if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_INODE,
                usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaInodes()))
             {
-               exceededGIDsInodes.push_back(index);
+               exceededGIDsInodes.push_back(iter->first);
             }
          }
       }
    }
-   else
-   { // no default quota configured, check only GIDs which has a configured limit
-      for(QuotaDataMapIter iter = groupLimits.begin(); iter != groupLimits.end(); iter++)
-      {
-         if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_SIZE,
-            usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaSize()))
-         {
-            exceededGIDsSize.push_back(iter->first);
-         }
-
-         if (isQuotaExceededForIDunlocked(storagePool, iter->first, QuotaLimitType_INODE,
-            usedQuotaGroup, groupLimits, defaultLimits.getDefaultGroupQuotaInodes()))
-         {
-            exceededGIDsInodes.push_back(iter->first);
-         }
-      }
-   }
-
-   lockGroup.unlock();                                                       // U N L O C K
 
    storagePool.exceededQuotaStore.updateExceededQuota(&exceededGIDsSize, QuotaDataType_GROUP,
       QuotaLimitType_SIZE);
@@ -821,29 +808,17 @@ void QuotaManager::saveQuotaData()
       (*iter)->saveQuotaLimits();
    }
 
-   if(this->usedQuotaUserStoreDirty)
    {
-      SafeRWLock lockUser(&this->usedQuotaUserRWLock, SafeRWLock_READ);           // R E A D L O C K
+      RWLockGuard const lock(usedQuotaUserRWLock, SafeRWLock_READ);
 
-      bool saveRes = QuotaData::saveQuotaDataMapForTargetToFile(usedQuotaUser,
-         USED_QUOTA_USER_PATH);
-      if(saveRes)
-         this->usedQuotaUserStoreDirty = false;
-
-      lockUser.unlock();                                                          // U N L O C K
+      QuotaData::saveQuotaDataMapForTargetToFile(usedQuotaUser, USED_QUOTA_USER_PATH);
    }
 
 
-   if(this->usedQuotaGroupStoreDirty)
    {
-      SafeRWLock lockGroup(&this->usedQuotaGroupRWLock, SafeRWLock_READ);         // R E A D L O C K
+      RWLockGuard const lock(usedQuotaGroupRWLock, SafeRWLock_READ);
 
-      bool saveRes = QuotaData::saveQuotaDataMapForTargetToFile(this->usedQuotaGroup,
-         USED_QUOTA_GROUP_PATH);
-      if(saveRes)
-         this->usedQuotaGroupStoreDirty = false;
-
-      lockGroup.unlock();                                                         // U N L O C K
+      QuotaData::saveQuotaDataMapForTargetToFile(this->usedQuotaGroup, USED_QUOTA_GROUP_PATH);
    }
 }
 
@@ -861,36 +836,31 @@ void QuotaManager::loadQuotaData()
       (*iter)->loadQuotaLimits();
    }
 
-   SafeRWLock lockUser(&this->usedQuotaUserRWLock, SafeRWLock_WRITE);           // W R I T E L O C K
-
-   Path usedQuotaUserPath(mgmtStorePath + "/" + USED_QUOTA_USER_PATH);
-   if(QuotaData::loadQuotaDataMapForTargetFromFile(this->usedQuotaUser,
-      usedQuotaUserPath.str() ) )
    {
-      log.log(Log_NOTICE, "Loaded quota data for users of " +
-         StringTk::intToStr(this->usedQuotaUser.size()) + " targets from file " +
-         usedQuotaUserPath.str() );
+      RWLockGuard const lock(usedQuotaUserRWLock, SafeRWLock_WRITE);
+
+      Path usedQuotaUserPath(mgmtStorePath + "/" + USED_QUOTA_USER_PATH);
+      if(QuotaData::loadQuotaDataMapForTargetFromFile(this->usedQuotaUser,
+         usedQuotaUserPath.str() ) )
+      {
+         log.log(Log_NOTICE, "Loaded quota data for users of " +
+            StringTk::intToStr(this->usedQuotaUser.size()) + " targets from file " +
+            usedQuotaUserPath.str() );
+      }
    }
 
-   this->usedQuotaUserStoreDirty = false;
-
-   lockUser.unlock();                                                           // U N L O C K
-
-
-   SafeRWLock lockGroup(&this->usedQuotaGroupRWLock, SafeRWLock_WRITE);         // W R I T E L O C K
-
-   Path usedQuotaGroupPath(mgmtStorePath + "/" + USED_QUOTA_GROUP_PATH);
-   if(QuotaData::loadQuotaDataMapForTargetFromFile(this->usedQuotaGroup,
-      usedQuotaGroupPath.str() ) )
    {
-      log.log(Log_NOTICE, "Loaded quota data for groups of " +
-         StringTk::intToStr(this->usedQuotaGroup.size() ) + " targets from file " +
-         usedQuotaGroupPath.str() );
+      RWLockGuard const lock(usedQuotaGroupRWLock, SafeRWLock_WRITE);
+
+      Path usedQuotaGroupPath(mgmtStorePath + "/" + USED_QUOTA_GROUP_PATH);
+      if(QuotaData::loadQuotaDataMapForTargetFromFile(this->usedQuotaGroup,
+         usedQuotaGroupPath.str() ) )
+      {
+         log.log(Log_NOTICE, "Loaded quota data for groups of " +
+            StringTk::intToStr(this->usedQuotaGroup.size() ) + " targets from file " +
+            usedQuotaGroupPath.str() );
+      }
    }
-
-   this->usedQuotaGroupStoreDirty = false;
-
-   lockGroup.unlock();                                                          // U N L O C K
 }
 
 /**
@@ -960,7 +930,8 @@ bool QuotaManager::getQuotaLimitsForRange(unsigned rangeStart, unsigned rangeEnd
  *
  * @return true if limits could be loaded, false otherwise
  */
-bool QuotaManager::getDefaultLimits(StoragePoolId storagePoolId, QuotaDefaultLimits& outLimits)
+bool QuotaManager::getDefaultLimits(StoragePoolId storagePoolId,
+      QuotaDefaultLimits& outLimits) const
 {
    // get the pool
    StoragePoolExPtr storagePool = storagePoolStore->getPool(storagePoolId);
@@ -988,21 +959,20 @@ bool QuotaManager::getDefaultLimits(StoragePoolId storagePoolId, QuotaDefaultLim
  *       quota value is added to the string.
  * @return A string which contains all used quota.
  */
-std::string QuotaManager::usedQuotaUserToString(bool mergeTargets)
+std::string QuotaManager::usedQuotaUserToString(bool mergeTargets) const
 {
    std::ostringstream returnStringStream;
 
-   SafeRWLock lockUser(&this->usedQuotaUserRWLock, SafeRWLock_READ);           // R E A D L O C K
+   RWLockGuard const lock(usedQuotaUserRWLock, SafeRWLock_READ);
 
    if(mergeTargets)
    {
       //merge the quota data from the targets
       QuotaDataMap mergedQuota;
 
-      for(QuotaDataMapForTargetIter iter = this->usedQuotaUser.begin();
-         iter != this->usedQuotaUser.end(); iter++)
+      for (auto iter = usedQuotaUser.begin(); iter != usedQuotaUser.end(); iter++)
       {
-         for(QuotaDataMapIter idIter = iter->second.begin(); idIter != iter->second.end(); idIter++)
+         for (auto idIter = iter->second.begin(); idIter != iter->second.end(); idIter++)
          {
             QuotaDataMapIter foundIter = mergedQuota.find(idIter->first);
             if (foundIter != mergedQuota.end() )
@@ -1016,8 +986,6 @@ std::string QuotaManager::usedQuotaUserToString(bool mergeTargets)
    else
       QuotaData::quotaDataMapForTargetToString(this->usedQuotaUser, QuotaDataType_USER,
          &returnStringStream);
-
-   lockUser.unlock();                                                          // U N L O C K
 
    return returnStringStream.str();
 }
@@ -1033,21 +1001,20 @@ std::string QuotaManager::usedQuotaUserToString(bool mergeTargets)
  *        quota value is added to the string.
  * @return A string which contains all used quota.
  */
-std::string QuotaManager::usedQuotaGroupToString(bool mergeTargets)
+std::string QuotaManager::usedQuotaGroupToString(bool mergeTargets) const
 {
    std::ostringstream returnStringStream;
 
-   SafeRWLock lockGroup(&this->usedQuotaGroupRWLock, SafeRWLock_READ);           // R E A D L O C K
+   RWLockGuard const lock(usedQuotaGroupRWLock, SafeRWLock_READ);
 
    if(mergeTargets)
    {
       //merge the quota data from the targets
       QuotaDataMap mergedQuota;
 
-      for(QuotaDataMapForTargetIter iter = this->usedQuotaGroup.begin();
-         iter != this->usedQuotaGroup.end(); iter++)
+      for (auto iter = usedQuotaGroup.begin(); iter != usedQuotaGroup.end(); iter++)
       {
-         for(QuotaDataMapIter idIter = iter->second.begin(); idIter != iter->second.end(); idIter++)
+         for (auto idIter = iter->second.begin(); idIter != iter->second.end(); idIter++)
          {
             QuotaDataMapIter foundIter = mergedQuota.find(idIter->first);
             if (foundIter != mergedQuota.end() )
@@ -1061,8 +1028,6 @@ std::string QuotaManager::usedQuotaGroupToString(bool mergeTargets)
    else
       QuotaData::quotaDataMapForTargetToString(this->usedQuotaGroup, QuotaDataType_GROUP,
          &returnStringStream);
-
-   lockGroup.unlock();                                                          // U N L O C K
 
    return returnStringStream.str();
 }

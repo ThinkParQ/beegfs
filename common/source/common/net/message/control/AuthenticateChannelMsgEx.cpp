@@ -7,34 +7,17 @@ bool AuthenticateChannelMsgEx::processIncoming(ResponseContext& ctx)
 {
    const char* logContext = "AuthenticateChannel incoming";
 
-   LOG_DEBUG(logContext, Log_DEBUG,
-      "Received a AuthenticateChannelMsg from: " + ctx.peerName() );
-
    AbstractApp* app = PThread::getCurrentThreadApp();
-   ICommonConfig* cfg = app->getCommonConfig();
+   auto cfg = app->getCommonConfig();
    uint64_t authHash = cfg->getConnAuthHash();
 
    if(authHash && (authHash != getAuthHash() ) )
    { // authentication failed
-
-      #ifdef BEEGFS_DEBUG
-         // print more info in debug mode
-         LOG_DEBUG(logContext, Log_WARNING,
-            "Peer sent wrong authentication: " + ctx.peerName() + " "
-               "My authHash: " + StringTk::uint64ToHexStr(getAuthHash() ) + " "
-               "Peer authHash: " + StringTk::uint64ToHexStr(getAuthHash() ) );
-      #else
-         LogContext(logContext).log(Log_WARNING,
-            "Peer sent wrong authentication: " + ctx.peerName() );
-      #endif // BEEGFS_DEBUG
+      LogContext(logContext).log(Log_WARNING,
+         "Peer sent wrong authentication: " + ctx.peerName() );
    }
    else
    {
-      LOG_DEBUG(logContext, Log_SPAM,
-         "Authentication successful. "
-            "My authHash: " + StringTk::uint64ToHexStr(getAuthHash() ) + " "
-            "Peer authHash: " + StringTk::uint64ToHexStr(getAuthHash() ) );
-
       ctx.getSocket()->setIsAuthenticated();
    }
 

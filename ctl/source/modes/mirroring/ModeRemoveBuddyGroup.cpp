@@ -84,8 +84,7 @@ int ModeRemoveBuddyGroup::execute()
    }
    else
    {
-      std::cerr << "Could not remove buddy group: " << FhgfsOpsErrTk::toErrString(removeRes)
-         << std::endl;
+      std::cerr << "Could not remove buddy group: " << removeRes << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 }
@@ -116,22 +115,13 @@ void ModeRemoveBuddyGroup::printHelp()
 FhgfsOpsErr ModeRemoveBuddyGroup::removeGroup(const uint16_t groupID, const bool dryRun,
       const bool force)
 {
-   char* buf = nullptr;
-   NetMessage* resultMsg = nullptr;
-
    RemoveBuddyGroupMsg msg(NODETYPE_Storage, groupID, dryRun, force);
 
    auto node = Program::getApp()->getMgmtNodes()->referenceFirstNode();
 
-   const bool commRes = MessagingTk::requestResponse(*node, &msg,
-         NETMSGTYPE_RemoveBuddyGroupResp, &buf, &resultMsg);
-   if (!commRes)
+   const auto resultMsg = MessagingTk::requestResponse(*node, msg, NETMSGTYPE_RemoveBuddyGroupResp);
+   if (!resultMsg)
       return FhgfsOpsErr_COMMUNICATION;
 
-   const auto result = static_cast<RemoveBuddyGroupRespMsg*>(resultMsg)->getResult();
-
-   delete resultMsg;
-   free(buf);
-
-   return result;
+   return static_cast<RemoveBuddyGroupRespMsg&>(*resultMsg).getResult();
 }

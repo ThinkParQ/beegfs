@@ -220,27 +220,20 @@ int ModeCreateFile::execute()
    EntryInfo ownerInfo;
 
    if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, true,
-         *app->getMetaNodes(), *app->getMetaMirrorBuddyGroupMapper(),
+         *app->getMetaNodes(), app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
          ownerInfo, ownerNode))
    {
       return APPCODE_RUNTIME_ERROR;
    }
 
-   bool commRes;
-   char* tmpBuf = nullptr;
-   NetMessage* tmpMsg = nullptr;
-
    // retrieve pattern from parent folder
 
    GetEntryInfoMsg getInfoMsg(&ownerInfo);
 
-   commRes = MessagingTk::requestResponse(*ownerNode, &getInfoMsg,
-         NETMSGTYPE_GetEntryInfoResp, &tmpBuf, &tmpMsg);
+   const auto infoRespMsg = MessagingTk::requestResponse(*ownerNode, getInfoMsg,
+         NETMSGTYPE_GetEntryInfoResp);
 
-   std::unique_ptr<NetMessage> infoRespMsg(tmpMsg);
-   std::unique_ptr<char> infoRespBuf(tmpBuf);
-
-   if (!commRes)
+   if (!infoRespMsg)
    {
       std::cerr << "Communication with server failed: " << ownerNode->getNodeIDWithTypeStr() <<
          std::endl;
@@ -253,7 +246,7 @@ int ModeCreateFile::execute()
    if (getInfoRes != FhgfsOpsErr_SUCCESS)
    {
       std::cerr << "Server encountered an error: " << ownerNode->getNodeIDWithTypeStr() << "; " <<
-         "Error: " << FhgfsOpsErrTk::toErrString(getInfoRes) << std::endl;
+         "Error: " << getInfoRes << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 
@@ -341,12 +334,12 @@ int ModeCreateFile::execute()
          if (patternType == StripePatternType_BuddyMirror)
          {
             pool = std::find_if(storagePools.begin(), storagePools.end(),
-                  std::bind(storagePoolHasBuddyGroup, std::placeholders::_1, *t));
+                  [&] (const auto& p) { return p->hasBuddyGroup(*t); });
          }
          else
          {
             pool = std::find_if(storagePools.begin(), storagePools.end(),
-                  std::bind(storagePoolHasTarget, std::placeholders::_1, *t));
+                  [&] (const auto& p) { return p->hasTarget(*t); });
          }
 
          if (pool == storagePools.end())
@@ -404,13 +397,10 @@ int ModeCreateFile::execute()
    MkFileWithPatternMsg msg(&ownerInfo, newFileName, userID, groupID, mode, 0000, pattern.get());
 
    // request/response
-   commRes = MessagingTk::requestResponse(
-      *ownerNode, &msg, NETMSGTYPE_MkFileWithPatternResp, &tmpBuf, &tmpMsg);
+   const auto respMsg = MessagingTk::requestResponse(
+      *ownerNode, msg, NETMSGTYPE_MkFileWithPatternResp);
 
-   std::unique_ptr<NetMessage> respMsg(tmpMsg);
-   std::unique_ptr<char> respBuf(tmpBuf);
-
-   if(!commRes)
+   if(!respMsg)
    {
       std::cerr << "Communication with server failed: " << ownerNode->getNodeIDWithTypeStr() <<
             std::endl;
@@ -422,8 +412,7 @@ int ModeCreateFile::execute()
    mkFileRes = (FhgfsOpsErr)respMsgCast->getResult();
    if(mkFileRes != FhgfsOpsErr_SUCCESS)
    {
-      std::cerr << "Node encountered an error: " << FhgfsOpsErrTk::toErrString(mkFileRes) <<
-         std::endl;
+      std::cerr << "Node encountered an error: " << mkFileRes << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
 

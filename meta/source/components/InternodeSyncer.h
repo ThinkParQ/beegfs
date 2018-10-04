@@ -5,13 +5,16 @@
 #include <common/components/ComponentInitException.h>
 #include <common/net/message/nodes/GetNodeCapacityPoolsMsg.h>
 #include <common/net/message/nodes/GetNodeCapacityPoolsRespMsg.h>
+#include <common/nodes/NodeStoreServers.h>
 #include <common/storage/quota/QuotaData.h>
 #include <common/threading/PThread.h>
 #include <common/Common.h>
-#include <nodes/NodeStoreServersEx.h>
 #include <storage/NodeOfflineWait.h>
 
+#include <atomic>
 #include <mutex>
+
+class AbstractDatagramListener;
 
 class InternodeSyncer : public PThread
 {
@@ -44,14 +47,13 @@ class InternodeSyncer : public PThread
    private:
       LogContext log;
 
-      Mutex forcePoolsUpdateMutex;
-      Mutex forceTargetStatesUpdateMutex;
-      Mutex forcePublishCapacitiesMutex;
-      Mutex forceStoragePoolsUpdateMutex;
-      bool forcePoolsUpdate; // true to force update of capacity pools
-      bool forceTargetStatesUpdate; // true to force update of node state
-      bool forcePublishCapacities; // true to force publishing free capacity
-      bool forceStoragePoolsUpdate; // true to force update of storage pools
+#if ATOMIC_BOOL_LOCK_FREE != 2
+# warn atomic<bool> is not always lock-free
+#endif
+      std::atomic<bool> forcePoolsUpdate; // true to force update of capacity pools
+      std::atomic<bool> forceTargetStatesUpdate; // true to force update of node state
+      std::atomic<bool> forcePublishCapacities; // true to force publishing free capacity
+      std::atomic<bool> forceStoragePoolsUpdate; // true to force update of storage pools
 
       // Keeps track of the timeout during which the node may not send state reports because it is
       // waiting to be offlined by the mgmtd.
@@ -74,7 +76,7 @@ class InternodeSyncer : public PThread
       void forceMgmtdPoolsRefresh();
 
       void dropIdleConns();
-      unsigned dropIdleConnsByStore(NodeStoreServersEx* nodes);
+      unsigned dropIdleConnsByStore(NodeStoreServers* nodes);
 
       void getStatInfo(int64_t* outSizeTotal, int64_t* outSizeFree, int64_t* outInodesTotal,
          int64_t* outInodesFree);
@@ -89,25 +91,21 @@ class InternodeSyncer : public PThread
       // inliners
       void setForcePoolsUpdate()
       {
-         std::lock_guard<Mutex> lock(forcePoolsUpdateMutex);
          forcePoolsUpdate = true;
       }
 
       void setForceTargetStatesUpdate()
       {
-         std::lock_guard<Mutex> lock(forceTargetStatesUpdateMutex);
          forceTargetStatesUpdate = true;
       }
 
       void setForcePublishCapacities()
       {
-         std::lock_guard<Mutex> lock(forcePublishCapacitiesMutex);
          forcePublishCapacities = true;
       }
 
       void setForceStoragePoolsUpdate()
       {
-         std::lock_guard<Mutex> lock(forceStoragePoolsUpdateMutex);
          forceStoragePoolsUpdate = true;
       }
 
@@ -132,48 +130,6 @@ class InternodeSyncer : public PThread
       {
          return this->buddyResyncInProgress.read();
       }
-
-   private:
-      // inliners
-      bool getAndResetForcePoolsUpdate()
-      {
-         std::lock_guard<Mutex> lock(forcePoolsUpdateMutex);
-
-         bool retVal = forcePoolsUpdate;
-         forcePoolsUpdate = false;
-
-         return retVal;
-      }
-
-      bool getAndResetForceTargetStatesUpdate()
-      {
-         std::lock_guard<Mutex> lock(forceTargetStatesUpdateMutex);
-
-         bool retVal = forceTargetStatesUpdate;
-         forceTargetStatesUpdate = false;
-
-         return retVal;
-      }
-
-      bool getAndResetForcePublishCapacities()
-      {
-         std::lock_guard<Mutex> lock(forcePublishCapacitiesMutex);
-
-         bool retVal = forcePublishCapacities;
-         forcePublishCapacities = false;
-
-         return retVal;
-      }
-      bool getAndResetForceStoragePoolsUpdate()
-      {
-         std::lock_guard<Mutex> lock(forceStoragePoolsUpdateMutex);
-
-         bool retVal = forceStoragePoolsUpdate;
-         forceStoragePoolsUpdate = false;
-
-         return retVal;
-      }
-
 };
 
 

@@ -3,7 +3,6 @@
 #include <common/net/message/storage/moving/MovingFileInsertRespMsg.h>
 #include <common/storage/striping/Raid0Pattern.h>
 #include <common/toolkit/MessagingTk.h>
-#include <net/msghelpers/MsgHelperChunkBacklinks.h>
 #include <net/msghelpers/MsgHelperUnlink.h>
 #include <net/msghelpers/MsgHelperXAttr.h>
 
@@ -69,10 +68,6 @@ std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock> MovingFileInsertMs
 
 bool MovingFileInsertMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("MovingFileInsertMsg incoming");
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Received a MovingFileInsertMsg from: " + ctx.peerName() );
-
    rctx = &ctx;
 
    return BaseType::processIncoming(ctx);
@@ -126,22 +121,13 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
       xattrNames.push_back(xattrName);
    }
 
-   // update backlinks
-   if (Program::getApp()->getConfig()->getStoreBacklinksEnabled())
-   {
-      EntryInfo* toDirInfo = this->getToDirInfo();
-      std::string newName  = this->getNewName();
-      MsgHelperChunkBacklinks::updateBacklink(toDirInfo->getEntryID(),
-         toDirInfo->getIsBuddyMirrored(), newName);
-   }
-
    if(unlinkInode)
    {
       inodeBuf.reset(new (std::nothrow) char[META_SERBUF_SIZE]);
       if (unlikely(!inodeBuf) )
       {  // out of memory, we are going to leak an inode and chunks
          inodeBufLen = 0;
-         LOG(GENERAL, ERR, "Malloc failed, leaking chunks", as("inodeID", unlinkInode->getEntryID()));
+         LOG(GENERAL, ERR, "Malloc failed, leaking chunks", ("inodeID", unlinkInode->getEntryID()));
       }
       else
       {

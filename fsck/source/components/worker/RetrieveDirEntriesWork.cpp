@@ -14,7 +14,6 @@ RetrieveDirEntriesWork::RetrieveDirEntriesWork(FsckDB* db, Node& node, Synchroni
       AtomicUInt64& errors, unsigned hashDirStart, unsigned hashDirEnd,
       AtomicUInt64* numDentriesFound, AtomicUInt64* numFileInodesFound,
       std::set<FsckTargetID>& usedTargets) :
-   Work(),
    log("RetrieveDirEntriesWork"), node(node), counter(counter), errors(&errors),
    numDentriesFound(numDentriesFound), numFileInodesFound(numFileInodesFound),
    usedTargets(&usedTargets), hashDirStart(hashDirStart), hashDirEnd(hashDirEnd),
@@ -65,25 +64,20 @@ void RetrieveDirEntriesWork::doWork(bool isBuddyMirrored)
 
          int64_t hashDirOffset = 0;
          int64_t contDirOffset = 0;
-         std::string currentContDirID = "";
+         std::string currentContDirID;
          int resultCount = 0;
 
          do
          {
-            bool commRes;
-            char *respBuf = NULL;
-            NetMessage *respMsg = NULL;
-
             RetrieveDirEntriesMsg retrieveDirEntriesMsg(hashDirNum, currentContDirID,
                RETRIEVE_DIR_ENTRIES_PACKET_SIZE, hashDirOffset, contDirOffset, isBuddyMirrored);
 
-            commRes = MessagingTk::requestResponse(node, &retrieveDirEntriesMsg,
-               NETMSGTYPE_RetrieveDirEntriesResp, &respBuf, &respMsg);
+            const auto respMsg = MessagingTk::requestResponse(node, retrieveDirEntriesMsg,
+               NETMSGTYPE_RetrieveDirEntriesResp);
 
-            if ( commRes )
+            if (respMsg)
             {
-               RetrieveDirEntriesRespMsg* retrieveDirEntriesRespMsg =
-                  (RetrieveDirEntriesRespMsg*) respMsg;
+               auto* retrieveDirEntriesRespMsg = (RetrieveDirEntriesRespMsg*) respMsg.get();
 
                // set new parameters
                currentContDirID = retrieveDirEntriesRespMsg->getCurrentContDirID();
@@ -108,10 +102,10 @@ void RetrieveDirEntriesWork::doWork(bool isBuddyMirrored)
                   }
 
                   LOG(GENERAL, ERR, "Found dentry with invalid entry IDs.",
-                        as("node", it->getSaveNodeID()),
-                        as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                        as("entryID", it->getID()),
-                        as("parentEntryID", it->getParentDirID()));
+                        ("node", it->getSaveNodeID()),
+                        ("isBuddyMirrored", it->getIsBuddyMirrored()),
+                        ("entryID", it->getID()),
+                        ("parentEntryID", it->getParentDirID()));
 
                   ++it;
                   errors->increase();
@@ -140,11 +134,11 @@ void RetrieveDirEntriesWork::doWork(bool isBuddyMirrored)
                   }
 
                   LOG(GENERAL, ERR, "Found inode with invalid entry IDs.",
-                        as("node", it->getSaveNodeID()),
-                        as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                        as("entryID", it->getID()),
-                        as("parentEntryID", it->getParentDirID()),
-                        as("origParent", it->getPathInfo()->getOrigParentEntryID()));
+                        ("node", it->getSaveNodeID()),
+                        ("isBuddyMirrored", it->getIsBuddyMirrored()),
+                        ("entryID", it->getID()),
+                        ("parentEntryID", it->getParentDirID()),
+                        ("origParent", it->getPathInfo()->getOrigParentEntryID()));
 
                   ++it;
                   errors->increase();
@@ -202,9 +196,9 @@ void RetrieveDirEntriesWork::doWork(bool isBuddyMirrored)
                   }
 
                   LOG(GENERAL, ERR, "Found content directory with invalid entry ID.",
-                        as("node", it->getSaveNodeID()),
-                        as("isBuddyMirrored", it->getIsBuddyMirrored()),
-                        as("entryID", it->getID()));
+                        ("node", it->getSaveNodeID()),
+                        ("isBuddyMirrored", it->getIsBuddyMirrored()),
+                        ("entryID", it->getID()));
 
                   ++it;
                   errors->increase();
@@ -212,14 +206,9 @@ void RetrieveDirEntriesWork::doWork(bool isBuddyMirrored)
                }
 
                this->contDirs->insert(contDirs, this->contDirsHandle);
-
-               SAFE_FREE(respBuf);
-               SAFE_DELETE(respMsg);
             }
             else
             {
-               SAFE_FREE(respBuf);
-               SAFE_DELETE(respMsg);
                throw FsckException("Communication error occured with node " + node.getID());
             }
 

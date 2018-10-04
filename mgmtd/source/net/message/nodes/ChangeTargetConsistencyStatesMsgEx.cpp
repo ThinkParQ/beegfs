@@ -7,8 +7,6 @@
 
 bool ChangeTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(STATES, DEBUG, "Received a ChangeTargetConsistencyStatesMsg.", ctx.peerName());
-
    App* app = Program::getApp();
 
    if (app->isShuttingDown())
@@ -18,7 +16,7 @@ bool ChangeTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
    }
 
    MgmtdTargetStateStore* stateStore;
-   MirrorBuddyGroupMapper* mirrorBuddyGroupMapper;
+   MirrorBuddyGroupMapperEx* mirrorBuddyGroupMapper;
 
    NodeType nodeType = getNodeType();
 
@@ -35,10 +33,7 @@ bool ChangeTargetConsistencyStatesMsgEx::processIncoming(ResponseContext& ctx)
          break;
 
       default:
-         LOG(STATES, ERR, "Invalid node type.",
-               as("Node Type", Node::nodeTypeToStr(nodeType)),
-               as("Sender", ctx.peerName())
-            );
+         LOG(STATES, ERR, "Invalid node type.", nodeType, ("Sender", ctx.peerName()));
          return false;
    }
 

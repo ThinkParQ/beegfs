@@ -2,12 +2,14 @@
 #include <common/app/AbstractApp.h>
 #include <common/net/message/control/AuthenticateChannelMsg.h>
 #include <common/net/message/control/SetChannelDirectMsg.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/PThread.h>
 #include <common/toolkit/MessagingTk.h>
 #include "Node.h"
 #include "NodeConnPool.h"
 
+#include <mutex>
+
+#include <boost/lexical_cast.hpp>
 
 #define NODECONNPOOL_SHUTDOWN_WAITTIMEMS              500
 
@@ -23,11 +25,9 @@ NodeConnPool::NodeConnPool(Node& parentNode, unsigned short streamPort, const Ni
    parentNode(parentNode)
 {
    AbstractApp* app = PThread::getCurrentThreadApp();
-   ICommonConfig* cfg = app->getCommonConfig();
+   auto cfg = app->getCommonConfig();
 
    this->nicList = nicList;
-   //this->nicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
-   this->pathNamedSocket = "";
 
    this->establishedConns = 0;
    this->availableConns = 0;
@@ -38,27 +38,6 @@ NodeConnPool::NodeConnPool(Node& parentNode, unsigned short streamPort, const Ni
 
    this->app = app;
    this->streamPort = streamPort;
-   memset(&localNicCaps, 0, sizeof(localNicCaps) );
-   memset(&stats, 0, sizeof(stats) );
-   memset(&errState, 0, sizeof(errState) );
-}
-
-NodeConnPool::NodeConnPool(Node& parentNode, std::string namedSocketPath) : parentNode(parentNode)
-{
-   AbstractApp* app = PThread::getCurrentThreadApp();
-   ICommonConfig* cfg = app->getCommonConfig();
-
-   this->pathNamedSocket = namedSocketPath;
-
-   this->establishedConns = 0;
-   this->availableConns = 0;
-
-   this->maxConns = cfg->getConnMaxInternodeNum();
-   this->fallbackExpirationSecs = cfg->getConnFallbackExpirationSecs();
-   this->isChannelDirect = true;
-
-   this->app = app;
-   this->streamPort = 0;
    memset(&localNicCaps, 0, sizeof(localNicCaps) );
    memset(&stats, 0, sizeof(stats) );
    memset(&errState, 0, sizeof(errState) );
@@ -110,14 +89,13 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
    std::string contextStr = "NodeConn (acquire stream)";
    LogContext log(contextStr);
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   std::unique_lock<Mutex> mutexLock(mutex);
 
    if(!availableConns && (establishedConns == maxConns) )
    { // wait for a conn to become available (or disconnected)
 
       if(!allowWaiting)
       { // all conns in use and waiting not allowed => exit
-         mutexLock.unlock(); // U N L O C K
          return NULL;
       }
 
@@ -141,241 +119,170 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
 
       availableConns--;
 
-      mutexLock.unlock(); // U N L O C K
-
       return sock;
    }
 
 
    // no conn available, but maxConns not reached yet => establish a new conn
 
-   if(this->pathNamedSocket.empty() )
-   {
-      bool isPrimaryInterface = true; // used to set expiration for non-primary interfaces
-         // primary means: first interface in the list that is supported by client and server
+   bool isPrimaryInterface = true; // used to set expiration for non-primary interfaces
+      // primary means: first interface in the list that is supported by client and server
 
-      port = this->streamPort;
-      NicAddressList nicListCopy = this->nicList;
+   port = this->streamPort;
+   NicAddressList nicListCopy = this->nicList;
 
-      std::string contextStr = "NodeConn (acquire stream)";
-      LogContext log(contextStr);
-
-      establishedConns++;
-
-      mutexLock.unlock(); // U N L O C K
-
-      // walk over all available NICs, create the corresponding socket and try to connect
-
-      NicAddressListIter iter = nicListCopy.begin();
-      for( ; iter != nicListCopy.end(); iter++)
-      {
-         StandardSocket* newStandardSock = NULL; // (to find out whether we need to set the
-            // socketOptions without runtime type info)
-         RDMASocket* newRDMASock = NULL; // (to find out whether we need to set the
-            // socketOptions without runtime type info)
-
-         if(!app->getNetFilter()->isAllowed(iter->ipAddr.s_addr) )
-            continue;
-
-         if( (iter->nicType != NICADDRTYPE_STANDARD) &&
-            app->getTcpOnlyFilter()->isContained(iter->ipAddr.s_addr) )
-            continue;
-
-         std::string endpointStr = parentNode.getNodeTypeStr() + "@" +
-            Socket::endpointAddrToString(&iter->ipAddr, port);
-
-         try
-         {
-            switch(iter->nicType)
-            {
-               case NICADDRTYPE_RDMA:
-               { // RDMA
-                  if(!localNicCaps.supportsRDMA)
-                     continue;
-
-                  log.log(Log_DEBUG, "Establishing new RDMA connection to: " + endpointStr);
-                  newRDMASock = new RDMASocket();
-                  sock = newRDMASock;
-               } break;
-               case NICADDRTYPE_SDP:
-               { // SDP
-                  if(!localNicCaps.supportsSDP)
-                     continue;
-
-                  log.log(Log_DEBUG, "Establishing new SDP connection to: " + endpointStr);
-                  newStandardSock = new StandardSocket(PF_SDP, SOCK_STREAM);
-                  sock = newStandardSock;
-               } break;
-               case NICADDRTYPE_STANDARD:
-               { // TCP
-                  log.log(Log_DEBUG, "Establishing new TCP connection to: " + endpointStr);
-                  newStandardSock = new StandardSocket(PF_INET, SOCK_STREAM);
-                  sock = newStandardSock;
-               } break;
-
-               default:
-               { // unknown
-                  log.log(Log_WARNING, "Skipping unknown connection type to: " + endpointStr);
-                  continue;
-               }
-
-            } // end of switch
-
-         } // end of try
-         catch(SocketException& e)
-         {
-            log.log(Log_NOTICE, std::string("Socket initialization failed: ") + endpointStr + ". "
-               "Exception: " + std::string(e.what() ) );
-
-            continue;
-         }
-
-         try
-         {
-            // the actual connection attempt
-            if(newRDMASock)
-               applySocketOptionsPreConnect(newRDMASock);
-            else
-            if(newStandardSock)
-               applySocketOptionsPreConnect(newStandardSock);
-
-            sock->connect(&iter->ipAddr, port);
-
-            if(errState.shouldPrintConnectedLogMsg(sock->getPeerIP(), sock->getSockType() ) )
-            {
-               std::string protocolStr = NetworkInterfaceCard::nicTypeToString(
-                  sock->getSockType() );
-               std::string fallbackStr = isPrimaryInterface ? "" : "; fallback route";
-
-               log.log(Log_NOTICE, "Connected: " + endpointStr + " "
-                  "(protocol: " + protocolStr + fallbackStr + ")" );
-            }
-
-            if(newStandardSock)
-               applySocketOptionsConnected(newStandardSock);
-
-            if(app->getCommonConfig()->getConnAuthHash() )
-               authenticateChannel(sock);
-
-            if(!isChannelDirect)
-               makeChannelIndirect(sock);
-
-            if(!isPrimaryInterface) // non-primary => set expiration counter
-               sock->setExpireTimeStart();
-
-            break;
-         }
-         catch(SocketException& e)
-         {
-            if(errState.shouldPrintConnectFailedLogMsg(sock->getPeerIP(), sock->getSockType() ) )
-               log.log(Log_NOTICE, std::string("Connect failed: ") + endpointStr + " "
-                  "(protocol: " + NetworkInterfaceCard::nicTypeToString(sock->getSockType() ) +
-                  "); Error: " + std::string(e.what() ) );
-
-            // the next interface is definitely non-primary
-            isPrimaryInterface = false;
-
-            delete(sock);
-         }
-      } // end of connect loop
-
-      mutexLock.relock(); // L O C K
-
-      if(iter != nicListCopy.end() )
-      {
-         // success => add to list (as unavailable)
-         connList.push_back(sock);
-         statsAddNic(sock->getSockType() );
-
-         errState.setConnSuccess(sock->getPeerIP(), sock->getSockType() );
-      }
-      else
-      {
-         // absolutely unable to connect
-         sock = NULL;
-         establishedConns--;
-
-         if(!errState.getWasLastTimeCompleteFail() )
-         {
-            log.log(Log_CRITICAL,
-               "Connect failed on all available routes: " + parentNode.getNodeIDWithTypeStr() );
-
-            errState.setCompleteFail();
-         }
-
-         // we are not using this connection => notify next waiter
-         changeCond.signal();
-      }
-   }
-   else
-   {
-      bool namedSocketCreated = false;
-
-      NamedSocket* newNamedSocket;
-
-      establishedConns++;
-
-      mutexLock.unlock(); // U N L O C K
-
-      try
-      {
-         log.log(Log_DEBUG, "Establishing new named socket connection to: localhost:" +
-            this->pathNamedSocket);
-
-         newNamedSocket = new NamedSocket(this->pathNamedSocket);
-         sock = newNamedSocket;
-         namedSocketCreated = true;
-      }
-      catch(SocketException& e)
-      {
-         log.log(Log_NOTICE, std::string("Socket initialization failed: localhost:") +
-            this->pathNamedSocket + ". Exception: " + std::string(e.what() ) );
-         goto cleanup;
-      }
-
-      applySocketOptionsPreConnect(newNamedSocket);
-
-      newNamedSocket->connectToPath();
-
-      if(errState.shouldPrintConnectedLogMsg(sock->getPeerIP(), sock->getSockType() ) )
-      {
-         std::string protocolStr = NetworkInterfaceCard::nicTypeToString(sock->getSockType() );
-
-         log.log(Log_NOTICE, "Connected: localhost:" + this->pathNamedSocket + " "
-            "(protocol: " + protocolStr + ")" );
-      }
-
-      mutexLock.relock(); // L O C K
-
-      if(namedSocketCreated)
-      {
-         // success => add to list (as unavailable)
-         connList.push_back(sock);
-         statsAddNic(sock->getSockType() );
-
-         errState.setConnSuccess(sock->getPeerIP(), sock->getSockType() );
-      }
-      else
-      {
-         // absolutely unable to connect
-         sock = NULL;
-         establishedConns--;
-
-         if(!errState.getWasLastTimeCompleteFail() )
-         {
-            log.log(Log_CRITICAL, "Connect failed to: localhost:" + this->pathNamedSocket);
-
-            errState.setCompleteFail();
-         }
-
-         // we are not using this connection => notify next waiter
-         changeCond.signal();
-      }
-   }
+   establishedConns++;
 
    mutexLock.unlock(); // U N L O C K
 
-cleanup:
+   // walk over all available NICs, create the corresponding socket and try to connect
+
+   NicAddressListIter iter = nicListCopy.begin();
+   for( ; iter != nicListCopy.end(); iter++)
+   {
+      StandardSocket* newStandardSock = NULL; // (to find out whether we need to set the
+         // socketOptions without runtime type info)
+      RDMASocket* newRDMASock = NULL; // (to find out whether we need to set the
+         // socketOptions without runtime type info)
+
+      if(!app->getNetFilter()->isAllowed(iter->ipAddr.s_addr) )
+         continue;
+
+      if( (iter->nicType != NICADDRTYPE_STANDARD) &&
+         app->getTcpOnlyFilter()->isContained(iter->ipAddr.s_addr) )
+         continue;
+
+      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
+         Socket::endpointAddrToString(&iter->ipAddr, port);
+
+      try
+      {
+         switch(iter->nicType)
+         {
+            case NICADDRTYPE_RDMA:
+            { // RDMA
+               if(!localNicCaps.supportsRDMA)
+                  continue;
+
+               log.log(Log_DEBUG, "Establishing new RDMA connection to: " + endpointStr);
+               newRDMASock = RDMASocket::create().release();
+               sock = newRDMASock;
+            } break;
+            case NICADDRTYPE_SDP:
+            { // SDP
+               if(!localNicCaps.supportsSDP)
+                  continue;
+
+               log.log(Log_DEBUG, "Establishing new SDP connection to: " + endpointStr);
+               newStandardSock = new StandardSocket(PF_SDP, SOCK_STREAM);
+               sock = newStandardSock;
+            } break;
+            case NICADDRTYPE_STANDARD:
+            { // TCP
+               log.log(Log_DEBUG, "Establishing new TCP connection to: " + endpointStr);
+               newStandardSock = new StandardSocket(PF_INET, SOCK_STREAM);
+               sock = newStandardSock;
+            } break;
+
+            default:
+            { // unknown
+               log.log(Log_WARNING, "Skipping unknown connection type to: " + endpointStr);
+               continue;
+            }
+
+         } // end of switch
+
+      } // end of try
+      catch(SocketException& e)
+      {
+         log.log(Log_NOTICE, std::string("Socket initialization failed: ") + endpointStr + ". "
+            "Exception: " + std::string(e.what() ) );
+
+         continue;
+      }
+
+      if (!sock) {
+         LOG(GENERAL, ERR, "Failed to open socket for unknown reasons.", endpointStr);
+         continue;
+      }
+
+      try
+      {
+         // the actual connection attempt
+         if(newRDMASock)
+            applySocketOptionsPreConnect(newRDMASock);
+         else
+         if(newStandardSock)
+            applySocketOptionsPreConnect(newStandardSock);
+
+         sock->connect(&iter->ipAddr, port);
+
+         if(errState.shouldPrintConnectedLogMsg(sock->getPeerIP(), sock->getSockType() ) )
+         {
+            std::string protocolStr = NetworkInterfaceCard::nicTypeToString(
+               sock->getSockType() );
+            std::string fallbackStr = isPrimaryInterface ? "" : "; fallback route";
+
+            log.log(Log_NOTICE, "Connected: " + endpointStr + " "
+               "(protocol: " + protocolStr + fallbackStr + ")" );
+         }
+
+         if(newStandardSock)
+            applySocketOptionsConnected(newStandardSock);
+
+         if(app->getCommonConfig()->getConnAuthHash() )
+            authenticateChannel(sock);
+
+         if(!isChannelDirect)
+            makeChannelIndirect(sock);
+
+         if(!isPrimaryInterface) // non-primary => set expiration counter
+            sock->setExpireTimeStart();
+
+         break;
+      }
+      catch(SocketException& e)
+      {
+         if(errState.shouldPrintConnectFailedLogMsg(sock->getPeerIP(), sock->getSockType() ) )
+            log.log(Log_NOTICE, std::string("Connect failed: ") + endpointStr + " "
+               "(protocol: " + NetworkInterfaceCard::nicTypeToString(sock->getSockType() ) +
+               "); Error: " + std::string(e.what() ) );
+
+         // the next interface is definitely non-primary
+         isPrimaryInterface = false;
+
+         delete(sock);
+      }
+   } // end of connect loop
+
+   mutexLock.lock(); // L O C K
+
+   if(iter != nicListCopy.end() )
+   {
+      // success => add to list (as unavailable)
+      connList.push_back(sock);
+      statsAddNic(sock->getSockType() );
+
+      errState.setConnSuccess(sock->getPeerIP(), sock->getSockType() );
+   }
+   else
+   {
+      // absolutely unable to connect
+      sock = NULL;
+      establishedConns--;
+
+      if(!errState.getWasLastTimeCompleteFail() )
+      {
+         log.log(Log_CRITICAL,
+            "Connect failed on all available routes: " + parentNode.getNodeIDWithTypeStr() );
+
+         errState.setCompleteFail();
+      }
+
+      // we are not using this connection => notify next waiter
+      changeCond.signal();
+   }
+
    if(!sock)
       throw SocketConnectException("Connect failed on all available routes");
 
@@ -396,15 +303,13 @@ void NodeConnPool::releaseStreamSocket(Socket* sock)
 
    // mark the socket as available
 
-   SafeMutexLock mutexLock(&mutex);
+   const std::lock_guard<Mutex> lock(mutex);
 
    availableConns++;
 
    pooledSock->setAvailable(true);
 
    changeCond.signal();
-
-   mutexLock.unlock();
 }
 
 void NodeConnPool::invalidateStreamSocket(Socket* sock)
@@ -425,30 +330,30 @@ void NodeConnPool::invalidateSpecificStreamSocket(Socket* sock)
 
    bool sockValid = true;
 
-   SafeMutexLock mutexLock(&mutex);
-
-   ConnListIter iter = connList.begin();
-
-   while( (*iter != ((PooledSocket*)sock) ) && (iter != connList.end() ) )
-      iter++;
-
-   if(unlikely(iter == connList.end() ) )
    {
-      log.logErr("Tried to remove a socket that was not found in the pool: " +
-         sock->getPeername() );
-      sockValid = false;
+      const std::lock_guard<Mutex> lock(mutex);
+
+      ConnListIter iter = connList.begin();
+
+      while( (*iter != ((PooledSocket*)sock) ) && (iter != connList.end() ) )
+         iter++;
+
+      if(unlikely(iter == connList.end() ) )
+      {
+         log.logErr("Tried to remove a socket that was not found in the pool: " +
+            sock->getPeername() );
+         sockValid = false;
+      }
+      else
+      { // found the socket in the pool => remove from pool list
+         establishedConns--;
+
+         connList.erase(iter);
+         statsRemoveNic(sock->getSockType() );
+
+         changeCond.signal();
+      }
    }
-   else
-   { // found the socket in the pool => remove from pool list
-      establishedConns--;
-
-      connList.erase(iter);
-      statsRemoveNic(sock->getSockType() );
-
-      changeCond.signal();
-   }
-
-   mutexLock.unlock();
 
    if(!sockValid)
       return;
@@ -464,7 +369,7 @@ void NodeConnPool::invalidateSpecificStreamSocket(Socket* sock)
    }
 
    log.log(Log_DEBUG, std::string("Disconnected: ") +
-      parentNode.getNodeTypeStr() + "@" + sock->getPeername() );
+      boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" + sock->getPeername() );
 
    delete(sock);
 }
@@ -486,33 +391,33 @@ unsigned NodeConnPool::invalidateAllAvailableStreams(bool idleStreamsOnly)
    unsigned numInvalidated = 0; // retVal
    ConnectionList availableConnsList;
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
-
-   if(this->availableConns)
-      LOG_DEBUG_CONTEXT(log, Log_DEBUG,
-         "Currently available connections: " + StringTk::uintToStr(this->availableConns) );
-
-
-   // STAGE 1: grab all sockets that should be disconnected
-
-   for(ConnListIter iter = connList.begin(); iter != connList.end(); iter++)
    {
-      PooledSocket* sock = *iter;
+      const std::lock_guard<Mutex> lock(mutex);
 
-      if(!sock->isAvailable() )
-         continue;
+      if(this->availableConns)
+         LOG_DEBUG_CONTEXT(log, Log_DEBUG,
+            "Currently available connections: " + StringTk::uintToStr(this->availableConns) );
 
-      if(idleStreamsOnly && sock->getHasActivity() )
-         continue; // idle-only requested and this one was not idle
 
-      sock->setAvailable(false);
-      this->availableConns--;
-      availableConnsList.push_back(sock);
+      // STAGE 1: grab all sockets that should be disconnected
 
-      numInvalidated++;
+      for(ConnListIter iter = connList.begin(); iter != connList.end(); iter++)
+      {
+         PooledSocket* sock = *iter;
+
+         if(!sock->isAvailable() )
+            continue;
+
+         if(idleStreamsOnly && sock->getHasActivity() )
+            continue; // idle-only requested and this one was not idle
+
+         sock->setAvailable(false);
+         this->availableConns--;
+         availableConnsList.push_back(sock);
+
+         numInvalidated++;
+      }
    }
-
-   mutexLock.unlock(); // U N L O C K
 
 
    // STAGE 2: invalidate all grabbed sockets
@@ -547,7 +452,7 @@ unsigned NodeConnPool::disconnectAndResetIdleStreams()
  */
 void NodeConnPool::resetStreamsIdleFlag()
 {
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    for(ConnListIter iter = connList.begin(); iter != connList.end(); iter++)
    {
@@ -558,14 +463,12 @@ void NodeConnPool::resetStreamsIdleFlag()
 
       sock->resetHasActivity();
    }
-
-   mutexLock.unlock(); // U N L O C K
 }
 
 
 void NodeConnPool::applySocketOptionsPreConnect(RDMASocket* sock)
 {
-   ICommonConfig* cfg = app->getCommonConfig();
+   auto cfg = app->getCommonConfig();
 
    sock->setBuffers(cfg->getConnRDMABufNum(), cfg->getConnRDMABufSize() );
    sock->setTypeOfService(cfg->getConnRDMATypeOfService());
@@ -573,17 +476,7 @@ void NodeConnPool::applySocketOptionsPreConnect(RDMASocket* sock)
 
 void NodeConnPool::applySocketOptionsPreConnect(StandardSocket* sock)
 {
-   ICommonConfig* cfg = app->getCommonConfig();
-
-   /* note: we're just re-using the rdma buffer settings here. should later be changed to separate
-      settings */
-
-   sock->setSoRcvBuf(cfg->getConnRDMABufNum() * cfg->getConnRDMABufSize() );
-}
-
-void NodeConnPool::applySocketOptionsPreConnect(NamedSocket* sock)
-{
-   ICommonConfig* cfg = app->getCommonConfig();
+   auto cfg = app->getCommonConfig();
 
    /* note: we're just re-using the rdma buffer settings here. should later be changed to separate
       settings */
@@ -623,82 +516,23 @@ void NodeConnPool::applySocketOptionsConnected(StandardSocket* sock)
    {
       log.log(Log_NOTICE, "Failed to enable SoKeepAlive");
    }
-
-   // apply special tcp options
-
-   if(sock->getSockDomain() == PF_INET)
-   {
-      // increase receive buf length
-//      {
-//         int rcvBufLen = 1048576;
-//         socklen_t rcvBufLenSize = sizeof(rcvBufLen);
-//         int rcvBufRes = setsockopt(
-//            sock->getFD(), SOL_SOCKET, SO_RCVBUF, &rcvBufLen, rcvBufLenSize);
-//         if(rcvBufRes)
-//            log.log(3, std::string("Failed to set socket receive buffer size. SysErr: ") +
-//               System::getErrString() );
-//      }
-
-
-
-//      {
-//         int sndBufLen = 0;
-//         socklen_t sndBufLenSize = sizeof(sndBufLen);
-//         int sndBufRes = getsockopt(
-//            sock->getFD(), SOL_SOCKET, SO_SNDBUF, &sndBufLen, &sndBufLenSize);
-//         if(sndBufRes)
-//            log.log(3, std::string("Failed to get socket send buffer size. SysErr: ") +
-//               System::getErrString() );
-//
-//         int rcvBufLen = 0;
-//         socklen_t rcvBufLenSize = sizeof(rcvBufLen);
-//         int rcvBufRes = getsockopt(
-//            sock->getFD(), SOL_SOCKET, SO_RCVBUF, &rcvBufLen, &rcvBufLenSize);
-//         if(rcvBufRes)
-//            log.log(3, std::string("Failed to get socket receive buffer size. SysErr: ") +
-//               System::getErrString() );
-//
-//         log.log(4, std::string("Socket sndbuf/recvbuf: ") + StringTk::intToStr(sndBufLen) + "/" +
-//            StringTk::intToStr(rcvBufLen) );
-//      }
-   }
 }
 
 void NodeConnPool::authenticateChannel(Socket* sock)
 {
    uint64_t authHash = app->getCommonConfig()->getConnAuthHash();
    AuthenticateChannelMsg authMsg(authHash);
-   std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(&authMsg);
+   const auto msgBuf = MessagingTk::createMsgVec(authMsg);
 
-   try
-   {
-      sock->sendto(msgBuf.first, msgBuf.second, 0, NULL, 0);
-   }
-   catch(SocketException& e)
-   {
-      free(msgBuf.first);
-      throw;
-   }
-
-   free(msgBuf.first);
+   sock->sendto(&msgBuf[0], msgBuf.size(), 0, NULL, 0);
 }
 
 void NodeConnPool::makeChannelIndirect(Socket* sock)
 {
    SetChannelDirectMsg directMsg(false);
-   std::pair<char*, unsigned> msgBuf = MessagingTk::createMsgBuf(&directMsg);
+   const auto msgBuf = MessagingTk::createMsgVec(directMsg);
 
-   try
-   {
-      sock->sendto(msgBuf.first, msgBuf.second, 0, NULL, 0);
-   }
-   catch(SocketException& e)
-   {
-      free(msgBuf.first);
-      throw;
-   }
-
-   free(msgBuf.first);
+   sock->sendto(&msgBuf[0], msgBuf.size(), 0, NULL, 0);
 }
 
 /**
@@ -710,17 +544,17 @@ void NodeConnPool::updateInterfaces(unsigned short streamPort, NicAddressList& n
    bool portHasChanged = false; // we only check port, because nicList check would be too
       // inefficient and not worth the effort
 
-   SafeMutexLock mutexLock(&mutex); // L O C K
-
-   if(streamPort && (streamPort != this->streamPort) )
    {
-      this->streamPort = streamPort;
-      portHasChanged = true;
+      const std::lock_guard<Mutex> lock(mutex);
+
+      if(streamPort && (streamPort != this->streamPort) )
+      {
+         this->streamPort = streamPort;
+         portHasChanged = true;
+      }
+
+      this->nicList = nicList;
    }
-
-   this->nicList = nicList;
-
-   mutexLock.unlock(); // U N L O C K
 
    if(unlikely(portHasChanged) )
       invalidateAllAvailableStreams(false);
@@ -738,9 +572,7 @@ void NodeConnPool::updateInterfaces(unsigned short streamPort, NicAddressList& n
 bool NodeConnPool::getFirstPeerName(NicAddrType nicType, std::string* outPeerName,
    bool* outIsNonPrimary)
 {
-   bool foundMatch = false;
-
-   SafeMutexLock mutexLock(&mutex); // L O C K
+   const std::lock_guard<Mutex> lock(mutex);
 
    for(ConnListIter connIter = connList.begin(); connIter != connList.end(); connIter++)
    {
@@ -752,21 +584,16 @@ bool NodeConnPool::getFirstPeerName(NicAddrType nicType, std::string* outPeerNam
 
          *outIsNonPrimary = sock->getHasExpirationTimer();
 
-         foundMatch = true;
-         break;
+         return true;
       }
    }
 
-   if(!foundMatch)
-   { // print "n/a"
-      *outPeerName = "busy";
+   // print "n/a"
+   *outPeerName = "busy";
 
-      *outIsNonPrimary = false;
-   }
+   *outIsNonPrimary = false;
 
-   mutexLock.unlock(); // U N L O C K
-
-   return foundMatch;
+   return false;
 }
 
 /**
@@ -784,11 +611,6 @@ void NodeConnPool::statsAddNic(NicAddrType nicType)
       case NICADDRTYPE_SDP:
       {
          (stats.numEstablishedSDP)++;
-      } break;
-
-      case NICADDRTYPE_NAMEDSOCK:
-      {
-         (stats.numEstablishedNamed)++;
       } break;
 
       default:
@@ -813,11 +635,6 @@ void NodeConnPool::statsRemoveNic(NicAddrType nicType)
       case NICADDRTYPE_SDP:
       {
          (stats.numEstablishedSDP)--;
-      } break;
-
-      case NICADDRTYPE_NAMEDSOCK:
-      {
-         (stats.numEstablishedNamed)--;
       } break;
 
       default:

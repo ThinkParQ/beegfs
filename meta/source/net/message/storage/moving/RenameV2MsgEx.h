@@ -70,7 +70,7 @@ class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
          const std::string& newName, std::string& unlinkedEntryID);
 
       FhgfsOpsErr renameInSameDir(DirInode& fromParent, const std::string& oldName,
-         const std::string& newName, std::string& unlinkedEntryID);
+         const std::string& toName, std::string& unlinkedEntryID);
       FhgfsOpsErr renameDir(DirInode& fromParent, EntryInfo* fromDirInfo,
          const std::string& oldName, EntryInfo* toDirInfo, const std::string& newName);
       FhgfsOpsErr renameFile(DirInode& fromParent, EntryInfo* fromDirInfo,
@@ -82,7 +82,7 @@ class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
          StringVector xattrs, std::string& unlinkedEntryID);
       FhgfsOpsErr remoteDirInsert(EntryInfo* toDirInfo, const std::string& newName,
          char* serialBuf, size_t serialBufLen);
-      FhgfsOpsErr updateRenamedDirInode(EntryInfo* renamedEntryInfo, EntryInfo* toDirInfo);
+      FhgfsOpsErr updateRenamedDirInode(EntryInfo* renamedDirEntryInfo, EntryInfo* toDirInfo);
 
       void forwardToSecondary(ResponseContext& ctx) override;
 

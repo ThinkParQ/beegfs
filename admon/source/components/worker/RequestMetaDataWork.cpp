@@ -14,16 +14,14 @@ void RequestMetaDataWork::process(char* bufIn, unsigned bufInLen,
       lastStatsTime = highResStats.back().rawVals.statsTimeMS;
    }
 
-   // generate the RequestDataMsg with the lastStatsTime
    RequestMetaDataMsg requestDataMsg(lastStatsTime);
-   char *outBuf;
-   NetMessage *rspMsg = NULL;
-   bool respReceived = MessagingTk::requestResponse(*node, &requestDataMsg,
-      NETMSGTYPE_RequestMetaDataResp, &outBuf, &rspMsg);
+
+   const auto rspMsg = MessagingTk::requestResponse(*node, requestDataMsg,
+      NETMSGTYPE_RequestMetaDataResp);
 
    // if node does not respond set not-responding flag, otherwise process the
    // response
-   if (!respReceived)
+   if (!rspMsg)
    {
       log.log(Log_SPAM, std::string("Received no response from node: ") +
          node->getNodeIDWithTypeStr() );
@@ -32,8 +30,7 @@ void RequestMetaDataWork::process(char* bufIn, unsigned bufInLen,
    else
    {
       // get response and process it
-      RequestMetaDataRespMsg *metaAdmonDataMsg =
-         (RequestMetaDataRespMsg*) rspMsg;
+      auto *metaAdmonDataMsg = (RequestMetaDataRespMsg*) rspMsg.get();
       std::string nodeID = metaAdmonDataMsg->getNodeID();
       NumNodeID nodeNumID = metaAdmonDataMsg->getNodeNumID();
       App *app = Program::getApp();
@@ -58,8 +55,5 @@ void RequestMetaDataWork::process(char* bufIn, unsigned bufInLen,
       // be deleted in there)
       NodeStoreMetaEx *metaNodeStore = app->getMetaNodes();
       metaNodeStore->addOrUpdateNode(std::move(newNode));
-
-      SAFE_FREE(outBuf);
-      SAFE_DELETE(metaAdmonDataMsg);
    }
 }

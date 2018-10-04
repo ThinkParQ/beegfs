@@ -2,9 +2,7 @@
 #define NODE_H_
 
 #include <common/Common.h>
-#include <common/nodes/NodeFeatureFlags.h>
 #include <common/nodes/NumNodeID.h>
-#include <common/threading/SafeMutexLock.h>
 #include <common/threading/Condition.h>
 #include <common/toolkit/BitStore.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -12,6 +10,8 @@
 
 #include "NodeConnPool.h"
 #include "NodeType.h"
+
+#include <mutex>
 
 // forward declaration
 class Node;
@@ -30,8 +30,8 @@ typedef NodeList::iterator NodeListIter;
 class Node
 {
    public:
-      Node(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP, unsigned short portTCP,
-         const NicAddressList& nicList);
+      Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
+         unsigned short portTCP, const NicAddressList& nicList);
       virtual ~Node();
 
       Node(const Node&) = delete;
@@ -43,30 +43,24 @@ class Node
 
       void updateLastHeartbeatT();
       Time getLastHeartbeatT();
-      bool waitForNewHeartbeatT(Time* oldT, int timeoutMS);
       void updateInterfaces(unsigned short portUDP, unsigned short portTCP,
          NicAddressList& nicList);
 
       std::string getTypedNodeID() const;
       std::string getNodeIDWithTypeStr() const;
-      std::string getNodeTypeStr() const;
-
-      void setFeatureFlags(const BitStore* featureFlags);
 
       // static
       static std::string getTypedNodeID(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType);
       static std::string getNodeIDWithTypeStr(std::string nodeID, NumNodeID nodeNumID,
          NodeType nodeType);
-      static std::string nodeTypeToStr(NodeType nodeType);
 
 
    protected:
       Mutex mutex;
-      Condition changeCond; // for last heartbeat time changes only
 
       NodeType nodeType;
 
-      Node(std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP);
+      Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP);
 
       void updateLastHeartbeatTUnlocked();
       Time getLastHeartbeatTUnlocked();
@@ -83,10 +77,6 @@ class Node
    private:
       std::string id; // string ID, generated locally on each node
       NumNodeID numID; // numeric ID, assigned by mgmtd server store
-
-      unsigned fhgfsVersion; // fhgfs version code of this node
-      BitStore nodeFeatureFlags; /* supported features of this node (access not protected by mutex,
-                                    so be careful with updates) */
 
       NodeConnPool* connPool;
       unsigned short portUDP;
@@ -124,15 +114,9 @@ class Node
 
       unsigned short getPortUDP()
       {
-         unsigned short retVal;
+         const std::lock_guard<Mutex> lock(mutex);
 
-         SafeMutexLock mutexLock(&mutex);
-
-         retVal = this->portUDP;
-
-         mutexLock.unlock();
-
-         return retVal;
+         return this->portUDP;
       }
 
       virtual unsigned short getPortTCP()
@@ -145,64 +129,13 @@ class Node
          return nodeType;
       }
 
-      void setNodeType(NodeType nodeType)
-      {
-         this->nodeType = nodeType;
-      }
-
-      unsigned getFhgfsVersion() const
-      {
-         return this->fhgfsVersion;
-      }
-
-      void setFhgfsVersion(unsigned fhgfsVersion)
-      {
-         this->fhgfsVersion = fhgfsVersion;
-      }
-
-      /**
-       * Check if this node supports a certain feature.
-       */
-      bool hasFeature(unsigned featureBitIndex)
-      {
-         SafeMutexLock lock(&mutex);
-
-         bool result = nodeFeatureFlags.getBitNonAtomic(featureBitIndex);
-
-         lock.unlock();
-
-         return result;
-      }
-
-      /**
-       * Add a feature flag to this node.
-       */
-      void addFeature(unsigned featureBitIndex)
-      {
-         SafeMutexLock lock(&mutex);
-
-         nodeFeatureFlags.setBit(featureBitIndex, true);
-
-         lock.unlock();
-      }
-
-      /**
-       * note: returns a reference to internal flags, so this is only valid while you hold a
-       * reference to this node.
-       */
-      const BitStore* getNodeFeatures()
-      {
-         return &nodeFeatureFlags;
-      }
-
-
 
       struct VectorDes
       {
-         bool longNodeIDs;
+         bool v6;
          std::vector<NodeHandle>& nodes;
 
-         friend Deserializer& operator%(Deserializer& des, const VectorDes& value)
+         Deserializer& runV6(Deserializer& des) const
          {
             uint32_t elemCount;
             uint32_t padding;
@@ -214,9 +147,9 @@ class Node
             if(!des.good())
                return des;
 
-            value.nodes.clear();
+            nodes.clear();
 
-            while (value.nodes.size() != elemCount)
+            while (nodes.size() != elemCount)
             {
                // PADDING
                PadFieldTo<Deserializer> pad(des, 8);
@@ -234,20 +167,8 @@ class Node
                   % nodeFeatureFlags
                   % serdes::stringAlign4(nodeID)
                   % nicList
-                  % fhgfsVersion;
-
-               if (value.longNodeIDs)
-               {
-                  des % nodeNumID;
-               }
-               else
-               {
-                  uint16_t id;
-                  des % id;
-                  nodeNumID = NumNodeID(id);
-               }
-
-               des
+                  % fhgfsVersion
+                  % nodeNumID
                   % portUDP
                   % portTCP
                   % nodeType;
@@ -255,42 +176,77 @@ class Node
                if(unlikely(!des.good()))
                   break;
 
-               value.nodes.push_back(std::make_shared<Node>(nodeID, nodeNumID, portUDP, portTCP,
-                     nicList));
-               value.nodes.back()->setNodeType(NodeType(nodeType) );
-               value.nodes.back()->setFhgfsVersion(fhgfsVersion);
-               value.nodes.back()->setFeatureFlags(&nodeFeatureFlags);
+               nodes.push_back(std::make_shared<Node>(NodeType(nodeType), nodeID, nodeNumID,
+                     portUDP, portTCP, nicList));
             }
 
             return des;
          }
+
+         Deserializer& run(Deserializer& des) const
+         {
+            uint32_t elemCount;
+
+            des % elemCount;
+
+            if(!des.good())
+               return des;
+
+            nodes.clear();
+
+            while (nodes.size() != elemCount)
+            {
+               NicAddressList nicList;
+               char nodeType = 0;
+               uint16_t portTCP = 0;
+               uint16_t portUDP = 0;
+               NumNodeID nodeNumID;
+               std::string nodeID;
+
+               des
+                  % nodeID
+                  % nicList
+                  % nodeNumID
+                  % portUDP
+                  % portTCP
+                  % nodeType;
+
+               if(unlikely(!des.good()))
+                  break;
+
+               nodes.push_back(std::make_shared<Node>(NodeType(nodeType), nodeID, nodeNumID,
+                        portUDP, portTCP, nicList));
+            }
+
+            return des;
+         }
+
+         friend Deserializer& operator%(Deserializer& des, const VectorDes& value)
+         {
+            if (value.v6)
+               return value.runV6(des);
+            else
+               return value.run(des);
+         }
       };
 
-      static VectorDes vectorWithShortIDs(std::vector<NodeHandle>& nodes)
+      static VectorDes inV6Format(std::vector<NodeHandle>& nodes)
       {
-         VectorDes result = { false, nodes };
-         return result;
+         return {true, nodes};
       }
 };
 
 inline Serializer& operator%(Serializer& ser, const std::vector<NodeHandle>& nodes)
 {
-   ser
-      % uint32_t(nodes.size() )
-      % uint32_t(0); // PADDING
+   ser % uint32_t(nodes.size());
 
    for (auto it = nodes.begin(), end = nodes.end(); it != end; ++it)
    {
-      // PADDING
-      PadFieldTo<Serializer> pad(ser, 8);
-
       Node& node = **it;
 
       ser
-         % *node.getNodeFeatures()
-         % serdes::stringAlign4(node.getID() )
+         % node.getID()
          % node.getNicList()
-         % node.getFhgfsVersion()
          % node.getNumID()
          % node.getPortUDP()
          % node.getPortTCP()
@@ -302,7 +258,7 @@ inline Serializer& operator%(Serializer& ser, const std::vector<NodeHandle>& nod
 
 inline Deserializer& operator%(Deserializer& des, std::vector<NodeHandle>& nodes)
 {
-   Node::VectorDes mod = { true, nodes };
+   Node::VectorDes mod = { false, nodes };
    return des % mod;
 }
 

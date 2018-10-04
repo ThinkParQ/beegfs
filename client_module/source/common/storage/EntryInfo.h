@@ -32,10 +32,9 @@ static inline void EntryInfo_updateSetParentEntryID(EntryInfo *this, const char 
 static inline char const* EntryInfo_getParentEntryID(const EntryInfo* this);
 static inline char const* EntryInfo_getEntryID(const EntryInfo* this);
 static inline void EntryInfo_updateFileName(EntryInfo *this, const char* newFileName);
-static inline int EntryInfo_getFeatureFlags(const EntryInfo *this);
 static inline bool EntryInfo_getIsBuddyMirrored(const EntryInfo *this);
 
-extern void EntryInfo_serialize(const EntryInfo* this, SerializeCtx* ctx);
+extern void EntryInfo_serialize(SerializeCtx* ctx, const EntryInfo* this);
 extern bool EntryInfo_deserialize(DeserializeCtx* ctx, EntryInfo* outThis);
 
 
@@ -182,11 +181,6 @@ void EntryInfo_updateFileName(EntryInfo *this, const char* newFileName)
 {
    kfree(this->fileName);
    this->fileName =  StringTk_strDup(newFileName);
-}
-
-int EntryInfo_getFeatureFlags(const EntryInfo *this)
-{
-   return this->featureFlags;
 }
 
 bool EntryInfo_getIsBuddyMirrored(const EntryInfo *this)

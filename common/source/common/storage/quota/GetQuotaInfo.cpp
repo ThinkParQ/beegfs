@@ -9,29 +9,83 @@ typedef std::map<uint16_t, std::shared_ptr<Mutex>> MutexMap;
 
 
 /*
- * send the quota data requests to the storage nodes and collects the responses
+ * send the quota limit requests to the management node and collects the responses
  *
  * note: the usage of storage pools here will only work if cfgTargetSelection  is set to
  * GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET
  *
  * @param mgmtNode the management node, need to be referenced
+ * @param workQ the MultiWorkQueue to use
+ * @param outQuotaResults returns the quota informations
+ * @param mapper the target mapper (only required for GETQUOTACONFIG_SINGLE_TARGET and
+ *        GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET)
+ * @param storagePoolId the storagePool to get information for; is only relevant if
+ *        storagePoolStore is !NULL
+ * @return error information, true on success, false if a error occurred
+ */
+bool GetQuotaInfo::requestQuotaLimitsAndCollectResponses(const NodeHandle& mgmtNode,
+   MultiWorkQueue* workQ, QuotaDataMapForTarget* outQuotaResults, const TargetMapper* mapper,
+   StoragePoolId storagePoolId)
+{
+   bool retVal = true;
+
+   SynchronizedCounter counter;
+
+   int maxMessageCount = getMaxMessageCount();
+
+   UInt16Vector nodeResults(maxMessageCount);
+   QuotaInodeSupport quotaInodeSupport;
+
+   Mutex mutex;
+
+   auto& resultMap = (*outQuotaResults)[QUOTADATAMAPFORTARGET_ALL_TARGETS_ID];
+
+   for (int messageNumber = 0; messageNumber < maxMessageCount; messageNumber++)
+   {
+      Work* work = new GetQuotaInfoWork(cfg, mgmtNode, messageNumber, &resultMap, &mutex,
+            &counter, &nodeResults[messageNumber], &quotaInodeSupport, storagePoolId);
+      workQ->addDirectWork(work);
+   }
+
+   // wait for all work to be done
+   counter.waitForCount(maxMessageCount);
+
+   for (auto iter = nodeResults.begin(); iter != nodeResults.end(); iter++)
+   {
+      if (*iter != 0)
+      {
+         // delete QuotaDataMap with invalid QuotaData
+         if (cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
+            outQuotaResults->erase(*iter);
+
+         retVal = false;
+      }
+   }
+
+   return retVal;
+}
+
+/*
+ * send the quota data requests to the storage nodes and collects the responses
+ *
+ * note: the usage of storage pools here will only work if cfgTargetSelection  is set to
+ * GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET
+ *
  * @param storageNodes a NodeStore with all storage servers
  * @param workQ the MultiWorkQueue to use
  * @param outQuotaResults returns the quota informations
  * @param mapper the target mapper (only required for GETQUOTACONFIG_SINGLE_TARGET and
  *        GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST_PER_TARGET)
- * @param requestLimits if true, the quota limits will be downloaded from the management server and
- *        not the used quota will be downloaded from the storage servers
  * @param storagePoolStore if !NULL the variable storagePoolId will be considered and only targets
  *        belonging to the given storage pool will be accounted
  * @param storagePoolId the storagePool to get information for; is only relevant if
  *        storagePoolStore is !NULL
  * @return error information, true on success, false if a error occurred
  */
-bool GetQuotaInfo::requestQuotaDataAndCollectResponses(const NodeHandle& mgmtNode,
-   NodeStoreServers* storageNodes, MultiWorkQueue* workQ, QuotaDataMapForTarget* outQuotaResults,
-   TargetMapper* mapper, bool requestLimits, QuotaInodeSupport* quotaInodeSupport,
-   StoragePoolStore* storagePoolStore, StoragePoolId storagePoolId)
+bool GetQuotaInfo::requestQuotaDataAndCollectResponses(const NodeStoreServers* storageNodes,
+   MultiWorkQueue* workQ, QuotaDataMapForTarget* outQuotaResults, const TargetMapper* mapper,
+   QuotaInodeSupport* quotaInodeSupport, StoragePoolStore* storagePoolStore,
+   StoragePoolId storagePoolId)
 {
    bool retVal = true;
 
@@ -45,33 +99,6 @@ bool GetQuotaInfo::requestQuotaDataAndCollectResponses(const NodeHandle& mgmtNod
 
    MutexMap mutexMap;
 
-   if(requestLimits)
-   { /* download the limits from the management daemon, multiple messages will be used if the
-        payload of the message is to small */
-      nodeResults = UInt16Vector(maxMessageCount);
-
-      QuotaDataMap map;
-      outQuotaResults->insert(QuotaDataMapForTargetMapVal(QUOTADATAMAPFORTARGET_ALL_TARGETS_ID,
-         map) );
-
-      //send command to the storage servers and print the response
-      // request all subranges (=> msg size limitation) from current server
-      mutexMap.insert({ QUOTADATAMAPFORTARGET_ALL_TARGETS_ID, std::make_shared<Mutex>() });
-
-      for(int messageNumber = 0; messageNumber < maxMessageCount; messageNumber++)
-      {
-         Work* work = new GetQuotaInfoWork(this->cfg, mgmtNode, messageNumber,
-            &outQuotaResults->find(QUOTADATAMAPFORTARGET_ALL_TARGETS_ID)->second,
-            mutexMap[QUOTADATAMAPFORTARGET_ALL_TARGETS_ID].get(), &counter,
-            &nodeResults[numWorks], quotaInodeSupport, storagePoolId);
-         workQ->addDirectWork(work);
-
-         numWorks++;
-      }
-
-      *quotaInodeSupport = QuotaInodeSupport_UNKNOWN;
-   }
-   else
    if(this->cfg.cfgTargetSelection == GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
    { /* download the used quota from the storage daemon, one request for all targets, multiple
         messages will be used if the payload of the message is to small */
@@ -206,7 +233,7 @@ bool GetQuotaInfo::requestQuotaDataAndCollectResponses(const NodeHandle& mgmtNod
    counter.waitForCount(numWorks);
 
    // merge the quota data if required
-   if(!requestLimits && (this->cfg.cfgTargetSelection == GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST) )
+   if (cfg.cfgTargetSelection == GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
    {
       QuotaDataMap map = calculateQuotaSums(*outQuotaResults);
 

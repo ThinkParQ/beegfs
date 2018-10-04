@@ -5,9 +5,9 @@
 #include <common/toolkit/list/UInt8List.h>
 #include <common/toolkit/NodesTk.h>
 #include <common/toolkit/StringTk.h>
-#include <common/nodes/TargetStateInfo.h>
 #include <common/nodes/TargetStateStore.h>
 #include <common/Common.h>
+#include <common/Types.h>
 #include <components/InternodeSyncer.h>
 #include <components/AckManager.h>
 #include <toolkit/ExternalHelperd.h>
@@ -26,7 +26,6 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "logType",
    "logClientID",
    "logHelperdIP",
-   "connUseSDP",
    "connUseRDMA",
    "connMgmtdPortUDP",
    "connClientPortUDP",
@@ -74,7 +73,6 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
 
 #ifdef LOG_DEBUG_MESSAGES
    "tunePageCacheValidityMS", // currently not public
-   "tuneAttribCacheValidityMS", // currently not public
    "tuneFileCacheBufNum", // currently not public
 #endif // LOG_DEBUG_MESSAGES
 
@@ -95,15 +93,10 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "logType = %s\n", Config_logTypeNumToStr(Config_getLogTypeNum(cfg) ) );
    seq_printf(file, "logClientID = %d\n", (int)Config_getLogClientID(cfg) );
    seq_printf(file, "logHelperdIP = %s\n", Config_getLogHelperdIP(cfg) );
-   seq_printf(file, "connUseSDP = %d\n", (int)Config_getConnUseSDP(cfg) );
    seq_printf(file, "connUseRDMA = %d\n", (int)Config_getConnUseRDMA(cfg) );
    seq_printf(file, "connMgmtdPortUDP = %d\n", (int)Config_getConnMgmtdPortUDP(cfg) );
    seq_printf(file, "connClientPortUDP = %d\n", (int)Config_getConnClientPortUDP(cfg) );
-   seq_printf(file, "connMetaPortUDP = %d\n", (int)Config_getConnMetaPortUDP(cfg) );
-   seq_printf(file, "connStoragePortUDP = %d\n", (int)Config_getConnStoragePortUDP(cfg) );
    seq_printf(file, "connMgmtdPortTCP = %d\n", (int)Config_getConnMgmtdPortUDP(cfg) );
-   seq_printf(file, "connMetaPortTCP = %d\n", (int)Config_getConnMetaPortTCP(cfg) );
-   seq_printf(file, "connStoragePortTCP = %d\n", (int)Config_getConnStoragePortTCP(cfg) );
    seq_printf(file, "connHelperdPortTCP = %d\n", (int)Config_getConnHelperdPortTCP(cfg) );
    seq_printf(file, "connMaxInternodeNum = %u\n", Config_getConnMaxInternodeNum(cfg) );
    seq_printf(file, "connInterfacesFile = %s\n", Config_getConnInterfacesFile(cfg) );
@@ -149,7 +142,6 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
 
 #ifdef LOG_DEBUG_MESSAGES
    seq_printf(file, "tunePageCacheValidityMS = %u\n", Config_getTunePageCacheValidityMS(cfg) );
-   seq_printf(file, "tuneAttribCacheValidityMS = %u\n", Config_getTuneAttribCacheValidityMS(cfg) );
    seq_printf(file, "tuneFileCacheBufNum = %d\n", Config_getTuneFileCacheBufNum(cfg) );
 #endif // LOG_DEBUG_MESSAGES
 
@@ -188,9 +180,6 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
    if(!strcmp(currentKey, "logHelperdIP") )
       count = scnprintf(buf, size, "%s = %s\n", currentKey, Config_getLogHelperdIP(cfg) );
    else
-   if(!strcmp(currentKey, "connUseSDP") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, (int)Config_getConnUseSDP(cfg) );
-   else
    if(!strcmp(currentKey, "connUseRDMA") )
       count = scnprintf(buf, size, "%s = %d\n", currentKey, (int)Config_getConnUseRDMA(cfg) );
    else
@@ -202,25 +191,9 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
       count = scnprintf(buf, size, "%s = %d\n",
          currentKey, (int)Config_getConnClientPortUDP(cfg) );
    else
-   if(!strcmp(currentKey, "connMetaPortUDP") )
-      count = scnprintf(buf, size, "%s = %d\n",
-         currentKey, (int)Config_getConnMetaPortUDP(cfg) );
-   else
-   if(!strcmp(currentKey, "connStoragePortUDP") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         (int)Config_getConnStoragePortUDP(cfg) );
-   else
    if(!strcmp(currentKey, "connMgmtdPortTCP") )
       count = scnprintf(buf, size, "%s = %d\n",
          currentKey, (int)Config_getConnMgmtdPortUDP(cfg) );
-   else
-   if(!strcmp(currentKey, "connMetaPortTCP") )
-      count = scnprintf(buf, size, "%s = %d\n",
-         currentKey, (int)Config_getConnMetaPortTCP(cfg) );
-   else
-   if(!strcmp(currentKey, "connStoragePortTCP") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         (int)Config_getConnStoragePortTCP(cfg) );
    else
    if(!strcmp(currentKey, "connHelperdPortTCP") )
       count = scnprintf(buf, size, "%s = %d\n", currentKey,
@@ -283,10 +256,6 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
    if(!strcmp(currentKey, "tunePageCacheValidityMS") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey,
          Config_getTunePageCacheValidityMS(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneAttribCacheValidityMS") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getTuneAttribCacheValidityMS(cfg) );
    else
    if(!strcmp(currentKey, "tuneRemoteFSync") )
       count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getTuneRemoteFSync(cfg) );
@@ -642,7 +611,7 @@ int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
    for( ; !NicAddressListIter_end(&nicIter); NicAddressListIter_next(&nicIter) )
    {
       NicAddress* nicAddr = NicAddressListIter_value(&nicIter);
-      char* nicAddrStr = NIC_nicAddrToStringLight(nicAddr);
+      char* nicAddrStr = NIC_nicAddrToString(nicAddr);
 
       if(unlikely(!nicAddrStr) )
          seq_printf(file, "%sNIC not available [Error: Out of memory]\n", NIC_INDENTATION_STR);
@@ -686,7 +655,7 @@ int ProcFsHelper_read_clientInfo(char* buf, char** start, off_t offset, int size
       char* tmpStr = vmalloc(nicListStrLen);
 
       // extended NIC info
-      nicAddrStr = NIC_nicAddrToStringLight(nicAddr);
+      nicAddrStr = NIC_nicAddrToString(nicAddr);
       snprintf(tmpStr, nicListStrLen, "%s%s%s\n", extendedNicListStr, NIC_INDENTATION_STR,
          nicAddrStr);
       strcpy(extendedNicListStr, tmpStr); // tmpStr to avoid writing to a buffer that we're

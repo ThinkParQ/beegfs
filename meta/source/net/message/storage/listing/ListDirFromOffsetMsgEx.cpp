@@ -2,13 +2,13 @@
 #include <common/net/message/storage/listing/ListDirFromOffsetRespMsg.h>
 #include "ListDirFromOffsetMsgEx.h"
 
+#include <boost/lexical_cast.hpp>
+
 
 bool ListDirFromOffsetMsgEx::processIncoming(ResponseContext& ctx)
 {
    #ifdef BEEGFS_DEBUG
       const char* logContext = "ListDirFromOffsetMsgEx incoming";
-
-      LOG_DEBUG(logContext, Log_DEBUG, "Received a ListDirFromOffsetMsg from: " + ctx.peerName() );
    #endif // BEEGFS_DEBUG
 
    EntryInfo* entryInfo = this->getEntryInfo();
@@ -33,7 +33,7 @@ bool ListDirFromOffsetMsgEx::processIncoming(ResponseContext& ctx)
    LOG_DEBUG(logContext, Log_SPAM,
       std::string("newServerOffset: ") + StringTk::int64ToStr(newServerOffset) + "; " +
       std::string("names.size: ") + StringTk::int64ToStr(names.size() ) + "; " +
-      std::string("listRes: ") + FhgfsOpsErrTk::toErrString(listRes) );
+      std::string("listRes: ") + boost::lexical_cast<std::string>(listRes));
 
    ctx.sendResponse(
          ListDirFromOffsetRespMsg(

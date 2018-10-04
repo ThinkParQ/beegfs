@@ -17,6 +17,11 @@ class ModeSetMetadataMirroring : public Mode
    private:
 
       bool setMirroring(Node& rootNode);
+      static bool verifyNoClientsActive();
+      static bool verifyBuddyGroupsDefined();
+
+
+      bool cfgForce = false;
 
 };
 

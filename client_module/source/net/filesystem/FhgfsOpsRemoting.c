@@ -56,14 +56,12 @@
 #include <common/toolkit/SynchronizedCounter.h>
 #include <nodes/NodeStoreEx.h>
 #include <common/net/message/NetMessage.h>
-#include <common/nodes/NodeFeatureFlags.h>
 #include <common/nodes/Node.h>
 #include <common/storage/StorageErrors.h>
 #include <common/toolkit/MathTk.h>
 #include <common/toolkit/MetadataTk.h>
 #include <common/FhgfsTypes.h>
 #include <common/toolkit/ackstore/AcknowledgmentStore.h>
-#include <common/toolkit/VersionTk.h>
 #include <common/Common.h>
 #include <net/filesystem/FhgfsOpsRemoting.h>
 #include <toolkit/NoAllocBufferStore.h>
@@ -1088,7 +1086,6 @@ FhgfsOpsErr __FhgfsOpsRemoting_flockGenericEx(NetMessage* requestMsg, unsigned r
    WaitAckNotification_uninit(&ackNotifier);
    WaitAckMap_uninit(&receivedAcks);
    WaitAckMap_uninit(&waitAcks);
-   WaitAck_uninit(&lockWaitAck);
 
    return retVal;
 }

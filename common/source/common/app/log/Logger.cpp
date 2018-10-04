@@ -3,7 +3,7 @@
 #include <common/toolkit/TimeAbs.h>
 #include "Logger.h"
 
-#include <time.h>
+#include <ctime>
 
 #undef  LOG_DEBUG
 #include <syslog.h>
@@ -14,107 +14,29 @@
 std::unique_ptr<Logger> Logger::logger;
 
 // Note: Keep in sync with enum LogTopic
-const Logger::LogTopicElem Logger::LogTopics[] =
+const char* const Logger::LogTopics[LogTopic_INVALID] =
 {
-   {"general",           LogTopic_GENERAL},
-   {"states",            LogTopic_STATES},
-   {"mirroring",         LogTopic_MIRRORING},
-   {"workqueues",        LogTopic_WORKQUEUES},
-   {"storage-pools",     LogTopic_STORAGEPOOLS},
-   {"capacity",          LogTopic_CAPACITY},
-   {"communication",     LogTopic_COMMUNICATION},
-   {"quota",             LogTopic_QUOTA},
-   {"sessions",          LogTopic_SESSIONS},
-   {"event-logger",      LogTopic_EVENTLOGGER},
-   {"unknown",           LogTopic_INVALID}
+   "general",
+   "states",
+   "mirroring",
+   "workqueues",
+   "storage-pools",
+   "capacity",
+   "communication",
+   "quota",
+   "sessions",
+   "event-logger",
+   "database",
+   "socklib",
 };
 
 static const int syslogLevelMapping[Log_LEVELMAX] = { LOG_ERR, LOG_CRIT, LOG_WARNING, 
    LOG_NOTICE, LOG_DEBUG, LOG_DEBUG };
 
-bool LogMessageBuilder::appendNextExtraInfoName(const char* suppliedName)
-{
-   if (suppliedName)
-      buffer << suppliedName;
-
-   if (!extraInfoNames || *extraInfoNames == '\0')
-      return suppliedName != NULL;
-
-   const char* infoEnd = extraInfoNames;
-
-   // skip to next comma on outermost level of syntax.
-   // since here we can be sure that extraInfoNames is the result of preprocessor operator ##
-   // applied to a valid set of expressions, we only have to care about (){}[]<> nesting and
-   // character/string literals.
-   // we can be sure of that because (*this, __VA_ARGS__) will have compiled for some value
-   // of __VA_ARGS__, and thus anything outside of a paren nesting will be on the outermost
-   // level of syntax.
-   // so why catch [], {}, <>? because operator, c++11, and templates.
-   unsigned parenDepth = 0;
-   while (*infoEnd != ',' || parenDepth > 0)
-   {
-      if (*infoEnd == '\0')
-         break;
-
-      switch (*infoEnd)
-      {
-         case '(':
-         case '[':
-         case '{':
-            parenDepth++;
-            infoEnd++;
-            break;
-
-         case ')':
-         case ']':
-         case '}':
-            parenDepth--;
-            infoEnd++;
-            break;
-
-         case '\'':
-         case '\"':
-         {
-            const char delimiter = *infoEnd;
-            infoEnd++;
-            while (*infoEnd != '\0' && *infoEnd != delimiter)
-            {
-               if (*infoEnd == '\\')
-                  infoEnd += 2;
-               else
-                  infoEnd += 1;
-            }
-            if (*infoEnd != '\0')
-               infoEnd++;
-            break;
-         }
-
-         default:
-            infoEnd++;
-            break;
-      }
-   }
-
-   if (!suppliedName)
-      buffer.write(extraInfoNames, infoEnd - extraInfoNames);
-
-   extraInfoNames = infoEnd;
-   if (*extraInfoNames == ',')
-   {
-      extraInfoNames++;
-      while (std::isspace(*extraInfoNames))
-         extraInfoNames++;
-   }
-
-   return true;
-}
-
-Logger::Logger(int defaultLevel, LogType cfgLogType,  bool errsToStdlog, bool noDate, 
-      const std::string& stdFile, const std::string& errFile, unsigned linesPerFile, 
-      unsigned rotatedFiles):
-   logType(cfgLogType), logLevels(LogTopic_INVALID, defaultLevel), 
-   logErrsToStdlog(errsToStdlog), logNoDate(noDate),logStdFile(stdFile), logErrFile(errFile), 
-   logNumLines(linesPerFile),logNumRotatedFiles(rotatedFiles)
+Logger::Logger(int defaultLevel, LogType cfgLogType,  bool noDate, const std::string& stdFile,
+      unsigned linesPerFile, unsigned rotatedFiles):
+   logType(cfgLogType), logLevels(LogTopic_INVALID, defaultLevel),
+   logNoDate(noDate),logStdFile(stdFile), logNumLines(linesPerFile),logNumRotatedFiles(rotatedFiles)
 {
    this->stdFile = stdout;
    this->errFile = stderr;
@@ -138,9 +60,6 @@ Logger::~Logger()
    // close files
    if(this->stdFile != stdout)
       fclose(this->stdFile);
-
-   if(!this->logErrsToStdlog && (this->errFile != stderr) )
-      fclose(this->errFile);
 
    pthread_rwlock_destroy(&this->rwLock);
 }
@@ -220,43 +139,6 @@ void Logger::logGranted(int level, const char* threadName, const char* context, 
 }
 
 /**
- * Prints a message to the error log.
- *
- * @param msg the actual log message
- */
-void Logger::logErrGranted(const char* threadName, const char* context, const char* msg)
-{
-   pthread_rwlock_rdlock(&this->rwLock);
-
-   TimeAbs nowTime;
-
-   char timeStr[LOGGER_TIMESTR_SIZE];
-   getTimeStr(nowTime.getTimeS(), timeStr, LOGGER_TIMESTR_SIZE);
-
-   if ( logType != LogType_SYSLOG )
-   {   
-#ifdef BEEGFS_DEBUG_PROFILING
-   uint64_t timeMicroS = nowTime.getTimeMicroSecPart();// additional microsecond info for timestamp
-
-   fprintf(errFile, "(E) %s.%06ld %s [%s] >> %s\n", timeStr, (long) timeMicroS,
-      threadName, context, msg);
-#else
-   fprintf(errFile, "(E) %s %s [%s] >> %s\n", timeStr, threadName, context, msg);
-#endif // BEEGFS_DEBUG_PROFILING
-      currentNumErrLines.increase();
-   }
-   else 
-   {
-      syslog(LOG_ERR, "(E) %s [%s] >> %s\n", threadName, context, msg);
-   }
-
-   pthread_rwlock_unlock(&this->rwLock);
-
-   rotateErrLogChecked();
-
-}
-
-/**
  * Prints a backtrage to the standard log.
  */
 void Logger::logBacktraceGranted(const char* context, int backtraceLength, char** backtraceSymbols)
@@ -320,33 +202,7 @@ void Logger::prepareLogFiles()
 
    setlinebuf(stdFile);
 
-   if(logErrsToStdlog)
-   {   
-      return;
-   }
-
-
-   if(!logErrFile.length() )
-   {
-      errFile = stderr;
-   }
-   else
-   {
-      rotateLogFile(logErrFile);
-
-      errFile = fopen(logErrFile.c_str(), "w");
-      if(!errFile)
-      {
-         perror("Logger::openErrLogFile");
-         errFile = stderr;
-         throw InvalidConfigException(
-            std::string("Unable to create error log file: ") + logErrFile);
-      }
-
-   }
-
-   setlinebuf(errFile);
-
+   return;
 }
 
 void Logger::rotateLogFile(std::string filename)
@@ -393,38 +249,6 @@ void Logger::rotateStdLogChecked()
    }
 
    setlinebuf(stdFile);
-
-   pthread_rwlock_unlock(&this->rwLock);
-}
-
-void Logger::rotateErrLogChecked()
-{
-   if( (errFile == stderr) || (logType == LogType_SYSLOG) ||
-       !logNumLines || (currentNumErrLines.read() < logNumLines) )
-      return; // nothing to do yet
-
-   pthread_rwlock_wrlock(&this->rwLock);
-
-   if (currentNumErrLines.read() < logNumLines)
-   { // we raced with another thread before aquiring the lock
-      pthread_rwlock_unlock(&this->rwLock);
-      return;
-   }
-
-   currentNumErrLines.setZero();
-
-   fclose(errFile);
-
-   rotateLogFile(logErrFile); // the actual rotation
-
-   errFile = fopen(logErrFile.c_str(), "w");
-   if(!errFile)
-   {
-      perror("Logger::rotateErrLogChecked");
-      errFile = stderr;
-   }
-
-   setlinebuf(errFile);
 
    pthread_rwlock_unlock(&this->rwLock);
 }

@@ -4,8 +4,6 @@
 
 bool FindLinkOwnerMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DEBUG("FindLinkOwnerMsg incoming", 4, "Received a FindLinkOwnerMsg from: " + ctx.peerName());
-
    MetaStore *metaStore = Program::getApp()->getMetaStore();
    std::string entryID = this->getEntryID();
 

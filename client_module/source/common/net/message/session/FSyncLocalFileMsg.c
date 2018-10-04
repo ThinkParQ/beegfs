@@ -13,7 +13,7 @@ void FSyncLocalFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    FSyncLocalFileMsg* thisCast = (FSyncLocalFileMsg*)this;
 
    // clientNumID
-   NumNodeID_serialize(&thisCast->clientNumID, ctx);
+   NumNodeID_serialize(ctx, &thisCast->clientNumID);
 
    // fileHandleID
    Serialization_serializeStrAlign4(ctx, thisCast->fileHandleIDLen, thisCast->fileHandleID);

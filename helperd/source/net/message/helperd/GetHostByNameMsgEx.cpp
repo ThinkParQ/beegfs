@@ -7,19 +7,18 @@
 
 bool GetHostByNameMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("GetHostByNameMsgEx incoming");
-   LOG_DEBUG_CONTEXT(log, 4, "Received a GetHostByNameMsg from: " + ctx.peerName() );
-
    // note: this will send an empty string in the response when the system was unable to
    //    resolve the hostname
 
-   const char* hostname = getHostname();
-   struct in_addr hostIP;
+   const std::string hostname = getHostname();
    std::string hostAddrStr;
 
-   bool resolveRes = SocketTk::getHostByName(hostname, &hostIP);
-   if(resolveRes)
-      hostAddrStr = Socket::ipaddrToStr(&hostIP);
+   const auto hostIP = SocketTk::getHostByName(hostname);
+   if(hostIP)
+      hostAddrStr = Socket::ipaddrToStr(&hostIP.value());
+   else
+      LOG(COMMUNICATION, ERR, "Failed to resolve hostname.", hostname,
+            ("System error", hostIP.error().message()));
 
    ctx.sendResponse(GetHostByNameRespMsg(hostAddrStr.c_str() ) );
 

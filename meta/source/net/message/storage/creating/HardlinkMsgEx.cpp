@@ -1,12 +1,9 @@
 #include <program/Program.h>
 #include <common/net/message/storage/attribs/GetEntryInfoMsg.h>
 #include <common/net/message/storage/attribs/GetEntryInfoRespMsg.h>
-#include <common/net/message/storage/attribs/UpdateBacklinkMsg.h>
-#include <common/net/message/storage/attribs/UpdateBacklinkRespMsg.h>
 #include <common/net/message/storage/creating/HardlinkRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <components/FileEventLogger.h>
-#include <net/msghelpers/MsgHelperChunkBacklinks.h>
 
 #include "HardlinkMsgEx.h"
 
@@ -66,19 +63,17 @@ std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx:
 
 bool HardlinkMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LOG_DBG(GENERAL, DEBUG, "Received a HardlinkMsg", as("peer", ctx.peerName()),
-         as("fromDirID", getFromDirInfo()->getEntryID()),
-         as("fromID", getFromInfo()->getEntryID()),
-         as("fromName", getFromName()),
-         as("toDirID", getToDirInfo()->getEntryID()),
-         as("toName", getToName()),
-         as("buddyMirrored", getToDirInfo()->getIsBuddyMirrored()));
+   LOG_DBG(GENERAL, DEBUG, "",
+         ("fromDirID", getFromDirInfo()->getEntryID()),
+         ("fromID", getFromInfo()->getEntryID()),
+         ("fromName", getFromName()),
+         ("toDirID", getToDirInfo()->getEntryID()),
+         ("toName", getToName()),
+         ("buddyMirrored", getToDirInfo()->getIsBuddyMirrored()));
 
    BaseType::processIncoming(ctx);
 
-   App* app = Program::getApp();
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_HARDLINK,
-      getMsgHeaderUserID());
+   updateNodeOp(ctx, MetaOpCounter_HARDLINK);
 
    return true;
 }

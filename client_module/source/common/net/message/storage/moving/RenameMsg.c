@@ -17,10 +17,10 @@ void RenameMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeUInt(ctx, thisCast->entryType);
 
    // fromDirInfo
-   EntryInfo_serialize(thisCast->fromDirInfo, ctx);
+   EntryInfo_serialize(ctx, thisCast->fromDirInfo);
 
    // toDirInfo
-   EntryInfo_serialize(thisCast->toDirInfo, ctx);
+   EntryInfo_serialize(ctx, thisCast->toDirInfo);
 
    // oldName
    Serialization_serializeStrAlign4(ctx, thisCast->oldNameLen, thisCast->oldName);
@@ -29,5 +29,5 @@ void RenameMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    Serialization_serializeStrAlign4(ctx, thisCast->newNameLen, thisCast->newName);
 
    if (this->msgHeader.msgFeatureFlags & RENAMEMSG_FLAG_HAS_EVENT)
-      FileEvent_serialize(thisCast->fileEvent, ctx);
+      FileEvent_serialize(ctx, thisCast->fileEvent);
 }

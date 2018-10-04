@@ -2,7 +2,7 @@
 
 #include <common/toolkit/Serialization.h>
 
-void StoragePoolId_serialize(const StoragePoolId* this, SerializeCtx* ctx)
+void StoragePoolId_serialize(SerializeCtx* ctx, const StoragePoolId* this)
 {
    Serialization_serializeUShort(ctx, this->value);
 }

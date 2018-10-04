@@ -9,22 +9,20 @@
 
 #define GETQUOTAINFOMSG_FEATURE_QUOTA_PER_TARGET         1
 
-/*
- * enum for the different quota query types
- */
-enum QuotaQueryType
-{
-   GetQuotaInfo_QUERY_TYPE_NONE = 0,
-   GetQuotaInfo_QUERY_TYPE_SINGLE_ID = 1,
-   GetQuotaInfo_QUERY_TYPE_ID_RANGE = 2,
-   GetQuotaInfo_QUERY_TYPE_ID_LIST = 3,
-   GetQuotaInfo_QUERY_TYPE_ALL_ID = 4
-};
-
 
 class GetQuotaInfoMsg: public NetMessageSerdes<GetQuotaInfoMsg>
 {
    friend class TestSerialization;
+
+   public:
+      enum QuotaQueryType
+      {
+         QUERY_TYPE_NONE = 0,
+         QUERY_TYPE_SINGLE_ID = 1,
+         QUERY_TYPE_ID_RANGE = 2,
+         QUERY_TYPE_ID_LIST = 3,
+         QUERY_TYPE_ALL_ID = 4
+      };
 
    public:
       /*
@@ -52,15 +50,15 @@ class GetQuotaInfoMsg: public NetMessageSerdes<GetQuotaInfoMsg>
             % obj->queryType
             % obj->type;
 
-         if(obj->queryType == GetQuotaInfo_QUERY_TYPE_ID_RANGE)
+         if(obj->queryType == QUERY_TYPE_ID_RANGE)
             ctx
                % obj->idRangeStart
                % obj->idRangeEnd;
 
-         if(obj->queryType == GetQuotaInfo_QUERY_TYPE_ID_LIST)
+         if(obj->queryType == QUERY_TYPE_ID_LIST)
             ctx % obj->idList;
 
-         if(obj->queryType == GetQuotaInfo_QUERY_TYPE_SINGLE_ID)
+         if(obj->queryType == QUERY_TYPE_SINGLE_ID)
             ctx % obj->idRangeStart;
 
          ctx
@@ -118,13 +116,13 @@ class GetQuotaInfoMsg: public NetMessageSerdes<GetQuotaInfoMsg>
 
       void setID(unsigned id)
       {
-         this->queryType = GetQuotaInfo_QUERY_TYPE_SINGLE_ID;
+         this->queryType = QUERY_TYPE_SINGLE_ID;
          this->idRangeStart = id;
       }
 
       void setIDRange(unsigned idRangeStart, unsigned idRangeEnd)
       {
-         this->queryType = GetQuotaInfo_QUERY_TYPE_ID_RANGE;
+         this->queryType = QUERY_TYPE_ID_RANGE;
          this->idRangeStart = idRangeStart;
          this->idRangeEnd = idRangeEnd;
       }

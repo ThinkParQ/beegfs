@@ -1,7 +1,6 @@
 #ifndef SYNCEDDISKACCESSPATH_H_
 #define SYNCEDDISKACCESSPATH_H_
 
-#include <common/threading/SafeMutexLock.h>
 #include <common/storage/Path.h>
 #include <common/system/System.h>
 #include <toolkit/StorageTkEx.h>

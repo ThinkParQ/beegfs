@@ -19,11 +19,9 @@ extern StandardSocket* StandardSocket_constructUDP(void);
 extern StandardSocket* StandardSocket_constructTCP(void);
 extern StandardSocket* StandardSocket_constructSDP(void);
 extern void _StandardSocket_uninit(Socket* this);
-extern void _StandardSocket_destruct(Socket* this);
 
 extern bool StandardSocket_setSoKeepAlive(StandardSocket* this, bool enable);
 extern bool StandardSocket_setSoBroadcast(StandardSocket* this, bool enable);
-extern bool StandardSocket_setSoReuseAddr(StandardSocket* this, bool enable);
 extern bool StandardSocket_getSoRcvBuf(StandardSocket* this, int* outSize);
 extern bool StandardSocket_setSoRcvBuf(StandardSocket* this, int size);
 extern bool StandardSocket_setTcpNoDelay(StandardSocket* this, bool enable);
@@ -49,10 +47,6 @@ extern ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* it
 extern ssize_t StandardSocket_recvfromT(StandardSocket* this, struct iov_iter* iter,
    int flags, fhgfs_sockaddr_in *from, int timeoutMS);
 
-extern ssize_t StandardSocket_broadcast(StandardSocket* this, void *buf, size_t len, int flags,
-   struct in_addr* broadcastIP, unsigned short port);
-
-
 extern bool _StandardSocket_initSock(StandardSocket* this, int domain, int type,
    int protocol);
 extern void __StandardSocket_setAllocMode(StandardSocket* this, gfp_t flags);
@@ -62,12 +56,9 @@ extern int _StandardSocket_getsockopt(StandardSocket* this, int level, int optna
    char *optval, int *optlen);
 
 // getters & setters
-static inline unsigned short StandardSocket_getSockDomain(StandardSocket* this);
 static inline struct socket* StandardSocket_getRawSock(StandardSocket* this);
 
 // inliners
-static inline char* StandardSocket_getPeername(StandardSocket* this);
-static inline unsigned short StandardSocket_getSockDomain(StandardSocket* this);
 static inline struct socket* StandardSocket_getRawSock(StandardSocket* this);
 
 
@@ -78,18 +69,6 @@ struct StandardSocket
    struct socket* sock;
    unsigned short sockDomain;
 };
-
-char* StandardSocket_getPeername(StandardSocket* this)
-{
-   Socket* thisBase = (Socket*)this;
-
-   return thisBase->peername;
-}
-
-unsigned short StandardSocket_getSockDomain(StandardSocket* this)
-{
-   return this->sockDomain;
-}
 
 struct socket* StandardSocket_getRawSock(StandardSocket* this)
 {

@@ -90,8 +90,6 @@ void FhgfsInode_destroyUninit(FhgfsInode* fhgfsInode)
 
    PathInfo_uninit(&fhgfsInode->pathInfo);
 
-   Time_uninit(&fhgfsInode->dataCacheTime);
-
    SAFE_DESTRUCT_NOSET(fhgfsInode->pattern, StripePattern_virtualDestruct);
 
    IntMap_clear(&fhgfsInode->rangeLockPIDs);

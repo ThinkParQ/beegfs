@@ -10,6 +10,8 @@
 
 #include <mutex>
 
+#include <boost/lexical_cast.hpp>
+
 InternodeSyncer::InternodeSyncer() :
    PThread("XNodeSync"),
    log("XNodeSync"),
@@ -50,7 +52,7 @@ void InternodeSyncer::run()
          return;
       }
 
-      Program::getApp()->getTargetMapper()->getMapping(originalTargetMap);
+      originalTargetMap = Program::getApp()->getTargetMapper()->getMapping();
 
       syncRes = downloadAndSyncTargetStates();
       if (!syncRes)
@@ -215,7 +217,7 @@ bool InternodeSyncer::downloadAndSyncNodes(NumNodeIDList& addedStorageNodes,
       if(!storageRes)
          return false;
 
-      storageNodes->syncNodes(storageNodesList, &addedStorageNodes, &removedStorageNodes, true,
+      storageNodes->syncNodes(storageNodesList, &addedStorageNodes, &removedStorageNodes,
          &localNode);
       printSyncNodesResults(NODETYPE_Storage, &addedStorageNodes, &removedStorageNodes);
    }
@@ -231,9 +233,9 @@ bool InternodeSyncer::downloadAndSyncNodes(NumNodeIDList& addedStorageNodes,
       if(!metaRes)
          return false;
 
-      metaNodes->syncNodes(metaNodesList, &addedMetaNodes, &removedMetaNodes, true, &localNode);
+      metaNodes->syncNodes(metaNodesList, &addedMetaNodes, &removedMetaNodes, &localNode);
 
-      if(metaNodes->setRootNodeNumID(rootNodeID, false, rootIsBuddyMirrored) )
+      if (app->getMetaRoot().setIfDefault(rootNodeID, rootIsBuddyMirrored))
       {
          LogContext(logContext).log(Log_CRITICAL,
             "Root NodeID (from sync results): " + rootNodeID.str() );
@@ -250,15 +252,15 @@ void InternodeSyncer::printSyncNodesResults(NodeType nodeType, NumNodeIDList* ad
 {
    const char* logContext = "Sync results";
 
-   if(addedNodes->size() )
+   if (!addedNodes->empty())
       LogContext(logContext).log(Log_WARNING, std::string("Nodes added: ") +
          StringTk::uintToStr(addedNodes->size() ) +
-         " (Type: " + Node::nodeTypeToStr(nodeType) + ")");
+         " (Type: " + boost::lexical_cast<std::string>(nodeType) + ")");
 
-   if(removedNodes->size() )
+   if (!removedNodes->empty())
       LogContext(logContext).log(Log_WARNING, std::string("Nodes removed: ") +
          StringTk::uintToStr(removedNodes->size() ) +
-         " (Type: " + Node::nodeTypeToStr(nodeType) + ")");
+         " (Type: " + boost::lexical_cast<std::string>(nodeType) + ")");
 }
 
 /**
@@ -276,12 +278,9 @@ bool InternodeSyncer::downloadAndSyncTargetMappings()
    if(!mgmtNode)
       return false;
 
-   UInt16List targetIDs;
-   NumNodeIDList nodeIDs;
-
-   bool downloadRes = NodesTk::downloadTargetMappings(*mgmtNode, &targetIDs, &nodeIDs, false);
-   if(downloadRes)
-      targetMapper->syncTargetsFromLists(targetIDs, nodeIDs);
+   auto mappings = NodesTk::downloadTargetMappings(*mgmtNode, false);
+   if (mappings.first)
+      targetMapper->syncTargets(std::move(mappings.second));
    else
       retVal = false;
 
@@ -355,19 +354,19 @@ void InternodeSyncer::handleNodeChanges(NodeType nodeType, NumNodeIDList& addedN
 {
    const char* logContext = "handleNodeChanges";
 
-   if ( addedNodes.size() )
+   if (!addedNodes.empty())
       LogContext(logContext).log(Log_WARNING,
          std::string("Nodes added while beegfs-fsck was running: ")
-            + StringTk::uintToStr(addedNodes.size()) + " (Type: " + Node::nodeTypeToStr(nodeType)
-            + ")");
+            + StringTk::uintToStr(addedNodes.size())
+            + " (Type: " + boost::lexical_cast<std::string>(nodeType) + ")");
 
-   if ( removedNodes.size() )
+   if (!removedNodes.empty())
    {
       // removed nodes must lead to fsck stoppage
       LogContext(logContext).log(Log_WARNING,
          std::string("Nodes removed while beegfs-fsck was running: ")
-            + StringTk::uintToStr(removedNodes.size()) + " (Type: " + Node::nodeTypeToStr(nodeType)
-            + "); beegfs-fsck cannot continue.");
+            + StringTk::uintToStr(removedNodes.size())
+            + " (Type: " + boost::lexical_cast<std::string>(nodeType) + ")");
 
       Program::getApp()->abort();
    }
@@ -377,8 +376,7 @@ void InternodeSyncer::handleTargetMappingChanges()
 {
    const char* logContext = "handleTargetMappingChanges";
 
-   TargetMap newTargetMap;
-   Program::getApp()->getTargetMapper()->getMapping(newTargetMap);
+   TargetMap newTargetMap = Program::getApp()->getTargetMapper()->getMapping();
 
    for ( TargetMapIter originalMapIter = originalTargetMap.begin();
       originalMapIter != originalTargetMap.end(); originalMapIter++ )

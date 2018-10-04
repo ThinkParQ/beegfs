@@ -39,8 +39,8 @@ struct OpenFileRespMsg
    StripePattern* pattern; // not owned by this object!
 
    // for deserialization
-   struct StripePatternHeader patternHeader;
    const char* patternStart;
+   uint32_t patternLength;
 };
 
 extern const struct NetMessageOps OpenFileRespMsg_Ops;
@@ -55,7 +55,7 @@ void OpenFileRespMsg_init(OpenFileRespMsg* this)
  */
 StripePattern* OpenFileRespMsg_createPattern(OpenFileRespMsg* this)
 {
-   return StripePattern_createFromBuf(this->patternStart, &this->patternHeader);
+   return StripePattern_createFromBuf(this->patternStart, this->patternLength);
 }
 
 int OpenFileRespMsg_getResult(OpenFileRespMsg* this)
