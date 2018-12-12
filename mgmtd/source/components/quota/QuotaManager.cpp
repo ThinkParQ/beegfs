@@ -16,7 +16,7 @@
 
 const std::string QuotaManager::QUOTA_SAVE_DIR            = "quota";
 const std::string QuotaManager::USER_LIMITS_FILENAME      = "quotaUserLimits.store";
-const std::string QuotaManager::GROUP_LIMITS_FILENAME     = "quotaUserLimits.store";
+const std::string QuotaManager::GROUP_LIMITS_FILENAME     = "quotaGroupLimits.store";
 const std::string QuotaManager::DEFAULT_LIMITS_FILENAME   = "quotaDefaultLimits.store";
 
 // relative paths inside mgmt directory

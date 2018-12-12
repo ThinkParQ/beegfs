@@ -20,18 +20,18 @@
  *
  * @return 0 if all available numIDs are currently assigned, so none are left
  */
-NumNodeID NodeStoreClientsEx::generateID(Node& node) const
+NumNodeID NodeStoreClientsEx::generateID(Node& node)
 {
    // check whether this node's stringID is already associated with an active or deleted numID
    NumNodeID previousNumID = retrieveNumIDFromStringID(node.getID());
    if (previousNumID)
       return previousNumID;
 
-   if (activeNodes.empty())
-      return NumNodeID(1);
-
-   if (activeNodes.rbegin()->first.val() < NODESTORECLIENTS_MAX_ID)
-      return NumNodeID(activeNodes.rbegin()->first.val() + 1);
+   // generate increasing IDs until we read the u32 maximum. this should take a while.
+   if (lastUsedNumID.val() < NODESTORECLIENTS_MAX_ID) {
+      lastUsedNumID = NumNodeID(lastUsedNumID.val() + 1);
+      return lastUsedNumID;
+   }
 
    if (activeNodes.begin()->first.val() > 1)
       return NumNodeID(1);
@@ -264,6 +264,9 @@ bool NodeStoreClientsEx::loadFromBuf(const char* buf, unsigned bufLen, bool v6Fo
       IGNORE_UNUSED_VARIABLE(nodeAdded);
       IGNORE_UNUSED_VARIABLE(&nodeID);
    }
+
+   if (!activeNodes.empty())
+      lastUsedNumID = activeNodes.rbegin()->first;
 
    return true;
 }

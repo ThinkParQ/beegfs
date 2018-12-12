@@ -19,7 +19,7 @@ class NodeStoreClientsEx : public NodeStoreClients
       bool loadFromBuf(const char* buf, unsigned bufLen, bool v6Format);
       ssize_t saveToBuf(boost::scoped_array<char>& buf);
 
-      virtual NumNodeID generateID(Node& node) const override;
+      virtual NumNodeID generateID(Node& node) override;
       NumNodeID retrieveNumIDFromStringID(const std::string& nodeID) const;
 
    public:

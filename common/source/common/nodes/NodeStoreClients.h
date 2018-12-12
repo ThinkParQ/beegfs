@@ -37,7 +37,7 @@ class NodeStoreClients : public AbstractNodeStore
 
       NodeMap activeNodes;
 
-      virtual NumNodeID generateID(Node& node) const
+      virtual NumNodeID generateID(Node& node)
       {
          return {};
       }

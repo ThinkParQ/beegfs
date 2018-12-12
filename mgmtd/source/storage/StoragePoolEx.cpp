@@ -11,27 +11,19 @@ StoragePoolEx::StoragePoolEx(StoragePoolId id, const std::string& description,
 
 void StoragePoolEx::initQuota()
 {
-   if (!quotaUserLimits)
-   {
-      quotaUserLimits = std::unique_ptr<QuotaStoreLimits>(new QuotaStoreLimits(
-            QuotaDataType_USER,
-            "QuotaUserLimits (Pool: " + id.str() + ")",
-            USER_LIMITS_STORE_PATH(id.str())));
-   }
+   quotaUserLimits = std::unique_ptr<QuotaStoreLimits>(new QuotaStoreLimits(
+         QuotaDataType_USER,
+         "QuotaUserLimits (Pool: " + id.str() + ")",
+         USER_LIMITS_STORE_PATH(id.str())));
 
-   if (!quotaGroupLimits)
-   {
-      quotaGroupLimits = std::unique_ptr<QuotaStoreLimits>(new QuotaStoreLimits(
-            QuotaDataType_GROUP,
-            "QuotaGroupLimits (Pool: " + id.str() + ")",
-            GROUP_LIMITS_STORE_PATH(id.str())));
-   }
 
-   if (!quotaDefaultLimits)
-   {
-      quotaDefaultLimits = std::unique_ptr<QuotaDefaultLimits>(new QuotaDefaultLimits(
-            DEFAULT_LIMITS_STORE_PATH(id.str())));
-   }
+   quotaGroupLimits = std::unique_ptr<QuotaStoreLimits>(new QuotaStoreLimits(
+         QuotaDataType_GROUP,
+         "QuotaGroupLimits (Pool: " + id.str() + ")",
+         GROUP_LIMITS_STORE_PATH(id.str())));
+
+   quotaDefaultLimits = std::unique_ptr<QuotaDefaultLimits>(new QuotaDefaultLimits(
+         DEFAULT_LIMITS_STORE_PATH(id.str())));
 }
 
 void StoragePoolEx::clearQuota()

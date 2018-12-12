@@ -48,6 +48,9 @@ class PThread
 
       void join()
       {
+         if (!threadID)
+            throw PThreadException("Cannot join invalid thread.");
+
          pthread_join(threadID, NULL);
       }
 
@@ -56,6 +59,10 @@ class PThread
        */
       bool timedjoin(int timeoutMS)
       {
+         if (!threadID)
+            throw PThreadException("Cannot join invalid thread.");
+
+
          struct timespec joinEndtime;
 
          if(clock_gettime(CLOCK_REALTIME, &joinEndtime) )
@@ -82,11 +89,17 @@ class PThread
 
       void terminate()
       {
+         if (!threadID)
+            throw PThreadException("Cannot terminate invalid thread.");
+
          pthread_kill(threadID, SIGTERM);
       }
 
       void kill()
       {
+         if (!threadID)
+            throw PThreadException("Cannot kill invalid thread.");
+
          pthread_kill(threadID, SIGKILL);
       }
 

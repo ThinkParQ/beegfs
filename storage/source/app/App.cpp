@@ -1157,6 +1157,7 @@ boost::optional<std::map<uint16_t, std::unique_ptr<StorageTarget>>> App::preregi
       {
          targets[newTargetNumID] = boost::make_unique<StorageTarget>(path, newTargetNumID,
                *timerQueue, *mgmtNodes, *mirrorBuddyGroupMapper);
+         targets[newTargetNumID]->setCleanShutdown(StorageTk::checkSessionFileExists(path.str()));
       }
       catch (const std::system_error& e)
       {

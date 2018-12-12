@@ -77,7 +77,7 @@ App::App(int argc, char** argv)
    this->statsCollector = NULL;
    this->internodeSyncer = NULL;
    this->modificationEventFlusher = NULL;
-   this->timerQueue = NULL;
+   this->timerQueue = new TimerQueue(1, 1);
    this->buddyResyncer = NULL;
 
    this->nextNumaBindTarget = 0;
@@ -136,6 +136,8 @@ App::~App()
    SAFE_DELETE(this->netFilter);
 
    SAFE_DELETE(this->cfg);
+
+   delete timerQueue;
 
    Logger::destroyLogger();
    closelog();
@@ -830,8 +832,6 @@ void App::initComponents(TargetConsistencyState initialConsistencyState)
    this->buddyResyncer = new BuddyResyncer();
 
    this->internodeSyncer = new InternodeSyncer(initialConsistencyState);
-
-   this->timerQueue = new TimerQueue(1, 1);
 
    this->modificationEventFlusher = new ModificationEventFlusher();
 

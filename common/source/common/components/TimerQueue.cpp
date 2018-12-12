@@ -120,12 +120,12 @@ TimerQueue::TimerQueue(unsigned minPoolSize, unsigned maxPoolSize)
 
 TimerQueue::~TimerQueue()
 {
-   selfTerminate();
+   if (getID())
    {
-      std::unique_lock<Mutex> lock(mutex);
+      selfTerminate();
       condition.signal();
+      join();
    }
-   join();
 
    for (auto it = workerPool.begin(); it != workerPool.end(); ++it)
    {
