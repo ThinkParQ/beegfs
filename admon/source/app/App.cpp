@@ -176,7 +176,7 @@ void App::runNormal()
       bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
 
       if (foundRdmaInterfaces)
-         localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp); // re-sort the niclist
+         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
    }
 
    logInfos();
@@ -224,7 +224,6 @@ void App::initLocalNodeInfo()
 {
    unsigned portUDP = cfg->getConnAdmonPortUDP();
 
-   StringList allowedInterfaces;
    std::string interfacesFilename = cfg->getConnInterfacesFile();
    if(interfacesFilename.length() )
       Config::loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
@@ -234,7 +233,7 @@ void App::initLocalNodeInfo()
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
 
-   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    std::string nodeID = System::getHostname();
 

@@ -6,6 +6,41 @@
 #include <common/toolkit/tree/PointerRBTreeIter.h>
 #include "ListTk.h"
 
+#include <linux/sort.h>
+
+struct nicaddr_sort_entry {
+   StrCpyList* preferences;
+   NicAddress* addr;
+};
+
+static int nicaddr_sort_comp(const void* l, const void* r)
+{
+   const struct nicaddr_sort_entry* lhs = l;
+   const struct nicaddr_sort_entry* rhs = r;
+
+   StrCpyListIter it;
+
+   StrCpyListIter_init(&it, lhs->preferences);
+   while (!StrCpyListIter_end(&it)) {
+      const char* value = StrCpyListIter_value(&it);
+
+      if (strcmp(value, lhs->addr->name) == 0)
+         return -1;
+      if (strcmp(value, rhs->addr->name) == 0)
+         return 1;
+
+      StrCpyListIter_next(&it);
+   }
+
+   if (NicAddress_preferenceComp(lhs->addr, rhs->addr))
+      return -1;
+   if (NicAddress_preferenceComp(rhs->addr, lhs->addr))
+      return 1;
+
+   return 0;
+}
+
+
 
 void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone)
 {
@@ -35,51 +70,44 @@ void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicList
 /**
  * Returns a sorted clone of a nicList.
  *
- * Note: As this is based on a tree insertion, it won't work when there are duplicate elements
- * in the list.
+ * Note: the comparison implemented here is a valid only if preferences contains
+ * all possible names ever encountered, or none at all.
  */
-void ListTk_cloneSortNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone)
+void ListTk_cloneSortNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone,
+      StrCpyList* preferences)
 {
    NicAddressListIter listIter;
-   RBTree tree;
-   RBTreeIter treeIter;
 
+   struct nicaddr_sort_entry* list, *p;
 
-   PointerRBTree_init(&tree, NicAddress_treeComparator);
-
-   // sort => insert each list elem into the tree (no copying)
+   /* i'm so sorry. we can't indicate failure here without a lot of work in App, and the
+    * lists are usually tiny anyway. */
+   list = kcalloc(NicAddressList_length(nicList), sizeof(*list), GFP_NOFS | __GFP_NOFAIL);
+   p = list;
 
    NicAddressListIter_init(&listIter, nicList);
 
-   for( ; !NicAddressListIter_end(&listIter); NicAddressListIter_next(&listIter) )
-   {
-      NicAddress* nicAddr = NicAddressListIter_value(&listIter);
+   while (!NicAddressListIter_end(&listIter)) {
+      p->preferences = preferences;
+      p->addr = NicAddressListIter_value(&listIter);
 
-      // Note: We insert elems into the tree without copying, so there's no special cleanup
-      //    required for the tree when we're done
-      PointerRBTree_insert(&tree, nicAddr, NULL);
+      NicAddressListIter_next(&listIter);
+      p++;
    }
 
+   sort(list, NicAddressList_length(nicList), sizeof(*list), nicaddr_sort_comp, NULL);
 
-   // copy elements from tree to clone list (sorted)
-
+   /* *maybe* the clone already contains elements, don't rely on its size */
+   p = list;
    NicAddressList_init(nicListClone);
-
-   treeIter = PointerRBTree_begin(&tree);
-
-   for( ; !PointerRBTreeIter_end(&treeIter); PointerRBTreeIter_next(&treeIter) )
-   {
-      NicAddress* nicAddr = (NicAddress*)PointerRBTreeIter_key(&treeIter);
-
-      // clone
-      NicAddress* nicAddrClone = (NicAddress*)os_kmalloc(sizeof(NicAddress) );
-      memcpy(nicAddrClone, nicAddr, sizeof(NicAddress) );
-
-      // append to the clone list
-      NicAddressList_append(nicListClone, nicAddrClone);
+   while (NicAddressList_length(nicList) != NicAddressList_length(nicListClone)) {
+      NicAddress* clone = os_kmalloc(sizeof(*clone));
+      memcpy(clone, p->addr, sizeof(*clone));
+      NicAddressList_append(nicListClone, clone);
+      p++;
    }
 
-   PointerRBTree_uninit(&tree);
+   kfree(list);
 }
 
 void ListTk_kfreeNicAddressListElems(NicAddressList* nicList)

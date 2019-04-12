@@ -10,13 +10,12 @@
 #define NODECONNPOOL_SHUTDOWN_WAITTIMEMS  1500
 
 /**
- * @param nicList an internal copy will be created (and sorted)
+ * @param nicList an internal copy will be created
  */
 LocalNodeConnPool::LocalNodeConnPool(Node& parentNode, NicAddressList& nicList) :
    NodeConnPool(parentNode, 0, nicList)
 {
    this->nicList = nicList;
-   this->nicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
 
    this->establishedConns = 0;
    this->availableConns = 0;

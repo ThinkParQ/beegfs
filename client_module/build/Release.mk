@@ -94,6 +94,10 @@ endif
 
 ifneq ($(OFED_INCLUDE_PATH),)
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
+
+module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h
+$(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
+	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
 endif
 
 # OFED API version

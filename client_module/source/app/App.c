@@ -513,7 +513,7 @@ bool __App_initLocalNodeInfo(App* this)
    }
 
    // created sorted nicList clone
-   ListTk_cloneSortNicAddressList(&nicList, &sortedNicList);
+   ListTk_cloneSortNicAddressList(&nicList, &sortedNicList, &this->allowedInterfaces);
 
 
    // prepare clientID and create localNode

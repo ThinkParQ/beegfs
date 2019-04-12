@@ -259,7 +259,7 @@ void App::initLocalNodeInfo()
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
 
-   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   localNicList.sort(NetworkInterfaceCard::NicAddrComp{allowedInterfaces});
 
    std::string nodeID = System::getHostname() + "-" + StringTk::uint64ToHexStr(System::getPID() ) +
       "-" + StringTk::uintToHexStr(TimeAbs().getTimeMS() ) + "-" "ctl";

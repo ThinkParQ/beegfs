@@ -75,13 +75,13 @@ class App : public AbstractApp
 
       Config* cfg;
       LogContext* log;
+      std::list<std::string> allowedInterfaces;
 
       LockFD pidFileLockFD;
       std::vector<LockFD> storageTargetLocks;
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
-      StringList* allowedInterfaces; // empty list means "all interfaces accepted"
       NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       std::shared_ptr<Node> localNode;
 

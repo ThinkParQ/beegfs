@@ -247,7 +247,7 @@ void App::runNormal()
    {
       bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
       if (foundRdmaInterfaces)
-         localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp); // re-sort the niclist
+         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
    }
 
    // Find MgmtNode
@@ -430,7 +430,6 @@ void App::initBasicNetwork()
    this->tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
 
    // prepare filter for interfaces
-   StringList allowedInterfaces;
    std::string interfacesList = cfg->getConnInterfacesList();
    if(!interfacesList.empty() )
    {
@@ -444,7 +443,7 @@ void App::initBasicNetwork()
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
 
-   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    // prepare factory for incoming messages
    this->netMessageFactory = new NetMessageFactory();

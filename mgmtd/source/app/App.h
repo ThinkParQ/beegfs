@@ -71,6 +71,7 @@ class App : public AbstractApp
 
       Config*  cfg;
       LogContext* log;
+      std::list<std::string> allowedInterfaces;
 
       LockFD pidFileLockFD;
       LockFD workingDirLockFD;

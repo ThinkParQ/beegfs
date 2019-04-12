@@ -72,7 +72,11 @@ extern int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, int mode, de
 
 #if defined KERNEL_HAS_ATOMIC_OPEN
    int FhgfsOps_atomicOpen(struct inode* dir, struct dentry* dentry, struct file* file,
-      unsigned openFlags, umode_t createMode,  int* outOpenedFlags);
+      unsigned openFlags, umode_t createMode
+      #ifndef FMODE_CREATED
+      ,  int* outOpenedFlags
+      #endif
+      );
    extern int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t mode,
       bool isExclusiveCreate);
 #elif defined KERNEL_HAS_UMODE_T

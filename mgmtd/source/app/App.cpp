@@ -186,7 +186,7 @@ void App::runNormal()
       bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
 
       if (foundRdmaInterfaces)
-         localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp); // re-sort the niclist
+         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
    }
 
    // start component threads
@@ -295,8 +295,6 @@ void App::initLocalNodeInfo()
    unsigned portTCP = cfg->getConnMgmtdPortTCP();
 
    // prepare filter for published local interfaces
-   StringList allowedInterfaces;
-
    std::string interfacesList = cfg->getConnInterfacesList();
    if(!interfacesList.empty() )
    {
@@ -309,7 +307,7 @@ void App::initLocalNodeInfo()
    if (localNicList.empty())
       throw InvalidConfigException("Couldn't find any usable NIC");
 
-   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    // try to load localNodeID from file and fall back to auto-generated ID otherwise
 

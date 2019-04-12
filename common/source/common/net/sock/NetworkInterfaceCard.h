@@ -89,37 +89,40 @@ class NetworkInterfaceCard
 
 
    public:
-      // inliners
+      struct NicAddrComp {
+         // the comparison implemented here is a model of Compare only if preferences contains
+         // all possible names ever encountered or is unset.
+         StringList* preferences = nullptr;
 
-      /**
-       * @return true if lhs (left-hand side) is preferred comared to rhs
-       */
-      static bool nicAddrPreferenceComp(const NicAddress& lhs, const NicAddress& rhs)
-      {
-         // compares the preference of NICs
-         // returns true if lhs is preferred compared to rhs
+         explicit NicAddrComp(StringList* preferences = nullptr): preferences(preferences) {}
 
-         // prefer RDMA NICs
-         if( (lhs.nicType == NICADDRTYPE_RDMA) && (rhs.nicType != NICADDRTYPE_RDMA) )
-            return true;
-         if( (rhs.nicType == NICADDRTYPE_RDMA) && (lhs.nicType != NICADDRTYPE_RDMA) )
-            return false;
+         bool operator()(const NicAddress& lhs, const NicAddress& rhs) const
+         {
+            // compares the preference of NICs
+            // returns true if lhs is preferred compared to rhs
+            if (preferences) {
+               for (const auto& p : *preferences) {
+                  if (p == lhs.name)
+                     return true;
+                  if (p == rhs.name)
+                     return false;
+               }
+            }
 
-         // prefer SDP NICs
-         if( (lhs.nicType == NICADDRTYPE_SDP) && (rhs.nicType == NICADDRTYPE_STANDARD) )
-            return true;
-         if( (rhs.nicType == NICADDRTYPE_SDP) && (lhs.nicType == NICADDRTYPE_STANDARD) )
-            return false;
+            // prefer RDMA NICs
+            if( (lhs.nicType == NICADDRTYPE_RDMA) && (rhs.nicType != NICADDRTYPE_RDMA) )
+               return true;
+            if( (rhs.nicType == NICADDRTYPE_RDMA) && (lhs.nicType != NICADDRTYPE_RDMA) )
+               return false;
 
-         // prefer higher ipAddr
-         unsigned lhsHostOrderIP = ntohl(lhs.ipAddr.s_addr);
-         unsigned rhsHostOrderIP = ntohl(rhs.ipAddr.s_addr);
+            // prefer higher ipAddr
+            unsigned lhsHostOrderIP = ntohl(lhs.ipAddr.s_addr);
+            unsigned rhsHostOrderIP = ntohl(rhs.ipAddr.s_addr);
 
-         // this is the original IP-order version
-         return lhsHostOrderIP > rhsHostOrderIP;
-            return true;
-      }
-
+            // this is the original IP-order version
+            return lhsHostOrderIP > rhsHostOrderIP;
+         }
+      };
 };
 
 

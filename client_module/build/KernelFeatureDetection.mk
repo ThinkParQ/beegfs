@@ -291,6 +291,7 @@ $(call define_if_matches, KERNEL_HAS_ALLOC_WORKQUEUE, "alloc_workqueue", workque
 $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WAIT_QUEUE_ENTRY_T, "wait_queue_entry_t", wait.h)
 $(call define_if_matches, KERNEL_HAS_CURRENT_FS_TIME, "current_fs_time", fs.h)
+$(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64[[:space:]]\+i_atime;", fs.h)
 
 # inodeChangeRes was changed to setattr_prepare in vanilla 4.9
 $(call define_if_matches, KERNEL_HAS_SETATTR_PREPARE, "int setattr_prepare", fs.h)

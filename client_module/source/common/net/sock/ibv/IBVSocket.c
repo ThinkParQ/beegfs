@@ -36,6 +36,24 @@
    __func__, __LINE__, ##__VA_ARGS__)
 
 
+/* 4.19 added const qualifiers to ib_post_send and ib_post_recv. */
+typedef __typeof__(
+      __builtin_choose_expr(
+         __builtin_types_compatible_p(
+            __typeof__(&ib_post_send),
+            int (*)(struct ib_qp*, struct ib_send_wr*, struct ib_send_wr**)),
+         (struct ib_send_wr*) 0,
+         (const struct ib_send_wr*) 0))
+   _bad_send_wr;
+typedef __typeof__(
+      __builtin_choose_expr(
+         __builtin_types_compatible_p(
+            __typeof__(&ib_post_recv),
+            int (*)(struct ib_qp*, struct ib_recv_wr*, struct ib_recv_wr**)),
+         (struct ib_recv_wr*) 0,
+         (const struct ib_recv_wr*) 0))
+   _bad_recv_wr;
+
 
 bool IBVSocket_init(IBVSocket* _this)
 {
@@ -810,7 +828,7 @@ err_cleanup:
 int __IBVSocket_postRecv(IBVSocket* _this, IBVCommContext* commContext, size_t bufIndex)
 {
    struct ib_recv_wr wr;
-   struct ib_recv_wr* bad_wr;
+   _bad_recv_wr bad_wr;
    int postRes;
 
    commContext->sendBufs[bufIndex].lists[0].length = commContext->commCfg.bufSize;
@@ -843,7 +861,7 @@ int IBVSocket_checkConnection(IBVSocket* _this)
 # define wr_of(wr) (wr)
    struct ib_send_wr wr;
 #endif
-   struct ib_send_wr *bad_wr;
+   _bad_send_wr bad_wr;
    int postRes;
    int waitRes;
 
@@ -895,7 +913,7 @@ int __IBVSocket_postSend(IBVSocket* _this, size_t bufIndex)
 {
    IBVCommContext* commContext = _this->commContext;
    struct ib_send_wr wr;
-   struct ib_send_wr *bad_wr;
+   _bad_send_wr bad_wr;
    int postRes;
 
    wr.wr_id      = bufIndex;
@@ -1810,7 +1828,7 @@ struct ib_cq* __IBVSocket_createCompletionQueue(struct ib_device* device,
 {
    #if defined (BEEGFS_OFED_1_2_API) && BEEGFS_OFED_1_2_API >= 1
       return ib_create_cq(device, comp_handler, event_handler, cq_context, cqe);
-   #elif defined OFED_HAS_IB_CREATE_CQATTR
+   #elif defined OFED_HAS_IB_CREATE_CQATTR || defined ib_create_cq
       struct ib_cq_init_attr attrs = {
          .cqe = cqe,
          .comp_vector = 0,

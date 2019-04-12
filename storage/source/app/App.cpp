@@ -46,7 +46,6 @@ App::App(int argc, char** argv)
    this->netFilter = NULL;
    this->tcpOnlyFilter = NULL;
    this->log = NULL;
-   this->allowedInterfaces = NULL;
    this->mgmtNodes = NULL;
    this->metaNodes = NULL;
    this->storageNodes = NULL;
@@ -96,7 +95,6 @@ App::~App()
    SAFE_DELETE(this->buddyResyncer);
    SAFE_DELETE(this->chunkFetcher);
    SAFE_DELETE(this->dgramListener);
-   SAFE_DELETE(this->allowedInterfaces);
    SAFE_DELETE(this->chunkDirStore);
    SAFE_DELETE(this->syncedStoragePaths);
    SAFE_DELETE(this->netMessageFactory);
@@ -221,7 +219,7 @@ void App::runNormal()
       bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
 
       if (foundRdmaInterfaces)
-         localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp); // re-sort the niclist
+         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
    }
 
    // wait for management node heartbeat (required for localNodeNumID and target pre-registration)
@@ -373,7 +371,6 @@ void App::initBasicNetwork()
    this->tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
 
    // prepare filter for interfaces
-   StringList allowedInterfaces;
    std::string interfacesList = cfg->getConnInterfacesList();
    if(!interfacesList.empty() )
    {
@@ -387,7 +384,7 @@ void App::initBasicNetwork()
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
 
-   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    // prepare factory for incoming messages
    this->netMessageFactory = new NetMessageFactory();

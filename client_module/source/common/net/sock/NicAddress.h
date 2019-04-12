@@ -19,7 +19,6 @@ typedef struct NicListCapabilities NicListCapabilities;
 
 
 extern bool NicAddress_preferenceComp(const NicAddress* lhs, const NicAddress* rhs);
-extern int NicAddress_treeComparator(const void* key1, const void* key2);
 
 // inliners
 static inline void NicAddress_ipToStr(struct in_addr ipAddr, char* outStr);

@@ -149,7 +149,7 @@ void App::runNormal()
       bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
 
       if (foundRdmaInterfaces)
-         localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp); // re-sort the niclist
+         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
    }
 
    // start component threads
@@ -194,7 +194,6 @@ void App::initDataObjects(int argc, char** argv)
 
 void App::initLocalNodeInfo()
 {
-   StringList allowedInterfaces;
    std::string interfacesFilename = cfg->getConnInterfacesFile();
    if(interfacesFilename.length() )
       Config::loadStringListFile(interfacesFilename.c_str(), allowedInterfaces);
@@ -204,7 +203,7 @@ void App::initLocalNodeInfo()
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
 
-   localNicList.sort(&NetworkInterfaceCard::nicAddrPreferenceComp);
+   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    std::string nodeID = System::getHostname();
    localNode = std::make_shared<LocalNode>(NODETYPE_Helperd, nodeID, NumNodeID(1), 0, 0,

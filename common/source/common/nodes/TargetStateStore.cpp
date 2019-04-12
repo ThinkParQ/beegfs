@@ -121,7 +121,7 @@ void TargetStateStore::getStatesAndGroups(const MirrorBuddyGroupMapper* buddyGro
    RWLockGuard buddyGroupsLock(buddyGroups->rwlock, SafeRWLock_READ);
 
    states = {statesMap.begin(), statesMap.end()};
-   outGroups = buddyGroups->getMapping();
+   outGroups = buddyGroups->mirrorBuddyGroups;
 }
 
 

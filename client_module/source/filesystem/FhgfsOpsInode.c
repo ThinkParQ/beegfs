@@ -1194,7 +1194,11 @@ outErr:
  *       global locks enabled.
  */
 int FhgfsOps_atomicOpen(struct inode* dir, struct dentry* dentry, struct file* file,
-   unsigned openFlags, umode_t createMode,  int* outOpenedFlags)
+   unsigned openFlags, umode_t createMode
+   #ifndef FMODE_CREATED
+   ,  int* outOpenedFlags
+   #endif
+   )
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1305,7 +1309,11 @@ int FhgfsOps_atomicOpen(struct inode* dir, struct dentry* dentry, struct file* f
    {
       if (lookupOutInfo.createRes == FhgfsOpsErr_SUCCESS) // implies isCreate == true
       {
+#ifdef FMODE_CREATED
+         file->f_mode |= FMODE_CREATED;
+#else
          *outOpenedFlags |= FILE_CREATED;
+#endif
 
          if (lookupOutInfo.lookupRes != FhgfsOpsErr_SUCCESS)
          {  // only update directory time stamps if the file did not exist yet
@@ -1360,7 +1368,11 @@ int FhgfsOps_atomicOpen(struct inode* dir, struct dentry* dentry, struct file* f
    // stripePattern is assigned to FhgfsInode now, make sure it does not get free'ed
    LookupIntentInfoOut_setStripePattern(&lookupOutInfo, NULL);
 
-   retVal = finish_open(file, dentry, generic_file_open, outOpenedFlags);
+   retVal = finish_open(file, dentry, generic_file_open
+#ifndef FMODE_CREATED
+         , outOpenedFlags
+#endif
+         );
    if (unlikely(retVal) )
    {  // finish open failed
       int releaseRes;

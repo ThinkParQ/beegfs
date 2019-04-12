@@ -602,13 +602,13 @@ bool IBVSocket_shutdown(IBVSocket* _this)
 {
    IBVCommContext* commContext = _this->commContext;
 
-   if(_this->errState)
-      return true; // true, because the conn is down anyways
 
    if(!commContext)
       return true; // this socket has never been connected
 
-   if(commContext->incompleteSend.numAvailable)
+   // if object is in errState, then the socket might be in an inconsistent state,
+   // therefore further commands (except for disconnect) should not be executed
+   if(!_this->errState && commContext->incompleteSend.numAvailable)
    { // wait for all incomplete sends
       int waitRes;
 
@@ -1035,6 +1035,19 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
 {
    if(!commContext)
       return;
+
+   if(commContext->qp)
+   {
+      // see recommendation here: https://www.rdmamojo.com/2012/12/28/ibv_destroy_qp/
+      // the qp should be set to error state, so that no more events can be pushed to that queue.
+
+      struct ibv_qp_attr qpAttr;
+      qpAttr.qp_state = IBV_QPS_ERR;
+      if (ibv_modify_qp(commContext->qp, &qpAttr, IBV_QP_STATE))
+      {
+          LOG(SOCKLIB, WARNING, "Failed to modify qp IBV_QP_STATE.");
+      }
+   }
 
    // ack remaining delayed acks
    if(commContext->recvCQ && commContext->numUnackedRecvCompChannelEvents)

@@ -56,6 +56,12 @@ int SocketTk_poll(PollState* state, int timeoutMS)
 
    long __timeout = TimeTk_msToJiffiesSchedulable(timeoutMS);
 
+   /* 4.19 (vanilla, not stable) had a bug in the sock_poll_wait signature. rhel 4.18 backports
+    * this bug. 4.19.1 fixes it again. */
+   BUILD_BUG_ON(__builtin_types_compatible_p(
+            __typeof__(&sock_poll_wait),
+            void (*)(struct file*, poll_table*)));
+
    poll_initwait(&stdTable);
 
    if(__timeout)

@@ -38,27 +38,3 @@ bool NicAddress_preferenceComp(const NicAddress* lhs, const NicAddress* rhs)
    // this is the original IP-order version
    return lhsHostOrderIP > rhsHostOrderIP;
 }
-
-
-/**
- * Compares elements suitable for a tree.
- *
- * @param key1 NicAddress pointer
- * @param key2 NicAddress pointer
- * @return: <0 if key1<key2, 0 for equal keys, >0 otherwise
- */
-int NicAddress_treeComparator(const void* key1, const void* key2)
-{
-   NicAddress* lhs = (NicAddress*)key1;
-   NicAddress* rhs = (NicAddress*)key2;
-
-   // Note: We interpret "preferred" elements as "smaller" elements here.
-
-   if(NicAddress_preferenceComp(lhs, rhs) )
-      return -1;
-
-   if(NicAddress_preferenceComp(rhs, lhs) )
-      return 1;
-
-   return 0;
-}
