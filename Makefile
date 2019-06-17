@@ -103,7 +103,7 @@ endef
 comm_debug-install: install_name=comm-debug
 
 $(foreach D,$(DAEMONS),$(eval $(call install_component,$D,sbin)))
-$(foreach U,$(filter-out event_listener $(UTILS)),$(eval $(call install_component,$U,sbin)))
+$(foreach U,$(filter-out event_listener,$(UTILS)),$(eval $(call install_component,$U,sbin)))
 
 .PHONY: daemons-install
 daemons-install: $(patsubst %,%-install,$(DAEMONS))
