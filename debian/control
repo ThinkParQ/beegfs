@@ -2,7 +2,8 @@ Source: beegfs
 Section: misc
 Priority: optional
 Maintainer: BeeGFS Maintainers <packages@beegfs.com>
-Build-Depends: debhelper (>= 9.0.0), lsb-release, librdmacm-dev, libibverbs-dev, java6-sdk, ant, kmod
+Build-Depends: debhelper (>= 9.0.0), lsb-release, librdmacm-dev, libibverbs-dev, java6-sdk, ant, kmod,
+               dkms, pkg-config, zlib1g-dev
 Standards-Version: 4.1.4.1
 
 
@@ -107,6 +108,13 @@ Depends: beegfs-mon (= ${binary:Version}), ${misc:Depends}
 Description: debugging symbols for beegfs-mon
  The package contains the debugging symbols for beegfs-mon
 
+Package: beegfs-mon-grafana
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: BeeGFS mon dashboards for Grafana
+ This package contains the BeeGFS mon dashboards to display monitoring data in Grafana.
+ The default dashboard setup requires both Grafana, and InfluxDB.
+
 
 
 Package: beegfs-admon
@@ -184,7 +192,9 @@ Package: beeond
 Architecture: any
 Depends: ${misc:Depends}, beeond-thirdparty-gpl (= ${binary:Version}),
   beegfs-utils (= ${binary:Version}), beegfs-mgmtd (= ${binary:Version}), beegfs-meta (= ${binary:Version}),
-  beegfs-storage (= ${binary:Version}), beegfs-client (= ${binary:Version}), beegfs-helperd (= ${binary:Version})
+  beegfs-storage (= ${binary:Version}),
+  beegfs-client (= ${binary:Version}) | beegfs-client-dkms (= ${binary:Version}),
+  beegfs-helperd (= ${binary:Version})
 Description: BeeOND
  This package contains BeeOND.
 
@@ -193,10 +203,20 @@ Description: BeeOND
 Package: beegfs-client
 Architecture: all
 Depends: ${misc:Depends}, build-essential
+Conflicts: beegfs-client-dkms
 Recommends: linux-headers-amd64
 Description: BeeGFS client
  This package contains scripts, config and source files to build and
  start beegfs-client.
+
+Package: beegfs-client-dkms
+Architecture: all
+Depends: ${misc:Depends}, dkms
+Conflicts: beegfs-client
+Recommends: linux-headers-amd64
+Description: BeeGFS client (DKMS version)
+ This package contains scripts, config and source files to build and
+ start beegfs-client. It uses DKMS to build the kernel module.
 
 Package: beegfs-client-compat
 Architecture: all

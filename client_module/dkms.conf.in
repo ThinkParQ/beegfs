@@ -1,0 +1,8 @@
+PACKAGE_NAME="__NAME__"
+PACKAGE_VERSION="__VERSION__"
+BUILT_MODULE_NAME[0]="__MODNAME__"
+BUILT_MODULE_LOCATION[0]="build/"
+DEST_MODULE_LOCATION[0]="/kernel/fs/beegfs/"
+MAKE[0]="make -C build module 'KDIR=$kernel_source_dir' TARGET=__MODNAME__ BEEGFS_VERSION=__VERSION__"
+CLEAN="make -C build clean"
+AUTOINSTALL="yes"

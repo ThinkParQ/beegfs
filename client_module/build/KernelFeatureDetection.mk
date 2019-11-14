@@ -11,8 +11,6 @@ $(eval \
          && echo "-D$(strip $1)"))
 endef
 
-ifeq ($(BEEGFS_OPENTK_IBVERBS),1)
-
 ifneq ($(OFED_INCLUDE_PATH),)
 OFED_DETECTION_PATH := $(OFED_INCLUDE_PATH)
 else
@@ -59,8 +57,6 @@ KERNEL_FEATURE_DETECTION += $(shell \
    grep -qs -F "IB_PD_UNSAFE_GLOBAL_RKEY" \
       ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
       && echo "-DOFED_UNSAFE_GLOBAL_RKEY")
-
-endif # BEEGFS_OPENTK_IBVERBS
 
 # Find out whether the kernel has a scsi/fc_compat.h file, which defines
 # vlan_dev_vlan_id.

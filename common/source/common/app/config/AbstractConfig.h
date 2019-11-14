@@ -94,6 +94,8 @@ class AbstractConfig : public ICommonConfig
          return argv;
       }
 
+      static void assignKeyIfNotZero(const StringMapIter&, int& intVal, bool enableException = true);
+
    public:
       std::string getCfgFile() const
       {

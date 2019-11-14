@@ -1,11 +1,12 @@
-#ifdef BEEGFS_OPENTK_IBVERBS
+#include "IBVSocket.h"
+
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
 
 #ifdef KERNEL_HAS_SCSI_FC_COMPAT
 #include <scsi/fc_compat.h> // some kernels (e.g. rhel 5.9) forgot this in their rdma headers
 #endif // KERNEL_HAS_SCSI_FC_COMPAT
 
 
-#include "IBVSocket.h"
 #include <common/toolkit/TimeTk.h>
 
 #include <linux/in.h>
@@ -1859,4 +1860,4 @@ const char* __IBVSocket_wcStatusStr(int wcStatusCode)
    }
 }
 
-#endif // BEEGFS_OPENTK_IBVERBS
+#endif

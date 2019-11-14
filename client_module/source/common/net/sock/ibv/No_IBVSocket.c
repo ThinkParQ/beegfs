@@ -1,7 +1,6 @@
-#ifndef BEEGFS_OPENTK_IBVERBS
-
 #include "IBVSocket.h"
 
+#if !defined(CONFIG_INFINIBAND) && !defined(CONFIG_INFINIBAND_MODULE)
 
 bool IBVSocket_init(IBVSocket* _this)
 {
@@ -85,5 +84,5 @@ void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService)
 }
 
 
-#endif // BEEGFS_OPENTK_IBVERBS
+#endif
 

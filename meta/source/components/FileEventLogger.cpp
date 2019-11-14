@@ -97,7 +97,18 @@ void FileEventLogger::log(const FileEvent& event, const std::string& entryId,
       return;
    } while (false);
 
-   ssize_t sendRes = ::send(sockFD, serializedItem, itemSize, MSG_NOSIGNAL | MSG_DONTWAIT);
+   ssize_t sendRes;
+
+   sendRes = ::send(sockFD, serializedItem, itemSize, MSG_NOSIGNAL | MSG_DONTWAIT);
+   if (sendRes < 0 && errno == EPIPE) {
+      close(sockFD);
+      sockFD = -1;
+      if (tryReconnect()) {
+         LOG(EVENTLOGGER, NOTICE, "Reconnected.");
+         sendRes = ::send(sockFD, serializedItem, itemSize, MSG_NOSIGNAL | MSG_DONTWAIT);
+      }
+   }
+
    if (sendRes >= 0 && size_t(sendRes) == itemSize)
       return;
 

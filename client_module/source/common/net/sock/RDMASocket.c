@@ -74,7 +74,11 @@ void _RDMASocket_uninit(Socket* this)
 
 bool RDMASocket_rdmaDevicesExist(void)
 {
-   return IBVSocket_rdmaDevicesExist();
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+   return true;
+#else
+   return false;
+#endif
 }
 
 bool _RDMASocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned short port)

@@ -1,6 +1,5 @@
 # all variables used by package builds must be exported.
 export BEEGFS_DEBUG
-export BEEGFS_OPENTK_IBVERBS
 export USER_CXXFLAGS
 export USER_LDFLAGS
 

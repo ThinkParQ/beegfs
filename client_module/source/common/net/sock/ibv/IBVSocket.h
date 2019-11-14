@@ -71,7 +71,12 @@ struct IBVCommConfig
 };
 
 
-#ifdef BEEGFS_OPENTK_IBVERBS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+
+#include <rdma/ib_verbs.h>
+#include <rdma/rdma_cm.h>
+#include <rdma/ib_cm.h>
+#include "IBVBuffer.h"
 
 
 enum IBVSocketConnState;
@@ -215,7 +220,7 @@ struct IBVSocket
 };
 
 
-#else // BEEGFS_OPENTK_IBVERBS not defined in this case
+#else
 
 
 struct IBVSocket
@@ -225,6 +230,6 @@ struct IBVSocket
 };
 
 
-#endif // BEEGFS_OPENTK_IBVERBS
+#endif
 
 #endif /*OPENTK_IBVSOCKET_H_*/

@@ -53,7 +53,7 @@ class FileEventLogger {
       uint64_t missedEventsSeq;
 
       Mutex mtx;
-      Time lastConnectionAttempt;
+      Time lastConnectionAttempt{true};
 
       bool tryReconnect();
 };

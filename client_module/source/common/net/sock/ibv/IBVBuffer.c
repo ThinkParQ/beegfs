@@ -1,4 +1,4 @@
-#ifdef BEEGFS_OPENTK_IBVERBS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
 
 #include "IBVBuffer.h"
 #include "IBVSocket.h"

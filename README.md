@@ -59,6 +59,9 @@ You also have the choice between
 the openssl, nss, or gnutls version of `libcurl-dev`. Choose the one you prefer.
 
 ## Building Packages
+
+### For development systems
+
 BeeGFS comes with a Makefile capable of building packages for the system on which it is executed.
 These include all services, the client module and utilities.
 
@@ -90,6 +93,20 @@ You may specify any other non-existent directory instead.
 
 Note, however, that having `PACKAGE_DIR` on a NFS or similar network share may slow down
 the build process significantly.
+
+### For production systems, or from source snapshots
+
+By default the packaging system generates version numbers suitable only for development
+packages. Packages intended for installation on production systems must be built differently.
+All instructions to build development packages (as given above) apply, but additionally the
+package version must be explicitly set. This is done by passing `BEEGFS_VERSION=<version>`
+in the make command line, e.g.
+```
+ $ make package-deb PACKAGE_DIR=packages DEBUILD_OPTS="-j<n>" BEEGFS_VERSION=7.1.4-local1
+```
+
+Setting the version explicitly is required to generate packages that can be easily upgraded
+with the system package manager.
 
 
 ## Building without packaging

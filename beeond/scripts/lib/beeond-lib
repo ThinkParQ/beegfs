@@ -11,6 +11,7 @@ BEEOND_END_FILE_LIST="${BEEOND_FILENAME_PREFIX}files_end"
 BEEOND_END_UPDATED_FILE_LIST="${BEEOND_FILENAME_PREFIX}files_end_updated"
 BEEOND_START_DIR_LIST="${BEEOND_FILENAME_PREFIX}dirs_start"
 BEEOND_END_DIR_LIST="${BEEOND_FILENAME_PREFIX}dirs_end"
+BEEOND_END_UPDATED_DIR_LIST="${BEEOND_FILENAME_PREFIX}dirs_end_updated"
 BEEOND_SESSION_FILE="${BEEOND_FILENAME_PREFIX}session"
 
 BEEOND_BATCH_SIZE=20
@@ -76,7 +77,7 @@ beeond_generate_file_list()
       beeond_print_info \
             "Generating file list ${LISTFILE}. Timestamp reference: ${REFERENCE_FILE}..."
 
-      find . ! -path ./${BEEOND_FILENAME_PREFIX}\* -type f -or -type l \
+      find . ! -path ./${BEEOND_FILENAME_PREFIX}\* \( -type f -or -type l \) \
             \( -cnewer "${REFERENCE_FILE}" -or -newer "${REFERENCE_FILE}" \) \
             -exec bash -c 'printf "%q\n" "$0"' {} \; \
             | grep -v ^\\$ | sort > "${LISTFILE}"
@@ -91,13 +92,29 @@ beeond_generate_directory_list()
 {
    local LOCAL_PATH="${1}"
    local LISTFILE="${2}"
-
-   beeond_print_info "Generating directory list file ${LISTFILE}..."
+   local REFERENCE_FILE="${3}"
 
    pushd "${LOCAL_PATH}"
-   find . ! -path . -type d \
-         -exec bash -c 'printf "%q\n" "$0"' {} \; \
-         | grep -v ^\\$ | sort > "${LISTFILE}"
+   if [ "${REFERENCE_FILE}" = "" ]
+   then     # No reference file - just generate the full list (e.g. on startup).
+
+      beeond_print_info "Generating directory list ${LISTFILE}..."
+
+      find . ! -path . -type d \
+            -exec bash -c 'printf "%q\n" "$0"' {} \; \
+            | grep -v ^\\$ | sort > "${LISTFILE}"
+
+   else     # Reference file given: Compare timestamps.
+
+      beeond_print_info \
+            "Generating directory list ${LISTFILE}. Timestamp reference: ${REFERENCE_FILE}..."
+
+      find . ! -path . -type d \
+            \( -cnewer "${REFERENCE_FILE}" -or -newer "${REFERENCE_FILE}" \) \
+            -exec bash -c 'printf "%q\n" "$0"' {} \; \
+            | grep -v ^\\$ | sort > "${LISTFILE}"
+
+   fi
    popd
 }
 
@@ -274,20 +291,23 @@ beeond_copy_updated_files()
             done; \
          "
 
-   # Copy files into moved directories. (When a directory is renamed, the files in it don't have
-   # their timestamp updated. Therefore, we need to check all the new directories again).
+   # Copy files into updated directories. (When a directory is renamed or files
+   # are moved to a directory, the files in it don't have their timestamp
+   # updated. Therefore, we need to check all the updated directories again).
 
-   beeond_print_info "Copying back changed files (moved dirs):"
+   beeond_print_info "Copying back changed files (updated dirs):"
 
-   comm -13 "${LOCAL_PATH}/${BEEOND_START_DIR_LIST}" "${LOCAL_PATH}/${BEEOND_END_DIR_LIST}" | \
-         cut -b3- | \
-            ${PARALLEL} -S "${NODE_LIST}" -j"${CONCURRENCY}" --pipe --recend "\n" \
-               -N${BEEOND_BATCH_SIZE} --controlmaster --will-cite \
-            " \
-               while read FILE; do \
-                  cp -uv \"${LOCAL_PATH}/\${FILE}\" \"\`dirname \"${GLOBAL_PATH}/\${FILE}\"\`\"; \
-               done; \
-            "
+   pushd "${LOCAL_PATH}"
+   < "${LOCAL_PATH}/${BEEOND_END_UPDATED_DIR_LIST}" \
+         xargs -I{} find {} -maxdepth 1 \( -type f -or -type l \) | \
+         ${PARALLEL} -S "${NODE_LIST}" -j"${CONCURRENCY}" --pipe --recend "\n" \
+            -N${BEEOND_BATCH_SIZE} --controlmaster --will-cite \
+         " \
+            while read FILE; do \
+               cp -uv \"${LOCAL_PATH}/\${FILE}\" \"\`dirname \"${GLOBAL_PATH}/\${FILE}\"\`\"; \
+            done; \
+         "
+   popd
 }
 
 # Stage in process: Copy all files from the global store to the local store.
@@ -346,9 +366,11 @@ beeond_stage_out()
 
    beeond_generate_file_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_FILE_LIST}"
    beeond_generate_file_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_UPDATED_FILE_LIST}" \
-         ${BEEOND_START_FILE_LIST}
+         "${BEEOND_START_FILE_LIST}"
 
    beeond_generate_directory_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_DIR_LIST}"
+   beeond_generate_directory_list "${LOCAL_PATH}" "${LOCAL_PATH}/${BEEOND_END_UPDATED_DIR_LIST}" \
+         "${BEEOND_START_DIR_LIST}"
 
    beeond_remove_removed_files "${GLOBAL_PATH}" "${LOCAL_PATH}" "${NODE_LIST}" "${CONCURRENCY}"
 

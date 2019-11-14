@@ -33,10 +33,17 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       return false;
    }
 
-
    if(nodeType == NODETYPE_Client)
    { // this is a client heartbeat
       NodeStoreClients* clients = app->getClientNodes();
+
+      if (getPortUDP() <= 0 || getPortTCP() != 0) {
+         LOG(GENERAL, WARNING, "Unable to register client because of wrong port.",
+             ("PortTCP",  getPortTCP()), ("addr", ctx.peerName()), 
+             (("nodeType"), nodeType));
+
+         return false;
+      }
 
       // construct node
 
@@ -52,6 +59,14 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       /* only accept new servers if nodeNumID is set
          (otherwise RegisterNodeMsg would need to be called first) */
+
+      if (getPortUDP() <= 0 || getPortTCP() == 0) {
+         LOG(GENERAL, WARNING, "Unable to register server because of wrong port.",
+               ("PortTCP",  getPortTCP()), ("addr", ctx.peerName()), 
+               (("nodeType"), nodeType));
+
+         return false;
+      }
 
       if(!getNodeNumID() )
       { /* shouldn't happen: this server would need to register first to get a nodeNumID assigned */

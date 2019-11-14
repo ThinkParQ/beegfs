@@ -99,7 +99,10 @@ bool setBuddyNeedsResyncComm(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm, 
 
    // until mgmt handles resync decision, refuse to set a primary to needs-resync locally.
    if (!currentIsPrimary)
+   {
+      buddyNeedsResyncFile->write(BUDDY_RESYNC_NOT_REQUIRED);
       return true;
+   }
 
    UInt16List targetIDList(1, buddyTargetID);
    UInt8List stateList(1, stateToSet);
@@ -123,6 +126,7 @@ bool setBuddyNeedsResyncComm(Node& mgmtNode, const MirrorBuddyGroupMapper& bgm, 
    {
       LOG(GENERAL, CRITICAL, "Management node did not accept target states.", buddyTargetID,
             needsResync);
+      buddyNeedsResyncFile->write(BUDDY_RESYNC_NOT_REQUIRED);
       return true;
    }
 

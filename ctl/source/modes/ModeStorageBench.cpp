@@ -259,7 +259,9 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
 
       auto mappings = NodesTk::downloadTargetMappings(mgmtNode, false);
 
-      for (auto it = mappings.second.begin(); it != mappings.second.end(); ++it)
+      // Delete all mappings for targets that are not in targetIDs, i.e. given by the user.
+      // Also deletes targetIDs entries to check for unknown targets.
+      for (auto it = mappings.second.begin(); it != mappings.second.end();)
       {
          bool targetFound = false;
 
@@ -330,7 +332,7 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
 
       auto mappings = NodesTk::downloadTargetMappings(mgmtNode, false);
 
-      for (auto it = mappings.second.begin(); it != mappings.second.end(); ++it)
+      for (auto it = mappings.second.begin(); it != mappings.second.end();)
       {
          bool targetFound = false;
 

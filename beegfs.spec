@@ -387,6 +387,18 @@ install -D client_module/build/dist/etc/beegfs-client-mount-hook.example \
    ${RPM_BUILD_ROOT}/etc/beegfs/beegfs-client-mount-hook.example
 
 ##########
+########## client-dkms
+##########
+
+cp client_module/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+mkdir -p ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
+cp -r client_module/build ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
+cp -r client_module/source ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
+sed -e 's/__VERSION__/%{VER}/g' -e 's/__NAME__/beegfs/g' -e 's/__MODNAME__/beegfs/g' \
+	 < client_module/dkms.conf.in \
+	 > ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}/dkms.conf
+
+##########
 ########## client-devel
 ##########
 
@@ -591,9 +603,31 @@ This package contains the BeeGFS mon server binaries.
 %config(noreplace) /etc/default/beegfs-mon
 /etc/init.d/beegfs-mon
 /opt/beegfs/sbin/beegfs-mon
-/opt/beegfs/scripts/grafana/
 /usr/lib/systemd/system/beegfs-mon.service
 /usr/lib/systemd/system/beegfs-mon@.service
+
+
+
+%package mon-grafana
+
+Summary: BeeGFS mon dashboards for Grafana
+Group: Software/Other
+BuildArch: noarch
+
+%description mon-grafana
+This package contains the BeeGFS mon dashboards to display monitoring data in Grafana.
+
+The default dashboard setup requires both Grafana, and InfluxDB.
+
+%post mon-grafana
+%post_package beegfs-mon-grafana
+
+%preun mon-grafana
+%preun_package beegfs-mon-grafana
+
+%files mon-grafana
+%defattr(-,root,root)
+/opt/beegfs/scripts/grafana/
 
 
 
@@ -710,10 +744,11 @@ License: GPL v2
 Group: Software/Other
 BuildArch: noarch
 requires: make, gcc, gcc-c++
+conflicts: beegfs-client-dkms
 
 %description client
-This package contains binary objects of the closed source part of BeeGFS and
-open source code to allow to build the client kernel module.
+This package contains scripts, config and source files to build and
+start beegfs-client.
 
 %post client
 %post_package beegfs-client
@@ -738,6 +773,33 @@ touch /var/lib/beegfs/client/force-auto-build
 /opt/beegfs/sbin/beegfs-setup-client
 /usr/lib/systemd/system/beegfs-client.service
 %{CLIENT_DIR}
+
+
+
+%package client-dkms
+
+Summary: BeeGFS client kernel module (DKMS version)
+License: GPL v2
+Group: Software/Other
+BuildArch: noarch
+requires: make, dkms
+conflicts: beegfs-client
+provides: beegfs-client
+
+%description client-dkms
+This package contains scripts, config and source files to build and
+start beegfs-client. It uses DKMS to build the kernel module.
+
+%post client-dkms
+dkms install beegfs/%{VER}
+
+%preun client-dkms
+dkms remove beegfs/%{VER} --all
+
+%files client-dkms
+%defattr(-,root,root)
+%config(noreplace) /etc/beegfs/beegfs-client.conf
+/usr/src/beegfs-%{VER}
 
 
 

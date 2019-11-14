@@ -1,5 +1,7 @@
 #include <common/toolkit/StringTk.h>
 #include <common/toolkit/StorageTk.h>
+#include <common/app/log/LogContext.h>
+#include <common/app/log/Logger.h>
 #include "AbstractConfig.h"
 
 
@@ -97,6 +99,7 @@ void AbstractConfig::loadDefaults(bool addDashes)
  */
 void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
 {
+
    for (StringMapIter iter = configMap.begin(); iter != configMap.end();)
    {
       bool unknownElement = false;
@@ -116,23 +119,23 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
       else if (testConfigMapKeyMatch(iter, "connPortShift", addDashes))
          connPortShift = StringTk::strToInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "connClientPortUDP", addDashes))
-         connClientPortUDP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connClientPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connStoragePortUDP", addDashes))
-         connStoragePortUDP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connStoragePortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMetaPortUDP", addDashes))
-         connMetaPortUDP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connMetaPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connAdmonPortUDP", addDashes))
-         connAdmonPortUDP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connAdmonPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMgmtdPortUDP", addDashes))
-         connMgmtdPortUDP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connMgmtdPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connStoragePortTCP", addDashes))
-         connStoragePortTCP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connStoragePortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMetaPortTCP", addDashes))
-         connMetaPortTCP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connMetaPortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connHelperdPortTCP", addDashes))
-         connHelperdPortTCP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connHelperdPortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMgmtdPortTCP", addDashes))
-         connMgmtdPortTCP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connMgmtdPortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connUseRDMA", addDashes))
          connUseRDMA = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connBacklogTCP", addDashes))
@@ -351,3 +354,20 @@ void AbstractConfig::loadFromArgs(int argc, char** argv)
       MapTk::addLineToStringMap(argv[i], &configMap);
 }
 
+
+/**
+ * @warning It might exit the proccess if it finds an incorrect value
+ */
+void AbstractConfig::assignKeyIfNotZero(const StringMapIter& it, int& intVal, bool enableException)
+{
+   const int tempVal = StringTk::strToInt(it->second);
+
+   if (tempVal <= 0) {
+      if (enableException) {
+         throw InvalidConfigException("Invalid or unset configuration variable: " + (it->first));
+      }
+      return;
+   }
+
+   intVal = tempVal;
+}

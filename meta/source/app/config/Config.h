@@ -63,6 +63,7 @@ class Config : public AbstractConfig
       bool              tuneUseAggressiveStreamPoll; // true to not sleep on epoll in streamlisv2
       unsigned          tuneNumResyncSlaves;
       bool              tuneMirrorTimestamps;
+      unsigned          tuneUnlinkDisposalDelay;
 
       bool              quotaEarlyChownResponse; // true to send response before chunk files chown
       bool              quotaEnableEnforcement;
@@ -270,6 +271,8 @@ class Config : public AbstractConfig
       }
 
       bool getTuneMirrorTimestamps() const { return tuneMirrorTimestamps; }
+
+      unsigned getTuneUnlinkDisposalDelay() const { return tuneUnlinkDisposalDelay; }
 
       bool getSysAllowUserSetPattern() const { return sysAllowUserSetPattern; }
 

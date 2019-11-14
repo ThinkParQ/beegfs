@@ -13,7 +13,7 @@ ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 endif
 
 %:
-	dh $@ --parallel
+	dh $@ --parallel --with dkms
 
 override_dh_auto_build:
 	make -j$(NUMJOBS) common-all daemons utils
@@ -119,9 +119,9 @@ override_dh_install:
 	mkdir -p debian/beegfs-admon/var/lib/beegfs
 	# mongoose document root
 	mkdir -p debian/beegfs-admon/var/lib/beegfs/www
-	@# mon
-	mkdir -p debian/beegfs-mon/opt/beegfs/lib/grafana
-	cp -a mon/scripts/grafana/* debian/beegfs-mon/opt/beegfs/lib/grafana
+	@# mon-grafana
+	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
+	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
 	@# upgraders
 	install -D upgrade/beegfs_mirror_md/build/beegfs-mirror-md \
 		debian/beegfs-mirror-md/opt/beegfs/sbin/beegfs-mirror-md
@@ -197,6 +197,15 @@ override_dh_install:
 		debian/beegfs-client/opt/beegfs/sbin/beegfs-setup-client
 	install -D client_module/build/dist/etc/beegfs-client-mount-hook.example \
 		debian/beegfs-client/etc/beegfs/beegfs-client-mount-hook.example
+	@# client-dkms
+	mkdir -p debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)
+	cp -r client_module/build debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)
+	cp -r client_module/source debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)
+	sed -e 's/__VERSION__/$(BEEGFS_VERSION)/g' -e 's/__NAME__/beegfs/g' -e 's/__MODNAME__/beegfs/g' \
+		< client_module/dkms.conf.in \
+		> debian/beegfs-client-dkms.dkms
+	install -D -m644 client_module/build/dist/etc/beegfs-client.conf \
+		debian/beegfs-client-dkms/etc/beegfs/beegfs-client.conf
 	@# client-devel
 	mkdir -p debian/beegfs-client-devel/usr/include
 	cp -a client_devel/include/beegfs debian/beegfs-client-devel/usr/include/

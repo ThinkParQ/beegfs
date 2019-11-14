@@ -22,7 +22,7 @@ class MetaNodeEx: public Node
    private:
       mutable RWLock lock;
       bool isResponding;
-      std::chrono::milliseconds lastStatRequestTime;
+      std::chrono::milliseconds lastStatRequestTime{0};
 
    public:
       std::chrono::milliseconds getLastStatRequestTime() const

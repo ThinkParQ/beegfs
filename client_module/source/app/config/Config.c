@@ -60,6 +60,16 @@ static size_t Config_fs_read(struct file *file, char *buf, size_t size, loff_t *
    return readRes;
 }
 
+static bool assignKeyIfNotZero(const char* key, const char* strVal, int* const intVal) {
+   const int tempVal = StringTk_strToInt(strVal);
+   if (tempVal <= 0 || intVal == NULL) {
+      return false;
+   }
+
+   *intVal = tempVal;
+   return true;
+}
+
 /**
  * @param mountConfig will be copied (not owned by this object)
  */
@@ -302,16 +312,28 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          this->connPortShift = StringTk_strToInt(valueStr);
       else
       if(!strcmp(keyStr, "connClientPortUDP") )
-         this->connClientPortUDP = StringTk_strToInt(valueStr);
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connClientPortUDP))
+            goto bad_config_elem;
+      }
       else
       if(!strcmp(keyStr, "connMgmtdPortUDP") )
-         this->connMgmtdPortUDP = StringTk_strToInt(valueStr);
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connMgmtdPortUDP))
+            goto bad_config_elem;
+      }
       else
       if(!strcmp(keyStr, "connHelperdPortTCP") )
-         this->connHelperdPortTCP = StringTk_strToInt(valueStr);
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connHelperdPortTCP))
+            goto bad_config_elem;
+      }
       else
       if(!strcmp(keyStr, "connMgmtdPortTCP") )
-         this->connMgmtdPortTCP = StringTk_strToInt(valueStr);
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connMgmtdPortTCP))
+            goto bad_config_elem;
+      }
       else
       if(!strcmp(keyStr, "connUseRDMA") )
          this->connUseRDMA = StringTk_strToBool(valueStr);

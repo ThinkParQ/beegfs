@@ -70,7 +70,7 @@ void Config::loadDefaults(bool addDashes)
 
    // own definitions
    configMapRedefine("connInterfacesFile", "", addDashes);
-   configMapRedefine("connFsckPortUDP", "0", addDashes);
+   configMapRedefine("connFsckPortUDP", "8005", addDashes);
 
    configMapRedefine("tuneNumWorkers", "32", addDashes);
    configMapRedefine("tunePreferredNodesFile", "", addDashes);
@@ -173,7 +173,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       if (testConfigMapKeyMatch(iter, "connInterfacesFile", addDashes))
          connInterfacesFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "connFsckPortUDP", addDashes))
-         connFsckPortUDP = StringTk::strToInt(iter->second);
+         assignKeyIfNotZero(iter, connFsckPortUDP);
       else if (testConfigMapKeyMatch(iter, "tuneNumWorkers", addDashes))
          tuneNumWorkers = StringTk::strToUInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "tunePreferredNodesFile", addDashes))

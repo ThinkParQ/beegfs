@@ -1,7 +1,7 @@
 #ifndef IBVBuffer_h_aMQFNfzrjbEHDOcv216fi
 #define IBVBuffer_h_aMQFNfzrjbEHDOcv216fi
 
-#ifdef BEEGFS_OPENTK_IBVERBS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
 
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>

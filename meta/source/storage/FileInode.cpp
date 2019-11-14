@@ -4,6 +4,7 @@
 #include <common/storage/StorageDefinitions.h>
 #include <toolkit/XAttrTk.h>
 #include <program/Program.h>
+#include "DelayedDisposer.h"
 #include "FileInode.h"
 #include "Locking.h"
 
@@ -600,14 +601,24 @@ bool FileInode::removeStoredMetaData(const std::string& id, bool isBuddyMirrored
    const char* logContext = "FileInode (remove stored metadata)";
 
    App* app = Program::getApp();
+   Config* cfg = app->getConfig();
    std::string inodeFilename = MetaStorageTk::getMetaInodePath(
          isBuddyMirrored
             ? app->getBuddyMirrorInodesPath()->str()
             : app->getInodesPath()->str(),
          id);
 
+   LogContext(logContext).log(Log_SPAM, "unlink " + inodeFilename);
    // delete metadata file
-   int unlinkRes = unlink(inodeFilename.c_str() );
+   int unlinkRes = 0;
+   const unsigned unlinkDisposalDelay = std::max<unsigned>(cfg->getTuneUnlinkDisposalDelay(), 0);
+   // this is really a workaround for a case, when a file is deleted/created/read by  multiple clients in parallel.
+   // Under rare circumstances, it can happen, that the file is unlinked just a few milliseconds too early
+   if (unlinkDisposalDelay > 0)
+      unlinkRes = DelayedDisposer::unlink(inodeFilename, unlinkDisposalDelay);
+   else
+      unlinkRes = unlink(inodeFilename.c_str());
+
 
    /* ignore errno == ENOENT as the file does not exist anymore for whatever reasons. Although
     * unlink() failed, we do not have to care, as our goal is still reached. This is also about

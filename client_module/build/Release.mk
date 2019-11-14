@@ -88,10 +88,6 @@ BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"'
 endif
 
 # OFED
-ifeq ($(BEEGFS_OPENTK_IBVERBS),1)
-BEEGFS_CFLAGS += -DBEEGFS_OPENTK_IBVERBS
-endif
-
 ifneq ($(OFED_INCLUDE_PATH),)
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 
@@ -180,8 +176,6 @@ help:
 	@echo '     Set a different module and file system name.'
 	@echo ' '
 	@echo 'Infiniband (RDMA) arguments (optional):'
-	@echo '  BEEGFS_OPENTK_IBVERBS=1:'
-	@echo '    Defining this enables ibverbs support.'
 	@echo '  OFED_INCLUDE_PATH=<path>:'
 	@echo '    Path to OpenFabrics Enterpise Distribution kernel include directory, e.g.'
 	@echo '    "/usr/src/openib/include". (If not defined, the standard kernel headers'
