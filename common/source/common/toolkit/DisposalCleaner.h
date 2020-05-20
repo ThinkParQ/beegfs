@@ -3,8 +3,6 @@
 
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/Node.h>
-#include <common/nodes/NodeStore.h>
-
 #include <functional>
 
 class DisposalCleaner
@@ -14,20 +12,24 @@ class DisposalCleaner
             const bool isMirrored);
       typedef void (OnErrorFn)(Node& node, FhgfsOpsErr err);
 
-      DisposalCleaner(MirrorBuddyGroupMapper& bgm):
-         bgm(&bgm)
+      DisposalCleaner(MirrorBuddyGroupMapper& bgm, bool onlyMirrored=false):
+         bgm(&bgm), onlyMirrored(onlyMirrored)
       {
       }
 
-      void run(NodeStore& nodes, const std::function<OnItemFn>& onItem,
-         const std::function<OnErrorFn>& onError);
+      void run(const std::vector<NodeHandle>& nodes, const std::function<OnItemFn>& onItem,
+         const std::function<OnErrorFn>& onError,
+         const std::function<bool()>& abortCondition = [] () { return false; });
 
       static FhgfsOpsErr unlinkFile(Node& node, std::string entryName, const bool isMirrored);
 
    private:
       MirrorBuddyGroupMapper* bgm;
 
-      FhgfsOpsErr walkNode(Node& node, const std::function<OnItemFn>& onItem);
+      FhgfsOpsErr walkNode(Node& node, const std::function<OnItemFn>& onItem,
+              const std::function<bool()>& abortCondition);
+
+      const bool onlyMirrored;
 };
 
 #endif

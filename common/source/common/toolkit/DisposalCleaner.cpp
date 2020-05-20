@@ -7,18 +7,19 @@
 #include <common/storage/Metadata.h>
 #include <common/toolkit/MessagingTk.h>
 
-void DisposalCleaner::run(NodeStore& nodes, const std::function<OnItemFn>& onItem,
-   const std::function<OnErrorFn>& onError)
+void DisposalCleaner::run(const std::vector<NodeHandle>& nodes, const std::function<OnItemFn>& onItem,
+   const std::function<OnErrorFn>& onError, const std::function<bool()>& abortCondition)
 {
-   for (const auto& node : nodes.referenceAllNodes())
+   for (const auto& node : nodes)
    {
-      FhgfsOpsErr walkRes = walkNode(*node, onItem);
+      FhgfsOpsErr walkRes = walkNode(*node, onItem, abortCondition);
       if (walkRes != FhgfsOpsErr_SUCCESS)
          onError(*node, walkRes);
    }
 }
 
-FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>& onItem)
+FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>& onItem,
+        const std::function<bool()>& abortCondition)
 {
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
@@ -32,7 +33,7 @@ FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>&
 
    do
    {
-      for (int i = 0; i <= 1; i++)
+      for (int i = (onlyMirrored ? 1 : 0); i <= 1; i++)
       {
          // i == 0 -> non-mirrored metadata
          // i == 1 -> mirrored metadata
@@ -82,6 +83,9 @@ FhgfsOpsErr DisposalCleaner::walkNode(Node& node, const std::function<OnItemFn>&
             if (retVal != FhgfsOpsErr_SUCCESS)
                break;
          }
+
+         if (abortCondition())
+             return retVal;
       }
    } while (retVal == FhgfsOpsErr_SUCCESS && numEntriesThisRound == maxOutNames);
 

@@ -21,7 +21,11 @@ else
   BEEGFS_EPOCH := 20
 endif
 
-BEEGFS_VERSION_DEB := $(BEEGFS_EPOCH):${BEEGFS_VERSION}
+# sanitize version strings:
+# rpm accepts underscores but not dashes
+# deb accepts dashes but not underscores
+BEEGFS_VERSION_RPM := $(subst -,_,$(BEEGFS_VERSION))
+BEEGFS_VERSION_DEB := $(BEEGFS_EPOCH):$(subst _,-,$(BEEGFS_VERSION))
 export BEEGFS_VERSION
 
 PREFIX ?= /opt/beegfs
@@ -169,10 +173,10 @@ package-rpm: clean
 	! [ -d '$(PACKAGE_DIR)' ] || { echo choose a new directory for PACKAGE_DIR, please >&2; false; }
 	mkdir -p $(PACKAGE_DIR)/SOURCES
 	tar --exclude $(PACKAGE_DIR) --exclude .git --exclude .ccache \
-		-cf $(PACKAGE_DIR)/SOURCES/beegfs-$(BEEGFS_VERSION).tar .
+		-cf $(PACKAGE_DIR)/SOURCES/beegfs-$(BEEGFS_VERSION_RPM).tar .
 	rpmbuild --clean -bb beegfs.spec \
 		--define '_topdir $(abspath $(PACKAGE_DIR))' \
 		--define 'EPOCH $(BEEGFS_EPOCH)' \
-		--define 'BEEGFS_VERSION $(BEEGFS_VERSION)' \
+		--define 'BEEGFS_VERSION $(BEEGFS_VERSION_RPM)' \
 		$(RPMBUILD_OPTS)
 

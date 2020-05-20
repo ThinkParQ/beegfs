@@ -29,7 +29,7 @@ _beegfs-ctl()
          # completion for the options with --
          case $cmd in
             --listnodes)
-               opts="$mclh --nodetype= --details --nicdetails --showversion --reachable \
+               opts="$mclh --nodetype= --details --nicdetails --reachable \
                   --reachretries= --reachtimeout= --route --errorcodes"
                ;;
 

@@ -154,7 +154,12 @@
 #if defined(KERNEL_HAS_64BIT_TIMESTAMPS)
 static inline struct timespec64 current_fs_time(struct super_block *sb)
 {
+#if defined(KERNEL_HAS_KTIME_GET)
+   struct timespec64 now;
+   ktime_get_real_ts64(&now);
+#else
    struct timespec64 now = current_kernel_time64();
+#endif /* KERNEL_HAS_KTIME_GET */
    return timespec64_trunc(now, sb->s_time_gran);
 }
 #elif !defined(KERNEL_HAS_CURRENT_FS_TIME)

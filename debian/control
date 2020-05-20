@@ -194,7 +194,8 @@ Depends: ${misc:Depends}, beeond-thirdparty-gpl (= ${binary:Version}),
   beegfs-utils (= ${binary:Version}), beegfs-mgmtd (= ${binary:Version}), beegfs-meta (= ${binary:Version}),
   beegfs-storage (= ${binary:Version}),
   beegfs-client (= ${binary:Version}) | beegfs-client-dkms (= ${binary:Version}),
-  beegfs-helperd (= ${binary:Version})
+  beegfs-helperd (= ${binary:Version}),
+  psmisc
 Description: BeeOND
  This package contains BeeOND.
 

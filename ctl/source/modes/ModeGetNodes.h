@@ -14,7 +14,6 @@ class ModeGetNodes : public Mode
                      // unreachable nodes later.
          cfgPrintDetails(false),
          cfgPrintNicDetails(false),
-         cfgPrintFhgfsVersion(false),
          cfgCheckReachability(false),
          cfgNotReachableAsError(false),
          cfgReachabilityNumRetries(6), // (>= 1)
@@ -35,7 +34,6 @@ class ModeGetNodes : public Mode
    private:
       bool cfgPrintDetails;
       bool cfgPrintNicDetails;
-      bool cfgPrintFhgfsVersion;
       bool cfgCheckReachability;
       bool cfgNotReachableAsError;
       unsigned cfgReachabilityNumRetries; // (>= 1)

@@ -74,7 +74,7 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("tuneUseAggressiveStreamPoll","false");
    configMapRedefine("tuneNumResyncSlaves",        "12");
    configMapRedefine("tuneMirrorTimestamps",        "true");
-   configMapRedefine("tuneUnlinkDisposalDelay",        "0");
+   configMapRedefine("tuneDisposalGCPeriod",       "0");
 
    configMapRedefine("quotaEarlyChownResponse",    "true");
    configMapRedefine("quotaEnableEnforcement",     "false");
@@ -199,8 +199,8 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          tuneUsePerUserMsgQueues = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("tuneMirrorTimestamps"))
          tuneMirrorTimestamps = StringTk::strToBool(iter->second);
-      else if(iter->first == std::string("tuneUnlinkDisposalDelay") )
-         tuneUnlinkDisposalDelay = StringTk::strToUInt(iter->second);
+      else if(iter->first == std::string("tuneDisposalGCPeriod"))
+          tuneDisposalGCPeriod = StringTk::strToUInt(iter->second);
       else if (iter->first == std::string("sysFileEventLogTarget"))
          sysFileEventLogTarget = iter->second;
       else if (iter->first == std::string("runDaemonized"))

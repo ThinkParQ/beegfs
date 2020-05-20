@@ -194,7 +194,7 @@ static long FhgfsOpsIoctl_getCfgFile(struct file *file, void __user *argp)
       return -EINVAL;
    }
 
-   if(!access_ok(VERIFY_WRITE, confFile, sizeof(*confFile) ) )
+   if(!os_access_ok(VERIFY_WRITE, confFile, sizeof(*confFile) ) )
    {
       Logger_logFormatted(log, Log_DEBUG, logContext, "access_ok() denied to write to conf_file");
       return -EINVAL;
@@ -230,7 +230,7 @@ static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp
    int cpRes;
    int cfgFileStrLen;
 
-   if(!access_ok(VERIFY_WRITE, confFile, sizeof(*confFile) ) )
+   if(!os_access_ok(VERIFY_WRITE, confFile, sizeof(*confFile) ) )
    {
       Logger_logFormatted(log, Log_DEBUG, logContext, "access_ok() denied to write to conf_file");
       vfree(fileName);

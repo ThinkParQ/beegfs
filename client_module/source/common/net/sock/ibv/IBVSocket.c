@@ -707,6 +707,9 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
 
 
    if(commContext->sendCQ)
+#ifdef KERNEL_IB_DESTROY_CQ_IS_VOID
+      ib_destroy_cq(commContext->sendCQ);
+#else
    {
       int destroyRes = ib_destroy_cq(commContext->sendCQ);
       if (unlikely(destroyRes) )
@@ -715,8 +718,12 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
          dump_stack();
       }
    }
+#endif
 
    if(commContext->recvCQ)
+#ifdef KERNEL_IB_DESTROY_CQ_IS_VOID
+      ib_destroy_cq(commContext->recvCQ);
+#else
    {
       int destroyRes = ib_destroy_cq(commContext->recvCQ);
       if (unlikely(destroyRes) )
@@ -725,6 +732,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
          dump_stack();
       }
    }
+#endif
 
    IBVBuffer_free(&commContext->checkConBuffer, commContext);
 

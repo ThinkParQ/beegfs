@@ -11,6 +11,7 @@
 #include <common/toolkit/NodesTk.h>
 #include <components/FileEventLogger.h>
 #include <components/ModificationEventFlusher.h>
+#include <components/DisposalGarbageCollector.h>
 #include <program/Program.h>
 #include <session/SessionStore.h>
 #include <storage/MetadataEx.h>
@@ -78,6 +79,7 @@ App::App(int argc, char** argv)
    this->internodeSyncer = NULL;
    this->modificationEventFlusher = NULL;
    this->timerQueue = new TimerQueue(1, 1);
+   this->gcQueue = new TimerQueue(1, 1);
    this->buddyResyncer = NULL;
 
    this->nextNumaBindTarget = 0;
@@ -848,6 +850,7 @@ void App::startComponents()
    PThread::blockInterruptSignals();
 
    timerQueue->start();
+   gcQueue->start();
 
    this->dgramListener->start();
 
@@ -870,6 +873,10 @@ void App::startComponents()
 
    this->modificationEventFlusher->start();
 
+   if(const auto wait = getConfig()->getTuneDisposalGCPeriod()) {
+       this->gcQueue->enqueue(std::chrono::seconds(wait), disposalGarbageCollector);
+   }
+
    workersStart();
    commSlavesStart();
 
@@ -880,6 +887,9 @@ void App::startComponents()
 
 void App::stopComponents()
 {
+
+   SAFE_DELETE(this->gcQueue);
+
    // note: this method may not wait for termination of the components, because that could
    //    lead to a deadlock (when calling from signal handler)
 

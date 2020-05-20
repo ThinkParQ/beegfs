@@ -181,7 +181,7 @@ void ModeDisposeUnusedFiles::handleNodes(NodeStoreServers* metaNodes)
 
    DisposalCleaner dc(*Program::getApp()->getMetaMirrorBuddyGroupMapper());
 
-   dc.run(*metaNodes,
+   dc.run(metaNodes->referenceAllNodes(),
          std::bind(&ModeDisposeUnusedFiles::handleItem, this, _1, _2, _3),
          std::bind(&ModeDisposeUnusedFiles::handleError, this, _1, _2));
 

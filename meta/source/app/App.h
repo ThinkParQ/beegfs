@@ -130,6 +130,7 @@ class App : public AbstractApp
       InternodeSyncer* internodeSyncer;
       ModificationEventFlusher* modificationEventFlusher;
       TimerQueue* timerQueue;
+      TimerQueue* gcQueue;
 
       unsigned numStreamListeners; // value copied from cfg (for performance)
       StreamLisVec streamLisVec;
@@ -458,6 +459,11 @@ class App : public AbstractApp
       TimerQueue* getTimerQueue() const
       {
          return timerQueue;
+      }
+
+      TimerQueue* getGcQueue() const
+      {
+         return gcQueue;
       }
 
       ModificationEventFlusher* getModificationEventFlusher() const

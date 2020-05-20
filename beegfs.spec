@@ -361,6 +361,8 @@ make -C client_module/build %make_j \
    RELEASE_PATH=${RPM_BUILD_ROOT}/opt/beegfs/src/client KDIR="%{KDIR}" V=1 \
    prepare_release
 cp client_module/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+cp client_module/build/dist/etc/beegfs-client-build.mk ${RPM_BUILD_ROOT}/etc/beegfs/beegfs-client-build.mk
+
 
 # compat files
 cp -a ${RPM_BUILD_ROOT}/%{CLIENT_DIR} ${RPM_BUILD_ROOT}/%{CLIENT_COMPAT_DIR}
@@ -391,9 +393,18 @@ install -D client_module/build/dist/etc/beegfs-client-mount-hook.example \
 ##########
 
 cp client_module/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+
 mkdir -p ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
+
 cp -r client_module/build ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
 cp -r client_module/source ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
+
+rm -Rf ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}/build/dist
+
+
+install -D client_module/build/dist/sbin/beegfs-setup-client \
+   ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-client
+
 sed -e 's/__VERSION__/%{VER}/g' -e 's/__NAME__/beegfs/g' -e 's/__MODNAME__/beegfs/g' \
 	 < client_module/dkms.conf.in \
 	 > ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}/dkms.conf
@@ -765,6 +776,7 @@ touch /var/lib/beegfs/client/force-auto-build
 %config(noreplace) /etc/beegfs/beegfs-client-autobuild.conf
 %config(noreplace) /etc/beegfs/beegfs-client-mount-hook.example
 %config(noreplace) /etc/beegfs/beegfs-client.conf
+%config(noreplace) /etc/beegfs/beegfs-client-build.mk
 %config(noreplace) /etc/beegfs/beegfs-mounts.conf
 %dir /etc/beegfs/lib/
 %config(noreplace) /etc/beegfs/lib/init-multi-mode.beegfs-client

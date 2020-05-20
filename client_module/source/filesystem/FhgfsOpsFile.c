@@ -301,7 +301,7 @@ int FhgfsOps_readlink(struct dentry* dentry, char __user* buf, int size)
       FhgfsOpsHelper_logOp(5, app, dentry, inode, logContext);
 
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_WRITE, buf, size) ) )
+   if(unlikely(!os_access_ok(VERIFY_WRITE, buf, size) ) )
       return -EFAULT;
 
    FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo

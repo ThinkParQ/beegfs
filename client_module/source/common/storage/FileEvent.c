@@ -11,7 +11,7 @@ void FileEvent_init(struct FileEvent* event, enum FileEventType eventType, struc
    if (!dentry)
       return;
 
-   event->pathPagePFN = __get_free_page(GFP_NOFS);
+   event->pathPagePFN = (unsigned long) kmalloc(4096, GFP_NOFS);
    if (!event->pathPagePFN)
       return;
 
@@ -23,7 +23,7 @@ void FileEvent_init(struct FileEvent* event, enum FileEventType eventType, struc
 void FileEvent_uninit(struct FileEvent* event)
 {
    if (event->pathPagePFN)
-      free_page(event->pathPagePFN);
+      kfree((void *)event->pathPagePFN);
 
    FileEvent_setTargetStr(event, NULL);
 }
@@ -35,7 +35,7 @@ void FileEvent_setTargetDentry(struct FileEvent* event, struct dentry* dentry)
    if (!dentry)
       return;
 
-   event->targetPagePFN = __get_free_page(GFP_NOFS);
+   event->targetPagePFN = (unsigned long) kmalloc(4096, GFP_NOFS);
    if (!event->targetPagePFN)
       return;
 

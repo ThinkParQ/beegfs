@@ -134,7 +134,7 @@ ifneq ($(OFED_INCLUDE_PATH),)
 endif
 
 	@echo "Building beegfs client module"
-	$(MAKE) -C $(KDIR_PRUNED_HEAD) SUBDIRS=$(BEEGFS_BUILDDIR)/../source \
+	$(MAKE) -C $(KDIR_PRUNED_HEAD) M=$(BEEGFS_BUILDDIR)/../source \
 	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS)" modules
 
 	@cp ../source/$(TARGET).ko .

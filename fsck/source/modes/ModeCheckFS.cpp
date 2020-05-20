@@ -440,7 +440,7 @@ void ModeCheckFS::disposeUnusedFiles()
    uint64_t errors = 0;
 
    DisposalCleaner dc(*Program::getApp()->getMetaMirrorBuddyGroupMapper());
-   dc.run(*Program::getApp()->getMetaNodes(),
+   dc.run(Program::getApp()->getMetaNodes()->referenceAllNodes(),
          handleDisposalItem,
          [&] (const auto&, const auto&) { errors += 1; });
 

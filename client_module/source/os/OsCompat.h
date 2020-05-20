@@ -299,4 +299,12 @@ static inline void os_inode_unlock(struct inode* inode)
 }
 #endif
 
+
+#if defined(KERNEL_ACCESS_OK_WANTS_TYPE)
+#  define os_access_ok(type, addr, size) access_ok(type, addr, size)
+#else
+#  define os_access_ok(type, addr, size) access_ok(addr, size)
+#endif
+
+
 #endif /* OSCOMPAT_H_ */

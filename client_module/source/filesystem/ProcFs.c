@@ -465,7 +465,7 @@ ssize_t __ProcFs_writeV2_connRetriesEnabled(struct file *file, const char __user
    App* app = __ProcFs_getProcParentDirEntryDataField(procInode); // (app is ->data in parent dir)
 
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_connRetriesEnabled(buf, count, app);
@@ -478,7 +478,7 @@ int ProcFs_write_connRetriesEnabled(struct file* file, const char __user *buf,
    unsigned long count, void* data)
 {
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_connRetriesEnabled(buf, count, (App*)data);
@@ -507,7 +507,7 @@ ssize_t __ProcFs_writeV2_netBenchModeEnabled(struct file *file, const char __use
    App* app = __ProcFs_getProcParentDirEntryDataField(procInode); // (app is ->data in parent dir)
 
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_netBenchModeEnabled(buf, count, app);
@@ -520,7 +520,7 @@ int ProcFs_write_netBenchModeEnabled(struct file* file, const char __user *buf,
    unsigned long count, void* data)
 {
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_netBenchModeEnabled(buf, count, (App*)data);
@@ -533,7 +533,7 @@ ssize_t __ProcFs_writeV2_dropConns(struct file *file, const char __user *buf,
    App* app = __ProcFs_getProcParentDirEntryDataField(procInode); // (app is ->data in parent dir)
 
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_dropConns(buf, count, app);
@@ -546,7 +546,7 @@ int ProcFs_write_dropConns(struct file* file, const char __user *buf,
    unsigned long count, void* data)
 {
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_dropConns(buf, count, (App*)data);
@@ -575,7 +575,7 @@ ssize_t __ProcFs_writeV2_logLevels(struct file *file, const char __user *buf,
    App* app = __ProcFs_getProcParentDirEntryDataField(procInode); // (app is ->data in parent dir)
 
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_logLevels(buf, count, app);
@@ -588,7 +588,7 @@ int ProcFs_write_logLevels(struct file* file, const char __user *buf,
    unsigned long count, void* data)
 {
    // check user buffer
-   if(unlikely(!access_ok(VERIFY_READ, buf, count) ) )
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
       return -EFAULT;
 
    return ProcFsHelper_write_logLevels(buf, count, (App*)data);

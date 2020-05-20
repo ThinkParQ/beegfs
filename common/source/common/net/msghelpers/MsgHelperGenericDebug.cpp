@@ -402,7 +402,7 @@ std::string MsgHelperGenericDebug::processOpListTargetStates(std::istringstream&
 
    for (ZipConstIterRange<UInt16List, UInt8List, UInt8List>
       iter(targetIDs, targetReachabilityStates, targetConsistencyStates);
-      iter.empty(); ++iter)
+      !iter.empty(); ++iter)
    {
       returnStream << *iter()->first << " "
             << TargetStateStore::stateToStr( (TargetReachabilityState)*iter()->second) << " "

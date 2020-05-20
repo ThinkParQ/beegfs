@@ -19,7 +19,10 @@
 
 #ifdef BEEGFS_DEBUG
 
-#if defined CONFIG_STACKTRACE // kernel has stacktrace support
+// Significant parts of the kernel code around struct stack_trace are removed
+// when CONFIG_ARCH_STACKWALK is set. Code below needs to be rewritten to work
+// with newer kernels that have CONFIG_ARCH_STACKWALK enabled.
+#if defined CONFIG_STACKTRACE && !defined CONFIG_ARCH_STACKWALK
 
 /**
  * Save a given trace. NOTE: Allocated memory has to be freed later on!
@@ -80,7 +83,7 @@ void os_printStackTrace(void* trace, int spaces)
 }
 
 
-#else // no CONFIG_STACKTRACE => nothing to do at all
+#else // no CONFIG_STACKTRACE or CONFIG_ARCH_STACKWALK enabled => nothing to do at all
 
 void* os_saveStackTrace(void)
 {
@@ -98,7 +101,7 @@ void os_freeStackTrace(void* trace)
    return;
 }
 
-#endif // CONFIG_STACKTRACE
+#endif // CONFIG_STACKTRACE && !CONFIG_ARCH_STACKWALK
 
 #endif // BEEGFS_DEBUG
 

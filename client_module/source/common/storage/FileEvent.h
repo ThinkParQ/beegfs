@@ -37,7 +37,7 @@ void FileEvent_uninit(struct FileEvent* event);
 static inline void FileEvent_setTargetStr(struct FileEvent* event, const char* target)
 {
    if (event->targetPagePFN)
-      free_page(event->targetPagePFN);
+      kfree((void *)event->targetPagePFN);
    else
       kfree(event->target);
 

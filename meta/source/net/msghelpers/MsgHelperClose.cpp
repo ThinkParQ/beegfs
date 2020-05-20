@@ -344,6 +344,9 @@ apply_dyn_attribs:
 FhgfsOpsErr MsgHelperClose::unlinkDisposableFile(const std::string& fileID, unsigned msgUserID,
       bool isBuddyMirrored)
 {
+    if (isBuddyMirrored && 0 < Program::getApp()->getConfig()->getTuneDisposalGCPeriod())
+        return FhgfsOpsErr_SUCCESS;
+
    // Note: This attempt to unlink directly is inefficient if the file is marked as disposable
    //    and is still busy (but we assume that this rarely happens)
 

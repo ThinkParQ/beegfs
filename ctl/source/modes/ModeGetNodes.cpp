@@ -15,7 +15,6 @@
 
 #define MODEGETNODES_ARG_PRINTDETAILS              "--details"
 #define MODEGETNODES_ARG_PRINTNICDETAILS           "--nicdetails"
-#define MODEGETNODES_ARG_PRINTFHGFSVERSION         "--showversion"
 #define MODEGETNODES_ARG_CHECKREACHABILITY         "--reachable"
 #define MODEGETNODES_ARG_ERRORCODES                "--errorcodes"
 #define MODEGETNODES_ARG_REACHABILITYRETRIES       "--reachretries"
@@ -46,13 +45,6 @@ int ModeGetNodes::execute()
    {
       cfgPrintNicDetails = true;
       cfgPrintDetails = true; // implied in this case
-      cfg->erase(iter);
-   }
-
-   iter = cfg->find(MODEGETNODES_ARG_PRINTFHGFSVERSION);
-   if(iter != cfg->end() )
-   {
-      cfgPrintFhgfsVersion = true;
       cfg->erase(iter);
    }
 
@@ -176,7 +168,6 @@ void ModeGetNodes::printHelp()
    std::cout << "                         and interface order." << std::endl;
    std::cout << "  --nicdetails           Print additional network interconnect details, such as" << std::endl;
    std::cout << "                         IP address of each node interface." << std::endl;
-   std::cout << "  --showversion          Print node version code." << std::endl;
    std::cout << "  --reachable            Check node reachability (from localhost)." << std::endl;
    std::cout << "  --errorcodes           Exit code reports an error if a node is not reachable," << std::endl;
    std::cout << "                         requires the option --reachable." << std::endl;
@@ -204,9 +195,6 @@ void ModeGetNodes::printNodes(const std::vector<NodeHandle>& nodes,
 
       // print only string ID for clients, but numeric & string ID for servers
       std::cout << node.getTypedNodeID() << std::endl;
-
-      if(cfgPrintFhgfsVersion)
-         std::cout << NODEINFO_INDENTATION_STR << "Version code: " BEEGFS_VERSION << std::endl;
 
       if(cfgPrintDetails)
       {

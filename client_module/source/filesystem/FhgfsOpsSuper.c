@@ -281,7 +281,11 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
    sb->s_magic = BEEGFS_MAGIC;
    sb->s_op = &fhgfs_super_ops;
    sb->s_time_gran = 1000000000; // granularity of c/m/atime in ns
+#ifdef KERNEL_HAS_SB_NODIRATIME
+   sb->s_flags |= SB_NODIRATIME;
+#else
    sb->s_flags |= MS_NODIRATIME;
+#endif
 
    if (Config_getSysXAttrsEnabled(cfg ) )
       sb->s_xattr = fhgfs_xattr_handlers_noacl; // handle only user xattrs

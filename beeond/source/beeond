@@ -256,13 +256,12 @@ check_pdsh()
    # execute cmd
    test -e "${PDSH}" &&\
    ${PDSH} -R ${PDSH_RCMD} -S -w "${HOSTS}" \
-      "if [ -e ${BEEOND_STOPLOCAL} ]; then true; else return 2; fi"
+      "test \${SHELL} = '/bin/bash' || exit 2"
    RES=$?
 
    if [ $RES -eq 2 ]
    then
-      print_error_and_exit "Unable to find BeeOND helper program on one or more nodes.
-Please make sure BeeOND is installed on all machines."
+      print_error_and_exit "One or more hosts don't use /bin/bash as default shell."
    elif [ $RES -ne 0 ]
    then
       print_info "pdsh does not seem to work on all nodes. Disabling pdsh and using ssh instead"
@@ -275,7 +274,13 @@ Please make sure BeeOND is installed on all machines."
          check_reachability "${HOST}"
       done
       unset IFS
+      return
    fi
+
+   ${PDSH} -R ${PDSH_RCMD} -S -w "${HOSTS}" \
+      "if [ -e ${BEEOND_STOPLOCAL} ]; then true; else exit 2; fi" || \
+      print_error_and_exit "Unable to find BeeOND helper program on one or more nodes.
+Please make sure BeeOND is installed on all machines."
 }
 
 execute_ssh_cmd()
@@ -341,19 +346,22 @@ check_reachability()
 
    print_info "Checking reachability of host ${HOST}"
 
-   execute_ssh_cmd "${HOST}" "test -e ${BEEOND_STOPLOCAL}"
+   execute_ssh_cmd "${HOST}" "test \${SHELL} = '/bin/bash'"
    RES=$?
    if [ $RES -eq 255 ]
    then
       print_error_and_exit "Host is unreachable via ssh: ${HOST}"
    elif [ $RES -eq 1 ]
    then
-      print_error_and_exit "Could not find BeeOND helper program on host: ${HOST}
-Please make sure BeeOND is installed on all machines."
+      print_error_and_exit "Host doesn't use /bin/bash as default shell: ${HOST}"
    elif [ $RES -ne 0 ]
    then
       print_error_and_exit "Error contacting host: ${HOST}"
    fi
+
+   execute_ssh_cmd "${HOST}" "test -e ${BEEOND_STOPLOCAL}" || \
+      print_error_and_exit "Could not find BeeOND helper program on host: ${HOST}
+Please make sure BeeOND is installed on all machines."
 }
 
 check_hostfile()
@@ -571,13 +579,9 @@ ${BEEGFS_BIN_PATH}/${META_BIN} \${PARAMS}"
             ln -s ${DATAPATH}/${META_NUMID_FILE} ${PREFERRED_MDS_FILE}" "false"
       fi
 
-      IFS=','
-      for HOST in ${HOSTS}
-      do
-         if [ "${HOST}" = "" ]; then continue; fi
-         add_to_status_file "${HOST}" "${META_BIN}" "${DATAPATH}" "${LOGFILE}" "${PIDFILE}"
-      done
-      unset IFS
+
+      execute_pdsh_cmd "${HOSTS}" "echo %h,${META_BIN},${DATAPATH},${LOGFILE},${PIDFILE} >> ${STATUSFILE}" "false"
+
    else
       # no pdsh => do it manually with ssh loop
       print_info "Starting ${META_BIN} processes"
@@ -679,13 +683,8 @@ needed parameters"
             ln -s ${DATAPATH}/${TARGET_NUMID_FILE} ${PREFERRED_TARGET_FILE}" "false"
       fi
 
-      IFS=','
-      for HOST in ${HOSTS}
-      do
-         if [ "${HOST}" = "" ]; then continue; fi
-         add_to_status_file "${HOST}" "${STORAGE_BIN}" "${DATAPATH}" "${LOGFILE}" "${PIDFILE}"
-      done
-      unset IFS
+      execute_pdsh_cmd "${HOSTS}" "echo %h,${STORAGE_BIN},${DATAPATH},${LOGFILE},${PIDFILE} >> ${STATUSFILE}" "false"
+
    else
       # no pdsh => do it manually with ssh loop
       print_info "Starting ${STORAGE_BIN} processes"
@@ -941,16 +940,8 @@ mkdir -p ${MOUNTPOINT} && ${MODPROBE_CMD} && mount -t beegfs beegfs_ondemand ${M
 
       execute_pdsh_cmd "${HOSTS}" "${HELPERD_CMD}" "false"
 
-      IFS=','
-      for HOST in ${HOSTS}
-      do
-         if [ "${HOST}" = "" ]; then continue; fi
-         # NOTE : - is empty data path
-         add_to_status_file "${HOST}" "${HELPERD_BIN}" - "${LOGFILE}" "${PIDFILE}"
-         # NOTE : mountpoint as data path
-         add_to_status_file "${HOST}" "${CLIENT_BIN}" "${MOUNTPOINT}" "${LOGFILE}" -
-      done
-      unset IFS
+      execute_pdsh_cmd "${HOSTS}" "echo %h,${HELPERD_BIN},-,${LOGFILE},${PIDFILE} >> ${STATUSFILE}" "false"
+      execute_pdsh_cmd "${HOSTS}" "echo %h,${CLIENT_BIN},${MOUNTPOINT},${LOGFILE},- >> ${STATUSFILE}" "false"
 
       execute_pdsh_cmd "${HOSTS}" "${MODPROBE_CMD} || ${REBUILD_CMD}" "false"
       execute_pdsh_cmd "${HOSTS}" "${MOUNT_CMD}" "false"
@@ -997,7 +988,7 @@ from source."
             if [ "${PREFER_LOCAL}" = "true" ] #set target count to 1
             then
                  CTL_CMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
---setpattern --numtargets=1 --chunksize=512k ${MOUNTPOINT} > /dev/null" 
+--setpattern --numtargets=1 --chunksize=512k ${MOUNTPOINT} > /dev/null"
                  execute_ssh_cmd "${HOST}" "${CTL_CMD}"
             fi
 

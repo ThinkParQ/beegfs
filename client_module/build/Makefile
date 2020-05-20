@@ -150,7 +150,7 @@ ifneq ($(OFED_INCLUDE_PATH),)
 	fi
 endif
 
-	$(MAKE) -C $(KDIR_PRUNED_HEAD) "SUBDIRS=$(BEEGFS_BUILDDIR)/../source" \
+	$(MAKE) -C $(KDIR_PRUNED_HEAD) "M=$(BEEGFS_BUILDDIR)/../source" \
 	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)"  modules
 
 	@cp ../source/$(TARGET).ko .
@@ -158,7 +158,7 @@ endif
 	@ ${STRIP} --strip-debug ${TARGET}.ko;
 
 coccicheck:
-	$(MAKE) -C $(KDIR_PRUNED_HEAD) "SUBDIRS=$(BEEGFS_BUILDDIR)"  coccicheck MODE=report \
+	$(MAKE) -C $(KDIR_PRUNED_HEAD) "M=$(BEEGFS_BUILDDIR)"  coccicheck MODE=report \
 		M=$(BEEGFS_BUILDDIR)/../source KBUILD_EXTMOD="$(BEEGFS_BUILDDIR)/../source"
 
 

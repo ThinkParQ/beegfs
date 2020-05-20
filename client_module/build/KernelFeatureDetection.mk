@@ -288,6 +288,9 @@ $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WAIT_QUEUE_ENTRY_T, "wait_queue_entry_t", wait.h)
 $(call define_if_matches, KERNEL_HAS_CURRENT_FS_TIME, "current_fs_time", fs.h)
 $(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64[[:space:]]\+i_atime;", fs.h)
+$(call define_if_matches, KERNEL_HAS_KTIME_GET, "ktime_get_real_ts64", timekeeping.h)
+$(call define_if_matches, KERNEL_HAS_SB_NODIRATIME, "SB_NODIRATIME", fs.h)
+$(call define_if_matches, KERNEL_IB_DESTROY_CQ_IS_VOID, "static inline void ib_destroy_cq", ../rdma/ib_verbs.h)
 
 # inodeChangeRes was changed to setattr_prepare in vanilla 4.9
 $(call define_if_matches, KERNEL_HAS_SETATTR_PREPARE, "int setattr_prepare", fs.h)
@@ -298,3 +301,6 @@ KERNEL_FEATURE_DETECTION += $(shell \
    grep -sA1 "(*rename) " $(KSRCDIR_PRUNED_HEAD)/include/linux/fs.h \
       | grep -qsF "unsigned int" \
       && echo "-DKERNEL_HAS_RENAME_FLAGS")
+
+$(call define_if_matches, KERNEL_ACCESS_OK_WANTS_TYPE, "define access_ok(type, addr, size)" \
+   $(KSRCDIR_PRUNED_HEAD)/include/asm-generic/uaccess.h)

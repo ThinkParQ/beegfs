@@ -187,6 +187,8 @@ override_dh_install:
 		debian/beegfs-client.default
 	install -D -m644 client_module/build/dist/etc/beegfs-client.conf \
 		debian/beegfs-client/etc/beegfs/beegfs-client.conf
+	install -D -m644 client_module/build/dist/etc/beegfs-client-build.mk \
+		debian/beegfs-client/etc/beegfs/beegfs-client-build.mk
 	install -D -m644 client_module/build/dist/etc/beegfs-client-autobuild.conf \
 		debian/beegfs-client/etc/beegfs/beegfs-client-autobuild.conf
 	install -D -m644 client_module/build/dist/etc/beegfs-mounts.conf \
@@ -201,17 +203,18 @@ override_dh_install:
 	mkdir -p debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)
 	cp -r client_module/build debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)
 	cp -r client_module/source debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)
+	rm -Rf debian/beegfs-client-dkms/usr/src/beegfs-$(BEEGFS_VERSION)/build/dist
 	sed -e 's/__VERSION__/$(BEEGFS_VERSION)/g' -e 's/__NAME__/beegfs/g' -e 's/__MODNAME__/beegfs/g' \
 		< client_module/dkms.conf.in \
 		> debian/beegfs-client-dkms.dkms
 	install -D -m644 client_module/build/dist/etc/beegfs-client.conf \
 		debian/beegfs-client-dkms/etc/beegfs/beegfs-client.conf
-	@# client-devel
-	mkdir -p debian/beegfs-client-devel/usr/include
-	cp -a client_devel/include/beegfs debian/beegfs-client-devel/usr/include/
-	mkdir -p debian/beegfs-client-devel/usr/share/doc/beegfs-client-devel/examples/
+	@# client-dev
+	mkdir -p debian/beegfs-client-dev/usr/include
+	cp -a client_devel/include/beegfs debian/beegfs-client-dev/usr/include/
+	mkdir -p debian/beegfs-client-dev/usr/share/doc/beegfs-client-dev/examples/
 	cp -a client_devel/build/dist/usr/share/doc/beegfs-client-devel/examples/* \
-		debian/beegfs-client-devel/usr/share/doc/beegfs-client-devel/examples/
+		debian/beegfs-client-dev/usr/share/doc/beegfs-client-dev/examples/
 
 # automatic stripping works only with debhelper >= 9.20160114 (since deb9).
 # until that's the oldest version we support, strip manually. also remove the -dbg packages
