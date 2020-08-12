@@ -15,6 +15,8 @@
 
 #include <limits.h>
 
+#include <boost/format.hpp>
+
 template<typename Data>
 class Set {
    public:
@@ -81,15 +83,19 @@ class Set {
             if(allowCreate)
                return;
 
-            throw std::runtime_error("could not read set description");
+            throw std::runtime_error("could not read set description file " + basename);
          }
 
          {
             char code;
             unsigned version;
             in >> code >> version;
-            if (code != 'v' || version != VERSION)
-               throw std::runtime_error("cannot read this database version");
+            if (code != 'v' || version != VERSION) {
+               throw std::runtime_error(str(
+                        boost::format("cannot read set %1% with version %2%")
+                           % basename
+                           % version));
+            }
          }
 
          in >> nextID;
@@ -113,7 +119,7 @@ class Set {
          }
 
          if(!in || in.peek() != std::ifstream::traits_type::eof() )
-            throw std::runtime_error("bad set description");
+            throw std::runtime_error("bad set description for " + basename);
       }
 
       void saveConfig()
@@ -126,7 +132,7 @@ class Set {
 
          for (FragmentIter it = openFragments.begin(), end = openFragments.end(); it != end; ++it) {
             if (it->second->filename().find(basename) != 0)
-               throw std::runtime_error("set corrupted");
+               throw std::runtime_error("set corrupted: " + basename);
 
             out << it->second->filename().substr(basename.size()) << '\n';
          }
@@ -326,7 +332,7 @@ class Set {
       {
          clear();
          if(::unlink( (basename + ".t").c_str() ) )
-            throw std::runtime_error("could not unlink set file");
+            throw std::runtime_error("could not unlink set file " + basename + ": " + std::string(strerror(errno)));
 
          dropped = true;
       }

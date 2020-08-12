@@ -69,14 +69,17 @@ int ModeRemoveDirEntry::execute()
       NodeHandle ownerNode;
       EntryInfo entryInfo;
 
-      if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, true,
-            *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
-            entryInfo, ownerNode))
       {
-         retVal = APPCODE_RUNTIME_ERROR;
-         if(!cfgReadFromStdin)
-            break;
-         goto finish_this_entry;
+         auto dirname = path.dirname();
+         if (!ModeHelper::getEntryAndOwnerFromPath(dirname, useMountedPath,
+               *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
+               entryInfo, ownerNode))
+         {
+            retVal = APPCODE_RUNTIME_ERROR;
+            if (!cfgReadFromStdin)
+               break;
+            goto finish_this_entry;
+         }
       }
 
       // print some basic info

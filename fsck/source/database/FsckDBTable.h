@@ -90,7 +90,7 @@ class FsckDBDentryTable
                // stretches beyond writePos here (as we have flushed the write buffer), we can
                // reliably detect both.
                if (readRes < 0 || ssize_t(offset) + readRes > writePos)
-                  throw std::runtime_error("could not read name file");
+                  throw std::runtime_error("could not read name file: " + std::string(strerror(errno)));
 
                return buffer;
             }
@@ -108,7 +108,7 @@ class FsckDBDentryTable
             {
                ssize_t writeRes = ::pwrite(fd, &streamBuf[0], streamBuf.size(), writePos);
                if (writeRes < 0 || size_t(writeRes) < streamBuf.size())
-                  throw std::runtime_error("error in flush");
+                  throw std::runtime_error("error in flush: " + std::string(strerror(errno)));
 
                writePos += writeRes;
                streamBuf.resize(0);

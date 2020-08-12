@@ -108,7 +108,16 @@ void ModeRemoveBuddyGroup::printHelp()
       "        --dry-run\n"
       "\n"
       " To actually remove storage buddy group 7:\n"
-      "   $ beegfs-ctl --removemirrorgroup --mirrorgroupid=7 --nodetype=storage";
+      "   $ beegfs-ctl --removemirrorgroup --mirrorgroupid=7 --nodetype=storage\n\n"
+      "WARNING: Incorrect use of this command can corrupt your system. Please\n"
+      "make sure that one of the following conditions is met before removing a group:\n\n"
+      "* The filesystem is completely empty, with no files and no disposal files.\n\n"
+      "* The filesystem is offline (no mounted clients) and the last operations \n"
+      "  done with the filesystem were:\n"
+      "   * Migrate everything off of the group you want to remove.\n"
+      "   * Check whether disposal is empty (if not, abort).\n"
+      "   * Unmount the client used for migration.\n";
+
    std::cout << std::flush;
 }
 

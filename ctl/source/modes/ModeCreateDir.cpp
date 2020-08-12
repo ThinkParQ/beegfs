@@ -39,11 +39,14 @@ int ModeCreateDir::execute()
    NodeHandle ownerNode;
    EntryInfo entryInfo;
 
-   if(!ModeHelper::getEntryAndOwnerFromPath(*(settings.path), settings.useMountedPath, true,
-         *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper, entryInfo, ownerNode))
    {
-      retVal = APPCODE_RUNTIME_ERROR;
-      goto cleanup_settings;
+      auto dirname = settings.path->dirname();
+      if(!ModeHelper::getEntryAndOwnerFromPath(dirname, settings.useMountedPath,
+            *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper, entryInfo, ownerNode))
+      {
+         retVal = APPCODE_RUNTIME_ERROR;
+         goto cleanup_settings;
+      }
    }
 
    // check that all preferred nodes exist

@@ -100,7 +100,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
    }
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
-      "Acquire read node: %s offset: %ld size: %zu",
+      "Acquire read node: %s offset: %lli size: %zu",
       Node_getNodeIDWithTypeStr(comm->node), offset, comm->read.reqLen);
 
    // prepare message
@@ -230,7 +230,7 @@ void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
    if (unlikely(lengthInfo > comm->read.reqLen) )
    {
       Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
-         "Bug: Server wants to send more than we requested (%zu vs. %zu)",
+         "Bug: Server wants to send more than we requested (%zu vs. %llu)",
          comm->read.reqLen, lengthInfo);
 
       isSocketException = true;
@@ -289,7 +289,7 @@ void __FhgfsOpsCommKitVec_readfileStageRECVDATA(CommKitVecHelper* commHelper,
       }
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
-         "vecSize: %d offset: %lld; Vec-Idx: %d receivedData: %ld",
+         "vecSize: %zu offset: %lld; Vec-Idx: %zu receivedData: %ld",
          FhgfsChunkPageVec_getDataSize(pageVec), offset,
          vecIdx, receiveSum);
 
@@ -468,7 +468,7 @@ void __FhgfsOpsCommKitVec_readfileStageHandlePages(CommKitVecHelper* commHelper,
    int64_t readRes = comm->nodeResult;
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__,
-      "nodeResult: %d (%s)", comm->nodeResult,
+      "nodeResult: %lli (%s)", comm->nodeResult,
       (comm->nodeResult < 0) ? FhgfsOpsErr_toErrString(-comm->nodeResult):
          FhgfsOpsErr_toErrString(FhgfsOpsErr_SUCCESS));
 
@@ -496,7 +496,7 @@ void __FhgfsOpsCommKitVec_readfileStageHandlePages(CommKitVecHelper* commHelper,
 
    if (unlikely(readRes > 0)) {
       Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
-         "%: Bug: readRes too large!", __func__);
+         "%s: Bug: readRes too large!", __func__);
       comm->nodeResult = -FhgfsOpsErr_INTERNAL;
    }
 
@@ -518,7 +518,7 @@ void __FhgfsOpsCommKitVec_readfileStageHandlePages(CommKitVecHelper* commHelper,
          needInodeRefresh = false; // a single inode refresh is sufficient
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
-         "nodeResult: %ld pageIdx: %ld is-short-read: %d",
+         "nodeResult: %lld pageIdx: %ld is-short-read: %d",
          comm->nodeResult, FhgfsPage_getPageIndex(fhgfsPage), isShortRead);
 
          if (isShortRead)
@@ -716,7 +716,7 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
       loff_t offset = FhgfsOpsCommKitVec_getOffset(comm);
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
-         "targetID: %hu offset: %lld vecSize: %d, current-pgIdx: %d",
+         "targetID: %hu offset: %lld vecSize: %u, current-pgIdx: %zu",
          comm->targetID, (long long) offset, FhgfsChunkPageVec_getSize(pageVec), vecIdx);
       IGNORE_UNUSED_VARIABLE(offset);
    }
@@ -741,7 +741,7 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
       sendDataPartRes = Socket_send(comm->sock, data, dataLength, 0);
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__,
-          "VecIdx: %d; size: %lld; PgLen: %d, sendRes: %zd",
+          "VecIdx: %zu; size: %lld; PgLen: %d, sendRes: %zd",
           vecIdx, (long long)dataLength, fhgfsPage->length, sendDataPartRes);
 
 #if (BEEGFS_COMMKIT_DEBUG & COMMKIT_DEBUG_WRITE_SEND)
@@ -767,7 +767,7 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
 
          Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
             "Communication error in SENDDATA stage. "
-            "Node: %s; Request details: %lld/%lld pages",
+            "Node: %s; Request details: %zu/%u pages",
             Node_getNodeIDWithTypeStr(comm->node), vecIdx, FhgfsChunkPageVec_getSize(pageVec) );
 
 
@@ -777,7 +777,7 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
       if (sendDataPartRes < dataLength)
       {
          Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
-            "Error/Bug: Node: %s; Less data sent than requested; Request details: %lld/%lld pages",
+            "Error/Bug: Node: %s; Less data sent than requested; Request details: %zu/%u pages",
             Node_getNodeIDWithTypeStr(comm->node), vecIdx, FhgfsChunkPageVec_getSize(pageVec) );
 
          goto outErr;

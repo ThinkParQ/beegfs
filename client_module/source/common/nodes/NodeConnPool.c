@@ -70,7 +70,7 @@ void NodeConnPool_uninit(NodeConnPool* this)
    // close open connections
    if(ConnectionList_length(&this->connList) > 0)
    {
-      Logger_logFormatted(log, Log_DEBUG, logContext, "Closing %d connections...",
+      Logger_logFormatted(log, Log_DEBUG, logContext, "Closing %lu connections...",
          ConnectionList_length(&this->connList) );
    }
 

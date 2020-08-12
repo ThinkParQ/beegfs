@@ -207,7 +207,7 @@ void __FhgfsOpsPages_incInodeFileSizeOnPagedRead(struct inode* inode, loff_t off
             careful regarding user warnings and error return values. */
          Logger_logFormatted(log, Log_DEBUG, logContext, "Failed to increase MDS inode size to "
             "the expected value. (Application might read less data than expected or file was "
-            "truncated during read operation. Expected size: %ld isSize: %ld)",
+            "truncated during read operation. Expected size: %lld isSize: %lld)",
             offset + (loff_t)readRes, i_size);
       }
       else

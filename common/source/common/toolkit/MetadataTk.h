@@ -27,7 +27,7 @@ enum ModificationEventType
 class MetadataTk
 {
    public:
-      static FhgfsOpsErr referenceOwner(Path* searchPath, bool referenceParent,
+      static FhgfsOpsErr referenceOwner(Path* searchPath,
          NodeStoreServers* nodes, NodeHandle& outReferencedNode, EntryInfo* outEntryInfo,
          const RootInfo& metaRoot, MirrorBuddyGroupMapper* metaBuddyGroupMapper);
 

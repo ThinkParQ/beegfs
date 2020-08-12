@@ -25,7 +25,7 @@ class ICommonConfig
       int         connClientPortUDP;
       int         connStoragePortUDP;
       int         connMetaPortUDP;
-      int         connAdmonPortUDP;
+      int         connMonPortUDP;
       int         connMgmtdPortUDP;
       int         connStoragePortTCP;
       int         connMetaPortTCP;
@@ -93,9 +93,9 @@ class ICommonConfig
          return connMetaPortUDP ? (connMetaPortUDP + connPortShift) : 0;
       }
 
-      int getConnAdmonPortUDP() const
+      int getConnMonPortUDP() const
       {
-         return connAdmonPortUDP ? (connAdmonPortUDP + connPortShift) : 0;
+         return connMonPortUDP ? (connMonPortUDP + connPortShift) : 0;
       }
 
       int getConnMgmtdPortUDP() const

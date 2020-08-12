@@ -6,6 +6,7 @@
 
 #include <common/system/System.h>
 #include <toolkit/XAttrTk.h>
+#include <sys/xattr.h>
 
 #include "testing/syscall_override.h"
 

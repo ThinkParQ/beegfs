@@ -19,8 +19,6 @@ override_dh_auto_build:
 	make -j$(NUMJOBS) common-all daemons utils
 	make -j$(NUMJOBS) -C upgrade/beegfs_mirror_md/build all
 	make -j$(NUMJOBS) -C java_lib/build
-	@# admon is special
-	make -j$(NUMJOBS) -C admon/build all admon_gui
 
 # no build-runnable tests exist (yet)
 override_dh_auto_test:
@@ -82,43 +80,6 @@ override_dh_install:
 		debian/beegfs-mon.default
 	install -D -m644 mon/build/dist/etc/beegfs-mon.conf \
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.conf
-	@# admon is special
-	install -D admon/build/dist/etc/init.d/beegfs-admon.init debian/beegfs-admon.init
-	#add the genric part of the init script from the common package
-	cat common_package/build/dist/etc/init.d/beegfs-service.init >> debian/beegfs-admon.init
-	install -D admon/build/beegfs-admon debian/beegfs-admon/opt/beegfs/sbin/beegfs-admon
-	install -D admon/build/dist/sbin/beegfs-setup-admon \
-		debian/beegfs-admon/opt/beegfs/sbin/beegfs-setup-admon
-	install -D -m644 admon/build/dist/etc/default/beegfs-admon debian/beegfs-admon.default
-	install -D -m644 admon/build/dist/etc/beegfs-admon.conf debian/beegfs-admon/etc/beegfs/beegfs-admon.conf
-	#add admon GUI start script
-	install -D -m755 admon/build/dist/usr/bin/beegfs-admon-gui debian/beegfs-admon/usr/bin/beegfs-admon-gui
-	# add license file of beegfs-admon and of the beegfs-admon-gui
-	mkdir -p debian/beegfs-admon/opt/beegfs/LICENSE/beegfs-admon/gui
-	install -D -m644 admon/build/dist/LICENSE debian/beegfs-admon/opt/beegfs/LICENSE/beegfs-admon/
-	install -D -m644 admon_gui/license/* debian/beegfs-admon/opt/beegfs/LICENSE/beegfs-admon/gui
-	mkdir -p debian/beegfs-admon/etc/beegfs/lib/
-	install -D common_package/scripts/etc/beegfs/lib/init-multi-mode \
-		debian/beegfs-admon/etc/beegfs/lib/init-multi-mode.beegfs-admon
-	install -D -m644 common_package/scripts/etc/beegfs/lib/start-stop-functions \
-		debian/beegfs-admon/etc/beegfs/lib/start-stop-functions.beegfs-admon
-	mkdir -p debian/beegfs-admon/opt/beegfs/setup
-	cp -R admon/scripts/* debian/beegfs-admon/opt/beegfs/setup/
-	mkdir -p debian/beegfs-admon/opt/beegfs/setup/info
-	touch debian/beegfs-admon/opt/beegfs/setup/info/clients
-	touch debian/beegfs-admon/opt/beegfs/setup/info/ib_nodes
-	touch debian/beegfs-admon/opt/beegfs/setup/info/management
-	touch debian/beegfs-admon/opt/beegfs/setup/info/meta_server
-	touch debian/beegfs-admon/opt/beegfs/setup/info/storage_server
-	# create a dir for tmp data during script execution
-	mkdir -p debian/beegfs-admon/opt/beegfs/setup/tmp
-	# add admon gui
-	install -D -m644 admon_gui/dist/beegfs-admon-gui.jar \
-		debian/beegfs-admon/opt/beegfs/beegfs-admon-gui/beegfs-admon-gui.jar
-	# admon database directory
-	mkdir -p debian/beegfs-admon/var/lib/beegfs
-	# mongoose document root
-	mkdir -p debian/beegfs-admon/var/lib/beegfs/www
 	@# mon-grafana
 	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
 	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
@@ -220,7 +181,6 @@ override_dh_install:
 # until that's the oldest version we support, strip manually. also remove the -dbg packages
 # from the control file when we switch.
 override_dh_strip:
-	dh_strip -pbeegfs-admon      --dbg-package=beegfs-admon-dbg
 	dh_strip -pbeegfs-helperd    --dbg-package=beegfs-helperd-dbg
 	dh_strip -pbeegfs-meta       --dbg-package=beegfs-meta-dbg
 	dh_strip -pbeegfs-mgmtd      --dbg-package=beegfs-mgmtd-dbg
@@ -237,12 +197,11 @@ override_dh_installinit:
 			debian/beegfs-$$component/lib/systemd/system/beegfs-$$component@.service; \
 		dh_systemd_enable -p beegfs-$$component --no-enable --name=beegfs-$$component@ beegfs-$$component@.service; \
 	done
-	cp admon/build/dist/usr/lib/systemd/system/beegfs-admon.service debian/
 	cp client_module/build/dist/usr/lib/systemd/system/beegfs-client.service debian/
+	cp client_module/build/dist/usr/lib/systemd/system/beegfs-client@.service debian/
 	dh_systemd_enable
 	#
 	dh_installinit -pbeegfs-mgmtd         --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
-	dh_installinit -pbeegfs-admon         --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
 	dh_installinit -pbeegfs-mon           --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
 	dh_installinit -pbeegfs-storage       --no-restart-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
 	dh_installinit -pbeegfs-meta          --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .

@@ -10,6 +10,7 @@
 #include <boost/scoped_array.hpp>
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 struct FragmentDoesNotExist : public std::runtime_error
@@ -57,7 +58,7 @@ class SetFragment {
             total += current;
 
             if (current < 0)
-               throw std::runtime_error("read failed");
+               throw std::runtime_error("read failed: " + std::string(strerror(errno)));
 
             if (current == 0)
                break;
@@ -82,7 +83,7 @@ class SetFragment {
             total += current;
 
             if (current < 0)
-               throw std::runtime_error("write failed");
+               throw std::runtime_error("write failed: " + std::string(strerror(errno)));
 
             if (current == 0)
                break;
@@ -129,21 +130,23 @@ class SetFragment {
          fd = ::open(file.c_str(), O_RDWR | (allowCreate ? O_CREAT : 0), 0660);
          if(fd < 0)
          {
+            int eno = errno;
             if(!allowCreate && errno == ENOENT)
                throw FragmentDoesNotExist(file);
             else
-               throw std::runtime_error("could not open fragment file");
+               throw std::runtime_error("could not open fragment file " + file + ": " + strerror(eno));
          }
 
          off_t totalSize = ::lseek(fd, 0, SEEK_END);
 
          if(totalSize > 0)
          {
+            int eno = errno;
             if (totalSize < (off_t) CONFIG_AREA_SIZE)
-               throw std::runtime_error("error while opening fragment file");
+               throw std::runtime_error("error while opening fragment file " + file + ": " + strerror(eno));
             else
             if ( (totalSize - CONFIG_AREA_SIZE) % sizeof(Data) )
-               throw std::runtime_error("error while opening fragment file");
+               throw std::runtime_error("error while opening fragment file " + file + ": " + strerror(eno));
          }
 
          if(totalSize == 0)
@@ -153,8 +156,10 @@ class SetFragment {
          }
          else
          {
-            if(::pread(fd, &sorted, sizeof(sorted), 0) != sizeof(sorted) )
-               throw std::runtime_error("error while opening fragment file");
+            if (::pread(fd, &sorted, sizeof(sorted), 0) != sizeof(sorted)) {
+               int eno = errno;
+               throw std::runtime_error("error while opening fragment file " + file + ": " + strerror(eno));
+            }
 
             itemCount = (totalSize - CONFIG_AREA_SIZE) / sizeof(Data);
          }
@@ -215,12 +220,16 @@ class SetFragment {
          flushBuffer();
          buffer = std::vector<Data>();
 
-         if(::pwrite(fd, &sorted, sizeof(sorted), 0) < 0)
-            throw std::runtime_error("error in flush");
+         if (::pwrite(fd, &sorted, sizeof(sorted), 0) < 0) {
+            int eno = errno;
+            throw std::runtime_error("error in flush of " + file + ": " + strerror(eno));
+         }
 
          // truncate to CONFIG_AREA_SIZE (for reopen)
-         if(itemCount == 0 && ::ftruncate(fd, CONFIG_AREA_SIZE) < 0)
-            throw std::runtime_error("error in flush");
+         if (itemCount == 0 && ::ftruncate(fd, CONFIG_AREA_SIZE) < 0) {
+            int eno = errno;
+            throw std::runtime_error("error in flush of " + file + ": " + strerror(eno));
+         }
       }
 
       void sort()
@@ -255,8 +264,10 @@ class SetFragment {
       void drop()
       {
          flush();
-         if(::unlink(file.c_str() ) < 0)
-            throw std::runtime_error("could not unlink fragment file");
+         if (::unlink(file.c_str()) < 0) {
+            int eno = errno;
+            throw std::runtime_error("could not unlink fragment file " + file + ": " + strerror(eno));
+         }
 
          close(fd);
          fd = -1;
@@ -264,8 +275,10 @@ class SetFragment {
 
       void rename(const std::string& to)
       {
-         if(::rename(file.c_str(), to.c_str() ) < 0)
-            throw std::runtime_error("could not rename fragment file");
+         if (::rename(file.c_str(), to.c_str()) < 0) {
+            int eno = errno;
+            throw std::runtime_error("could not rename fragment file " + file + ": " + strerror(eno));
+         }
 
          file = to;
       }

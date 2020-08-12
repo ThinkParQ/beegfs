@@ -96,6 +96,10 @@ $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
 	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
 endif
 
+ifneq ($(OFED_INCLUDE_PATH),)
+BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
+endif
+
 # OFED API version
 ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"

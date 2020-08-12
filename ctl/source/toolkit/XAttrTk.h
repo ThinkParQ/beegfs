@@ -1,7 +1,6 @@
 #pragma once
 
 #include <common/Common.h>
-#include <attr/xattr.h>
 
 typedef std::vector<char> XAttrValue;
 typedef std::map<std::string, XAttrValue> XAttrMap;

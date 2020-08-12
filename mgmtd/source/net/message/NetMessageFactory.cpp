@@ -51,9 +51,6 @@
 #include <net/message/storage/SetStorageTargetInfoMsgEx.h>
 
 
-// admon messages
-#include <net/message/admon/GetNodeInfoMsgEx.h>
-
 #include <common/net/message/SimpleMsg.h>
 #include "NetMessageFactory.h"
 
@@ -122,9 +119,6 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_SetDefaultQuota: { msg = new SetDefaultQuotaMsgEx(); } break;
       case NETMSGTYPE_SetMetadataMirroring: { msg = new SetMetadataMirroringMsgEx(); } break;
       case NETMSGTYPE_SetMetadataMirroringResp: { msg = new SetMetadataMirroringRespMsg(); } break;
-
-      // admon messages
-      case NETMSGTYPE_GetNodeInfo: { msg = new GetNodeInfoMsgEx(); } break;
 
       default:
       {

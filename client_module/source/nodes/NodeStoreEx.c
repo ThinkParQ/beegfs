@@ -156,18 +156,22 @@ Node* NodeStoreEx_referenceNode(NodeStoreEx* this, NumNodeID id)
    node = NodeTree_find(&this->nodeTree, id);
    if (likely(node))
    { // found it
+      unsigned refs;
       Node_get(node);
 
+      (void) refs;
       // check for unusually high reference count
 #ifdef BEEGFS_DEBUG
 # ifdef KERNEL_HAS_KREF_READ
-      if (kref_read(&node->references) > NODESTORE_WARN_REFNUM)
+      refs = kref_read(&node->references);
 # else
-      if(atomic_read(&node->references.refcount) > NODESTORE_WARN_REFNUM)
+      refs = atomic_read(&node->references.refcount);
 #endif
+
+      if (refs > NODESTORE_WARN_REFNUM)
          Logger_logFormatted(log, Log_CRITICAL, __func__,
             "WARNING: Lots of references to node (=> leak?): %s %s; ref count: %d",
-            Node_getNodeTypeStr(node), Node_getID(node), node->references);
+            Node_getNodeTypeStr(node), Node_getID(node), refs);
 #endif // BEEGFS_DEBUG
    }
 

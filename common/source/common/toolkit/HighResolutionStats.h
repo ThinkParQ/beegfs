@@ -94,12 +94,12 @@ class HighResolutionStatsTk
 
       static void resetStats(HighResolutionStats* stats)
       {
-         memset(stats, 0, sizeof(*stats) );
+         *stats = {};
       }
 
       static void resetIncStats(HighResolutionStats* stats)
       {
-         memset(&stats->incVals, 0, sizeof(stats->incVals) );
+         stats->incVals = {};
       }
 };
 

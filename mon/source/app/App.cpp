@@ -87,7 +87,7 @@ void App::runNormal()
 void App::initLocalNodeInfo()
 {
    bool useRDMA = cfg->getConnUseRDMA();
-   unsigned portUDP = cfg->getConnAdmonPortUDP();
+   unsigned portUDP = cfg->getConnMonPortUDP();
 
    StringList allowedInterfaces;
    std::string interfacesFilename = cfg->getConnInterfacesFile();

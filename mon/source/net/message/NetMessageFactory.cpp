@@ -1,8 +1,7 @@
 #include <common/net/message/SimpleMsg.h>
 #include <common/net/message/NetMessageTypes.h>
-#include <common/net/message/admon/RequestMetaDataRespMsg.h>
-#include <common/net/message/admon/RequestStorageDataRespMsg.h>
-#include <common/net/message/admon/GetNodeInfoRespMsg.h>
+#include <common/net/message/mon/RequestMetaDataRespMsg.h>
+#include <common/net/message/mon/RequestStorageDataRespMsg.h>
 #include <common/net/message/control/DummyMsg.h>
 #include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/nodes/GetClientStatsRespMsg.h>
@@ -33,7 +32,6 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_GenericResponse: { msg = new GenericResponseMsg(); } break;
       case NETMSGTYPE_GetClientStatsResp: { msg = new GetClientStatsRespMsg(); } break;
       case NETMSGTYPE_GetMirrorBuddyGroupsResp: { msg = new GetMirrorBuddyGroupsRespMsg(); } break;
-      case NETMSGTYPE_GetNodeInfoResp: { msg = new GetNodeInfoRespMsg(); } break;
       case NETMSGTYPE_GetNodesResp: { msg = new GetNodesRespMsg(); } break;
       case NETMSGTYPE_GetTargetMappingsResp: { msg = new GetTargetMappingsRespMsg(); } break;
       case NETMSGTYPE_Heartbeat: { msg = new HeartbeatMsgEx(); } break;

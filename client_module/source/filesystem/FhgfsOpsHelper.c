@@ -72,16 +72,16 @@ void FhgfsOpsHelper_logOpMsg(int level, App* app, struct dentry* dentry, struct 
       newMsg = kmalloc(LOGGER_LOGBUF_SIZE, GFP_NOFS);
       if(newMsg)
       {
-         snprintf(newMsg, LOGGER_LOGBUF_SIZE, "called. Path: %s; EntryID: %s; %s",
-            path ? path : noPath,
-            entryID ? entryID : noEntryID,
-            msgStr);
+         int prefixLen = snprintf(newMsg, LOGGER_LOGBUF_SIZE, "called. Path: %s; EntryID: %s; %s",
+               path ? path : noPath,
+               entryID ? entryID : noEntryID,
+               msgStr);
 
          va_start(ap, msgStr);
-
-         Logger_logFormattedVA(log, level, logContext, newMsg, ap);
-
+         vsnprintf(newMsg + prefixLen, LOGGER_LOGBUF_SIZE - prefixLen, msgStr, ap);
          va_end(ap);
+
+         Logger_logFormatted(log, level, logContext, "%s", newMsg);
 
          kfree(newMsg);
       }

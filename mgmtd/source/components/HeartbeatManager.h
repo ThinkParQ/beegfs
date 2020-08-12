@@ -37,6 +37,7 @@ class HeartbeatManager : public PThread
       void notifyAsyncRefreshTargetStates();
       void notifyAsyncPublishCapacities();
       void notifyAsyncRefreshStoragePools();
+      void saveNodeStores();
 
    protected:
       LogContext log;
@@ -62,7 +63,6 @@ class HeartbeatManager : public PThread
       void performClientsCheck();
       bool processNotificationList();
 
-      void saveNodeStores();
 };
 
 #endif /*HEARTBEATMANAGER_H_*/

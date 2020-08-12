@@ -662,8 +662,8 @@ bool ModeSetQuota::uploadQuotaLimitsAndCollectResponses(Node& mgmtNode)
       respMsgCast = (SetQuotaRespMsg*)respMsg.get();
       if (!respMsgCast->getValue() )
       {
-         std::cerr << "Failed to set quota limits. Check management server logfile of node: "
-            << mgmtNode.getTypedNodeID() << std::endl;
+         std::cerr << "Failed to set quota limits. Quota is not enabled in the management server."
+            << std::endl;
          retVal = false;
          goto err_cleanup;
       }

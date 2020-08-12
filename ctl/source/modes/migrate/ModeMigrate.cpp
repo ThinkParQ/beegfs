@@ -101,6 +101,11 @@ int ModeMigrate::doExecute()
 
    // get the storage pool that shall be used to migrate the data to
    StoragePoolPtr destStoragePool = app->getStoragePoolStore()->getPool(cfgDestStoragePoolId);
+   if (!destStoragePool) {
+      std::cerr << "Error: The destination storage pool with id=" << cfgDestStoragePoolId
+                << " does not exist." << std::endl;
+      goto out;
+   }
 
    retVal = getTargets(*mgmtNode, destStoragePool);
    if (retVal != APPCODE_NO_ERROR)
@@ -1068,7 +1073,7 @@ int ModeMigrate::pathToEntryInfo(std::string& pathStr, EntryInfo* outEntryInfo,
    App* app = Program::getApp();
 
    Path path(pathStr);
-   if(!ModeHelper::getEntryAndOwnerFromPath(path, true, false,
+   if(!ModeHelper::getEntryAndOwnerFromPath(path, true,
          *app->getMetaNodes(), app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
          *outEntryInfo, outMetaOwnerNode))
    {

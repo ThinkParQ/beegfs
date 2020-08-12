@@ -2,8 +2,8 @@
 
 #include <common/toolkit/MessagingTk.h>
 #include <common/net/message/nodes/HeartbeatRequestMsg.h>
-#include <common/net/message/admon/RequestStorageDataMsg.h>
-#include <common/net/message/admon/RequestStorageDataRespMsg.h>
+#include <common/net/message/mon/RequestStorageDataMsg.h>
+#include <common/net/message/mon/RequestStorageDataRespMsg.h>
 #include <components/StatsCollector.h>
 
 void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,

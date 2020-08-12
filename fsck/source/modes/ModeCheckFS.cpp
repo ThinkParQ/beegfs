@@ -3,6 +3,7 @@
 #include <common/toolkit/DisposalCleaner.h>
 #include <common/toolkit/ListTk.h>
 #include <common/toolkit/UnitTk.h>
+#include <common/toolkit/UiTk.h>
 #include <common/toolkit/ZipIterator.h>
 #include <components/DataFetcher.h>
 #include <components/worker/RetrieveChunksWork.h>
@@ -165,6 +166,22 @@ int ModeCheckFS::execute()
 
    FsckTkEx::printVersionHeader(false);
    printHeaderInformation();
+
+   if (cfg->getNoFetch() && !Program::getApp()->getConfig()->getReadOnly()) {
+      FsckTkEx::fsckOutput(
+         "           WARNING:  RISK OF DATA LOSS!\n"
+         "        NEVER USE THE SAME DATABASE TWICE!\n\n"
+         
+         "After running fsck, any database obtained previously no longer matches the state\n"
+         "of the filesystem. A new database MUST be obtained before running fsck again.\n\n"
+         
+         "You are seeing this warning because you are using the option --nofetch.",
+         OutputOptions_DOUBLELINEBREAK | OutputOptions_ADDLINEBREAKBEFORE);
+
+      if (!uitk::userYNQuestion("Do you wish to continue?"))
+         return APPCODE_USER_ABORTED;
+   }
+
 
    if ( !FsckTkEx::checkReachability() )
       return APPCODE_COMMUNICATION_ERROR;

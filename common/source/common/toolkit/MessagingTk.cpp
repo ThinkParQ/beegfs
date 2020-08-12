@@ -441,9 +441,8 @@ FhgfsOpsErr MessagingTk::requestResponseComm(RequestResponseArgs* rrArgs)
    {
       if ( !(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_CONNESTABLISHFAILED) )
       {
-         LogContext(logContext).log(Log_WARNING,
-            "Unable to connect to: " + node.getNodeIDWithTypeStr() + ". " +
-            "(Message type: " + rrArgs->requestMsg->getMsgTypeStr() + ")");
+         LOG(GENERAL, WARNING, "Unable to connect, is the node offline?", ("node", node.getNodeIDWithTypeStr()),
+               ("Message type", rrArgs->requestMsg->getMsgTypeStr()));
       }
 
       retVal = FhgfsOpsErr_COMMUNICATION;

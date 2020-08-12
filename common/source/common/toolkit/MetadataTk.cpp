@@ -20,12 +20,11 @@ static std::shared_ptr<Node> referenceRoot(NodeStoreServers& nodes, const RootIn
 /**
  * Find and reference the metadata owner node of a certain entry.
  *
- * @param referenceParent true to reference the parent of the owner instead of the actual owner
  * @param nodes metadata nodes
  * @param outReferencedNode only valid if result is FhgfsOpsErr_SUCCESS (needs to be released
  * through the MetaNodesStore)
  */
-FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath, bool referenceParent,
+FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath,
    NodeStoreServers* nodes, NodeHandle& outReferencedNode, EntryInfo* outEntryInfo,
    const RootInfo& metaRoot, MirrorBuddyGroupMapper* metaBuddyGroupMapper)
 {
@@ -54,9 +53,8 @@ FhgfsOpsErr MetadataTk::referenceOwner(Path* searchPath, bool referenceParent,
       }
    }
 
-   FhgfsOpsErr findRes = findOwner(searchPath,
-      referenceParent ? (searchDepth - 1) : searchDepth, nodes, outEntryInfo, metaRoot,
-      metaBuddyGroupMapper);
+   FhgfsOpsErr findRes = findOwner(searchPath, searchDepth, nodes, outEntryInfo, metaRoot,
+         metaBuddyGroupMapper);
 
    if(findRes == FhgfsOpsErr_SUCCESS)
    { // simple success case => try to reference the node

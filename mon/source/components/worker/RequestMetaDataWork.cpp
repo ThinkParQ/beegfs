@@ -2,8 +2,8 @@
 
 #include <common/toolkit/MessagingTk.h>
 #include <common/net/message/nodes/HeartbeatRequestMsg.h>
-#include <common/net/message/admon/RequestMetaDataMsg.h>
-#include <common/net/message/admon/RequestMetaDataRespMsg.h>
+#include <common/net/message/mon/RequestMetaDataMsg.h>
+#include <common/net/message/mon/RequestMetaDataRespMsg.h>
 #include <components/StatsCollector.h>
 
 void RequestMetaDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, unsigned bufOutLen)

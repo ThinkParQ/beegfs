@@ -125,9 +125,8 @@
 #include <net/message/session/opening/CloseFileMsgEx.h>
 #include <net/message/session/opening/OpenFileMsgEx.h>
 
-// admon messages
-#include <net/message/admon/RequestMetaDataMsgEx.h>
-#include <net/message/admon/GetNodeInfoMsgEx.h>
+// mon message
+#include <net/message/mon/RequestMetaDataMsgEx.h>
 
 // fsck messages
 #include <net/message/fsck/CreateDefDirInodesMsgEx.h>
@@ -292,9 +291,8 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_AckNotify: { msg = new AckNotifiyMsgEx(); } break;
       case NETMSGTYPE_AckNotifyResp: { msg = new AckNotifiyRespMsg(); } break;
 
-      //admon messages
+      // mon message
       case NETMSGTYPE_RequestMetaData: { msg = new RequestMetaDataMsgEx(); } break;
-      case NETMSGTYPE_GetNodeInfo: { msg = new GetNodeInfoMsgEx(); } break;
 
       // fsck messages
       case NETMSGTYPE_RetrieveDirEntries: { msg = new RetrieveDirEntriesMsgEx(); } break;

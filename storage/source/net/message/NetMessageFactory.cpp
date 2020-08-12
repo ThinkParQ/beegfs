@@ -67,9 +67,8 @@
 #include <net/message/session/rw/WriteLocalFileMsgEx.h>
 #include <net/message/session/FSyncLocalFileMsgEx.h>
 
-// admon messages
-#include <net/message/admon/GetNodeInfoMsgEx.h>
-#include <net/message/admon/RequestStorageDataMsgEx.h>
+// mon messages
+#include <net/message/mon/RequestStorageDataMsgEx.h>
 
 // fsck
 #include <net/message/fsck/DeleteChunksMsgEx.h>
@@ -168,8 +167,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_WriteLocalFile: { msg = new WriteLocalFileMsgEx(); } break;
       case NETMSGTYPE_WriteLocalFileResp: { msg = new WriteLocalFileRespMsg(); } break;
 
-      // admon
-      case NETMSGTYPE_GetNodeInfo: { msg = new GetNodeInfoMsgEx(); } break;
+      // mon message
       case NETMSGTYPE_RequestStorageData: { msg = new RequestStorageDataMsgEx(); } break;
 
       // fsck

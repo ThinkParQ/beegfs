@@ -13,6 +13,9 @@ else
 override EXTRA_CFLAGS += $(BEEGFS_FEATURE_DETECTION)
 endif
 
+kernel-version = $(shell printf "%02d%02d" $(VERSION) $(PATCHLEVEL))
+kernel-if-version-or-later = $(shell [ $(kernel-version) -ge $(1) ] && echo $(2))
+
 obj-m	+= ${TARGET}.o
 
 SOURCES := \
@@ -167,11 +170,12 @@ ${TARGET}-y	:= $(patsubst %.c,%.o,$(SOURCES))
 
 ifneq ($(OFED_INCLUDE_PATH),)
 
+# RHEL/CentOS 8 + MLNX 4.7 requires extra flags (bug?)
+ccflags-y += $(call kernel-if-version-or-later, 0418, -DHAVE_BITS_H)
+
+NOSTDINC_FLAGS+=-I$(OFED_INCLUDE_PATH) -I$(OFED_INCLUDE_PATH)/uapi
 ifeq ($(shell [ -f $(OFED_INCLUDE_PATH)/linux/compat-2.6.h ] && echo 1),1)
-$(src)/common/net/sock/ibv/IBVSocket.o: CC+=-include $(OFED_INCLUDE_PATH)/linux/compat-2.6.h
-$(src)/common/net/sock/ibv/IBVBuffer.o: CC+=-include $(OFED_INCLUDE_PATH)/linux/compat-2.6.h
+ccflags-y += -include $(OFED_INCLUDE_PATH)/linux/compat-2.6.h
 endif
 
-$(src)/common/net/sock/ibv/IBVSocket.o: CC+=-I$(OFED_INCLUDE_PATH) -I$(OFED_INCLUDE_PATH)/uapi
-$(src)/common/net/sock/ibv/IBVBuffer.o: CC+=-I$(OFED_INCLUDE_PATH) -I$(OFED_INCLUDE_PATH)/uapi
 endif

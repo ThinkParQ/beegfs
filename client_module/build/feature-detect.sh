@@ -163,14 +163,6 @@ check_function \
    KERNEL_HAS_KERNEL_READ \
    linux/fs.h
 
-# kernel 4.9 and newer have the iov_iter flavor ITER_PIPE which we currently cannot handle in our
-# buffered read_iter/write_iter functions. until we can handle it those kernels must have their
-# buffered read_iter/write_iter disabled, otherwise the kernel may crash.
-check_symbol \
-   ITER_PIPE \
-   KERNEL_HAS_ITER_PIPE \
-   linux/uio.h
-
 check_function \
    skwq_has_sleeper "bool (struct socket_wq*)" \
    KERNEL_HAS_SKWQ_HAS_SLEEPER \

@@ -218,12 +218,14 @@ int ModeCreateFile::execute()
 
    NodeHandle ownerNode;
    EntryInfo ownerInfo;
-
-   if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, true,
-         *app->getMetaNodes(), app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
-         ownerInfo, ownerNode))
    {
-      return APPCODE_RUNTIME_ERROR;
+      auto dirname = path.dirname();
+      if (!ModeHelper::getEntryAndOwnerFromPath(dirname, useMountedPath,
+            *app->getMetaNodes(), app->getMetaRoot(),*app->getMetaMirrorBuddyGroupMapper(),
+            ownerInfo, ownerNode))
+      {
+         return APPCODE_RUNTIME_ERROR;
+      }
    }
 
    // retrieve pattern from parent folder

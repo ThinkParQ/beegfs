@@ -41,7 +41,6 @@ DEFAULT_PORT_SHIFT=1000
 SSH="ssh"
 SSH_PARAMS=( -qq -oNumberOfPasswordPrompts=0 -oStrictHostKeyChecking=no -n )
 DEFAULT_PDSH_PATH=$(which pdsh 2>/dev/null)
-PDSH=${DEFAULT_PDSH_PATH}
 PDSH_RCMD="ssh"
 
 # source helper script
@@ -122,7 +121,7 @@ print_usage_and_exit()
    echo "         -P          => Use pdsh for parallel startup. If this option is not"
    echo "                        given, ssh is used to start up the services on the nodes"
    echo "                        sequentially."
-   echo "         -b PATH     => Path to the pdsh binary. Default: ${DEFAULT_PDSH_PATH}"
+   echo "         -b PATH     => Path to the pdsh binary. Default: <auto-detected>"
    echo "         -r          => Use tmpfs for beegfs storage and metadata."
    echo "                        Note: On older Linux versions, tmpfs does not support"
    echo "                        extended attributes. If you get an error message"
@@ -1125,10 +1124,20 @@ wait_online_good()
    local NODE_TYPE=$1
    local NUM_NODES=$2
 
+   #first, wait for the correct number of *nodes* to become available.
+   local CTLCMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
+         --listnodes --nodetype=${NODE_TYPE}"
+   while [ ! "$(${CTLCMD} | wc -l)" = "${NUM_NODES}" ]
+   do
+      sleep 1
+   done
+
+   # now wait for all *targets* to become online/good. (also works for metadata servers, since they
+   # are internally treated as one target per server)
    local CTLCMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
          --listtargets --nodetype=${NODE_TYPE} --state"
 
-   while [ ! "$(${CTLCMD} | grep "Online\s\+Good" -c)" = "${NUM_NODES}" ]
+   while [ ! "$(${CTLCMD} | tail -n+3 | grep "Online\s\+Good" -c)" = "$(${CTLCMD} | tail -n+3 | wc -l)" ]
    do
       sleep 1
    done
@@ -1231,6 +1240,16 @@ do_start()
          ;;
       esac
    done
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      PDSH=${PDSH:-${DEFAULT_PDSH_PATH}}
+
+      if [ -z "${PDSH}" ]; then
+         echo "Unable to autodetect pdsh. Please specify using the -b option."
+         exit 1
+      fi
+   fi
 
    check_hostfile
    check_datapath
@@ -1418,6 +1437,16 @@ do_stop()
          ;;
       esac
    done
+
+   if [ "${USE_PDSH}" = "true" ]
+   then
+      PDSH=${PDSH:-${DEFAULT_PDSH_PATH}}
+
+      if [ -z "${PDSH}" ]; then
+         echo "Unable to autodetect pdsh. Please specify using the -b option."
+         exit 1
+      fi
+   fi
 
    check_hostfile
 

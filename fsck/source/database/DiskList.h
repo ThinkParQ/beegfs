@@ -41,7 +41,7 @@ class DiskListCursor
                return false;
 
             if (readRes < (ssize_t) sizeof(itemLen))
-               throw std::runtime_error("could not read from disk list file");
+               throw std::runtime_error("could not read from disk list file: " + std::string(strerror(errno)));
          }
 
          itemLen = LE_TO_HOST_64(itemLen);
@@ -51,13 +51,13 @@ class DiskListCursor
          ssize_t readRes = ::pread(fd, itemBuf.get(), itemLen, offset + sizeof(itemLen));
 
          if (readRes < (ssize_t) itemLen)
-            throw std::runtime_error("could not read from disk list file");
+            throw std::runtime_error("could not read from disk list file: " + std::string(strerror(errno)));
 
          Deserializer des(itemBuf.get(), itemLen);
 
          des % item;
          if (!des.good())
-            throw std::runtime_error("could not read from disk list file");
+            throw std::runtime_error("could not read from disk list file: " + std::string(strerror(errno)));
 
          offset += sizeof(itemLen) + itemLen;
          return true;
@@ -97,10 +97,11 @@ class DiskList {
          fd = ::open(file.c_str(), O_RDWR | (allowCreate ? O_CREAT : 0), 0660);
          if(fd < 0)
          {
+            int eno = errno;
             if(!allowCreate && errno == ENOENT)
                throw DiskListDoesNotExist(file);
             else
-               throw std::runtime_error("could not open disk list file");
+               throw std::runtime_error("could not open disk list file " + file + ": " + strerror(eno));
          }
       }
 
@@ -124,10 +125,10 @@ class DiskList {
 
          uint64_t bufSize = HOST_TO_LE_64(size);
          if (::write(fd, &bufSize, sizeof(bufSize)) < (ssize_t) sizeof(bufSize))
-            throw std::runtime_error("error writing disk list item");
+            throw std::runtime_error("error writing disk list item: " + std::string(strerror(errno)));
 
          if (::write(fd, buffer.get(), size) < size)
-            throw std::runtime_error("error writing disk list item");
+            throw std::runtime_error("error writing disk list item: " + std::string(strerror(errno)));
       }
 
       DiskListCursor<Data> cursor()
@@ -140,7 +141,7 @@ class DiskList {
          if (fd >= 0)
          {
             if (ftruncate(fd, 0) < 0)
-               throw std::runtime_error("error clearing disk list");
+               throw std::runtime_error("error clearing disk list: " + std::string(strerror(errno)));
          }
       }
 };

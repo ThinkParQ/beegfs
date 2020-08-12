@@ -17,7 +17,7 @@ class SessionLocalFileStore
          std::unique_ptr<SessionLocalFile> session);
       std::shared_ptr<SessionLocalFile> referenceSession(const std::string& fileHandleID,
          uint16_t targetID, bool isMirrorSession) const;
-      std::pair<bool, std::shared_ptr<SessionLocalFile::Handle>> removeSession(
+      std::shared_ptr<SessionLocalFile::Handle> removeSession(
          const std::string& fileHandleID, uint16_t targetID, bool isMirrorSession);
       size_t removeAllSessions();
       void removeAllMirrorSessions(uint16_t targetID);

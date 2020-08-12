@@ -344,7 +344,7 @@ NodeHandle MsgHelperRepair::referenceLostAndFoundOwner(EntryInfo* outLostAndFoun
 
    NodeHandle ownerNode;
 
-   FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, false, app->getMetaNodes(), ownerNode,
+   FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, app->getMetaNodes(), ownerNode,
       outLostAndFoundEntryInfo, app->getMetaRoot(), app->getMetaMirrorBuddyGroupMapper());
 
    if ( findRes != FhgfsOpsErr_SUCCESS )
@@ -370,7 +370,7 @@ bool MsgHelperRepair::createLostAndFound(NodeHandle& outReferencedNode,
    // rootPath.setAbsolute(true);
    EntryInfo rootEntryInfo;
 
-   FhgfsOpsErr findRes = MetadataTk::referenceOwner(&rootPath, false, metaNodes,
+   FhgfsOpsErr findRes = MetadataTk::referenceOwner(&rootPath, metaNodes,
       rootNode, &rootEntryInfo, app->getMetaRoot(), app->getMetaMirrorBuddyGroupMapper());
 
    if ( findRes != FhgfsOpsErr_SUCCESS )

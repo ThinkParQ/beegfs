@@ -131,8 +131,7 @@ ssize_t MessagingTk_recvMsgBuf(App* app, Socket* sock, char* bufIn, size_t bufIn
 
       if (fatal_signal_pending(current))
          Logger_logFormatted(log, Log_DEBUG, logContext,
-            "Receive interrupted by signal",
-            Socket_getPeername(sock), (long long)recvRes);
+            "Receive interrupted by signal");
       else
          Logger_logFormatted(log, Log_DEBUG, logContext,
             "Receive failed from: %s (ErrCode: %lld)",

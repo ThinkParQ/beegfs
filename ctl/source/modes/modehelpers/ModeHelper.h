@@ -43,7 +43,7 @@ class ModeHelper
             MetaBuddyResyncJobStatistics& outStats);
 
       static bool getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
-            bool useParent, NodeStoreServers& metaNodes, const RootInfo& metaRoot,
+            NodeStoreServers& metaNodes, const RootInfo& metaRoot,
             MirrorBuddyGroupMapper& metaBuddyGroupMapper,
             EntryInfo& outEntryInfo, NodeHandle& outOwnerHandle);
 

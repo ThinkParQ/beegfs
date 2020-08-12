@@ -233,10 +233,7 @@ bool ModeIOStat::nodesTotalStats(NodeStoreServers* nodes, NodeType nodeType)
 {
    const uint64_t oneSecMS = 1000;
 
-   HighResolutionStats zeroStats;
-   memset(&zeroStats, 0, sizeof(zeroStats) );
-
-   HighResStatsVec statsTotal(cfgHistorySecs, zeroStats);
+   HighResStatsVec statsTotal(cfgHistorySecs);
 
    uint64_t nowMS = TimeAbs().getTimeMS();
 
@@ -388,7 +385,7 @@ void ModeIOStat::printStatsNodeRow(uint64_t timeIndexMS, HighResStatsList& stats
 {
    const uint64_t oneSecMS = 1000;
 
-   HighResStatsList zeroStatsList; // empty dummy if node stats don't contain needed time index
+   HighResStatsList zeroStatsList(1); // empty dummy if node stats don't contain needed time index
 
    HighResStatsListIter statsIter = stats.begin();
 
@@ -406,10 +403,6 @@ void ModeIOStat::printStatsNodeRow(uint64_t timeIndexMS, HighResStatsList& stats
 
    if(statsIter == stats.end() )
    { // stats history didn't contain matching time index => use dummy with zero values
-      HighResolutionStats zeroStats;
-      memset(&zeroStats, 0, sizeof(zeroStats) );
-
-      zeroStatsList.push_back(zeroStats);
 
       statsIter = zeroStatsList.begin();
    }

@@ -203,15 +203,13 @@
 #define NETMSGTYPE_GetHostByName                   5003
 #define NETMSGTYPE_GetHostByNameResp               5004
 
-// admon messages
+// mon messages
 #define NETMSGTYPE_GetNodesFromRootMetaNode        6001
 #define NETMSGTYPE_SendNodesList                   6002
 #define NETMSGTYPE_RequestMetaData                 6003
 #define NETMSGTYPE_RequestStorageData              6004
 #define NETMSGTYPE_RequestMetaDataResp             6005
 #define NETMSGTYPE_RequestStorageDataResp          6006
-#define NETMSGTYPE_GetNodeInfo                     6007
-#define NETMSGTYPE_GetNodeInfoResp                 6008
 
 // fsck messages
 #define NETMSGTYPE_RetrieveDirEntries              7001

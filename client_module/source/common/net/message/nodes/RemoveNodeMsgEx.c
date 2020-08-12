@@ -69,7 +69,7 @@ bool __RemoveNodeMsgEx_processIncoming(NetMessage* this, struct App* app,
       SocketTk_ipaddrToStr(&fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
    LOG_DEBUG_FORMATTED(log, Log_DEBUG, logContext,
       "Received a RemoveNodeMsg from: %s; Node: %s %hu",
-      peer, Node_nodeTypeToStr(nodeType), nodeID);
+      peer, Node_nodeTypeToStr(nodeType), nodeID.value);
    kfree(peer);
 
 
@@ -77,14 +77,14 @@ bool __RemoveNodeMsgEx_processIncoming(NetMessage* this, struct App* app,
    {
       NodeStoreEx* nodes = App_getMetaNodes(app);
       if(NodeStoreEx_deleteNode(nodes, nodeID) )
-         Logger_logFormatted(log, Log_WARNING, logContext, "Removed metadata node: %hu", nodeID);
+         Logger_logFormatted(log, Log_WARNING, logContext, "Removed metadata node: %hu", nodeID.value);
    }
    else
    if(nodeType == NODETYPE_Storage)
    {
       NodeStoreEx* nodes = App_getStorageNodes(app);
       if(NodeStoreEx_deleteNode(nodes, nodeID) )
-         Logger_logFormatted(log, Log_WARNING, logContext, "Removed storage node: %hu", nodeID);
+         Logger_logFormatted(log, Log_WARNING, logContext, "Removed storage node: %hu", nodeID.value);
    }
    else
    { // should never happen

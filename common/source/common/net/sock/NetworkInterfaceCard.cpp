@@ -256,7 +256,7 @@ bool NetworkInterfaceCard::fillNicAddress(int sock, NicAddrType nicType, struct 
 
    // name
    // note: must be done at the beginning because following ioctl-calls will overwrite the data
-   strncpy(outAddr->name, ifr->ifr_name, sizeof(outAddr->name));
+   memcpy(outAddr->name, ifr->ifr_name, sizeof(outAddr->name));
 
    // retrieve flags
    if(ioctl(sock, SIOCGIFFLAGS, ifr) )

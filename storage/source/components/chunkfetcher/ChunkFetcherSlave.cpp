@@ -124,7 +124,7 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
       int statRes = ::stat(pathBuf.c_str(), &statBuf);
       if(statRes)
       {
-         LOG(GENERAL, WARNING, "Could not stat directory.", path, targetID, sysErr);
+         LOG(GENERAL, WARNING, "Could not stat directory.", ("path", pathBuf), targetID, sysErr);
          result = false;
          break;
       }

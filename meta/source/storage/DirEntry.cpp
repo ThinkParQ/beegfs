@@ -4,7 +4,7 @@
 #include "MetadataEx.h"
 #include "DirEntry.h"
 
-#include <attr/xattr.h> // (cannot be sys/xattr.h, because that doesn't provide ENOATTR)
+#include <sys/xattr.h>
 
 /*
  * Store the dirEntryID file. This is a normal dirEntry (with inlined inode),
@@ -605,7 +605,7 @@ bool DirEntry::loadFromFileXAttr(const std::string& path)
          path + ". " + "SysErr: " + System::getErrString() );
    }
    else
-   if( ( (getRes == 0) || ( (getRes == -1) && (errno == ENOATTR) ) ) &&
+   if( ( (getRes == 0) || ( (getRes == -1) && (errno == ENODATA) ) ) &&
        (cfg->getStoreSelfHealEmptyFiles() ) )
    { // empty link file probably due to server crash => self-heal through removal
       if (likely(this->name != META_DIRENTRYID_SUB_STR) )

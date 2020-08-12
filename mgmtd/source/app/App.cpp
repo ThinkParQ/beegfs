@@ -835,6 +835,7 @@ void App::shutDown (bool clean)
       notifyWorkers();
 
       getHeartbeatMgr()->notifyAsyncRefreshTargetStates();
+      getHeartbeatMgr()->saveNodeStores();
 
       int toWaitSecs = cfg->getSysTargetOfflineTimeoutSecs();
       LOG(GENERAL, NOTICE,

@@ -1,7 +1,7 @@
 #include <common/toolkit/StringTk.h>
 #include <common/system/System.h>
 #include <linux/limits.h>
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include "XAttrTk.h"
 
 namespace

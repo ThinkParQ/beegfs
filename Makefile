@@ -31,7 +31,7 @@ export BEEGFS_VERSION
 PREFIX ?= /opt/beegfs
 DESTDIR ?=
 
-DAEMONS := mgmtd meta storage helperd admon mon
+DAEMONS := mgmtd meta storage helperd mon
 UTILS := fsck ctl event_listener $(if $(WITHOUT_COMM_DEBUG),,comm_debug)
 
 # exclude components with no runnable tests from `test' and do not provide `ctl-test'.

@@ -117,24 +117,6 @@ Description: BeeGFS mon dashboards for Grafana
 
 
 
-Package: beegfs-admon
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
-Conflicts: beegfs-debian
-Description: BeeGFS admon daemon and java frontend.
- This package contains the optional BeeGFS admon daemon and java frontend.
- Admon and java frontend allow one to configure and monitor BeeGFS.
-
-Package: beegfs-admon-dbg
-Architecture: any
-Section: debug
-Priority: extra
-Depends: beegfs-admon (= ${binary:Version}), ${misc:Depends}
-Description: debugging symbols for beegfs-admon
- The package contains the debugging symbols for beegfs-admon
-
-
-
 Package: beegfs-mirror-md
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}

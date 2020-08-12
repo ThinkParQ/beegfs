@@ -79,7 +79,7 @@ class Path
          if (dirSeparators.size() > 0)
             return Path(pathStr.substr(0, dirSeparators.back()));
          else
-            return Path();
+            return Path(".");
       }
 
       /**

@@ -178,7 +178,7 @@ void RWPagesWork_processQueue(RWPagesWork* this)
       LOG_DEBUG_FORMATTED(log, 1, __func__, "error: %s", FhgfsOpsErr_toErrString(-rwRes) );
    else
    {
-      LOG_DEBUG_FORMATTED(log, 5, __func__, "rwRes: %d", rwRes );
+      LOG_DEBUG_FORMATTED(log, 5, __func__, "rwRes: %zu", rwRes );
       IGNORE_UNUSED_VARIABLE(log);
    }
 

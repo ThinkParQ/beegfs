@@ -1478,7 +1478,7 @@ ssize_t FhgfsOpsRemoting_rwChunkPageVec(FhgfsChunkPageVec *pageVec, RemotingIOIn
    // sanity check
    if (numPages > chunkPages)
    {
-      Logger_logErrFormatted(log, logContext, "Bug: %s: numPages (%u) > numChunkPages (%u)!",
+      Logger_logErrFormatted(log, logContext, "Bug: %s: numPages (%u) > numChunkPages (%lu)!",
          rwTypeStr, numPages, chunkPages);
 
       needReadWriteHandlePages = true;
@@ -1540,7 +1540,7 @@ ssize_t FhgfsOpsRemoting_rwChunkPageVec(FhgfsChunkPageVec *pageVec, RemotingIOIn
       needReadWriteHandlePages = true;
    }
 
-   LOG_DEBUG_FORMATTED(log, Log_SPAM, logContext, "fileHandleID: %s rwType %s: sum-result %lld",
+   LOG_DEBUG_FORMATTED(log, Log_SPAM, logContext, "fileHandleID: %s rwType %s: sum-result %ld",
       ioInfo->fileHandleID, rwTypeStr, retVal);
    IGNORE_UNUSED_VARIABLE(log);
    IGNORE_UNUSED_VARIABLE(logContext);

@@ -10,7 +10,7 @@
 #include <thread>
 #include <vector>
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>

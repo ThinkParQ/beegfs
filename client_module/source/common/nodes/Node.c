@@ -132,11 +132,6 @@ const char* Node_nodeTypeToStr(NodeType nodeType)
          return "beegfs-helperd";
       } break;
 
-      case NODETYPE_Admon:
-      {
-         return "beegfs-admon";
-      } break;
-
       default:
       {
          return "<unknown>";

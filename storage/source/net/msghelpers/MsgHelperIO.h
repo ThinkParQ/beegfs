@@ -5,7 +5,6 @@
 #include <app/App.h>
 #include <common/Common.h>
 #include <program/Program.h>
-#include <attr/xattr.h>
 
 /* The kernel has a weird read-ahead size limitation, but from userspace only. If this ever will
  * be abondoned, we need to make a config option for those future kernels. */

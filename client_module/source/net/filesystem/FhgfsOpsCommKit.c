@@ -769,7 +769,7 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
                Node_getNodeIDWithTypeStr(info->node),
                GenericResponseMsg_getLogStr(&msg) );
             Logger_logFormatted(context->log, Log_DEBUG, logContext,
-               "Message type: %hu", requestMsgType);
+               "Message type: %u", requestMsgType);
          }
 
          return FhgfsOpsErr_AGAIN;
@@ -784,7 +784,7 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
                Node_getNodeIDWithTypeStr(info->node),
                GenericResponseMsg_getLogStr(&msg) );
             Logger_logFormatted(context->log, Log_DEBUG, logContext,
-               "Message type: %hu", requestMsgType);
+               "Message type: %u", requestMsgType);
          }
 
          return FhgfsOpsErr_COMMUNICATION;
@@ -796,7 +796,7 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
             (unsigned)GenericResponseMsg_getControlCode(&msg),
             GenericResponseMsg_getLogStr(&msg) );
          Logger_logFormatted(context->log, Log_DEBUG, logContext,
-            "Message type: %hu", requestMsgType);
+            "Message type: %u", requestMsgType);
 
          return FhgfsOpsErr_INTERNAL;
    }
@@ -1033,7 +1033,7 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, ReadfileS
    if(unlikely(currentState->transmitted + lengthInfo > currentState->totalReadSize) )
    {
       Logger_logErrFormatted(context->log, context->ops->logContext,
-         "Bug: Received a lengthInfo that would overflow request from %s: %lld %lld %zu",
+         "Bug: Received a lengthInfo that would overflow request from %s: %lld %zu %zu",
          Node_getNodeIDWithTypeStr(currentState->base.node), (long long)lengthInfo,
          currentState->transmitted, currentState->totalReadSize);
 

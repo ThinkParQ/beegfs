@@ -52,8 +52,14 @@ lib$(LIB_NAME).so: $(CPP_BUILD_DIR)/lib$(LIB_NAME).so
 
 cppheaders: $(CPPHEADER) $(CPPINCLUDES)
 
+# Java 11 no longer has javah.
+ifeq ($(if $(findstring javac 11.,$(shell $(JAVAC) -version)),true,false),true)
+$(CPPHEADER): $(CLASSFILES) | $(CPP_BUILD_DIR)
+	$(JAVAC) -classpath $(JAVA_BUILD_DIR) -d $(CPP_BUILD_DIR) -h $(CPP_BUILD_DIR) $(SOURCES)
+else # But java 1.8 needs it.
 $(CPPHEADER): $(CLASSFILES) | $(CPP_BUILD_DIR)
 	$(JAVAH) -jni -classpath $(JAVA_BUILD_DIR) -d $(CPP_BUILD_DIR) com.beegfs.JBeeGFS
+endif
 
 $(CPP_BUILD_DIR)/jni.h: | $(CPP_BUILD_DIR)
 	cp $(JAVA_HOME)/include/jni.h $@

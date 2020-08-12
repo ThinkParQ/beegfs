@@ -3,7 +3,7 @@
 #include <common/app/log/Logger.h>
 #include <program/Program.h>
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <sys/types.h>
 #include <unistd.h>
 

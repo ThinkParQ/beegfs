@@ -62,7 +62,7 @@ void __DatagramListener_listenLoop(DatagramListener* this)
       { // error
 
          Logger_logErrFormatted(log, logContext,
-            "Encountered an unrecoverable socket error. ErrCode: %d", recvRes);
+            "Encountered an unrecoverable socket error. ErrCode: %ld", recvRes);
 
          break;
       }

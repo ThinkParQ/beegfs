@@ -96,7 +96,6 @@ build_dir := $(realpath $(dir $(firstword $(MAKEFILE_LIST))))
 
 BEEGFS_COMMON_PATH             ?= $(root_dir)/common
 BEEGFS_THIRDPARTY_PATH         ?= $(root_dir)/thirdparty
-ADMON_GUI_PATH                 ?= $(root_dir)/admon_gui
 BEEGFS_ONLINE_CFG_PATH         ?= $(root_dir)/ctl
 BEEGFS_COMM_DEBUG_PATH         ?= $(root_dir)/comm_debug
 BEEGFS_FSCK_PATH               ?= $(root_dir)/fsck
@@ -104,10 +103,6 @@ BEEGFS_EVENT_LISTENER_PATH     ?= $(root_dir)/event_listener
 BEEGFS_DEVEL_INCLUDE_PATH      ?= $(root_dir)/client_devel/include
 BEEGFS_JAVA_LIB_PATH           ?= $(root_dir)/java_lib
 
-SQLITE_INC_PATH   ?= $(BEEGFS_THIRDPARTY_PATH)/source/sqlite
-OPENSSL_INC_PATH  ?= $(BEEGFS_THIRDPARTY_PATH)/source/openssl/include
-TICPP_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/ticpp
-MONGOOSE_INC_PATH ?= $(BEEGFS_THIRDPARTY_PATH)/source/mongoose
 BOOST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/boost
 NU_INC_PATH       ?= $(BEEGFS_THIRDPARTY_PATH)/source/nu/include
 
@@ -174,10 +169,6 @@ CXXFLAGS += -DBEEGFS_VERSION="\"$(BEEGFS_VERSION)\""
 # currently supports building with our own libraries common and client-devel.
 # thirdparty packages supported are:
 #  * dl (from system)
-#  * sqlite (from thirdparty, or from system if not built in thirdparty)
-#  * openssl (from thirdparty, or from system if not built in thirdparty)
-#  * ticpp (from thirdparty)
-#  * mongoose (from thirdparty)
 #
 # to define new libraries, add appriopriate calls to define-dep-lib in this section.
 # the signature of define-dep-lib is:
@@ -255,40 +246,14 @@ else
 
    $(call define-dep-lib, rdma, , -lrdmacm -libverbs)
 
-   $(call define-dep-lib, ticpp,\
-      -isystem $(TICPP_INC_PATH),\
-      $(BEEGFS_THIRDPARTY_PATH)/build/libticpp.a)
-
-   $(call define-dep-lib, mongoose,\
-      -isystem $(MONGOOSE_INC_PATH),\
-      $(BEEGFS_THIRDPARTY_PATH)/build/libmongoose.a)
-
    $(call define-dep-lib, gtest,\
       -isystem $(GTEST_INC_PATH)/include,\
       $(GTEST_LIB_PATH)/libgtest.a)
 
    $(call define-dep-lib, cassandra, -I$(BEEGFS_THIRDPARTY_PATH)/source/datastax)
 
-   ifneq ($(realpath $(BEEGFS_THIRDPARTY_PATH)/build/libsqlite3.a),)
-      $(info [NOTE] Using packaged sqlite3)
-      $(call define-dep-lib, sqlite,\
-         -isystem $(SQLITE_INC_PATH),\
-         $(BEEGFS_THIRDPARTY_PATH)/build/libsqlite3.a)
-   else
-      $(call define-dep-lib-system, sqlite, sqlite3)
-   endif
-
    $(call define-dep-lib-system, curl, libcurl)  
    $(call define-dep-lib-system, z, zlib)
-
-   ifneq ($(realpath $(BEEGFS_THIRDPARTY_PATH)/build/libssl.a),)
-      $(info [NOTE] Using packaged OpenSSL)
-      $(call define-dep-lib, openssl,\
-         -isystem $(OPENSSL_INC_PATH),\
-         $(BEEGFS_THIRDPARTY_PATH)/build/libssl.a $(BEEGFS_THIRDPARTY_PATH)/build/libcrypto.a)
-   else
-      $(call define-dep-lib-system, openssl, libssl libcrypto)
-   endif
 endif
 
 
@@ -333,8 +298,25 @@ define -clang_tidy_checks
 -android-cloexec-fopen
 -android-cloexec-open
 -boost-use-to-string
+-bugprone-branch-clone
+-bugprone-exception-escape
+-bugprone-narrowing-conversions
+-bugprone-sizeof-expression
+-cert-oop54-cpp
+-clang-analyzer-core.CallAndMessage
+-clang-analyzer-core.uninitialized.Assign
+-clang-analyzer-cplusplus.NewDeleteLeaks
 -clang-analyzer-deadcode.DeadStores
+-clang-analyzer-optin.cplusplus.UninitializedObject
+-clang-diagnostic-deprecated-copy
+-cppcoreguidelines-avoid-c-arrays
+-cppcoreguidelines-avoid-goto
+-cppcoreguidelines-avoid-magic-numbers
+-cppcoreguidelines-init-variables
 -cppcoreguidelines-interfaces-global-init
+-cppcoreguidelines-macro-usage
+-cppcoreguidelines-narrowing-conversions
+-cppcoreguidelines-non-private-member-variables-in-classes
 -cppcoreguidelines-pro-bounds-array-to-pointer-decay
 -cppcoreguidelines-pro-bounds-constant-array-index
 -cppcoreguidelines-pro-bounds-pointer-arithmetic
@@ -346,20 +328,28 @@ define -clang_tidy_checks
 -cppcoreguidelines-pro-type-union-access
 -cppcoreguidelines-pro-type-vararg
 -cppcoreguidelines-special-member-functions
+-fuchsia-default-arguments-calls
+-fuchsia-default-arguments-declarations
+-fuchsia-statically-constructed-objects
 -google-default-arguments
 -google-explicit-constructor
+-google-readability-avoid-underscore-in-googletest-name
 -google-readability-redundant-smartptr-get
 -google-readability-todo
 -google-runtime-int
 -google-runtime-references
+-hicpp-avoid-c-arrays
+-hicpp-avoid-goto
 -hicpp-deprecated-headers
 -hicpp-explicit-conversions
 -hicpp-member-init
+-hicpp-multiway-paths-covered
 -hicpp-no-array-decay
 -hicpp-no-assembler
 -hicpp-no-malloc
 -hicpp-signed-bitwise
 -hicpp-special-member-functions
+-hicpp-uppercase-literal-suffix
 -hicpp-use-auto
 -hicpp-use-emplace
 -hicpp-use-equals-default
@@ -367,11 +357,15 @@ define -clang_tidy_checks
 -hicpp-use-noexcept
 -hicpp-use-nullptr
 -hicpp-vararg
+-llvm-qualified-auto
 -misc-misplaced-widening-cast
 -misc-move-constructor-init
+-misc-non-private-member-variables-in-classes
 -misc-redundant-expression
 -misc-string-compare
 -misc-unused-parameters
+-modernize-avoid-bind
+-modernize-avoid-c-arrays
 -modernize-loop-convert
 -modernize-make-shared
 -modernize-make-unique
@@ -387,18 +381,27 @@ define -clang_tidy_checks
 -modernize-use-equals-delete
 -modernize-use-noexcept
 -modernize-use-nullptr
+-modernize-use-trailing-return-type
 -modernize-use-using
 -performance-faster-string-find
 -performance-inefficient-string-concatenation
 -performance-unnecessary-copy-initialization
 -performance-unnecessary-value-param
+-readability-const-return-type
+-readability-convert-member-functions-to-static
 -readability-else-after-return
 -readability-implicit-bool-cast
+-readability-isolate-declaration
+-readability-magic-numbers
+-readability-make-member-function-const
 -readability-named-parameter
 -readability-non-const-parameter
+-readability-qualified-auto
 -readability-redundant-control-flow
 -readability-redundant-smartptr-get
 -readability-redundant-string-cstr
+-readability-string-compare
+-readability-uppercase-literal-suffix
 
 -cert-err58-cpp
 -cert-err60-cpp

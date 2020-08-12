@@ -220,8 +220,6 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_RequestStorageData: return "RequestStorageData (6004)";
       case NETMSGTYPE_RequestMetaDataResp: return "RequestMetaDataResp (6005)";
       case NETMSGTYPE_RequestStorageDataResp: return "RequestStorageDataResp (6006)";
-      case NETMSGTYPE_GetNodeInfo: return "GetNodeInfo (6007)";
-      case NETMSGTYPE_GetNodeInfoResp: return "GetNodeInfoResp (6008)";
       case NETMSGTYPE_RetrieveDirEntries: return "RetrieveDirEntries (7001)";
       case NETMSGTYPE_RetrieveDirEntriesResp: return "RetrieveDirEntriesResp (7002)";
       case NETMSGTYPE_RetrieveInodes: return "RetrieveInodes (7003)";

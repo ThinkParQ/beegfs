@@ -608,7 +608,7 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
                Node_getNodeIDWithTypeStr(rrArgs->node), Socket_getPeername(sock) );
          else
             Logger_logFormatted(log, Log_WARNING, logContext,
-               "Receive failed from %s @ %s (recv result: %lld)",
+               "Receive failed from %s @ %s (recv result: %zi)",
                Node_getNodeIDWithTypeStr(rrArgs->node), Socket_getPeername(sock), respRes);
 
          Logger_logFormatted(log, Log_DEBUG, logContext,

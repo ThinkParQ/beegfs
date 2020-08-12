@@ -18,10 +18,6 @@ bool BuddyMirrorPattern_deserializePattern(StripePattern* this, DeserializeCtx* 
    if(!Serialization_deserializeUInt16Vec(&mirrorBuddyGroupIDsVec, &thisCast->mirrorBuddyGroupIDs) )
       return false;
 
-   // calc stripeSetSize
-   thisCast->stripeSetSize = UInt16Vec_length(
-      &thisCast->mirrorBuddyGroupIDs) * StripePattern_getChunkSize(this);
-
    // check mirrorBuddyGroupIDs
    if(!UInt16Vec_length(&thisCast->mirrorBuddyGroupIDs) )
       return false;
@@ -31,38 +27,9 @@ bool BuddyMirrorPattern_deserializePattern(StripePattern* this, DeserializeCtx* 
 
 size_t BuddyMirrorPattern_getStripeTargetIndex(StripePattern* this, int64_t pos)
 {
-   BuddyMirrorPattern* thisCast = (BuddyMirrorPattern*)this;
+   struct BuddyMirrorPattern* p = container_of(this, struct BuddyMirrorPattern, stripePattern);
 
-   /* the code below is an optimization (wrt division/modulo) of following the two lines:
-         int64_t stripeSetInnerOffset = pos % thisCast->stripeSetSize;
-         int64_t targetIndex = stripeSetInnerOffset / StripePattern_getChunkSize(this); */
-
-   // note: do_div(n64, base32) assigns the result to n64 and returns the remainder!
-   // (do_div is needed for 64bit division on 32bit archs)
-
-   unsigned stripeSetSize = thisCast->stripeSetSize;
-
-   int64_t stripeSetInnerOffset;
-   unsigned chunkSize;
-   size_t targetIndex;
-
-   if(MathTk_isPowerOfTwo(stripeSetSize) )
-   { // quick path => no modulo needed
-      stripeSetInnerOffset = pos & (stripeSetSize - 1);
-   }
-   else
-   { // slow path => modulo
-      stripeSetInnerOffset = do_div(pos, thisCast->stripeSetSize);
-
-      // warning: do_div modifies pos! (so do not use it afterwards within this method)
-   }
-
-   chunkSize = StripePattern_getChunkSize(this);
-
-   // this is "a=b/c" written as "a=b>>log2(c)", because chunkSize is a power of two.
-   targetIndex = (stripeSetInnerOffset >> MathTk_log2Int32(chunkSize) );
-
-   return targetIndex;
+   return (pos / this->chunkSize) % UInt16Vec_length(&p->mirrorBuddyGroupIDs);
 }
 
 uint16_t BuddyMirrorPattern_getStripeTargetID(StripePattern* this, int64_t pos)

@@ -101,7 +101,7 @@ int StorageBenchSlave::initStorageBench(UInt16List* targetIDs, int64_t blocksize
    LogContext(logContext).log(Log_DEBUG, "Initializing benchmark ...");
 
    this->benchType = type;
-   this->targetIDs = targetIDs;
+   this->targetIDs = new auto(*targetIDs);
    this->blocksize = blocksize;
    this->size = size;
    this->numThreads = threads;

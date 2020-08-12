@@ -69,7 +69,7 @@ class ModeClientStats : public Mode
       void makeStdinNonblocking() const;
       void makeStdinBlocking() const;
       bool waitForInput(int timeoutSecs) const;
-
+      std::vector<std::pair<int64_t, ClientOps::OpsList>> sortedVectorByOpsSum(const ClientOps::IdOpsMap &idOpsMap) const;
 };
 
 #endif /* MODECLIENTSTATS_H_ */

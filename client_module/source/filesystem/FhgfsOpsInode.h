@@ -266,8 +266,8 @@ void __FhgfsOps_applyStatSizeToInode(struct kstat* kstat, FhgfsIsizeHints* iSize
                 spin_unlock(&inOutInode->i_lock);
 
                 LOG_DEBUG_FORMATTED(log, Log_WARNING, __func__,
-                   "Warn-once: (possibly valid) isize-shrink oldSize: %ld newSize: %ld "
-                   "lastWBTime: %lu, timeBeforeRemote; %lu\n",
+                   "Warn-once: (possibly valid) isize-shrink oldSize: %lld newSize: %lld "
+                   "lastWBTime: %llu, timeBeforeRemote; %llu\n",
                    oldSize, kstat->size, lastWriteBackOrIsizeWriteTime, iSizeHints->timeBeforeRemoteStat);
                 dump_stack();
 

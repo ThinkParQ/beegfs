@@ -47,6 +47,9 @@ void TargetCapacityPools::removeFromOthersUnlocked(uint16_t targetID, NumNodeID 
       if(previousNodeID)
       { // previous mapping existed
          groupedTargetPools[poolType][previousNodeID].erase(targetID);
+
+         if (groupedTargetPools[poolType][previousNodeID].empty())
+            groupedTargetPools[poolType].erase(previousNodeID);
       }
 
       return;

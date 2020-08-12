@@ -63,17 +63,22 @@ extern Logger* Logger_construct(App* app, Config* cfg);
 extern void Logger_uninit(Logger* this);
 extern void Logger_destruct(Logger* this);
 
+__attribute__((format(printf, 4, 5)))
 extern void Logger_logFormatted(Logger* this, LogLevel level, const char* context,
    const char* msgFormat, ...);
+__attribute__((format(printf, 5, 6)))
 extern void Logger_logTopFormattedWithEntryID(struct inode* inode, LogTopic logTopic,
    LogLevel level, const char* logContext, const char* msgFormat, ...);
+__attribute__((format(printf, 5, 6)))
 extern void Logger_logTopFormatted(Logger* this, LogTopic logTopic, LogLevel level,
    const char* context, const char* msgFormat, ...);
 extern void Logger_logFormattedVA(Logger* this, LogLevel level, const char* context,
    const char* msgFormat, va_list ap);
 extern void Logger_logTopFormattedVA(Logger* this, LogTopic logTopic, LogLevel level,
    const char* context, const char* msgFormat, va_list ap);
+__attribute__((format(printf, 3, 4)))
 extern void Logger_logErrFormatted(Logger* this, const char* context, const char* msgFormat, ...);
+__attribute__((format(printf, 4, 5)))
 extern void Logger_logTopErrFormatted(Logger* this, LogTopic logTopic, const char* context,
    const char* msgFormat, ...);
 

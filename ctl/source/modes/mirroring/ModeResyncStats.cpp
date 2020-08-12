@@ -169,58 +169,19 @@ int ModeResyncStats::getStatsStorage(uint16_t syncToTargetID, bool isBuddyGroupI
    App* app = Program::getApp();
    MirrorBuddyGroupMapper* buddyGroupMapper = app->getMirrorBuddyGroupMapper();
 
-   // download storage nodes and mappings
-   NodeList nodeList;
-   UInt16List targetIDs;
-   UInt16List nodeIDs;
-   UInt16List buddyGroupIDs;
-   UInt16List buddyPrimaryTargetIDs;
-   UInt16List buddySecondaryTargetIDs;
-   uint16_t syncFromTargetID = 0;
-   StorageBuddyResyncJobStatistics jobStats;
-
-   // get buddy groups as list
-   buddyGroupMapper->getMappingAsLists(buddyGroupIDs, buddyPrimaryTargetIDs,
-      buddySecondaryTargetIDs);
-
-   if(isBuddyGroupID)
-   { // find the target IDs to the given buddy group
-      UInt16ListIter buddyIter = buddyGroupIDs.begin();
-      UInt16ListIter primaryIter = buddyPrimaryTargetIDs.begin();
-      UInt16ListIter secondaryIter = buddySecondaryTargetIDs.begin();
-
-      for(; buddyIter != buddyGroupIDs.end(); buddyIter++, primaryIter++, secondaryIter++)
-      {
-         if(*buddyIter == syncToTargetID)
-         {
-            syncFromTargetID = *primaryIter;
-            syncToTargetID = *secondaryIter;
-            break;
-         }
-      }
-   }
-   else
-   { // find the primary target to the given sync target
-      UInt16ListIter primaryIter = buddyPrimaryTargetIDs.begin();
-      UInt16ListIter secondaryIter = buddySecondaryTargetIDs.begin();
-
-      for(; primaryIter != buddyPrimaryTargetIDs.end(); primaryIter++, secondaryIter++)
-      {
-         if(*secondaryIter == syncToTargetID)
-         {
-            syncFromTargetID = *primaryIter;
-            break;
-         }
-      }
-   }
-
-   if (syncFromTargetID == 0)
-   {
-      std::cerr << "Couldn't find " << (isBuddyGroupID ? "secondary of group" : "buddy of target")
-         << " ID: " << syncToTargetID << "."
-         " Is it the target ID of the secondary?" << std::endl;
+   const auto group = buddyGroupMapper->getMirrorBuddyGroup(isBuddyGroupID
+         ? syncToTargetID
+         : buddyGroupMapper->getBuddyGroupID(syncToTargetID));
+   if (group.firstTargetID == 0) {
+      std::cerr << "Could not find buddy group "
+         << (isBuddyGroupID ? "" : "of target ")
+         << syncToTargetID
+         << "." << std::endl;
       return APPCODE_RUNTIME_ERROR;
    }
+
+   const auto syncFromTargetID = group.firstTargetID;
+   StorageBuddyResyncJobStatistics jobStats;
 
    // get the storage node corresponding to the ID
    FhgfsOpsErr getStatsRes = ModeHelper::getStorageBuddyResyncStats(syncFromTargetID, jobStats);

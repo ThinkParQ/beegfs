@@ -137,7 +137,7 @@ void __AckManager_processAckQueue(AckManager* this)
       if(unlikely(!node) )
       { // node not found in store
          Logger_logFormatted(log, Log_DEBUG, logContext, "Metadata node no longer exists: %hu",
-            currentAck->metaNodeID);
+            currentAck->metaNodeID.value);
 
          goto remove;
       }
@@ -152,7 +152,7 @@ void __AckManager_processAckQueue(AckManager* this)
       { // serialization failed
          Logger_logFormatted(log, Log_CRITICAL, logContext,
             "BUG(?): Unable to serialize ack msg for metadata node: %hu (ack: %s)",
-            currentAck->metaNodeID, currentAck->ackID);
+            currentAck->metaNodeID.value, currentAck->ackID);
 
          goto release;
       }
@@ -162,7 +162,7 @@ void __AckManager_processAckQueue(AckManager* this)
          if(currentRetryNum == 1)
          { // inform user about retry (only on first retry to not spam the log)
             Logger_logFormatted(log, Log_NOTICE, logContext,
-               "Retrying communication with metadata node: %hu", currentAck->metaNodeID);
+               "Retrying communication with metadata node: %hu", currentAck->metaNodeID.value);
          }
 
          // unlock, so that more entries can be added to the queue during remoting without waiting
@@ -192,7 +192,7 @@ void __AckManager_processAckQueue(AckManager* this)
          if(unlikely(!sock || (sendRes != (ssize_t) msgLen) ) )
          { // no connection or communication error
             Logger_logFormatted(log, Log_NOTICE, logContext,
-               "Communication with metadata node failed: %hu", currentAck->metaNodeID);
+               "Communication with metadata node failed: %hu", currentAck->metaNodeID.value);
 
             removeAllNextByNode = true; // (only effective if no more retries)
 

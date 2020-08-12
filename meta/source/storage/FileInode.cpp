@@ -7,7 +7,7 @@
 #include "FileInode.h"
 #include "Locking.h"
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 
 #include <boost/lexical_cast.hpp>
 

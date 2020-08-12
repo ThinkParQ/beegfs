@@ -136,6 +136,8 @@ bool ModeGetQuotaInfo::queryAndPrintQuota(const NodeHandle& mgmtNode, StoragePoo
        Program::getApp()->getWorkQueue(), &usedQuotaDataResults, targetMapper,
        &quotaInodeSupport, storagePoolStore, storagePoolId))
    {
+      std::cerr << "Could not gather quota information from all storage nodes.\n"
+              << "Refusing to display incorrect information." << std::endl;
       return false;
    }
 

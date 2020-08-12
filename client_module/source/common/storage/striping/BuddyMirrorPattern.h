@@ -36,7 +36,6 @@ struct BuddyMirrorPattern
    StripePattern stripePattern;
 
    UInt16Vec mirrorBuddyGroupIDs;
-   unsigned stripeSetSize; // = numStripeTargets * chunkSize
    unsigned defaultNumTargets;
 };
 
@@ -59,8 +58,6 @@ void BuddyMirrorPattern_init(BuddyMirrorPattern* this,
    ListTk_copyUInt16ListToVec( (UInt16List*)mirrorBuddyGroupIDs, &this->mirrorBuddyGroupIDs);
 
    this->defaultNumTargets = defaultNumTargets ? defaultNumTargets : 4;
-
-   this->stripeSetSize = UInt16Vec_length(mirrorBuddyGroupIDs) * chunkSize;
 }
 
 /**

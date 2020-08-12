@@ -46,10 +46,9 @@ std::shared_ptr<SessionLocalFile> SessionLocalFileStore::referenceSession(
 
 /**
  * @param isMirrorSession true if this is a session for a mirror chunk file
- * @return first component: false if the session is still in use, true otherwise.
- *         second component: filesystem state of the session if it was unused, nullptr otherwise.
+ * @return filesystem state of the session if it was unused, nullptr otherwise.
  */
-std::pair<bool, std::shared_ptr<SessionLocalFile::Handle>> SessionLocalFileStore::removeSession(
+std::shared_ptr<SessionLocalFile::Handle> SessionLocalFileStore::removeSession(
    const std::string& fileHandleID, uint16_t targetID, bool isMirrorSession)
 {
    std::shared_ptr<SessionLocalFile> file;
@@ -59,17 +58,13 @@ std::pair<bool, std::shared_ptr<SessionLocalFile::Handle>> SessionLocalFileStore
 
       auto iter = sessions.find({fileHandleID, targetID, isMirrorSession});
       if (iter == sessions.end())
-         return {true, nullptr};
+         return nullptr;
 
       file = std::move(iter->second);
       sessions.erase(iter);
    }
 
-   auto fsState = releaseLastReference(std::move(file));
-   if (fsState)
-      return {true, std::move(fsState)};
-   else
-      return {false, nullptr};
+   return releaseLastReference(std::move(file));
 }
 
 size_t SessionLocalFileStore::removeAllSessions()

@@ -1,36 +1,26 @@
 %define VER %(echo '%{BEEGFS_VERSION}' | cut -d - -f 1)
-%define BEEGFS_RELEASE_STR %(echo '%{BEEGFS_VERSION}-' | cut -d - -f 2)
 
 %define BEEGFS_MAJOR_VERSION %(echo '%{BEEGFS_VERSION}' | cut -d . -f 1)
 %define CLIENT_DIR /opt/beegfs/src/client/client_module_%{BEEGFS_MAJOR_VERSION}
 %define CLIENT_COMPAT_DIR /opt/beegfs/src/client/client_compat_module_%{BEEGFS_MAJOR_VERSION}
 
-%define is_fedora %(test -e /etc/fedora-release && echo 1 || echo 0)
-%define is_redhat %(test -e /etc/redhat-release && echo 1 || echo 0)
-%define is_suse %(test -e /etc/SuSE-release && echo 1 || echo 0)
+%define is_sles %(test -f /etc/SUSEConnect && echo 1 || echo 0)
 
-%if %is_suse
-%define disttag sles
-%define distver %(relpackage="`rpm -qf /etc/SuSE-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
-%endif
+%if %is_sles
+%define distver %(release="`rpm -qf --queryformat='%%{VERSION}' /etc/os-release 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
+%define RELEASE sles%{distver}
 
-%if %is_fedora
-%define disttag fc
-%endif
-
-%if %is_redhat
-%define disttag el
-%define distver %(relpackage="`rpm -qf /etc/redhat-release`"; release="`rpm -q --queryformat='%{VERSION}' $relpackage 2> /dev/null | tr . : | sed s/:.*$//g`" ; if test $? != 0 ; then release="" ; fi ; echo "$release")
-%endif
-
-%if %{defined disttag}
-%define RELEASE %{BEEGFS_RELEASE_STR}%{disttag}%{distver}
 %else
-%define RELEASE %{BEEGFS_RELEASE_STR}generic
+%if %{defined ?dist}
+%define RELEASE %(tr -d . <<< %{?dist})
+
+%else
+%define RELEASE generic
+
+%endif
 %endif
 
 %define FULL_VERSION %{EPOCH}:%{VER}-%{RELEASE}
-
 
 %define post_package() if [ "$1" = 1 ] \
 then \
@@ -62,7 +52,7 @@ fi
 
 
 Name: beegfs
-Summary: BeeGFS parallel file syste,
+Summary: BeeGFS parallel file system
 License: BeeGFS EULA
 Version: %{VER}
 Release: %{RELEASE}
@@ -82,10 +72,6 @@ rm -rf %{buildroot}
 %prep
 %setup -c
 
-%if %is_suse
-%debug_package
-%endif
-
 %define make_j %{?MAKE_CONCURRENCY:-j %{MAKE_CONCURRENCY}}
 
 %build
@@ -95,7 +81,6 @@ export WITHOUT_COMM_DEBUG=1
 
 make %make_j daemons utils
 
-make -C admon/build admon_gui
 # disabled, doesn't build
 #make -C beeond_thirdparty/build %make_j
 make -C beeond_thirdparty_gpl/build %make_j
@@ -271,64 +256,6 @@ install -D mon/build/dist/etc/default/beegfs-mon ${RPM_BUILD_ROOT}/etc/default/b
 install -D mon/scripts/grafana/* ${RPM_BUILD_ROOT}/opt/beegfs/scripts/grafana
 
 ##########
-########## admon extra files
-##########
-
-cp -a admon/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
-
-#add license file of beegfs-admon and of the beegfs-admon-gui
-mkdir -p ${RPM_BUILD_ROOT}/opt/beegfs/LICENSE/beegfs-admon/gui
-install -D -m644 admon/build/dist/LICENSE ${RPM_BUILD_ROOT}/opt/beegfs/LICENSE/beegfs-admon/
-install -D -m644 admon_gui/license/* ${RPM_BUILD_ROOT}/opt/beegfs/LICENSE/beegfs-admon/gui
-
-install -D admon/build/dist/etc/init.d/beegfs-admon.init ${RPM_BUILD_ROOT}/etc/init.d/beegfs-admon
-
-#add the generic part of the init script from the common package
-cat common_package/build/dist/etc/init.d/beegfs-service.init >> ${RPM_BUILD_ROOT}/etc/init.d/beegfs-admon
-
-#install systemd unit description
-install -D -m644 admon/build/dist/usr/lib/systemd/system/beegfs-admon.service \
-	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-admon.service
-
-install -D admon/build/dist/sbin/beegfs-setup-admon \
-	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-admon
-
-install -D -m644 admon/build/dist/etc/default/beegfs-admon ${RPM_BUILD_ROOT}/etc/default/beegfs-admon
-
-install -D -m644 common_package/scripts/etc/beegfs/lib/start-stop-functions \
-	${RPM_BUILD_ROOT}/etc/beegfs/lib/start-stop-functions.beegfs-admon
-
-install -D -m644 common_package/scripts/etc/beegfs/lib/init-multi-mode \
-	${RPM_BUILD_ROOT}/etc/beegfs/lib/init-multi-mode.beegfs-admon
-
-#add admon GUI start script
-install -D -m755 admon/build/dist/usr/bin/beegfs-admon-gui ${RPM_BUILD_ROOT}/usr/bin/beegfs-admon-gui
-
-mkdir -p \
-   ${RPM_BUILD_ROOT}/opt/beegfs/setup \
-   ${RPM_BUILD_ROOT}/opt/beegfs/setup/info
-
-cp -R admon/scripts/* ${RPM_BUILD_ROOT}/opt/beegfs/setup
-touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/clients
-touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/ib_nodes
-touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/management
-touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/meta_server
-touch ${RPM_BUILD_ROOT}/opt/beegfs/setup/info/storage_server
-
-# create a dir for tmp data during script execution
-mkdir -p ${RPM_BUILD_ROOT}/opt/beegfs/setup/tmp
-
-# add admon gui
-DEST_JAR=${RPM_BUILD_ROOT}/opt/beegfs/beegfs-admon-gui/beegfs-admon-gui.jar
-install -D -m644 admon_gui/dist/beegfs-admon-gui.jar ${DEST_JAR}
-
-# we need a directory for the admon db
-mkdir -p ${RPM_BUILD_ROOT}/var/lib/beegfs
-
-# we need a directory for the mongoose document root
-mkdir -p ${RPM_BUILD_ROOT}/var/lib/beegfs/www
-
-##########
 ########## utils
 ##########
 
@@ -376,6 +303,10 @@ install -D client_module/build/dist/etc/init.d/beegfs-client.init ${RPM_BUILD_RO
 #install systemd unit description
 install -D -m644 client_module/build/dist/usr/lib/systemd/system/beegfs-client.service \
    ${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-client.service
+
+install -D -m644 client_module/build/dist/usr/lib/systemd/system/beegfs-client@.service \
+   ${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-client@.service
+
 
 install -D client_module/build/dist/etc/default/beegfs-client ${RPM_BUILD_ROOT}/etc/default/beegfs-client
 
@@ -642,70 +573,6 @@ The default dashboard setup requires both Grafana, and InfluxDB.
 
 
 
-%package admon
-
-Summary: BeeGFS administration and monitoring daemon
-Group: Software/Other
-requires: beegfs-common = %{FULL_VERSION}
-
-%description admon
-The package contains the BeeGFS admon daemon.
-
-%post admon
-%post_package beegfs-admon
-hostname > /opt/beegfs/setup/info/management
-
-%preun admon
-%preun_package beegfs-admon
-
-%files admon
-%defattr(-,root,root)
-%config(noreplace) /etc/beegfs/beegfs-admon.conf
-%dir /etc/beegfs/lib/
-%config(noreplace) /etc/beegfs/lib/init-multi-mode.beegfs-admon
-%config(noreplace) /etc/beegfs/lib/start-stop-functions.beegfs-admon
-%config(noreplace) /etc/default/beegfs-admon
-/etc/init.d/beegfs-admon
-/opt/beegfs/sbin/beegfs-admon
-/opt/beegfs/sbin/beegfs-setup-admon
-/usr/bin/beegfs-admon-gui
-/opt/beegfs/beegfs-admon-gui/beegfs-admon-gui.jar
-/opt/beegfs/setup/setup.add_repo.sh
-/opt/beegfs/setup/setup.add_repo_parallel.sh
-/opt/beegfs/setup/setup.check_ssh.sh
-/opt/beegfs/setup/setup.check_ssh_parallel.sh
-/opt/beegfs/setup/setup.check_status.sh
-/opt/beegfs/setup/setup.check_status_parallel.sh
-/opt/beegfs/setup/setup.defaults
-/opt/beegfs/setup/setup.get_remote_file.sh
-/opt/beegfs/setup/setup.get_system_info.sh
-/opt/beegfs/setup/setup.get_system_info_parallel.sh
-/opt/beegfs/setup/setup.install.sh
-/opt/beegfs/setup/setup.install_parallel.sh
-/opt/beegfs/setup/setup.start.sh
-/opt/beegfs/setup/setup.start_parallel.sh
-/opt/beegfs/setup/setup.stop.sh
-/opt/beegfs/setup/setup.stop_parallel.sh
-/opt/beegfs/setup/setup.uninstall.sh
-/opt/beegfs/setup/setup.uninstall_parallel.sh
-/opt/beegfs/setup/setup.write_config.sh
-/opt/beegfs/setup/setup.write_mounts.sh
-%dir /opt/beegfs/LICENSE/
-/opt/beegfs/LICENSE/beegfs-admon/LICENSE
-/opt/beegfs/LICENSE/beegfs-admon/gui/
-%dir /opt/beegfs/setup/info/
-%dir /opt/beegfs/setup/tmp/
-%config(noreplace) /opt/beegfs/setup/info/clients
-%config(noreplace) /opt/beegfs/setup/info/ib_nodes
-%config(noreplace) /opt/beegfs/setup/info/management
-%config(noreplace) /opt/beegfs/setup/info/meta_server
-%config(noreplace) /opt/beegfs/setup/info/storage_server
-%config(noreplace) /opt/beegfs/setup/confs/config
-/usr/lib/systemd/system/beegfs-admon.service
-%dir /var/lib/beegfs/
-
-
-
 %package utils
 
 Summary: BeeGFS utilities
@@ -784,6 +651,7 @@ touch /var/lib/beegfs/client/force-auto-build
 /etc/init.d/beegfs-client
 /opt/beegfs/sbin/beegfs-setup-client
 /usr/lib/systemd/system/beegfs-client.service
+/usr/lib/systemd/system/beegfs-client@.service
 %{CLIENT_DIR}
 
 
@@ -857,7 +725,7 @@ This package contains BeeGFS client development files.
 
 Summary: BeeOND
 Group: Software/Other
-requires: beeond-thirdparty-gpl = %{FULL_VERSION}, beegfs-utils = %{FULL_VERSION}, beegfs-mgmtd = %{FULL_VERSION}, beegfs-meta = %{FULL_VERSION}, beegfs-storage = %{FULL_VERSION}, beegfs-client = %{FULL_VERSION}, beegfs-helperd = %{FULL_VERSION}
+requires: beeond-thirdparty-gpl = %{FULL_VERSION}, beegfs-utils = %{FULL_VERSION}, beegfs-mgmtd = %{FULL_VERSION}, beegfs-meta = %{FULL_VERSION}, beegfs-storage = %{FULL_VERSION}, beegfs-client = %{FULL_VERSION}, beegfs-helperd = %{FULL_VERSION}, psmisc
 
 %description -n beeond
 This package contains BeeOND.

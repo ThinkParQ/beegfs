@@ -57,7 +57,6 @@ bool GetQuotaInfo::requestQuotaLimitsAndCollectResponses(const NodeHandle& mgmtN
          // delete QuotaDataMap with invalid QuotaData
          if (cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
             outQuotaResults->erase(*iter);
-
          retVal = false;
       }
    }
@@ -247,8 +246,14 @@ bool GetQuotaInfo::requestQuotaDataAndCollectResponses(const NodeStoreServers* s
       if (*iter != 0)
       {
          // delete QuotaDataMap with invalid QuotaData
-         if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST)
+         if(this->cfg.cfgTargetSelection != GETQUOTACONFIG_ALL_TARGETS_ONE_REQUEST) {
             outQuotaResults->erase(*iter);
+            LOG(QUOTA, ERR, "Unable to fetch quota information from storage target."
+                  " Is the node offline?", ("Storage target id", *iter));
+         } else {
+            LOG(QUOTA, ERR, "Unable to fetch quota information from storage server."
+                  " Is the node offline?", ("Storage node id", *iter));
+         }
 
          retVal = false;
       }

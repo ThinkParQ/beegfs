@@ -71,7 +71,7 @@ bool __MapTargetsMsgEx_processIncoming(NetMessage* this, struct App* app,
       if(wasNewTarget)
       {
          LOG_DEBUG_FORMATTED(log, Log_WARNING, logContext, "Mapping target %hu => node %hu",
-            mapping->targetID, nodeID);
+            mapping->targetID, nodeID.value);
       }
    }
 

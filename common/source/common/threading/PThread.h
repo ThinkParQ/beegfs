@@ -127,19 +127,6 @@ class PThread
       }
 
       /**
-       * Note: This is designed primarily for fhgfs_admon. It allows the web server threads to
-       * pretend they are fhgfs threads and use the routines of fhgfs_common. So we init
-       * thread-local storage and signal handlers here.
-       */
-      static void initFakeThread(std::string name, AbstractApp* app)
-      {
-         // store thread-local vars
-         setCurrentThreadName(name);
-         setCurrentThreadApp(app);
-         registerSignalHandler();
-      }
-
-      /**
        * Note: This is designed primarily for deeper_lib. It allows the lib to pretend they are
        * beegfs threads and use the routines of beegfs_common. So we init the app and the signal
        * handlers here.

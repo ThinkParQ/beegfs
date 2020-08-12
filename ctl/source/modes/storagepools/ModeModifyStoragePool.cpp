@@ -294,7 +294,7 @@ void ModeModifyStoragePool::printHelp()
    std::cout << "                                         to add to the pool." << std::endl;
    std::cout << std::endl;
    std::cout << "  --rmirrorgroups=<mbgID1,mbgID2,...>    A comma-separated list of mirror groups" << std::endl;
-   std::cout << "                                         to emove from the pool." << std::endl;
+   std::cout << "                                         to remove from the pool." << std::endl;
    std::cout << std::endl;
    std::cout << "  --desc=<description>                   A new description for the pool" << std::endl;
    std::cout << std::endl;

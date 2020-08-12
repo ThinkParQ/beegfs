@@ -1,7 +1,7 @@
 #include <program/Program.h>
 #include "StorageTkEx.h"
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 
 #define STORAGETK_FORMAT_XATTR   "xattr"
 

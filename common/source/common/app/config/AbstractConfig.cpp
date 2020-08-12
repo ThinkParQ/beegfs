@@ -71,7 +71,7 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connClientPortUDP",          "8004", addDashes);
    configMapRedefine("connStoragePortUDP",         "8003", addDashes);
    configMapRedefine("connMetaPortUDP",            "8005", addDashes);
-   configMapRedefine("connAdmonPortUDP",           "8007", addDashes);
+   configMapRedefine("connMonPortUDP",           "8007", addDashes);
    configMapRedefine("connMgmtdPortUDP",           "8008", addDashes);
    configMapRedefine("connStoragePortTCP",         "8003", addDashes);
    configMapRedefine("connMetaPortTCP",            "8005", addDashes);
@@ -124,8 +124,8 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          assignKeyIfNotZero(iter, connStoragePortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMetaPortUDP", addDashes))
          assignKeyIfNotZero(iter, connMetaPortUDP, enableException);
-      else if (testConfigMapKeyMatch(iter, "connAdmonPortUDP", addDashes))
-         assignKeyIfNotZero(iter, connAdmonPortUDP, enableException);
+      else if (testConfigMapKeyMatch(iter, "connMonPortUDP", addDashes))
+         assignKeyIfNotZero(iter, connMonPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMgmtdPortUDP", addDashes))
          assignKeyIfNotZero(iter, connMgmtdPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connStoragePortTCP", addDashes))

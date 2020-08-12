@@ -14,7 +14,7 @@ Before building BeeGFS, install the following dependency packages:
 ### Red Hat / CentOS
 ```
 $ yum install libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config \
-  rpm-build xfsprogs-devel zlib-devel openssl-devel sqlite sqlite-devel ant gcc-c++ gcc \
+  rpm-build xfsprogs-devel zlib-devel ant gcc-c++ gcc \
   redhat-lsb-core java-devel unzip libcurl-devel elfutils-libelf-devel kernel-devel
 ```
 
@@ -50,8 +50,7 @@ On Debian or Ubuntu based systems run this command to install the required packa
 ```
 $ sudo apt install build-essential autoconf automake pkg-config devscripts debhelper \
   libtool libattr1-dev xfslibs-dev lsb-release kmod librdmacm-dev libibverbs-dev \
-  default-jdk ant dh-systemd zlib1g-dev libssl-dev sqlite3 libsqlite3-dev \
-  libcurl4-openssl-dev
+  default-jdk ant dh-systemd zlib1g-dev libssl-dev libcurl4-openssl-dev
 ```
 Note: If you have an older Debian system you might have to install the
 `module-init-tools` package instead of `kmod`.

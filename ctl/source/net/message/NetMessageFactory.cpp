@@ -45,6 +45,7 @@
 #include <common/net/message/storage/listing/ListDirFromOffsetRespMsg.h>
 #include <common/net/message/storage/lookup/FindOwnerRespMsg.h>
 #include <common/net/message/storage/lookup/FindLinkOwnerRespMsg.h>
+#include <common/net/message/storage/lookup/LookupIntentRespMsg.h>
 #include <common/net/message/storage/mirroring/GetMetaResyncStatsRespMsg.h>
 #include <common/net/message/storage/mirroring/GetStorageResyncStatsRespMsg.h>
 #include <common/net/message/storage/mirroring/SetLastBuddyCommOverrideRespMsg.h>
@@ -138,6 +139,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_RenameResp: { msg = new RenameRespMsg(); } break;
       case NETMSGTYPE_RmDirResp: { msg = new RmDirRespMsg(); } break;
       case NETMSGTYPE_RmDirEntryResp: { msg = new RmDirEntryRespMsg(); } break;
+      case NETMSGTYPE_LookupIntentResp: { msg = new LookupIntentRespMsg(); } break;
       case NETMSGTYPE_RmLocalDirResp: { msg = new RmLocalDirRespMsg(); } break;
       case NETMSGTYPE_SetAttrResp: { msg = new SetAttrRespMsg(); } break;
       case NETMSGTYPE_SetDirPatternResp: { msg = new SetDirPatternRespMsg(); } break;

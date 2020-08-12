@@ -83,7 +83,7 @@ int ModeGetEntryInfo::execute()
 
       Path path(cfgPathStr);
 
-      if(!ModeHelper::getEntryAndOwnerFromPath(path, cfgUseMountedPath, false,
+      if(!ModeHelper::getEntryAndOwnerFromPath(path, cfgUseMountedPath,
             *metaNodes, app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
             entryInfo, ownerNode))
       {
@@ -99,6 +99,7 @@ int ModeGetEntryInfo::execute()
 
       // print some basic info
 
+      std::cout << "Entry type: " << entryInfo.getEntryType() << std::endl;
       std::cout << "EntryID: " << entryInfo.getEntryID() << std::endl;
       if (!isFile && this->cfgVerbose)
          std::cout << "ParentID: " << entryInfo.getParentEntryID() << std::endl;

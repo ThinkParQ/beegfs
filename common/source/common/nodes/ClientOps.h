@@ -31,15 +31,6 @@ class ClientOps
          return sumOpsList;
       }
 
-      /**
-      * Return the summed up op lists mapped to their belonging ip/user AND one op list with the sum
-      * over all op lists from all ips/users.
-      */
-      std::tuple<IdOpsMap, OpsList> getAbsoluteOpsMapAndSum() const
-      {
-         return std::make_tuple(idOpsMap, sumOpsList);
-      }
-
       void clear();
 
 

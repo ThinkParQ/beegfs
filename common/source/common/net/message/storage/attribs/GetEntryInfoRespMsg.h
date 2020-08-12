@@ -9,7 +9,7 @@
 
 /**
  * Retrieve information about an entry, such as the stripe pattern or mirroring settings.
- * This is typically used by "fhgfs-ctl --getentryinfo" or the admon file browser.
+ * This is typically used by "fhgfs-ctl --getentryinfo".
  */
 class GetEntryInfoRespMsg : public NetMessageSerdes<GetEntryInfoRespMsg>
 {

@@ -53,7 +53,7 @@ static inline const char* Node_getNodeTypeStr(Node* this);
 
 enum NodeType
    {NODETYPE_Invalid = 0, NODETYPE_Meta = 1, NODETYPE_Storage = 2, NODETYPE_Client = 3,
-   NODETYPE_Mgmt = 4, NODETYPE_Helperd = 5, NODETYPE_Admon = 6};
+   NODETYPE_Mgmt = 4, NODETYPE_Helperd = 5};
 
 
 struct Node

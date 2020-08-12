@@ -106,7 +106,7 @@ int ModeIOTest::execute()
    NodeHandle ownerNode;
    EntryInfo entryInfo;
 
-   if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath, false,
+   if(!ModeHelper::getEntryAndOwnerFromPath(path, useMountedPath,
          *metaNodes, app->getMetaRoot(), *metaBuddyGroupMapper,
          entryInfo, ownerNode))
    {

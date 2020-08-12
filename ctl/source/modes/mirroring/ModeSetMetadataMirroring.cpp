@@ -105,7 +105,7 @@ bool ModeSetMetadataMirroring::setMirroring(Node& rootNode)
    std::cout << std::endl;
    std::cout << "NOTE:" << std::endl;
    std::cout << " To complete activating metadata mirroring, please remount any clients and" << std::endl;
-   std::cout << " restart all metadata servers now." << std::endl;
+   std::cout << " restart all metadata services now." << std::endl;
 
    retVal = true;
 

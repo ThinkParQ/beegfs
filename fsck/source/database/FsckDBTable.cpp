@@ -27,8 +27,9 @@ static db::DirEntry fsckDirEntryToDbDirEntry(const FsckDirEntry& dentry)
    };
 
    if(result.fileNameInlined) {
+      ::memset(result.name.inlined.text, '\0', sizeof(result.name.inlined.text));
       ::strncpy(result.name.inlined.text, dentry.getName().c_str(),
-            sizeof(result.name.inlined.text));
+            sizeof(result.name.inlined.text) - 1);
    }
 
    return result;

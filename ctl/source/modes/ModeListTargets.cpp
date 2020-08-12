@@ -862,7 +862,7 @@ int ModeListTargets::addSpaceToLine(char* inOutString, int* inOutOffset, uint16_
    double freeSpacePercent;
    double freeInodesPercent;
    double gb = 1024*1024*1024;
-   double mb = 1024*1024;
+   double m = 1000*1000;
 
    // retrieve space info from server
 
@@ -880,8 +880,8 @@ int ModeListTargets::addSpaceToLine(char* inOutString, int* inOutOffset, uint16_
    freeSpaceGiB = freeSpace / gb;
    totalSpaceGiB = totalSpace / gb;
    freeSpacePercent = totalSpace ? (100.0 * freeSpace / totalSpace) : 0;
-   freeInodesM = freeInodes / mb;
-   totalInodesM = totalInodes / mb;
+   freeInodesM = freeInodes / m;
+   totalInodesM = totalInodes / m;
    freeInodesPercent = totalInodes ? (100.0 * freeInodes / totalInodes) : 0;
 
    *inOutOffset += sprintf(&inOutString[*inOutOffset],

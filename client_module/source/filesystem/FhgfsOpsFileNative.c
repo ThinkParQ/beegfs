@@ -2056,7 +2056,7 @@ static ssize_t beegfs_dIO_read(struct kiocb* iocb, struct iov_iter* iter, loff_t
       offset, iter->nr_segs);
    IGNORE_UNUSED_VARIABLE(app);
 
-   iov_for_each(iov, loopIter, *iter)
+   beegfs_iov_for_each(iov, loopIter, iter)
    {
       readRes = FhgfsOpsRemoting_readfile(iov.iov_base, iov.iov_len, offset, ioInfo,
          BEEGFS_INODE(inode) );
@@ -2112,7 +2112,7 @@ static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_
    IGNORE_UNUSED_VARIABLE(app);
    IGNORE_UNUSED_VARIABLE(inode);
 
-   iov_for_each(iov, loopIter, *iter)
+   beegfs_iov_for_each(iov, loopIter, iter)
    {
       writeRes = FhgfsOpsRemoting_writefile(iov.iov_base, iov.iov_len, offset, ioInfo);
       if(writeRes < 0)
@@ -2160,33 +2160,6 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
    return -EINVAL;
 }
 
-#if defined(KERNEL_HAS_IOV_DIO)
-static ssize_t beegfs_direct_IO(struct kiocb* iocb, struct iov_iter* iter)
-{
-   return __beegfs_direct_IO(iov_iter_rw(iter), iocb, iter, iocb->ki_pos);
-}
-#elif defined(KERNEL_HAS_LONG_IOV_DIO)
-static ssize_t beegfs_direct_IO(struct kiocb* iocb, struct iov_iter* iter, loff_t offset)
-{
-   return __beegfs_direct_IO(iov_iter_rw(iter), iocb, iter, offset);
-}
-#elif defined(KERNEL_HAS_DIRECT_IO_ITER)
-static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* iter, loff_t offset)
-{
-   return __beegfs_direct_IO(rw, iocb, iter, offset);
-}
-#else
-static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* iov, loff_t pos,
-      unsigned long nr_segs)
-{
-   struct iov_iter iter;
-
-   BEEGFS_IOV_ITER_INIT(&iter, rw & RW_MASK, iov, nr_segs, iov_length(iov, nr_segs) );
-
-   return __beegfs_direct_IO(rw, iocb, &iter, pos);
-}
-#endif
-
 static int beegfs_launderpage(struct page* page)
 {
    return beegfs_flush_page(page);
@@ -2198,7 +2171,6 @@ const struct address_space_operations fhgfs_addrspace_native_ops = {
    .releasepage = beegfs_releasepage,
    .set_page_dirty = beegfs_set_page_dirty,
    .invalidatepage = beegfs_invalidate_page,
-   .direct_IO = beegfs_direct_IO,
 
    .readpages = beegfs_readpages,
    .writepages = beegfs_writepages,

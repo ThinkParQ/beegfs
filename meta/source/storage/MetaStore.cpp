@@ -9,7 +9,7 @@
 #include <program/Program.h>
 #include "MetaStore.h"
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <dirent.h>
 #include <sys/types.h>
 
@@ -1746,7 +1746,7 @@ std::pair<FhgfsOpsErr, IncompleteInode> MetaStore::beginResyncFor(const Path& pa
       return {FhgfsOpsErr_SUCCESS, IncompleteInode(mkRes)};
    }
 
-   LOG(GENERAL, ERR, "Could not create metadata file/directory", path, isDirectory);
+   LOG(GENERAL, ERR, "Could not create metadata file/directory", path, isDirectory, sysErr);
    return {FhgfsOpsErrTk::fromSysErr(errno), IncompleteInode{}};
 }
 

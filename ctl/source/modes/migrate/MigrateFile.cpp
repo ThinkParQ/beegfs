@@ -226,7 +226,7 @@ bool MigrateFile::migrateSymLink()
 
    // now copy over the time stamps, NOTE: although we renamed the file, tmpFD is still valid.
    metaRes = copyTimesLink(&fromStatData);
-   if (metaRes)
+   if (!metaRes)
    {
       removeTmpOnErr();
       goto out;
@@ -367,8 +367,8 @@ int MigrateFile::runCreateIoctl(struct stat* fromStat, const char* symlinkTo)
    ioctlData.parentEntryID          = this->parentInfo.getEntryID().c_str();
    ioctlData.parentEntryIDLen       = this->parentInfo.getEntryID().length() + 1;
 
-   ioctlData.parentName             = this->parentInfo.getFileName().c_str();
-   ioctlData.parentNameLen          = this->parentInfo.getFileName().length() + 1;
+   ioctlData.parentName = "";
+   ioctlData.parentNameLen = 1;
 
    ioctlData.parentIsBuddyMirrored  = this->parentInfo.getIsBuddyMirrored();
 

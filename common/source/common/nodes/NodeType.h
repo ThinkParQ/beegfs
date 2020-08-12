@@ -14,7 +14,6 @@ enum NodeType
    NODETYPE_Client = 3,
    NODETYPE_Mgmt = 4,
    NODETYPE_Helperd = 5,
-   NODETYPE_Admon = 6,
 };
 
 inline std::ostream& operator<<(std::ostream& os, NodeType nodeType)
@@ -32,7 +31,6 @@ inline std::ostream& operator<<(std::ostream& os, NodeType nodeType)
       case NODETYPE_Client:      return os << "beegfs-client";
       case NODETYPE_Mgmt:        return os << "beegfs-mgmtd";
       case NODETYPE_Helperd:     return os << "beegfs-helperd";
-      case NODETYPE_Admon:       return os << "beegfs-admon";
       default:
          return os << "<unknown(" << int(nodeType) << ")>";
    }

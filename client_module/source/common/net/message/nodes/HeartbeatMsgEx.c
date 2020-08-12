@@ -192,7 +192,7 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
          "New node: %s %s [ID: %hu]; %s%s",
          Node_nodeTypeToStr(HeartbeatMsgEx_getNodeType(thisCast) ),
          HeartbeatMsgEx_getNodeID(thisCast),
-         HeartbeatMsgEx_getNodeNumID(thisCast),
+         HeartbeatMsgEx_getNodeNumID(thisCast).value,
          (supportsSDP ? "SDP; " : ""),
          (supportsRDMA ? "RDMA; " : "") );
    }
@@ -239,7 +239,7 @@ void __HeartbeatMsgEx_processIncomingRoot(HeartbeatMsgEx* this, App* app)
    if(setRootRes)
    { // found the very first root
       Logger_logFormatted(log, Log_CRITICAL, logContext, "Root (by Heartbeat): %hu",
-         HeartbeatMsgEx_getRootNumID(this) );
+         HeartbeatMsgEx_getRootNumID(this).value );
    }
 
 }

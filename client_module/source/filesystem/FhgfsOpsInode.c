@@ -467,7 +467,7 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
 
    int refreshRes;
 
-   forget_cached_acl(inode, type);
+   forget_all_cached_acls(inode);
 
    refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)

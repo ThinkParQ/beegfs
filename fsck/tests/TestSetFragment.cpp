@@ -20,7 +20,7 @@ TEST_F(TestSetFragment, open)
          try {
             SetFragment<Data> frag(this->fileName);
          } catch (const std::runtime_error& e) {
-            ASSERT_EQ(std::string(e.what()), "could not open fragment file");
+            ASSERT_NE(std::string(e.what()).find("could not open fragment file"), std::string::npos);
             break;
          }
 
@@ -35,7 +35,7 @@ TEST_F(TestSetFragment, open)
       try {
          SetFragment<Data> frag(this->fileName);
       } catch (const std::runtime_error& e) {
-         ASSERT_EQ(std::string(e.what()), "error while opening fragment file");
+         ASSERT_NE(std::string(e.what()).find("error while opening fragment file"), std::string::npos);
          break;
       }
 
@@ -50,7 +50,7 @@ TEST_F(TestSetFragment, open)
       try {
          SetFragment<Data> frag(this->fileName);
       } catch (const std::runtime_error& e) {
-         ASSERT_EQ(std::string(e.what()), "error while opening fragment file");
+         ASSERT_NE(std::string(e.what()).find("error while opening fragment file"), std::string::npos);
          break;
       }
 
@@ -66,7 +66,7 @@ TEST_F(TestSetFragment, open)
       try {
          SetFragment<Data> frag(this->fileName);
       } catch (const std::runtime_error& e) {
-         ASSERT_EQ(std::string(e.what()), "error while opening fragment file");
+         ASSERT_NE(std::string(e.what()).find("error while opening fragment file"), std::string::npos);
          break;
       }
 

@@ -59,6 +59,21 @@ struct SerializeAs<DirEntryType> {
    typedef uint8_t type;
 };
 
+inline std::ostream& operator<<(std::ostream& os, DirEntryType t) {
+   switch (t) {
+      case DirEntryType_DIRECTORY:   return os << "directory";
+      case DirEntryType_REGULARFILE: return os << "file";
+      case DirEntryType_SYMLINK:     return os << "symlink";
+      case DirEntryType_BLOCKDEV:    return os << "block device node";
+      case DirEntryType_CHARDEV:     return os << "character device node";
+      case DirEntryType_FIFO:        return os << "pipe";
+      case DirEntryType_SOCKET:      return os << "unix domain socket";
+
+      default:
+         return os << "invalid";
+   }
+}
+
 #define DirEntryType_ISVALID(dirEntryType)       (dirEntryType != DirEntryType_INVALID)
 #define DirEntryType_ISDIR(dirEntryType)         (dirEntryType == DirEntryType_DIRECTORY)
 #define DirEntryType_ISREGULARFILE(dirEntryType) (dirEntryType == DirEntryType_REGULARFILE)

@@ -1,6 +1,8 @@
 #include <common/net/message/nodes/HeartbeatMsg.h>
 #include <common/net/message/nodes/RemoveNodeMsg.h>
 #include <common/net/message/nodes/RemoveNodeRespMsg.h>
+#include <common/net/message/storage/lookup/LookupIntentMsg.h>
+#include <common/net/message/storage/lookup/LookupIntentRespMsg.h>
 #include <common/net/message/storage/mirroring/GetStorageResyncStatsMsg.h>
 #include <common/net/message/storage/mirroring/GetStorageResyncStatsRespMsg.h>
 #include <common/net/message/storage/mirroring/GetMetaResyncStatsMsg.h>
@@ -384,32 +386,55 @@ FhgfsOpsErr ModeHelper::getMetaBuddyResyncStats(uint16_t nodeID,
 }
 
 bool ModeHelper::getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
-      bool useParent, NodeStoreServers& metaNodes, const RootInfo& metaRoot,
+      NodeStoreServers& metaNodes, const RootInfo& metaRoot,
       MirrorBuddyGroupMapper& metaBuddyGroupMapper,
       EntryInfo& outEntryInfo, NodeHandle& outOwnerHandle)
 {
    if(useMountedPath)
    {
-      std::string testPath = useParent ? StorageTk::getPathDirname(path.str()) : path.str();
+      struct stat s;
+
+      if (lstat(path.str().c_str(), &s)) {
+         perror("Stat failed");
+         return false;
+      }
+
+      const bool doLookup = !(S_ISDIR(s.st_mode) || S_ISREG(s.st_mode));
+      std::string testPath = doLookup
+         ? StorageTk::getPathDirname(path.str())
+         : path.str();
 
       IoctlTk ioctlTk(testPath);
       if(!ioctlTk.getEntryInfo(outEntryInfo))
       {
-         std::cerr << "Unable to retrieve entryInfo from path: " << testPath <<
-            std::endl;
+         std::cerr << "Unable to retrieve entryInfo for " << testPath << ": "
+                   << ioctlTk.getErrMsg() << std::endl;
          return false;
       }
 
-      uint16_t id =
-            outEntryInfo.getIsBuddyMirrored() ?
-               metaBuddyGroupMapper.getPrimaryTargetID(outEntryInfo.getOwnerNodeID().val()) :
-               outEntryInfo.getOwnerNodeID().val();
+      auto getNodeID = [&metaBuddyGroupMapper] (const EntryInfo& e) -> NumNodeID {
+         return e.getIsBuddyMirrored() ?
+            NumNodeID(metaBuddyGroupMapper.getPrimaryTargetID(e.getOwnerNodeID().val())) :
+            e.getOwnerNodeID();
+      };
 
-      outOwnerHandle = metaNodes.referenceNode(NumNodeID(id));
+      if (doLookup) {
+         LookupIntentMsg msg(&outEntryInfo, path.back());
+         auto node = metaNodes.referenceNode(getNodeID(outEntryInfo));
+
+         const auto resp = MessagingTk::requestResponse(*node, msg, NETMSGTYPE_LookupIntentResp);
+         auto& respMsg = static_cast<LookupIntentRespMsg&>(*resp);
+
+         if (respMsg.getLookupResult() != FhgfsOpsErr_SUCCESS)
+            return false;
+         outEntryInfo = *respMsg.getEntryInfo();
+      }
+
+      outOwnerHandle = metaNodes.referenceNode(getNodeID(outEntryInfo));
    }
    else
    {
-      FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, useParent, &metaNodes, outOwnerHandle,
+      FhgfsOpsErr findRes = MetadataTk::referenceOwner(&path, &metaNodes, outOwnerHandle,
             &outEntryInfo, metaRoot, &metaBuddyGroupMapper);
       if(findRes != FhgfsOpsErr_SUCCESS)
       {

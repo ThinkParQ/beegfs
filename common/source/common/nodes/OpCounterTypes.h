@@ -18,7 +18,6 @@ enum MetaOpCounterTypes
    MetaOpCounter_ACK,
    MetaOpCounter_CLOSE,
    MetaOpCounter_GETENTRYINFO,
-   MetaOpCounter_GETNODEINFO,
    MetaOpCounter_FINDOWNER,
    MetaOpCounter_MKDIR,
    MetaOpCounter_MKFILE,
@@ -57,8 +56,7 @@ enum MetaOpCounterTypes
    MetaOpCounter_MIRROR, // any mirrored message. lump them all together
 
    // For compatibility new fields MUST be added directly above _OpCounterLastEnum
-   // NOTE: New types must also be added to admon/gui/common/enums/MetaOpsEnum.java
-   //       and MetaOpToStringMapping below.
+   // NOTE: New types must also be added to MetaOpToStringMapping below.
 
    MetaOpCounter_OpCounterLastEnum // This must be the last element (to get num of valid elems)
 };
@@ -91,14 +89,12 @@ enum StorageOpCounterTypes
    StorageOpCounter_HEARTBEAT,
    StorageOpCounter_REMOVENODE,
 
-   StorageOpCounter_GETNODEINFO,
    StorageOpCounter_REQUESTSTORAGEDATA,
 
    StorageOpCounter_UNLINK,
 
    // For compatibility new fields MUST be added directly above _OpCounterLastEnum
-   // NOTE: New types must also be added to admon/gui/common/enums/StorageOpsEnum.java
-   //       and StorageOpToStringMapping below.
+   // NOTE: New types must also be added to StorageOpToStringMapping below.
 
    StorageOpCounter_OpCounterLastEnum // must be the last element (to get num of valid elems)
 };
@@ -119,7 +115,6 @@ class OpToStringMapping
             case MetaOpCounter_ACK: return "ack";
             case MetaOpCounter_CLOSE: return "close";
             case MetaOpCounter_GETENTRYINFO: return "entInf";
-            case MetaOpCounter_GETNODEINFO: return "nodeInf";
             case MetaOpCounter_FINDOWNER: return "fndOwn";
             case MetaOpCounter_MKDIR: return "mkdir";
             case MetaOpCounter_MKFILE: return "create";
@@ -178,7 +173,6 @@ class OpToStringMapping
             case StorageOpCounter_GENERICDEBUG: return "gendbg";
             case StorageOpCounter_HEARTBEAT: return "hrtbeat";
             case StorageOpCounter_REMOVENODE: return "remNode";
-            case StorageOpCounter_GETNODEINFO: return "nodeInf";
             case StorageOpCounter_REQUESTSTORAGEDATA: return "storInf";
             case StorageOpCounter_UNLINK: return "unlnk";
          }

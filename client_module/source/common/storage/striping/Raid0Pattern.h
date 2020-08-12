@@ -35,7 +35,6 @@ struct Raid0Pattern
    StripePattern stripePattern;
 
    UInt16Vec stripeTargetIDs;
-   unsigned stripeSetSize; // = numStripeTargets * chunkSize
    unsigned defaultNumTargets;
 };
 
@@ -59,7 +58,6 @@ void Raid0Pattern_init(Raid0Pattern* this,
 
    this->defaultNumTargets = defaultNumTargets ? defaultNumTargets : 4;
 
-   this->stripeSetSize = UInt16Vec_length(stripeTargetIDs) * chunkSize;
 }
 
 /**

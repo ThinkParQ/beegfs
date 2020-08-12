@@ -284,8 +284,8 @@ void StreamListener::onIncomingStandardConnection(StandardSocket* sock)
       struct sockaddr_in peerAddr;
       socklen_t peerAddrLen = sizeof(peerAddr);
 
-      StandardSocket* acceptedSock =
-         (StandardSocket*)sock->accept( (struct sockaddr*)&peerAddr, &peerAddrLen);
+      std::unique_ptr<StandardSocket> acceptedSock(
+         (StandardSocket*)sock->accept( (struct sockaddr*)&peerAddr, &peerAddrLen));
 
       // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
       log.log(Log_DEBUG, std::string("Accepted new connection from " +
@@ -293,11 +293,11 @@ void StreamListener::onIncomingStandardConnection(StandardSocket* sock)
          std::string(" [SockFD: ") + StringTk::intToStr(acceptedSock->getFD() ) +
          std::string("]") );
 
-      applySocketOptions(acceptedSock);
+      applySocketOptions(acceptedSock.get());
 
       struct epoll_event epollEvent;
       epollEvent.events = EPOLLIN | EPOLLONESHOT | EPOLLET;
-      epollEvent.data.ptr = acceptedSock;
+      epollEvent.data.ptr = acceptedSock.get();
 
       if(epoll_ctl(this->epollFD, EPOLL_CTL_ADD, acceptedSock->getFD(), &epollEvent) == -1)
       {
@@ -305,7 +305,7 @@ void StreamListener::onIncomingStandardConnection(StandardSocket* sock)
             System::getErrString() );
       }
 
-      pollList.add(acceptedSock);
+      pollList.add(acceptedSock.release());
    }
    catch(SocketException& se)
    {

@@ -7,7 +7,7 @@
 #include <toolkit/XAttrTk.h>
 
 #include <sys/types.h>
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <dirent.h>
 
 #include "DiskMetaData.h"

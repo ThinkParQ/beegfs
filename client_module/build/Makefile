@@ -17,16 +17,23 @@ else
 BEEGFS_BUILDDIR := $(obj)
 endif
 
+$(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
 
 # The following section deals with the auto-detection of the kernel
 # build directory (KDIR)
 
-# Guess KDIR based on running kernel
-# (This is usually /lib/modules/<kernelversion>/build, but you can specify
-# multiple directories here as a space-separated list)
+# Guess KDIR based on running kernel.
+# - "/usr/src/linux-headers-*" for Ubuntu
+# - "/usr/src/kernels/*" for RHEL
+# - "/lib/modules/*/build" for Debian, SLES
 ifeq ($(KDIR),)
-KDIR = /lib/modules/$(shell uname -r)/build /usr/src/linux-headers-$(shell uname -r) \
-       /usr/src/kernels/$(shell uname -r)
+override KDIR = \
+	/lib/modules/$(shell uname -r)/build \
+	/lib/modules/default/build \
+	/usr/src/linux-headers-$(shell uname -r) \
+	/usr/src/linux-headers-default \
+	/usr/src/kernels/$(shell uname -r) \
+	/usr/src/kernels/default
 endif
 
 # Prune the KDIR list down to paths that exist and have an
@@ -104,6 +111,10 @@ BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h
 $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
 	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
+endif
+
+ifneq ($(OFED_INCLUDE_PATH),)
+BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 endif
 
 # OFED API version

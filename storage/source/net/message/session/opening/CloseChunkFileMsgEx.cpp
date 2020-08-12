@@ -50,9 +50,6 @@ std::pair<FhgfsOpsErr, CloseChunkFileMsgEx::DynamicAttribs> CloseChunkFileMsgEx:
 
    SessionLocalFileStore* sessionLocalFiles;
 
-   bool sessionRemoved;
-   std::shared_ptr<SessionLocalFile::Handle> fsState;
-
    // select the right targetID
 
    targetID = getTargetID();
@@ -82,22 +79,12 @@ std::pair<FhgfsOpsErr, CloseChunkFileMsgEx::DynamicAttribs> CloseChunkFileMsgEx:
    auto session = sessions->referenceOrAddSession(getSessionID());
    sessionLocalFiles = session->getLocalFiles();
 
-   std::tie(sessionRemoved, fsState) = sessionLocalFiles->removeSession(fileHandleID, targetID,
-         isMirrorSession);
-   if (!sessionRemoved)
-   { // error
-      LogContext(logContext).log(Log_DEBUG,
-         "Cannot close chunk file (still in use, marked for delayed close). "
-         "SessionID: " + getSessionID().str() + "; "
-         "FileHandleID: " + fileHandleID);
-
-      closeMsgRes = FhgfsOpsErr_INUSE;
-   }
+   auto fsState = sessionLocalFiles->removeSession(fileHandleID, targetID, isMirrorSession);
 
    // get current dynamic file attribs
 
    if (fsState)
-   { // file open => refresh filesize and close file fd
+   { // file no longer in use => refresh filesize and close file fd
       auto& fd = fsState->getFD();
 
       /* get dynamic attribs, here before closing the file.
@@ -121,7 +108,7 @@ std::pair<FhgfsOpsErr, CloseChunkFileMsgEx::DynamicAttribs> CloseChunkFileMsgEx:
    }
    else
    if(!isMsgHeaderFeatureFlagSet(CLOSECHUNKFILEMSG_FLAG_NODYNAMICATTRIBS) )
-   { // file not open but exists => get dynamic attribs by path
+   { // file still in use by other threads => get dynamic attribs by path
 
       bool getRes = getDynamicAttribsByPath(fileHandleID, targetID, dynAttribs);
       if (getRes)

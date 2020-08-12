@@ -24,12 +24,30 @@
 #include <linux/uio.h>
 #endif
 
-#ifndef iov_for_each
-#define iov_for_each(iov, iter, start)                          \
-        for (iter = (start);                                    \
-             (iter).count &&                                    \
-             ((iov = iov_iter_iovec(&(iter))), 1);              \
-             iov_iter_advance(&(iter), (iov).iov_len))
+#ifndef KERNEL_HAS_IOV_ITER_TYPE
+#ifdef KERNEL_HAS_ITER_KVEC
+static inline int iov_iter_type(const struct iov_iter *i)
+{
+   return i->type & ~(READ | WRITE);
+}
+#endif
+#endif
+
+
+#ifdef KERNEL_HAS_ITER_KVEC
+#define beegfs_iov_for_each(iov, iter, start)       \
+   if ((iov_iter_type(start) == ITER_IOVEC) ||      \
+       (iov_iter_type(start) == ITER_KVEC))         \
+   for (iter = (*start);                            \
+        (iter).count &&                             \
+        ((iov = iov_iter_iovec(&(iter))), 1);       \
+          iov_iter_advance(&(iter), (iov).iov_len))
+#else
+#define beegfs_iov_for_each(iov, iter, start)       \
+   for (iter = (*start);                            \
+        (iter).count &&                             \
+        ((iov = iov_iter_iovec(&(iter))), 1);       \
+          iov_iter_advance(&(iter), (iov).iov_len))
 #endif
 
 #if !defined(KERNEL_HAS_IOV_ITER_IOVEC)

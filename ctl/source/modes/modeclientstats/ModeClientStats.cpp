@@ -186,7 +186,9 @@ void ModeClientStats::loop()
          sumOpsList = clientOps.getAbsoluteSumOpsList();
       }
 
-      if (!idOpsMap.empty())
+     auto idOpsVector = sortedVectorByOpsSum(idOpsMap);
+
+     if (!idOpsVector.empty())
       {
          if (filter.empty() && maxLines == 0)
          {
@@ -196,8 +198,8 @@ void ModeClientStats::loop()
          }
 
          unsigned lineCounter = 0;
-         auto opsMapIter = idOpsMap.begin();
-         while (opsMapIter != idOpsMap.end() && (lineCounter < maxLines || maxLines == 0))
+         auto opsMapIter = idOpsVector.begin();
+         while (opsMapIter != idOpsVector.end() && (lineCounter < maxLines || maxLines == 0))
          {
             std::string id;
             if (perUser)
@@ -255,6 +257,26 @@ void ModeClientStats::loop()
 }
 
 /**
+ * Convert the map (key=user/client id, value=ops list) to a list sorted by sum of operations.
+ * We want to print the operations table sorted by the sum.
+ */
+std::vector<std::pair<int64_t, ClientOps::OpsList>>
+ModeClientStats::sortedVectorByOpsSum(const ClientOps::IdOpsMap &idOpsMap) const
+{
+   std::vector<std::pair<int64_t, ClientOps::OpsList>> idOpsList(idOpsMap.begin(), idOpsMap.end());
+   std::stable_sort(idOpsList.begin(), idOpsList.end(),
+         [](auto &v1, auto &v2) {
+            if(v2.second.empty())
+               return true;
+            if(v1.second.empty())
+               return false;
+            return *v1.second.begin() > *v2.second.begin();
+         }
+   );
+   return idOpsList;
+}
+
+/**
  * Parses and prints one list ops opCounters
  *
  * @return OK if all opValues are >= 0 and at least one > 0, EMPTY if all opValues are = 0,
@@ -288,7 +310,7 @@ ModeClientStats::ParseResult ModeClientStats::parseAndPrintOpsList(
                amount /= 1024*1024;
                opName = "Mi" + opName;
             }
-            if (!perInterval)
+            if (!perInterval && interval != 0)
             {
                amount /= interval;
                opName += "/s";

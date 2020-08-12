@@ -16,7 +16,8 @@ TEST_F(TestSet, open)
       try {
          Set<Data> set(this->fileName);
       } catch (const std::runtime_error& e) {
-         ASSERT_EQ(std::string(e.what()), "cannot read this database version");
+         ASSERT_NE(std::string(e.what()).find("cannot read set"), std::string::npos);
+         ASSERT_NE(std::string(e.what()).find("with version 0"), std::string::npos);
          break;
       }
 
@@ -27,7 +28,7 @@ TEST_F(TestSet, open)
       try {
          Set<Data> set(this->fileName);
       } catch (const std::runtime_error& e) {
-         ASSERT_EQ(std::string(e.what()), "bad set description");
+         ASSERT_NE(std::string(e.what()).find("bad set description"), std::string::npos);
          break;
       }
 
@@ -49,7 +50,7 @@ TEST_F(TestSet, open)
       try {
          Set<Data> set(this->fileName);
       } catch (const std::runtime_error& e) {
-         ASSERT_EQ(std::string(e.what()), "bad set description");
+         ASSERT_NE(std::string(e.what()).find("bad set description"), std::string::npos);
          break;
       }
 

@@ -7,7 +7,7 @@
 #include <array>
 #include <memory>
 
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <cerrno>
 
 namespace XAttrTk
@@ -73,7 +73,7 @@ std::tuple<FhgfsOpsErr, std::vector<char>, ssize_t> getXAttr(const std::string& 
 
    switch (errno)
    {
-      case ENOATTR:
+      case ENODATA:
          return std::make_tuple(FhgfsOpsErr_NODATA, std::vector<char>(), ssize_t(0));
 
       case ERANGE:
@@ -126,7 +126,7 @@ FhgfsOpsErr setUserXAttr(const std::string& path, const std::string& name, const
    // ideally we would want to use one mutex per worker thread, and ensure that each path has its
    // own mutex, but that's not possible. using 1024 mutexes (more than one per worker, in the
    // default configuration) and hashed pathnames is pretty much the best we can do here.
-   if (res < 0 && limitXAttrListLength && errno == ENOATTR && !(flags & XATTR_REPLACE))
+   if (res < 0 && limitXAttrListLength && errno == ENODATA && !(flags & XATTR_REPLACE))
    {
       static std::array<Mutex, 1024> mutexHash;
 
@@ -151,7 +151,7 @@ FhgfsOpsErr setUserXAttr(const std::string& path, const std::string& name, const
       case EEXIST:
          return FhgfsOpsErr_EXISTS;
 
-      case ENOATTR:
+      case ENODATA:
          return FhgfsOpsErr_NODATA;
 
       case ERANGE:
@@ -179,7 +179,7 @@ FhgfsOpsErr removeUserXAttr(const std::string& path, const std::string& name)
 
    switch (errno)
    {
-      case ENOATTR:
+      case ENODATA:
          return FhgfsOpsErr_NODATA;
 
       case ERANGE:
