@@ -13,7 +13,7 @@
 class CurlWrapper
 {
    public:
-      CurlWrapper(std::chrono::milliseconds timeout);
+      CurlWrapper(std::chrono::milliseconds timeout, bool checkSSLCertificates);
 
       CurlWrapper(const CurlWrapper&) = delete;
       CurlWrapper& operator=(const CurlWrapper&) = delete;

@@ -2,7 +2,7 @@
 
 #include <exception/CurlException.h>
 
-CurlWrapper::CurlWrapper(std::chrono::milliseconds timeout) :
+CurlWrapper::CurlWrapper(std::chrono::milliseconds timeout, bool checkSSLCertificates) :
    curlHandle(curl_easy_init(), &curl_easy_cleanup)
 {
    if (curlHandle.get() == NULL)
@@ -27,6 +27,15 @@ CurlWrapper::CurlWrapper(std::chrono::milliseconds timeout) :
    if (curl_easy_setopt(curlHandle.get(), CURLOPT_CONNECTTIMEOUT_MS,
          timeout.count()) != CURLE_OK)
       throw CurlException(errorBuffer);
+
+   if (!checkSSLCertificates)
+   {
+      if (curl_easy_setopt(curlHandle.get(), CURLOPT_SSL_VERIFYPEER, 0) != CURLE_OK)
+         throw CurlException(errorBuffer);
+
+      if (curl_easy_setopt(curlHandle.get(), CURLOPT_SSL_VERIFYHOST, 0) != CURLE_OK)
+         throw CurlException(errorBuffer);
+   }
 }
 
 unsigned short CurlWrapper::sendGetRequest(const std::string& url, const ParameterMap& parameters)

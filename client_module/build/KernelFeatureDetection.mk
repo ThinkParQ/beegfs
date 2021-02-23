@@ -41,6 +41,14 @@ KERNEL_FEATURE_DETECTION += $(shell \
       | grep -qs "const struct ib_cq_init_attr \*cq_attr);" \
       && echo "-DOFED_HAS_IB_CREATE_CQATTR")
 
+# Find out whether rdma_reject function has reason argument
+# This is tricky because the function declaration spans multiple lines.
+# Note: Was introduced in MLNX OFED 5.1
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -sA1 "int rdma_reject(" ${OFED_DETECTION_PATH}/rdma/rdma_cm.h 2>&1 \
+      | grep -qs "u8 reason);" \
+      && echo "-DOFED_RDMA_REJECT_NEEDS_REASON")
+
 # kernels >=v4.4 expect a netns argument for rdma_create_id
 KERNEL_FEATURE_DETECTION += $(shell \
    grep -qs "struct rdma_cm_id \*rdma_create_id.struct net \*net," \
@@ -57,6 +65,11 @@ KERNEL_FEATURE_DETECTION += $(shell \
    grep -qs -F "IB_PD_UNSAFE_GLOBAL_RKEY" \
       ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
       && echo "-DOFED_UNSAFE_GLOBAL_RKEY")
+
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -qs -F "static inline void ib_destroy_cq" \
+      ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
+      && echo "-DOFED_IB_DESTROY_CQ_IS_VOID")
 
 # Find out whether the kernel has a scsi/fc_compat.h file, which defines
 # vlan_dev_vlan_id.
@@ -293,7 +306,6 @@ $(call define_if_matches, KERNEL_HAS_CURRENT_FS_TIME, "current_fs_time", fs.h)
 $(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64[[:space:]]\+i_atime;", fs.h)
 $(call define_if_matches, KERNEL_HAS_KTIME_GET, "ktime_get_real_ts64", timekeeping.h)
 $(call define_if_matches, KERNEL_HAS_SB_NODIRATIME, "SB_NODIRATIME", fs.h)
-$(call define_if_matches, KERNEL_IB_DESTROY_CQ_IS_VOID, "static inline void ib_destroy_cq", ../rdma/ib_verbs.h)
 
 # inodeChangeRes was changed to setattr_prepare in vanilla 4.9
 $(call define_if_matches, KERNEL_HAS_SETATTR_PREPARE, "int setattr_prepare", fs.h)
@@ -307,3 +319,5 @@ KERNEL_FEATURE_DETECTION += $(shell \
 
 $(call define_if_matches, KERNEL_ACCESS_OK_WANTS_TYPE, "define access_ok(type, addr, size)" \
    $(KSRCDIR_PRUNED_HEAD)/include/asm-generic/uaccess.h)
+
+$(call define_if_matches, KERNEL_SPIN_RELEASE_HAS_3_ARGUMENTS, "\#define spin_release(l, n, i)", lockdep.h)

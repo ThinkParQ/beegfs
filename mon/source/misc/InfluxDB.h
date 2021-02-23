@@ -23,6 +23,7 @@ class InfluxDB : public TSDatabase
          unsigned maxPointsPerRequest;
          bool setRetentionPolicy;
          std::string retentionDuration;
+         bool curlCheckSSLCertificates;
       };
 
       InfluxDB(Config config);

@@ -17,6 +17,10 @@ else
 BEEGFS_BUILDDIR := $(obj)
 endif
 
+ifeq ($(KRELEASE),)
+KRELEASE := $(shell uname -r)
+endif
+
 $(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
 
 # The following section deals with the auto-detection of the kernel
@@ -28,11 +32,11 @@ $(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
 # - "/lib/modules/*/build" for Debian, SLES
 ifeq ($(KDIR),)
 override KDIR = \
-	/lib/modules/$(shell uname -r)/build \
+	/lib/modules/$(KRELEASE)/build \
 	/lib/modules/default/build \
-	/usr/src/linux-headers-$(shell uname -r) \
+	/usr/src/linux-headers-$(KRELEASE) \
 	/usr/src/linux-headers-default \
-	/usr/src/kernels/$(shell uname -r) \
+	/usr/src/kernels/$(KRELEASE) \
 	/usr/src/kernels/default
 endif
 
@@ -75,7 +79,7 @@ KSRCDIR_PRUNED_HEAD := $(firstword $(KSRCDIR_PRUNED) )
 # Include kernel feature auto-detectors
 include KernelFeatureDetection.mk
 
-KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(shell uname -r)/updates/fs/beegfs
+KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(KRELEASE)/updates/fs/beegfs
 
 # Prepare CFLAGS:
 # (Note: "-Wsign-compare" included in "-Wextra", but must be explicit here,
@@ -205,7 +209,7 @@ endif
 
 install:
 	install -D -m 644 $(TARGET).ko $(KMOD_INST_DIR)/$(TARGET).ko
-	depmod -a
+	depmod -a $(KRELEASE)
 
 clean:
 	rm -f *~ .${TARGET}??*
@@ -226,8 +230,12 @@ help:
 	@echo '    The path to the client release directory.'
 	@echo ' '
 	@echo 'client Arguments (optional):'
+	@echo '   KRELEASE=<release>: Kernel release'
+	@echo '     (The output of "uname -r" will be used if undefined.'
+	@echo '      This option is useful when building for a kernel different'
+	@echo '      from the one currently running (e.g. in a chroot).)'
 	@echo '   KDIR=<path>: Kernel build directory.'
-	@echo '     (Will be guessed based on running kernel if undefined.)'
+	@echo '     (Will be guessed based on running kernel or KRELEASE if undefined.)'
 	@echo '   KSRCDIR=<path>: Kernel source directory containing the kernel include '
 	@echo '     directory. (Will be guessed based on KDIR if undefined.)'
 	@echo '   BEEGFS_DEBUG=1:'

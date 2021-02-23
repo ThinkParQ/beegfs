@@ -37,9 +37,12 @@ static inline int sk_has_sleeper(struct sock* sk)
 }
 #endif
 
-#ifndef __wake_up_sync_key
-# define __wake_up_sync_key(wq, state, n, key) __wake_up_sync(wq, state, n)
+#if defined(KERNEL_WAKE_UP_SYNC_KEY_HAS_3_ARGUMENTS)
+# define __wake_up_sync_key_m(wq, state, key) __wake_up_sync_key(wq, state, key)
+#else
+# define __wake_up_sync_key_m(wq, state, key) __wake_up_sync_key(wq, state, 1, key)
 #endif
+
 
 /* unlike linux sock_def_readable, this will also wake TASK_KILLABLE threads. we need this
  * for SocketTk_poll, which wants to wait for fatal signals only. */
@@ -53,7 +56,7 @@ static void sock_readable(struct sock *sk)
    read_lock(&sk->sk_callback_lock);
    if (sk_has_sleeper(sk))
    {
-      __wake_up_sync_key(sk->sk_sleep, TASK_NORMAL, 1,
+      __wake_up_sync_key_m(sk->sk_sleep, TASK_NORMAL,
             (void*) (POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND));
    }
    read_unlock(&sk->sk_callback_lock);
@@ -64,7 +67,7 @@ static void sock_readable(struct sock *sk)
    wq = rcu_dereference(sk->sk_wq);
    if (__sock_has_sleeper(wq))
    {
-      __wake_up_sync_key(&wq->wait, TASK_NORMAL, 1,
+      __wake_up_sync_key_m(&wq->wait, TASK_NORMAL,
             (void*) (POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND));
    }
    rcu_read_unlock();
@@ -81,7 +84,7 @@ static void sock_write_space(struct sock *sk)
 
    if (sk_has_sleeper(sk))
    {
-      __wake_up_sync_key(sk->sk_sleep, TASK_NORMAL, 1,
+      __wake_up_sync_key_m(sk->sk_sleep, TASK_NORMAL,
             (void*) (POLLOUT | POLLWRNORM | POLLWRBAND));
    }
 
@@ -93,7 +96,7 @@ static void sock_write_space(struct sock *sk)
 
    wq = rcu_dereference(sk->sk_wq);
    if (__sock_has_sleeper(wq))
-      __wake_up_sync_key(&wq->wait, TASK_NORMAL, 1, (void*) (POLLOUT | POLLWRNORM | POLLWRBAND));
+      __wake_up_sync_key_m(&wq->wait, TASK_NORMAL, (void*) (POLLOUT | POLLWRNORM | POLLWRBAND));
 
    rcu_read_unlock();
 #endif
@@ -124,7 +127,7 @@ static void sock_error_report(struct sock *sk)
 #ifdef KERNEL_HAS_SK_SLEEP
    read_lock(&sk->sk_callback_lock);
    if (sk_has_sleeper(sk))
-      __wake_up_sync_key(sk->sk_sleep, TASK_NORMAL, 1, (void*) (POLLERR));
+      __wake_up_sync_key_m(sk->sk_sleep, TASK_NORMAL, (void*) (POLLERR));
    read_unlock(&sk->sk_callback_lock);
 #else
    struct socket_wq *wq;
@@ -132,7 +135,7 @@ static void sock_error_report(struct sock *sk)
    rcu_read_lock();
    wq = rcu_dereference(sk->sk_wq);
    if (__sock_has_sleeper(wq))
-      __wake_up_sync_key(&wq->wait, TASK_NORMAL, 1, (void*) (POLLERR));
+      __wake_up_sync_key_m(&wq->wait, TASK_NORMAL, (void*) (POLLERR));
    rcu_read_unlock();
 #endif
 }

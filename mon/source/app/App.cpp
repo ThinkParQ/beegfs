@@ -146,6 +146,7 @@ void App::initDataObjects()
       influxdbConfig.setRetentionPolicy = cfg->getInfluxDbSetRetentionPolicy();
       influxdbConfig.retentionDuration = cfg->getInfluxDbRetentionDuration();
       influxdbConfig.httpTimeout = cfg->getHttpTimeout();
+      influxdbConfig.curlCheckSSLCertificates = cfg->getCurlCheckSSLCertificates();
 
       tsdb = boost::make_unique<InfluxDB>(std::move(influxdbConfig));
    }

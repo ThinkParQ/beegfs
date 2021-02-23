@@ -14,6 +14,9 @@ else
 BEEGFS_BUILDDIR := $(obj)
 endif
 
+ifeq ($(KRELEASE),)
+KRELEASE := $(shell uname -r)
+endif
 
 # The following section deals with the auto-detection of the kernel
 # build directory (KDIR)
@@ -22,8 +25,8 @@ endif
 # (This is usually /lib/modules/<kernelversion>/build, but you can specify
 # multiple directories here as a space-separated list)
 ifeq ($(KDIR),)
-KDIR = /lib/modules/$(shell uname -r)/build /usr/src/linux-headers-$(shell uname -r) \
-       /usr/src/kernels/$(shell uname -r)
+KDIR = /lib/modules/$(KRELEASE)/build /usr/src/linux-headers-$(KRELEASE) \
+       /usr/src/kernels/$(KRELEASE)
 endif
 
 # Prune the KDIR list down to paths that exist and have an
@@ -61,7 +64,7 @@ KSRCDIR_PRUNED := $(foreach dir, $(KSRCDIR), $(test_dir) )
 # We use the first valid entry of the pruned KSRCDIR list
 KSRCDIR_PRUNED_HEAD := $(firstword $(KSRCDIR_PRUNED) )
 
-KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(shell uname -r)/updates/fs/beegfs_autobuild
+KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(KRELEASE)/updates/fs/beegfs_autobuild
 
 # Include kernel feature auto-detectors
 include KernelFeatureDetection.mk
@@ -151,7 +154,7 @@ include AutoRebuild.mk # adds auto_rebuild targets
 
 install:
 	install -D -m 644 $(TARGET).ko $(KMOD_INST_DIR)/$(TARGET).ko
-	depmod -a
+	depmod -a $(KRELEASE)
 
 
 
@@ -172,8 +175,12 @@ help:
 	@echo "This makefile creates the kernel module: $(TARGET) (beegfs-client)"
 	@echo ' '
 	@echo 'client Arguments (optional):'
+	@echo '  KRELEASE=<release>: Kernel release'
+	@echo '    (The output of "uname -r" will be used if undefined.'
+	@echo '     This option is useful when building for a kernel different'
+	@echo '     from the one currently running (e.g. in a chroot).)'
 	@echo '  KDIR=<path>: Kernel build directory.'
-	@echo '    (Will be guessed based on running kernel if undefined.)'
+	@echo '    (Will be guessed based on running kernel or KRELEASE if undefined.)'
 	@echo '  KSRCDIR=<path>: Kernel source directory containing the kernel include files.'
 	@echo '    (Will be guessed based on KDIR if undefined.)'
 	@echo '   TARGET=<MODULE_NAME>'

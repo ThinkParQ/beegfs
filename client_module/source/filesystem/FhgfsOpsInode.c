@@ -1137,6 +1137,7 @@ int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, int createMo
    // clean-up
 
    LookupIntentInfoOut_uninit(&lookupOutInfo);
+   FileEvent_uninit(&event);
 
    retVal = 0; // success
 

@@ -15,7 +15,7 @@ WITHOUT_COMM_DEBUG = true
 # debian epoch for unversioned builds (usually dev builds) is 19 because it was 18 previously.
 # versioned builds (usually from tags) are set to epoch 20, allowing upgrades from all previous versions.
 ifndef BEEGFS_VERSION
-  BEEGFS_VERSION := $(shell git describe --match '*.*' --abbrev=10)
+  BEEGFS_VERSION := $(shell git describe --tags --match '*.*' --abbrev=10)
   BEEGFS_EPOCH := 19
 else
   BEEGFS_EPOCH := 20
@@ -179,4 +179,3 @@ package-rpm: clean
 		--define 'EPOCH $(BEEGFS_EPOCH)' \
 		--define 'BEEGFS_VERSION $(BEEGFS_VERSION_RPM)' \
 		$(RPMBUILD_OPTS)
-

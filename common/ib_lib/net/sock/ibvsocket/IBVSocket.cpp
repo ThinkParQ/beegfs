@@ -960,7 +960,8 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    }
 
    commContext->recvCQ = ibv_create_cq(
-      commContext->context, commCfg->bufNum, commContext, commContext->recvCompChannel, 0);
+      commContext->context, commCfg->bufNum, commContext, commContext->recvCompChannel,
+      rand()%commContext->context->num_comp_vectors);
    if(!commContext->recvCQ)
    {
       LOG(SOCKLIB, WARNING, "Couldn't create recv CQ.");
@@ -969,7 +970,8 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
 
    // note: 1+commCfg->bufNum here for the RDMA write usedBufs reset work (=> flow/flood control)
    commContext->sendCQ = ibv_create_cq(
-      commContext->context, 1+commCfg->bufNum, NULL, NULL, 0);
+      commContext->context, 1+commCfg->bufNum, NULL, NULL, 
+      rand()%commContext->context->num_comp_vectors);
    if(!commContext->sendCQ)
    {
       LOG(SOCKLIB, WARNING, "Couldn't create send CQ.");

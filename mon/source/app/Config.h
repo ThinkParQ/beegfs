@@ -37,6 +37,7 @@ class Config : public AbstractConfig
       std::chrono::milliseconds httpTimeout;
       std::chrono::seconds statsRequestInterval;
       std::chrono::seconds nodelistRequestInterval;
+      bool curlCheckSSLCertificates;
 
       virtual void loadDefaults(bool addDashes) override;
       virtual void applyConfigMap(bool enableException, bool addDashes) override;
@@ -133,6 +134,11 @@ class Config : public AbstractConfig
       const std::chrono::seconds& getNodelistRequestInterval() const
       {
          return nodelistRequestInterval;
+      }
+
+      bool getCurlCheckSSLCertificates() const
+      {
+         return curlCheckSSLCertificates;
       }
 };
 

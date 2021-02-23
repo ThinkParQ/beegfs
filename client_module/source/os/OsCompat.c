@@ -331,7 +331,11 @@ resume:
 
 		if (!list_empty(&dentry->d_subdirs)) {
 			spin_unlock(&this_parent->d_lock);
+#if defined(KERNEL_SPIN_RELEASE_HAS_3_ARGUMENTS)
 			spin_release(&dentry->d_lock.dep_map, 1, _RET_IP_);
+#else
+			spin_release(&dentry->d_lock.dep_map, _RET_IP_);
+#endif
 			this_parent = dentry;
 			spin_acquire(&this_parent->d_lock.dep_map, 0, 1, _RET_IP_);
 			goto repeat;

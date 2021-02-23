@@ -2,7 +2,7 @@
 
 set -e
 
-CFLAGS="-D__KERNEL__ $LINUXINCLUDE $KBUILD_CFLAGS $KBUILD_CPPFLAGS -DKBUILD_BASENAME=\"beegfs\""
+CFLAGS="-D__KERNEL__ $LINUXINCLUDE $KBUILD_CFLAGS $KBUILD_CPPFLAGS -DKBUILD_BASENAME=\"beegfs\" -DKBUILD_MODNAME=\"beegfs\""
 
 _generate_includes() {
    for i in "$@"; do
@@ -182,6 +182,11 @@ check_function \
    sk_has_sleeper "int (struct sock*)" \
    KERNEL_HAS_SK_HAS_SLEEPER \
    net/sock.h
+
+check_function \
+   __wake_up_sync_key "void (struct wait_queue_head* , unsigned int, void*)" \
+   KERNEL_WAKE_UP_SYNC_KEY_HAS_3_ARGUMENTS \
+   linux/wait.h
 
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to

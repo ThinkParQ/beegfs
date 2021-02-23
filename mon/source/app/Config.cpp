@@ -48,6 +48,8 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("statsRequestIntervalSecs",   "5");
    configMapRedefine("nodelistRequestIntervalSecs","30");
 
+   configMapRedefine("curlCheckSSLCertificates",   "true");
+
 }
 
 void Config::applyConfigMap(bool enableException, bool addDashes)
@@ -138,6 +140,9 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       else
       if (iter->first == std::string("nodelistRequestIntervalSecs"))
          nodelistRequestInterval = std::chrono::seconds(StringTk::strToUInt(iter->second));
+      else
+      if (iter->first == std::string("curlCheckSSLCertificates"))
+         curlCheckSSLCertificates = StringTk::strToBool(iter->second);
       else
       {
          unknownElement = true;

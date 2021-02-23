@@ -707,7 +707,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
 
 
    if(commContext->sendCQ)
-#ifdef KERNEL_IB_DESTROY_CQ_IS_VOID
+#ifdef OFED_IB_DESTROY_CQ_IS_VOID
       ib_destroy_cq(commContext->sendCQ);
 #else
    {
@@ -721,7 +721,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
 #endif
 
    if(commContext->recvCQ)
-#ifdef KERNEL_IB_DESTROY_CQ_IS_VOID
+#ifdef OFED_IB_DESTROY_CQ_IS_VOID
       ib_destroy_cq(commContext->recvCQ);
 #else
    {
@@ -1649,7 +1649,11 @@ int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event
 
       case RDMA_CM_EVENT_CONNECT_REQUEST:
          // incoming connections not supported => reject all
-         rdma_reject(cm_id, NULL, 0);
+         #ifdef OFED_RDMA_REJECT_NEEDS_REASON
+            rdma_reject(cm_id, NULL, 0, 0);
+         #else
+            rdma_reject(cm_id, NULL, 0);
+         #endif // OFED_RDMA_REJECT_NEEDS_REASON
          break;
 
       case RDMA_CM_EVENT_CONNECT_RESPONSE:
@@ -1840,7 +1844,7 @@ struct ib_cq* __IBVSocket_createCompletionQueue(struct ib_device* device,
    #elif defined OFED_HAS_IB_CREATE_CQATTR || defined ib_create_cq
       struct ib_cq_init_attr attrs = {
          .cqe = cqe,
-         .comp_vector = 0,
+         .comp_vector = get_random_int()%device->num_comp_vectors,
       };
 
       return ib_create_cq(device, comp_handler, event_handler, cq_context, &attrs);
