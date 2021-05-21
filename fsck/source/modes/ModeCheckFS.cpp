@@ -630,10 +630,9 @@ int64_t ModeCheckFS::checkAndRepairOrphanedChunk()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
-      FsckRepairAction_DELETECHUNK,
    };
 
-   UserPrompter prompt(possibleActions, FsckRepairAction_DELETECHUNK);
+   UserPrompter prompt(possibleActions, FsckRepairAction_NOTHING);
    RepairChunkState state = { &prompt, "", FsckRepairAction_UNDEFINED };
 
    FsckTkEx::fsckOutput("* Checking: Chunk without an inode pointing to it (orphaned chunk) ...",

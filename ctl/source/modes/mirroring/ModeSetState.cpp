@@ -3,6 +3,8 @@
 #include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
 #include <common/net/message/nodes/SetTargetConsistencyStatesRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
+#include <common/toolkit/UiTk.h>
+
 #include <program/Program.h>
 
 #define MODESETSTATE_ARG_TARGETID   "--targetid"
@@ -108,6 +110,12 @@ int ModeSetState::execute()
    }
 
    if (ModeHelper::checkInvalidArgs(cfg))
+      return APPCODE_INVALID_CONFIG;
+
+   if (!uitk::userYNQuestion("WARNING!\n\nThis command is very dangerous and can cause serious data "
+         "loss.\n"
+         "It should not be used under normal circumstances. It is absolutely recommended to contact "
+         "support before proceeding."))
       return APPCODE_INVALID_CONFIG;
 
    return doSet(cfgTargetID, cfgState);

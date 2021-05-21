@@ -1,4 +1,6 @@
 BeeGFS (formerly known as FhGFS) END USER LICENSE AGREEMENT
+===========================================================
+
 March 02, 2016
 
 
@@ -11,7 +13,7 @@ THIS LICENSE, DO NOT INSTALL, COPY, OR USE THE SOFTWARE.
 
 1.1) LICENSOR: Fraunhofer Gesellschaft zur Foerderung der angewandten Forschung
 e.V., Hansastr. 27c, 80686 Muenchen, Germany, as legal entity of Fraunhofer-
-Institut fuer Techno- und Wirtschaftsmathematik, Fraunhofer-Platz 1, 
+Institut fuer Techno- und Wirtschaftsmathematik, Fraunhofer-Platz 1,
 67663 Kaiserslautern, Germany.
 
 1.2) LICENSEE: The user of BEEGFS under this License Agreement.
@@ -123,3 +125,36 @@ unaffected. In such a case, the parties shall replace the invalid or
 unenforceable condition by another legally effective provision meeting the
 purpose of the abolished provision to the greatest extent. The same applies in
 case of a gap of regulation.
+
+
+
+THIRD PARTY LICENSES
+====================
+
+Paul Hsieh OLD BSD license
+--------------------------
+
+Copyright (c) 2010, Paul Hsieh All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are mitted
+provided that the following conditions are met:
+
+   Redistributions of source code must retain the above copyright notice, this list of
+   conditions and the following disclaimer.
+
+   Redistributions in binary form must reproduce the above copyright notice, this list of
+   conditions and the following disclaimer in the documentation and/or other materials vided
+   with the distribution.
+
+   Neither my name, Paul Hsieh, nor the names of any other contributors to the code use may
+   be used to endorse or promote products derived from this software without specific prior
+   written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR SEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF ,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING ANY
+WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

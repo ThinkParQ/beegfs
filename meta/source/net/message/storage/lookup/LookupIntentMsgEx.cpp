@@ -32,6 +32,18 @@ std::tuple<DirIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(EntryL
       dirLock = {&store, getParentInfo()->getEntryID(), false};
       fileLock = {&store, entryID};
    }
+   else
+   {
+      //For all the other flags, take parent lock if parenEntryID is not
+      //empty and fileID lock.
+      const std::string& parentEntryID = getParentInfo()->getEntryID();
+      if (!parentEntryID.empty())
+      {
+         dirLock = {&store, getParentInfo()->getEntryID(), true};
+         dentryLock = {&store, getParentInfo()->getEntryID(), getEntryName()};
+      }
+      fileLock = {&store, entryID};
+   }
 
    return std::make_tuple(std::move(dirLock), std::move(dentryLock), std::move(fileLock));
 }

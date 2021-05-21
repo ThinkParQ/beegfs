@@ -107,9 +107,8 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
       if (getEntryInfo()->getIsBuddyMirrored() && getMaxUsedNodeIndex() >= 0)
          addMsgHeaderFeatureFlag(CLOSEFILEMSG_FLAG_DYNATTRIBS);
 
-      // send response
-      // (caller won't be interested in the unlink result below, so no reason to wait for that)
-      earlyComplete(ctx, ResponseState(closeRes));
+      //Avoid sending early response. Let unlink of Disposal file happens.
+      //with Locks held.
    }
 
    if (closeSucceeded && Program::getApp()->getFileEventLogger() && getFileEvent())
@@ -134,6 +133,11 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
       MsgHelperClose::unlinkDisposableFile(entryInfo->getEntryID(), getMsgHeaderUserID(),
             entryInfo->getIsBuddyMirrored());
    }
+
+   //for alternative 2: forward the operation to secondary through earlyComplete only
+   //after unlinkDisposalFile on primary is complete.
+   if(!isMsgHeaderFeatureFlagSet(CLOSEFILEMSG_FLAG_EARLYRESPONSE))
+      earlyComplete(ctx, ResponseState(closeRes));
 
    return {};
 }

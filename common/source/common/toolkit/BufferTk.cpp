@@ -1,15 +1,37 @@
+// Paul Hsiehs hash function, available under http://www.azillionmonkeys.com/qed/hash.html
+
+
+// Paul Hsieh OLD BSD license
+
+// Copyright (c) 2010, Paul Hsieh All rights reserved.
+
+// Redistribution and use in source and binary forms, with or without modification, are permitted
+// provided that the following conditions are met:
+
+//     Redistributions of source code must retain the above copyright notice, this list of
+//     conditions and the following disclaimer.
+
+//     Redistributions in binary form must reproduce the above copyright notice, this list of
+//     conditions and the following disclaimer in the documentation and/or other materials provided
+//     with the distribution.
+
+//     Neither my name, Paul Hsieh, nor the names of any other contributors to the code use may not
+//     be used to endorse or promote products derived from this software without specific prior
+//     written permission.
+
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR
+// IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+// FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+// WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
+// WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "BufferTk.h"
 
 #define get16bits(d) (*((const uint16_t *) (d)))
 
-
-/**
- * Note: This is the Hsieh hash function, which is available under old BSD-style license.
- * (It performs very well on x86 and PowerPC archs compared to other famous hash functions.)
- *
- * @data the buffer for which you want the hash value to be computed (arbitrary length)
- * @len length of the data buffer
- */
 uint32_t BufferTk::hash32(const char* data, int len)
 {
    uint32_t hash = len, tmp;
