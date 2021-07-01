@@ -69,7 +69,7 @@ class FileIDLockTestThread : public PThread
 
          LogContext(logContext).log(Log_DEBUG, "Trying to lock '" + fileID + "'");
 
-         FileIDLockData* lock = entryLockStore.lock(fileID);
+         FileIDLockData* lock = entryLockStore.lock(fileID, true);
 
          LogContext(logContext).log(Log_DEBUG, "Locked '" + fileID + "'");
          LogContext(logContext).log(Log_DEBUG, "Sleeping for " + StringTk::intToStr(sleepSec) +
@@ -111,7 +111,7 @@ class DirIDLockTestThread : public PThread
 
          LogContext(logContext).log(Log_DEBUG, "Trying to lock '" + logInfo + "'");
 
-         DirIDLockData* lock = entryLockStore.lock(dirID, writeLock);
+         FileIDLockData* lock = entryLockStore.lock(dirID, writeLock);
 
          LogContext(logContext).log(Log_DEBUG, "Locked '" + logInfo + "'");
          LogContext(logContext).log(Log_DEBUG, "Sleeping for " + StringTk::intToStr(sleepSec) +
@@ -205,7 +205,7 @@ TEST(BuddyMirroring, rwEntryLocks)
 
    std::list<PThread*> threadList;
 
-   // prepare DirIDLocks
+   // prepare FileIDLocks for Directories
    std::string dirID = "dirID";
    for (unsigned i=0 ; i<numThreadsWrite; i++)
    {

@@ -33,16 +33,16 @@ bool SetAttrMsgEx::processIncoming(ResponseContext& ctx)
    return BaseType::processIncoming(ctx);
 }
 
-std::tuple<FileIDLock, DirIDLock> SetAttrMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, FileIDLock> SetAttrMsgEx::lock(EntryLockStore& store)
 {
    if (DirEntryType_ISDIR(getEntryInfo()->getEntryType()))
       return std::make_tuple(
             FileIDLock(),
-            DirIDLock(&store, getEntryInfo()->getEntryID(), true));
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true));
    else
       return std::make_tuple(
-            FileIDLock(&store, getEntryInfo()->getEntryID()),
-            DirIDLock());
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true),
+            FileIDLock());
 }
 
 std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(ResponseContext& ctx,

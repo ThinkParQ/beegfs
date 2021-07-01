@@ -10,7 +10,7 @@
 // Update entry info, called by fsck or by fhgfs-ctl
 
 class RefreshEntryInfoMsgEx : public MirroredMessage<RefreshEntryInfoMsg,
-   std::tuple<FileIDLock, DirIDLock>>
+   std::tuple<FileIDLock, FileIDLock>>
 {
    public:
       typedef ErrorCodeResponseState<RefreshEntryInfoRespMsg, NETMSGTYPE_RefreshEntryInfo>
@@ -18,7 +18,7 @@ class RefreshEntryInfoMsgEx : public MirroredMessage<RefreshEntryInfoMsg,
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, DirIDLock> lock(EntryLockStore& store) override;
+      std::tuple<FileIDLock, FileIDLock> lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getEntryInfo()->getIsBuddyMirrored(); }
 

@@ -11,7 +11,7 @@
 
 FileIDLock OpenFileMsgEx::lock(EntryLockStore& store)
 {
-   return {&store, getEntryInfo()->getEntryID()};
+   return {&store, getEntryInfo()->getEntryID(), true};
 }
 
 bool OpenFileMsgEx::processIncoming(ResponseContext& ctx)

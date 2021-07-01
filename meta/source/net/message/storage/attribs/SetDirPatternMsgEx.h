@@ -8,14 +8,14 @@
 
 // set stripe pattern, called by fhgfs-ctl
 
-class SetDirPatternMsgEx : public MirroredMessage<SetDirPatternMsg, DirIDLock>
+class SetDirPatternMsgEx : public MirroredMessage<SetDirPatternMsg, FileIDLock>
 {
    public:
       typedef ErrorCodeResponseState<SetDirPatternRespMsg, NETMSGTYPE_SetDirPattern> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      DirIDLock lock(EntryLockStore& store) override
+      FileIDLock lock(EntryLockStore& store) override
       {
          return {&store, getEntryInfo()->getEntryID(), true};
       }

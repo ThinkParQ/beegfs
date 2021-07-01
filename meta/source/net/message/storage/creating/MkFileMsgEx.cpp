@@ -7,11 +7,11 @@
 #include <program/Program.h>
 #include "MkFileMsgEx.h"
 
-std::tuple<DirIDLock, ParentNameLock, FileIDLock> MkFileMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, ParentNameLock, FileIDLock> MkFileMsgEx::lock(EntryLockStore& store)
 {
-   DirIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
+   FileIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
    ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getNewName());
-   FileIDLock fileLock(&store, newEntryID);
+   FileIDLock fileLock(&store, newEntryID, true);
 
    return std::make_tuple(
          std::move(dirLock),

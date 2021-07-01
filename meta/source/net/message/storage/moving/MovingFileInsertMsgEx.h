@@ -68,14 +68,14 @@ class MovingFileInsertResponseState : public MirroredMessageResponseState
 };
 
 class MovingFileInsertMsgEx : public MirroredMessage<MovingFileInsertMsg,
-   std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock>>
+   std::tuple<FileIDLock, FileIDLock, FileIDLock, ParentNameLock>>
 {
    public:
       typedef MovingFileInsertResponseState ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock>
+      std::tuple<FileIDLock, FileIDLock, FileIDLock, ParentNameLock>
          lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getToDirInfo()->getIsBuddyMirrored(); }

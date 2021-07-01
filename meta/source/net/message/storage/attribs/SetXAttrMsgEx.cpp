@@ -4,16 +4,16 @@
 #include <session/EntryLock.h>
 #include "SetXAttrMsgEx.h"
 
-std::tuple<FileIDLock, DirIDLock> SetXAttrMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, FileIDLock> SetXAttrMsgEx::lock(EntryLockStore& store)
 {
    if (getEntryInfo()->getEntryType() == DirEntryType_DIRECTORY)
       return std::make_tuple(
             FileIDLock(),
-            DirIDLock(&store, getEntryInfo()->getEntryID(), true));
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true));
    else
       return std::make_tuple(
-            FileIDLock(&store, getEntryInfo()->getEntryID()),
-            DirIDLock());
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true),
+            FileIDLock());
 }
 
 bool SetXAttrMsgEx::processIncoming(ResponseContext& ctx)

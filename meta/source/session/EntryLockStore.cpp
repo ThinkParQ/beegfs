@@ -8,16 +8,9 @@ ParentNameLockData* EntryLockStore::lock(const std::string& parentID, const std:
    return &lock;
 }
 
-FileIDLockData* EntryLockStore::lock(const std::string& fileID)
+FileIDLockData* EntryLockStore::lock(const std::string& fileID, const bool writeLock)
 {
    FileIDLockData& lock = fileLocks.getLockFor(fileID);
-   lock.getLock().lock();
-   return &lock;
-}
-
-DirIDLockData* EntryLockStore::lock(const std::string& dirID, const bool writeLock)
-{
-   DirIDLockData& lock = dirLocks.getLockFor(dirID);
    if(writeLock)
       lock.getLock().writeLock();
    else
@@ -43,12 +36,6 @@ void EntryLockStore::unlock(FileIDLockData* fileIDLockData)
 {
    fileIDLockData->getLock().unlock();
    fileLocks.putLock(*fileIDLockData);
-}
-
-void EntryLockStore::unlock(DirIDLockData* dirIDLockData)
-{
-   dirIDLockData->getLock().unlock();
-   dirLocks.putLock(*dirIDLockData);
 }
 
 void EntryLockStore::unlock(HashDirLockData* hashDirLockData)

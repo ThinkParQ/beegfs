@@ -6,7 +6,7 @@ sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
 $(call build-static-library,\
    Meta,\
    $(sources),\
-   common dl,\
+   common dl blkid uuid,\
    ../source)
 
 $(call define-dep-lib,\
@@ -17,12 +17,12 @@ $(call define-dep-lib,\
 $(call build-executable,\
    beegfs-meta,\
    $(main),\
-   Meta common dl)
+   Meta common dl blkid uuid)
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   Meta common dl,\
+   Meta common dl blkid uuid,\
    ../tests)
 
 # enable special reference DirInode debug code

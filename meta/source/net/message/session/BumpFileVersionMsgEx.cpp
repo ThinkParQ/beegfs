@@ -17,7 +17,7 @@ bool BumpFileVersionMsgEx::processIncoming(ResponseContext& ctx)
 
 FileIDLock BumpFileVersionMsgEx::lock(EntryLockStore& store)
 {
-   return {&store, getEntryInfo().getEntryID()};
+   return {&store, getEntryInfo().getEntryID(), true};
 }
 
 std::unique_ptr<MirroredMessageResponseState> BumpFileVersionMsgEx::executeLocally(

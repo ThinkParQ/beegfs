@@ -31,7 +31,7 @@ bool UpdateDirParentMsgEx::processIncoming(ResponseContext& ctx)
    return true;
 }
 
-DirIDLock UpdateDirParentMsgEx::lock(EntryLockStore& store)
+FileIDLock UpdateDirParentMsgEx::lock(EntryLockStore& store)
 {
    if (rctx->isLocallyGenerated())
       return {};

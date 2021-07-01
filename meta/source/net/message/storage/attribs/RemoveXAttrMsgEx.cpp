@@ -28,16 +28,16 @@ bool RemoveXAttrMsgEx::processIncoming(ResponseContext& ctx)
    return true;
 }
 
-std::tuple<FileIDLock, DirIDLock> RemoveXAttrMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, FileIDLock> RemoveXAttrMsgEx::lock(EntryLockStore& store)
 {
    if (getEntryInfo()->getEntryType() == DirEntryType_DIRECTORY)
       return std::make_tuple(
             FileIDLock(),
-            DirIDLock(&store, getEntryInfo()->getEntryID(), true));
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true));
    else
       return std::make_tuple(
-            FileIDLock(&store, getEntryInfo()->getEntryID()),
-            DirIDLock());
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true),
+            FileIDLock());
 }
 
 std::unique_ptr<MirroredMessageResponseState> RemoveXAttrMsgEx::executeLocally(ResponseContext& ctx,

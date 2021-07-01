@@ -12,12 +12,12 @@ struct RenameV2Locks
 {
    ParentNameLock fromNameLock;
    ParentNameLock toNameLock;
-   DirIDLock fromDirLock;
-   DirIDLock toDirLock;
+   FileIDLock fromDirLock;
+   FileIDLock toDirLock;
    // source file must be locked because concurrent modifications of file attributes may
    // race with the moving operation between two servers.
    FileIDLock fromFileLockF;
-   DirIDLock fromFileLockD;
+   FileIDLock fromFileLockD;
    // if target exists, the target file must be unlocked to exclude concurrent operations on
    // target (eg close, setxattr, ...)
    FileIDLock unlinkedFileLock;

@@ -8,7 +8,7 @@
 
 #include "MovingFileInsertMsgEx.h"
 
-std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock> MovingFileInsertMsgEx::lock(
+std::tuple<FileIDLock, FileIDLock, FileIDLock, ParentNameLock> MovingFileInsertMsgEx::lock(
       EntryLockStore& store)
 {
    // we must not lock the directory if it is owned by the current node. if it is, the
@@ -17,7 +17,7 @@ std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock> MovingFileInsertMs
    if (rctx->isLocallyGenerated())
       return {};
 
-   DirIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
+   FileIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
 
    ParentNameLock nameLock(&store, getToDirInfo()->getEntryID(), getNewName());
 
@@ -42,17 +42,17 @@ std::tuple<FileIDLock, FileIDLock, DirIDLock, ParentNameLock> MovingFileInsertMs
 
          if (newInode.getEntryID() < unlinkedID)
          {
-            newLock = {&store, newInode.getEntryID()};
-            unlinkedLock = {&store, unlinkedID};
+            newLock = {&store, newInode.getEntryID(), true};
+            unlinkedLock = {&store, unlinkedID, true};
          }
          else if (newInode.getEntryID() == unlinkedID)
          {
-            newLock = {&store, newInode.getEntryID()};
+            newLock = {&store, newInode.getEntryID(), true};
          }
          else
          {
-            unlinkedLock = {&store, unlinkedID};
-            newLock = {&store, newInode.getEntryID()};
+            unlinkedLock = {&store, unlinkedID, true};
+            newLock = {&store, newInode.getEntryID(), true};
          }
       }
 

@@ -254,6 +254,10 @@ else
 
    $(call define-dep-lib-system, curl, libcurl)  
    $(call define-dep-lib-system, z, zlib)
+
+   $(call define-dep-lib, blkid, , , -lblkid)
+   $(call define-dep-lib, uuid, , , -luuid)
+
 endif
 
 

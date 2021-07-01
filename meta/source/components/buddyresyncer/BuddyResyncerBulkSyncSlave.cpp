@@ -66,7 +66,7 @@ void BuddyResyncerBulkSyncSlave::syncLoop()
       const std::string dirInodeID = Path(candidate.getRelativePath()).back();
       const std::string fullPath = META_BUDDYMIRROR_SUBDIR_NAME "/" + candidate.getRelativePath();
 
-      DirIDLock dirLock(lockStore, dirInodeID, false);
+      FileIDLock dirLock(lockStore, dirInodeID, false);
 
       // first ensure that the directory still exists - a concurrent modification may have deleted
       // it. this would not be an error; bulk resync should not touch it, an modification sync
@@ -208,9 +208,8 @@ FhgfsOpsErr BuddyResyncerBulkSyncSlave::streamCandidateDir(Socket& socket,
       // we are now either in a fsids (file inode) directory or a second-level inode hash-dir,
       // which may contain either file or directory inodes. taking a lock unnecessarily is stilll
       // cheaper than reading the inode from disk to determine its type, so just lock the inode id
-      // as both file and directory
-      FileIDLock fileLock(lockStore, entry->d_name);
-      DirIDLock dirLock(lockStore, entry->d_name, true);
+      // as file
+      FileIDLock dirLock(lockStore, entry->d_name, true);
 
       // access the file once more, because it may have been deleted in the meantime. a new entry
       // with the same name cannot appear in a sane filesystem (that would indicate an ID being

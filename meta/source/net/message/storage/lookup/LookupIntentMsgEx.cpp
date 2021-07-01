@@ -15,34 +15,36 @@
 #include "LookupIntentMsgEx.h"
 
 
-std::tuple<DirIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(EntryLockStore& store)
 {
    ParentNameLock dentryLock;
-   DirIDLock dirLock;
+   FileIDLock dirLock;
    FileIDLock fileLock;
 
    if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE)
    {
       dirLock = {&store, getParentInfo()->getEntryID(), true};
       dentryLock = {&store, getParentInfo()->getEntryID(), getEntryName()};
-      fileLock = {&store, entryID};
+      fileLock = {&store, entryID, true};
    }
    else if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_OPEN)
    {
       dirLock = {&store, getParentInfo()->getEntryID(), false};
-      fileLock = {&store, entryID};
+      fileLock = {&store, entryID, true};
    }
    else
    {
       //For all the other flags, take parent lock if parenEntryID is not
       //empty and fileID lock.
+      //XXX Note: If you are addding new flag for lookupintent, make sure to
+      //check if shared lock for parent dir and file is sufficient.
+      //Otherwise add another else if condition.
       const std::string& parentEntryID = getParentInfo()->getEntryID();
       if (!parentEntryID.empty())
       {
-         dirLock = {&store, getParentInfo()->getEntryID(), true};
-         dentryLock = {&store, getParentInfo()->getEntryID(), getEntryName()};
+         dirLock = {&store, getParentInfo()->getEntryID(), false};
       }
-      fileLock = {&store, entryID};
+      fileLock = {&store, entryID, false};
    }
 
    return std::make_tuple(std::move(dirLock), std::move(dentryLock), std::move(fileLock));

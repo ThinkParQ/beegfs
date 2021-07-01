@@ -9,14 +9,14 @@
 #include <net/message/MirroredMessage.h>
 
 
-class MkDirMsgEx : public MirroredMessage<MkDirMsg, std::tuple<HashDirLock, DirIDLock, ParentNameLock>>
+class MkDirMsgEx : public MirroredMessage<MkDirMsg, std::tuple<HashDirLock, FileIDLock, ParentNameLock>>
 {
    public:
       typedef ErrorAndEntryResponseState<MkDirRespMsg, NETMSGTYPE_MkDir> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<HashDirLock, DirIDLock, ParentNameLock> lock(EntryLockStore& store) override;
+      std::tuple<HashDirLock, FileIDLock, ParentNameLock> lock(EntryLockStore& store) override;
 
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;

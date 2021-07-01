@@ -9,6 +9,7 @@ DEFAULT_CFG_PATH="/etc/beegfs/beegfs-meta.conf"
 STORAGE_PATH_CFG_KEY="storeMetaDirectory"
 MGMTD_CFG_KEY="sysMgmtdHost"
 ALLOW_INIT_CFG_KEY="storeAllowFirstRunInit"
+FS_UUID_CFG_KEY="storeFsUUID"
 SERVER_NUMID_FILE="nodeNumID"
 SERVER_STRID_FILE="nodeID"
 FORMAT_FILENAME="format.conf"
@@ -52,7 +53,7 @@ print_usage()
 	echo "               (Default: Use hostname as ID.)"
 	echo
 	echo "   -u        - Do not disable usage of uninitialized storage directory in config"
-	echo "               file."
+	echo "               file and do not store the UUID of the underlying fs."
 	echo
 	echo "   -x        - Do not store metadata as extended attributes."
 	echo
@@ -150,6 +151,16 @@ update_config_file()
 	if [ -n "${DISABLE_UNINITED_TARGETS}" ] && [ -n "${STORAGE_PATH}" ]; then
 		echo " * Disabling usage of uninitialized storage directory in config file..."
 		sed -i "s/\(^${ALLOW_INIT_CFG_KEY}.*=\).*/\1 false/" ${CFG_PATH}
+
+		echo " * Fetching the underlying device..."
+		DEVICE=$(df "${STORAGE_PATH}" | tail -n1 | cut -d\  -f1)
+		echo "Underlying device detected: ${DEVICE}"
+		echo "Fetching UUID of the file system on that device..."
+		UUID=$(blkid -s UUID ${DEVICE} | cut -d= -f2 | sed "s/\"//g")
+		echo "Found UUID ${UUID}"
+		echo "Writing UUID to config file..."
+		sed -i "s|\(^${FS_UUID_CFG_KEY}.*=\).*$|\1 ${UUID}|" ${CFG_PATH}
+
 	fi
 
 	if [ -n "${STORAGE_PATH}" ]; then

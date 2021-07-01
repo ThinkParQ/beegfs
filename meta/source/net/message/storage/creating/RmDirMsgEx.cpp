@@ -21,7 +21,7 @@ bool RmDirMsgEx::processIncoming(ResponseContext& ctx)
    return true;
 }
 
-std::tuple<HashDirLock, DirIDLock, DirIDLock, ParentNameLock> RmDirMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, FileIDLock, FileIDLock, ParentNameLock> RmDirMsgEx::lock(EntryLockStore& store)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    EntryInfo delEntryInfo;
@@ -36,8 +36,8 @@ std::tuple<HashDirLock, DirIDLock, DirIDLock, ParentNameLock> RmDirMsgEx::lock(E
       metaStore->releaseDir(getParentInfo()->getEntryID());
    }
 
-   DirIDLock parentDirLock;
-   DirIDLock delDirLock;
+   FileIDLock parentDirLock;
+   FileIDLock delDirLock;
    HashDirLock hashLock;
 
    if (resyncJob && resyncJob->isRunning())

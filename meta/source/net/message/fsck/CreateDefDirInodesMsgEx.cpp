@@ -30,7 +30,7 @@ bool CreateDefDirInodesMsgEx::processIncoming(ResponseContext& ctx)
 
       // we try to create a new directory inode, with default values
 
-      DirIDLock dirLock;
+      FileIDLock dirLock;
 
       if (isBuddyMirrored)
          dirLock = {Program::getApp()->getMirroredSessions()->getEntryLockStore(), inodeID, true};

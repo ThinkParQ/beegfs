@@ -8,7 +8,7 @@
 
 FileIDLock TruncFileMsgEx::lock(EntryLockStore& store)
 {
-   return {&store, getEntryInfo()->getEntryID()};
+   return {&store, getEntryInfo()->getEntryID(), true};
 }
 
 bool TruncFileMsgEx::processIncoming(ResponseContext& ctx)

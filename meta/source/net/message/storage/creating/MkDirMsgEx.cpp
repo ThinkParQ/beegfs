@@ -42,7 +42,7 @@ std::unique_ptr<MirroredMessageResponseState> MkDirMsgEx::executeLocally(Respons
    return std::move(result);
 }
 
-std::tuple<HashDirLock, DirIDLock, ParentNameLock> MkDirMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, FileIDLock, ParentNameLock> MkDirMsgEx::lock(EntryLockStore& store)
 {
    HashDirLock hashLock;
 
@@ -52,7 +52,7 @@ std::tuple<HashDirLock, DirIDLock, ParentNameLock> MkDirMsgEx::lock(EntryLockSto
    if (resyncJob && resyncJob->isRunning())
       hashLock = {&store, MetaStorageTk::getMetaInodeHash(entryID)};
 
-   DirIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
+   FileIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
    ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getNewDirName());
 
    return std::make_tuple(std::move(hashLock), std::move(dirLock), std::move(dentryLock));
@@ -220,7 +220,7 @@ std::unique_ptr<MkDirMsgEx::ResponseState> MkDirMsgEx::mkDirPrimary(ResponseCont
       FileIDLock lock;
 
       if (parentInfo->getIsBuddyMirrored())
-         lock = {entryLockStore, entryID};
+         lock = {entryLockStore, entryID, true};
 
       retVal = mkDirDentry(*parentDir, newName, &newEntryInfo, isBuddyMirrored);
 

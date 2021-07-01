@@ -206,10 +206,7 @@ struct ValueLockHash<std::pair<unsigned, unsigned>>
 typedef ValueLockStore<std::pair<std::string, std::string>, Mutex, 1024> ParentNameLockStore;
 typedef ParentNameLockStore::ValueLock ParentNameLockData;
 
-typedef ValueLockStore<std::string, RWLock, 1024> DirIDLockStore;
-typedef DirIDLockStore::ValueLock DirIDLockData;
-
-typedef ValueLockStore<std::string, Mutex, 1024> FileIDLockStore;
+typedef ValueLockStore<std::string, RWLock, 1024> FileIDLockStore;
 typedef FileIDLockStore::ValueLock FileIDLockData;
 
 typedef ValueLockStore<std::pair<unsigned, unsigned>, Mutex, 1024> HashDirLockStore;
@@ -219,19 +216,17 @@ class EntryLockStore
 {
    public:
       ParentNameLockData* lock(const std::string& parentID, const std::string& name);
-      FileIDLockData* lock(const std::string& fileID);
-      DirIDLockData* lock(const std::string& dirID, const bool writeLock);
+      //FileIDLock is used for both files and directories
+      FileIDLockData* lock(const std::string& fileID, const bool writeLock);
       HashDirLockData* lock(std::pair<unsigned, unsigned> hashDir);
 
       void unlock(ParentNameLockData* parentNameLockData);
       void unlock(FileIDLockData* fileIDLockData);
-      void unlock(DirIDLockData* dirIDLockData);
       void unlock(HashDirLockData* hashDirLockData);
 
    private:
       ParentNameLockStore parentNameLocks;
       FileIDLockStore fileLocks;
-      DirIDLockStore dirLocks;
       HashDirLockStore hashDirLocks;
 };
 

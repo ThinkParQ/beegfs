@@ -28,7 +28,7 @@
 #define EVENTLOGMASK_SETATTR "setattr"
 #define EVENTLOGMASK_CLOSE "close"
 #define EVENTLOGMASK_LINK_OP "link-op"
-
+#define EVENTLOGMASK_READ "read"
 
 #define IGNORE_CONFIG_VALUE(compareStr) /* to be used in applyConfigMap() */ \
    if(!strcmp(keyStr, compareStr) ) \
@@ -552,6 +552,8 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
                   this->eventLogMask |= EventLogMask_CLOSE;
                else if (!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_LINK_OP))
                   this->eventLogMask |= EventLogMask_LINK_OP;
+               else if (!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_READ))
+                  this->eventLogMask |= EventLogMask_READ;
                else
                {
                   StrCpyList_uninit(&parts);
@@ -1119,6 +1121,11 @@ const char* Config_eventLogMaskToStr(enum EventLogMask mask)
    (mask & EventLogMask_LINK_OP \
     ? ELM_PART_CLOSE(Prefix "," EVENTLOGMASK_LINK_OP) \
     : ELM_PART_CLOSE(Prefix))
+#define ELM_PART_READ(Prefix) \
+   (mask & EventLogMask_READ \
+    ? ELM_PART_LINK_OP(Prefix "," EVENTLOGMASK_READ) \
+    : ELM_PART_LINK_OP(Prefix))
+
 
    if (mask == EventLogMask_NONE)
       return EVENTLOGMASK_NONE;

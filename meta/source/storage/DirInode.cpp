@@ -130,7 +130,7 @@ StripePattern* DirInode::createFileStripePatternUnlocked(const UInt16List* prefe
          in this case) */
       if( (chooserType == TargetChooserType_RANDOMIZED) ||
           (chooserType == TargetChooserType_RANDOMINTERNODE) ||
-          (chooserType == TargetChooserType_RANDOMINTRANODE) ||
+         //  (chooserType == TargetChooserType_RANDOMINTRANODE) ||
           (preferredTargets && !preferredTargets->empty() ) )
       { // randomized chooser, the only chooser that currently supports preferredTargets
          capacityPools->chooseStorageTargets(desiredNumTargets, minNumRequiredTargets,

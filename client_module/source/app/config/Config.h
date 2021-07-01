@@ -30,6 +30,7 @@ enum EventLogMask
    EventLogMask_SETATTR = 4,
    EventLogMask_CLOSE = 8,
    EventLogMask_LINK_OP = 16,
+   EventLogMask_READ = 32,
 };
 
 

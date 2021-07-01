@@ -22,7 +22,7 @@ bool FLockRangeMsgEx::processIncoming(ResponseContext& ctx)
 
 FileIDLock FLockRangeMsgEx::lock(EntryLockStore& store)
 {
-   return {&store, getEntryInfo()->getEntryID()};
+   return {&store, getEntryInfo()->getEntryID(), true};
 }
 
 std::unique_ptr<MirroredMessageResponseState> FLockRangeMsgEx::executeLocally(ResponseContext& ctx,

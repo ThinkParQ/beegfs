@@ -181,6 +181,12 @@ FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry, 
 
          FhgfsInode_entryInfoReadLock(this); // LOCK EntryInfo
 
+         if ((openFlags & OPENFILE_ACCESS_READ) && (app->cfg->eventLogMask & EventLogMask_READ))
+         {
+            FileEvent_init(&event, FileEventType_READ, dentry);
+            eventSent = &event;
+         }
+         else
          if ((openFlags & OPENFILE_ACCESS_TRUNC) && (app->cfg->eventLogMask & EventLogMask_TRUNC))
          {
             FileEvent_init(&event, FileEventType_TRUNCATE, dentry);

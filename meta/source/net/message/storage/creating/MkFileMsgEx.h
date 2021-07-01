@@ -10,7 +10,7 @@
 
 
 class MkFileMsgEx : public MirroredMessage<MkFileMsg,
-   std::tuple<DirIDLock, ParentNameLock, FileIDLock>>
+   std::tuple<FileIDLock, ParentNameLock, FileIDLock>>
 {
    public:
       typedef ErrorAndEntryResponseState<MkFileRespMsg, NETMSGTYPE_MkFile> ResponseState;
@@ -22,7 +22,7 @@ class MkFileMsgEx : public MirroredMessage<MkFileMsg,
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<DirIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
+      std::tuple<FileIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 

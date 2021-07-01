@@ -17,6 +17,7 @@ enum class FileEventType
    UNLINK = 9,
    HARDLINK = 10,
    RENAME = 11,
+   READ = 12,
 };
 
 template<>

@@ -173,6 +173,7 @@ class App : public AbstractApp
       void initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID);
       void initLocalNodeNumIDFile(NumNodeID localNodeNumID);
       bool preinitStorage();
+      void checkTargetUUID();
       void initStorage();
       void initXAttrLimit();
       void initRootDir(NumNodeID localNodeNumID);

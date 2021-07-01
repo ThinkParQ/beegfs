@@ -20,7 +20,7 @@ bool RemoveInodesMsgEx::processIncoming(ResponseContext& ctx)
       const bool isBuddyMirrored = std::get<2>(*it);
       FhgfsOpsErr rmRes;
 
-      DirIDLock dirLock;
+      FileIDLock dirLock;
       FileIDLock fileLock;
 
       if (entryType == DirEntryType_DIRECTORY)
@@ -30,7 +30,7 @@ bool RemoveInodesMsgEx::processIncoming(ResponseContext& ctx)
       }
       else
       {
-         fileLock = {entryLockStore, entryID};
+         fileLock = {entryLockStore, entryID, true};
          rmRes = metaStore->fsckUnlinkFileInode(entryID);
       }
 

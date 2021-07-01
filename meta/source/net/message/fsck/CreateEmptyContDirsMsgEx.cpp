@@ -31,7 +31,7 @@ bool CreateEmptyContDirsMsgEx::processIncoming(ResponseContext& ctx)
          continue;
       }
 
-      DirIDLock lock;
+      FileIDLock lock;
 
       if (isBuddyMirrored)
          lock = {Program::getApp()->getMirroredSessions()->getEntryLockStore(), dirID, true};

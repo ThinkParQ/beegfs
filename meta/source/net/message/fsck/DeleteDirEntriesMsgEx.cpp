@@ -22,7 +22,7 @@ bool DeleteDirEntriesMsgEx::processIncoming(ResponseContext& ctx)
       const std::string& entryName = iter->getName();
       FsckDirEntryType dirEntryType = iter->getEntryType();
 
-      DirIDLock dirLock;
+      FileIDLock dirLock;
       ParentNameLock dentryLock;
 
       if (iter->getIsBuddyMirrored())

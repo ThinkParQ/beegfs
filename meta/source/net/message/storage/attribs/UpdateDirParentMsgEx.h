@@ -7,7 +7,7 @@
 #include <common/net/message/storage/attribs/UpdateDirParentRespMsg.h>
 #include <net/message/MirroredMessage.h>
 
-class UpdateDirParentMsgEx : public MirroredMessage<UpdateDirParentMsg, DirIDLock>
+class UpdateDirParentMsgEx : public MirroredMessage<UpdateDirParentMsg, FileIDLock>
 {
    public:
       typedef ErrorCodeResponseState<UpdateDirParentRespMsg, NETMSGTYPE_UpdateDirParent>
@@ -18,7 +18,7 @@ class UpdateDirParentMsgEx : public MirroredMessage<UpdateDirParentMsg, DirIDLoc
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 
-      DirIDLock lock(EntryLockStore& store) override;
+      FileIDLock lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getEntryInfo()->getIsBuddyMirrored(); }
 

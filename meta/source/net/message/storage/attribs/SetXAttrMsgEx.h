@@ -5,14 +5,14 @@
 #include <common/net/message/storage/attribs/SetXAttrRespMsg.h>
 #include <net/message/MirroredMessage.h>
 
-class SetXAttrMsgEx : public MirroredMessage<SetXAttrMsg, std::tuple<FileIDLock, DirIDLock>>
+class SetXAttrMsgEx : public MirroredMessage<SetXAttrMsg, std::tuple<FileIDLock, FileIDLock>>
 {
    public:
       typedef ErrorCodeResponseState<SetXAttrRespMsg, NETMSGTYPE_SetXAttr> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, DirIDLock> lock(EntryLockStore& store) override;
+      std::tuple<FileIDLock, FileIDLock> lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getEntryInfo()->getIsBuddyMirrored(); }
 

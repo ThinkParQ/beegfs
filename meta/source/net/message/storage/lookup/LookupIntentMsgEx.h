@@ -165,14 +165,14 @@ class LookupIntentResponseState : public MirroredMessageResponseState
  * Note: The intent options currently work only for files.
  */
 class LookupIntentMsgEx : public MirroredMessage<LookupIntentMsg,
-   std::tuple<DirIDLock, ParentNameLock, FileIDLock>>
+   std::tuple<FileIDLock, ParentNameLock, FileIDLock>>
 {
    public:
       typedef LookupIntentResponseState ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<DirIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
+      std::tuple<FileIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
 
       bool isMirrored() override { return getParentInfo()->getIsBuddyMirrored(); }
 

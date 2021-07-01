@@ -29,6 +29,7 @@ class Config : public AbstractConfig
       std::string       connInterfacesList; // comma-separated list
 
       std::string       storeMetaDirectory;
+      std::string       storeFsUUID;
       bool              storeAllowFirstRunInit;
       bool              storeUseExtendedAttribs;
       bool              storeSelfHealEmptyFiles;
@@ -98,6 +99,11 @@ class Config : public AbstractConfig
       const std::string& getStoreMetaDirectory() const
       {
          return storeMetaDirectory;
+      }
+
+      const std::string& getStoreFsUUID() const
+      {
+         return storeFsUUID;
       }
 
       bool getStoreAllowFirstRunInit() const

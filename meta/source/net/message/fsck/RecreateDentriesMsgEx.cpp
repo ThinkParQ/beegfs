@@ -40,7 +40,7 @@ bool RecreateDentriesMsgEx::processIncoming(ResponseContext& ctx)
       // around here
       const std::string& dirID = iter->getParentDirID();
 
-      DirIDLock dirLock;
+      FileIDLock dirLock;
       ParentNameLock dentryLock;
 
       if (iter->getIsBuddyMirrored())

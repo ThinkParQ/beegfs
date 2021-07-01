@@ -5,7 +5,7 @@
 #include "RmLocalDirMsgEx.h"
 
 
-std::tuple<HashDirLock, DirIDLock> RmLocalDirMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, FileIDLock> RmLocalDirMsgEx::lock(EntryLockStore& store)
 {
    HashDirLock hashLock;
 
@@ -18,7 +18,7 @@ std::tuple<HashDirLock, DirIDLock> RmLocalDirMsgEx::lock(EntryLockStore& store)
 
    return std::make_tuple(
          std::move(hashLock),
-         DirIDLock(&store, getDelEntryInfo()->getEntryID(), true));
+         FileIDLock(&store, getDelEntryInfo()->getEntryID(), true));
 }
 
 bool RmLocalDirMsgEx::processIncoming(ResponseContext& ctx)

@@ -19,7 +19,7 @@ bool FixInodeOwnersMsgEx::processIncoming(ResponseContext& ctx)
       const std::string& entryID = iter->getID();
       NumNodeID ownerNodeID = iter->getOwnerNodeID();
 
-      DirIDLock lock;
+      FileIDLock lock;
 
       if (iter->getIsBuddyMirrored())
          lock = {entryLockStore, entryID, true};

@@ -17,13 +17,19 @@
 #include <storage/MetadataEx.h>
 #include <toolkit/BuddyCommTk.h>
 #include <toolkit/StorageTkEx.h>
+#include <boost/format.hpp>
 #include "App.h"
 
+#include <array>
 #include <mntent.h>
 #include <csignal>
+#include <fstream>
+#include <sstream>
 #include <syslog.h>
 #include <sys/resource.h>
 #include <sys/statfs.h>
+#include <blkid/blkid.h>
+#include <uuid/uuid.h>
 
 // this magic number is not available on all supported platforms. specifically, rhel5 does not have
 // linux/magic.h (which is where this constant is found).
@@ -213,6 +219,7 @@ void App::runNormal()
    const bool targetNew = preinitStorage();
 
    initLogging();
+   checkTargetUUID();
    initLocalNodeIDs(localNodeID, localNodeNumID);
    initDataObjects();
    initBasicNetwork();
@@ -1574,4 +1581,81 @@ bool App::deleteSessionFiles()
    }
 
    return retVal;
+}
+
+void App::checkTargetUUID() 
+{
+   if (!cfg->getStoreFsUUID().empty())
+   {
+      Path metaPath(cfg->getStoreMetaDirectory() );
+
+      // Find out device numbers of underlying device
+      struct stat st;
+
+      if (stat(metaPath.str().c_str(), &st)) {
+         throw InvalidConfigException("Could not stat metadata directory: " + metaPathStr);
+      }
+
+      // look for the device path
+      std::ifstream mountInfo("/proc/self/mountinfo");
+
+      if (!mountInfo) {
+         throw InvalidConfigException("Could not open /proc/self/mountinfo");
+      }
+
+      std::string line, device_path, device_majmin;
+      while (std::getline(mountInfo, line)) {
+         std::istringstream is(line);
+	      std::string dummy;
+         is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;
+
+	      auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);
+
+         if (majmin_f.str() == device_majmin)
+            break;
+
+	      device_path = "";
+      }
+
+      if (device_path.empty()) {
+         throw InvalidConfigException("Could not find a device path that belongs to device " + device_majmin);
+      }
+
+      // Lookup the fs UUID
+      std::unique_ptr<blkid_struct_probe, void(*)(blkid_struct_probe*)>
+            probe(blkid_new_probe_from_filename(device_path.data()), blkid_free_probe);
+
+      if (!probe) {
+	      throw InvalidConfigException("Failed to open device for probing: " + device_path);
+      }
+
+      if (blkid_probe_enable_superblocks(probe.get(), 1) < 0) {
+	      throw InvalidConfigException("Failed to enable superblock probing");
+      }
+
+      if (blkid_do_fullprobe(probe.get()) < 0) {
+	      throw InvalidConfigException("Failed to probe device");
+      }
+
+      const char* uuid = nullptr; // gets released automatically
+      if (blkid_probe_lookup_value(probe.get(), "UUID", &uuid, nullptr) < 0) {
+	      throw InvalidConfigException("Failed to lookup file system UUID");
+      }
+
+      std::string uuid_str(uuid);
+
+      if (cfg->getStoreFsUUID() != uuid_str)
+      {
+         throw InvalidConfigException("UUID of the metadata file system (" + uuid_str
+               + ") does not match the one configured (" + cfg->getStoreFsUUID() + ")");
+      }
+   }
+   else
+   {
+      LOG(GENERAL, WARNING, "UUID of underlying file system has not been configured and will "
+            "therefore not be checked. To prevent starting the server accidentally with the wrong "
+            "data, it is strongly recommended to set the storeFsUUID config parameter to "
+            "the appropriate UUID.");
+   }
+
 }

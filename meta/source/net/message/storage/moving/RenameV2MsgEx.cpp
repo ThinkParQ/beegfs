@@ -77,7 +77,7 @@ RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
       toDir->getFileEntryInfo(getNewName(), toFileInfo);
 
       {
-         std::map<std::string, DirIDLock*> lockOrder;
+         std::map<std::string, FileIDLock*> lockOrder;
 
          lockOrder.insert(std::make_pair(getFromDirInfo()->getEntryID(), &result.fromDirLock));
          lockOrder.insert(std::make_pair(getToDirInfo()->getEntryID(), &result.toDirLock));
@@ -135,22 +135,22 @@ RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
          {
             if (fromFileInfo.getEntryID() < toFileInfo.getEntryID())
             {
-               result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
-               result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
+               result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
+               result.unlinkedFileLock = {&store, toFileInfo.getEntryID(), true};
             }
             else if (fromFileInfo.getEntryID() == toFileInfo.getEntryID())
             {
-               result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+               result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
             }
             else
             {
-               result.unlinkedFileLock = {&store, toFileInfo.getEntryID()};
-               result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+               result.unlinkedFileLock = {&store, toFileInfo.getEntryID(), true};
+               result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
             }
          }
          else
          {
-            result.fromFileLockF = {&store, fromFileInfo.getEntryID()};
+            result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
          }
       }
 

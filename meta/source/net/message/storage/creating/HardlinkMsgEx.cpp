@@ -7,7 +7,7 @@
 
 #include "HardlinkMsgEx.h"
 
-std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx::lock(
+std::tuple<FileIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx::lock(
       EntryLockStore& store)
 {
    // NOTE: normally we'd need to also lock on the MDS holding the destination file,
@@ -17,7 +17,7 @@ std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx:
 
    FileIDLock fileLock;
 
-   DirIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
+   FileIDLock dirLock(&store, getToDirInfo()->getEntryID(), true);
 
    // take care about lock ordering! see MirroredMessage::lock()
    if (getFromDirInfo()->getEntryID() < getToDirInfo()->getEntryID()
@@ -49,7 +49,7 @@ std::tuple<DirIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx:
 
       dir->getFileEntryInfo(getFromName(), fromInfo);
       if (DirEntryType_ISFILE(fromInfo.getEntryType()))
-         fileLock = {&store, fromInfo.getEntryID()};
+         fileLock = {&store, fromInfo.getEntryID(), true};
 
       Program::getApp()->getMetaStore()->releaseDir(dir->getID());
    }

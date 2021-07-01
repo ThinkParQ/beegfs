@@ -46,7 +46,7 @@ bool AdjustChunkPermissionsMsgEx::processIncoming(ResponseContext& ctx)
 
       bool parentDirInodeIsTemp = false;
 
-      DirIDLock dirLock;
+      FileIDLock dirLock;
 
       if (getIsBuddyMirrored())
          dirLock = {Program::getApp()->getMirroredSessions()->getEntryLockStore(), parentID, false};

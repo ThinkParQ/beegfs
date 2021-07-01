@@ -19,6 +19,7 @@ enum FileEventType
    FileEventType_UNLINK,
    FileEventType_HARDLINK,
    FileEventType_RENAME,
+   FileEventType_READ,
 };
 
 struct FileEvent

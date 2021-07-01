@@ -34,6 +34,7 @@ enum class FileEventType : uint32_t
    UNLINK      =  9,
    HARDLINK    = 10,
    RENAME      = 11,
+   READ        = 12,
 };
 
 
@@ -65,6 +66,8 @@ std::string to_string(const FileEventType& fileEvent)
          return "Hardlink";
       case FileEventType::RENAME:
          return "Rename";
+      case FileEventType::READ:
+         return "Read";
    }
    return "";
 }

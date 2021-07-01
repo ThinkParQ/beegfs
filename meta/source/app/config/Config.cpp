@@ -44,6 +44,7 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("connInterfacesList",         "");
 
    configMapRedefine("storeMetaDirectory",         "");
+   configMapRedefine("storeFsUUID",                "");
    configMapRedefine("storeAllowFirstRunInit",     "true");
    configMapRedefine("storeUseExtendedAttribs",    "true");
    configMapRedefine("storeSelfHealEmptyFiles",    "true");
@@ -120,6 +121,8 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          connInterfacesList = iter->second;
       else if (iter->first == std::string("storeMetaDirectory"))
          storeMetaDirectory = iter->second;
+      else if (iter->first == std::string("storeFsUUID"))
+         storeFsUUID = iter->second;
       else if (iter->first == std::string("storeAllowFirstRunInit"))
          storeAllowFirstRunInit = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("storeUseExtendedAttribs"))
@@ -292,8 +295,7 @@ void Config::initTuneTargetChooserNum()
       this->tuneTargetChooserNum = TargetChooserType_RANDOMROBIN;
    else if (this->tuneTargetChooser == TARGETCHOOSERTYPE_RANDOMINTERNODE_STR)
       this->tuneTargetChooserNum = TargetChooserType_RANDOMINTERNODE;
-   else if (this->tuneTargetChooser == TARGETCHOOSERTYPE_RANDOMINTRANODE_STR)
-      this->tuneTargetChooserNum = TargetChooserType_RANDOMINTRANODE;
+   // Don't allow RANDOMINTRANODE Target Chooser
    else
    {
       // invalid chooser specified

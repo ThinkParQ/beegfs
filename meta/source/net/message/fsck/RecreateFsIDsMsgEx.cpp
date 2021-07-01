@@ -29,9 +29,9 @@ bool RecreateFsIDsMsgEx::processIncoming(ResponseContext& ctx)
 
       std::string dirEntryNameFilePath = dirEntryPath + "/" + entryName;
 
-      DirIDLock dirLock(entryLockStore, parentID, true);
+      FileIDLock dirLock(entryLockStore, parentID, true);
       ParentNameLock dentryLock(entryLockStore, parentID, entryName);
-      FileIDLock fileLock(entryLockStore, entryID);
+      FileIDLock fileLock(entryLockStore, entryID, true);
 
       // delete the old dentry-by-id file link (if one existed)
       int removeRes = unlink(dirEntryIDFilePath.c_str());

@@ -10,9 +10,9 @@
 #include <program/Program.h>
 #include "UnlinkFileMsgEx.h"
 
-std::tuple<DirIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLockStore& store)
 {
-   DirIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
+   FileIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
    ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getDelFileName());
    // we also have to lock the inode attached to the dentry - if we delete the inode, we must
    // exclude concurrent actions on the same inode. if we cannot look up a file inode for the
@@ -27,7 +27,7 @@ std::tuple<DirIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLoc
    if (dir->getFileDentry(getDelFileName(), dentry))
    {
       dentry.getEntryInfo(getParentInfo()->getEntryID(), 0, &fileInfo);
-      inodeLock = {&store, dentry.getID()};
+      inodeLock = {&store, dentry.getID(), true};
    }
 
    metaStore->releaseDir(dir->getID());

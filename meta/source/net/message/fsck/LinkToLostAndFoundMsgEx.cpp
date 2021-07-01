@@ -54,7 +54,7 @@ void LinkToLostAndFoundMsgEx::linkDirInodes(FsckDirInodeList* outFailedInodes,
          DirEntryType entryType = DirEntryType_DIRECTORY;
          DirEntry newDirEntry(entryType, entryID, entryID, ownerNodeID);
 
-         DirIDLock lock;
+         FileIDLock lock;
 
          if (iter->getIsBuddyMirrored())
          {

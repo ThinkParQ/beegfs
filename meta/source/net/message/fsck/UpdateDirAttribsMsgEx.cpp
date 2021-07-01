@@ -19,7 +19,7 @@ bool UpdateDirAttribsMsgEx::processIncoming(ResponseContext& ctx)
       // call the updating method
       const std::string& dirID = iter->getID();
 
-      DirIDLock lock;
+      FileIDLock lock;
 
       if (iter->getIsBuddyMirrored())
          lock = {entryLockStore, dirID, true};

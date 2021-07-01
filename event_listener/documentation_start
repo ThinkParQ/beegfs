@@ -55,6 +55,8 @@ Rename
    ParentEntryID  Its parentEntryID
    TargetPath     The path/name moved to
 
+Read
+   
    Example
    mv source dest
    will result in

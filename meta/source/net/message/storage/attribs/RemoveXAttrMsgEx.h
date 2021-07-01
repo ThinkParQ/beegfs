@@ -5,14 +5,14 @@
 #include <common/net/message/storage/attribs/RemoveXAttrRespMsg.h>
 #include <net/message/MirroredMessage.h>
 
-class RemoveXAttrMsgEx : public MirroredMessage<RemoveXAttrMsg, std::tuple<FileIDLock, DirIDLock>>
+class RemoveXAttrMsgEx : public MirroredMessage<RemoveXAttrMsg, std::tuple<FileIDLock, FileIDLock>>
 {
    public:
       typedef ErrorCodeResponseState<RemoveXAttrRespMsg, NETMSGTYPE_RemoveXAttr> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, DirIDLock> lock(EntryLockStore& store) override;
+      std::tuple<FileIDLock, FileIDLock> lock(EntryLockStore& store) override;
 
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;

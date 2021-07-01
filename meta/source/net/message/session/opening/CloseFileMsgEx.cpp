@@ -13,7 +13,7 @@
 
 FileIDLock CloseFileMsgEx::lock(EntryLockStore& store)
 {
-   return {&store, getEntryInfo()->getEntryID()};
+   return {&store, getEntryInfo()->getEntryID(), true};
 }
 
 bool CloseFileMsgEx::processIncoming(ResponseContext& ctx)

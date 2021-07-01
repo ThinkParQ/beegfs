@@ -77,29 +77,8 @@ class FileIDLock : UniqueEntryLockBase<FileIDLockData>
          return *this;
       }
 
-      FileIDLock(EntryLockStore* entryLockStore, const std::string& fileID)
-         : UniqueEntryLockBase<FileIDLockData>(entryLockStore, fileID)
-      {
-      }
-};
-
-class DirIDLock : UniqueEntryLockBase<DirIDLockData>
-{
-   public:
-      DirIDLock() = default;
-
-      DirIDLock(const DirIDLock&) = delete;
-      DirIDLock& operator=(const DirIDLock&) = delete;
-
-      DirIDLock(DirIDLock&& src) : BaseType(std::move(src)) {}
-      DirIDLock& operator=(DirIDLock&& src)
-      {
-         BaseType::operator=(std::move(src));
-         return *this;
-      }
-
-      DirIDLock(EntryLockStore* entryLockStore, const std::string& dirID, const bool writeLock)
-         : UniqueEntryLockBase<DirIDLockData>(entryLockStore, dirID, writeLock)
+      FileIDLock(EntryLockStore* entryLockStore, const std::string& fileID, const bool writeLock)
+         : UniqueEntryLockBase<FileIDLockData>(entryLockStore, fileID, writeLock)
       {
       }
 };

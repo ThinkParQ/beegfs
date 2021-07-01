@@ -28,16 +28,16 @@ bool RefreshEntryInfoMsgEx::processIncoming(ResponseContext& ctx)
    return true;
 }
 
-std::tuple<FileIDLock, DirIDLock> RefreshEntryInfoMsgEx::lock(EntryLockStore& store)
+std::tuple<FileIDLock, FileIDLock> RefreshEntryInfoMsgEx::lock(EntryLockStore& store)
 {
    if (DirEntryType_ISDIR(getEntryInfo()->getEntryType()))
       return std::make_tuple(
             FileIDLock(),
-            DirIDLock(&store, getEntryInfo()->getEntryID(), true));
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true));
    else
       return std::make_tuple(
-            FileIDLock(&store, getEntryInfo()->getEntryID()),
-            DirIDLock());
+            FileIDLock(&store, getEntryInfo()->getEntryID(), true),
+            FileIDLock());
 }
 
 std::unique_ptr<MirroredMessageResponseState> RefreshEntryInfoMsgEx::executeLocally(

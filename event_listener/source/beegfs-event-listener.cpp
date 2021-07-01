@@ -6,7 +6,7 @@
 
 /* The client needs a list of events to be logged in the config file
  * (beegfs-client.conf):
- * sysFileEventLogMask = flush,trunc,setattr,close,link-op
+ * sysFileEventLogMask = flush,trunc,setattr,close,link-op,read
  * (Or any combination of the above)
  */
 
@@ -142,7 +142,7 @@ int main(const int argc, const char** argv)
                    "     sysFileEventLogTarget = unix://<path>\n"
                    "  in beegfs-meta.conf.\n"
                    "  The clients need a list of events to be logged in the config file (beegfs-client.conf):\n"
-                   "    sysFileEventLogMask = flush,trunc,setattr,close,link-op\n"
+                   "    sysFileEventLogMask = flush,trunc,setattr,close,link-op,read\n"
                    "  (Or any combination of the above)\n\n"
                    "  Example:\n"
                    "     Enter the following line in beegfs-meta.conf:\n"
