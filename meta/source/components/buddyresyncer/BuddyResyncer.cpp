@@ -8,7 +8,7 @@ BuddyResyncer::~BuddyResyncer()
 {
    if (job)
    {
-      job->abort();
+      job->abort(false);
       job->join();
 
       SAFE_DELETE(job);
@@ -66,7 +66,7 @@ void BuddyResyncer::shutdown()
 
    if (job)
    {
-      job->abort();
+      job->abort(false);
       job->join();
    }
 }

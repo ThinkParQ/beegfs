@@ -2046,48 +2046,34 @@ static ssize_t beegfs_dIO_read(struct kiocb* iocb, struct iov_iter* iter, loff_t
 
    App* app = FhgfsOps_getApp(dentry->d_sb);
 
-   struct iov_iter loopIter;
-   struct iovec iov;
-
-   ssize_t readRes = 0;
    ssize_t result = 0;
 
    FhgfsOpsHelper_logOpDebug(app, dentry, inode, __func__, "pos: %lld, nr_segs: %lld",
       offset, iter->nr_segs);
    IGNORE_UNUSED_VARIABLE(app);
 
-   beegfs_iov_for_each(iov, loopIter, iter)
+   result = FhgfsOpsRemoting_readfileVec(iter, offset, ioInfo, BEEGFS_INODE(inode));
+
+   if(result < 0)
+      return FhgfsOpsErr_toSysErr(-result);
+
+   iov_iter_advance(iter, result);
+   offset += result;
+
+   if(iter->count > 0)
    {
-      readRes = FhgfsOpsRemoting_readfile(iov.iov_base, iov.iov_len, offset, ioInfo,
-         BEEGFS_INODE(inode) );
-      if(readRes < 0)
-         break;
-
-      if(readRes < iov.iov_len)
-      {
-         result += readRes;
-         offset += readRes;
-         readRes = __FhgfsOps_readSparse(filp, iov.iov_base + readRes, iov.iov_len - readRes,
-            offset + readRes);
-
-         if(readRes < 0)
-            break;
-      }
+      ssize_t readRes = __FhgfsOps_readSparse(filp, iter->iov->iov_base + offset + result, iter->count,
+         offset + result);
 
       result += readRes;
-      offset += readRes;
 
-      if(readRes < iov.iov_len)
-         break;
+      iov_iter_advance(iter, readRes);
    }
 
    task_io_account_read(result);
 
    if(offset > i_size_read(inode) )
       i_size_write(inode, offset);
-
-   if(result == 0)
-      return FhgfsOpsErr_toSysErr(-readRes);
 
    return result;
 }
@@ -2101,10 +2087,6 @@ static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_
 
    App* app = FhgfsOps_getApp(dentry->d_sb);
 
-   struct iov_iter loopIter;
-   struct iovec iov;
-
-   ssize_t writeRes = 0;
    ssize_t result = 0;
 
    FhgfsOpsHelper_logOpDebug(app, dentry, inode, __func__, "pos: %lld, nr_segs: %lld",
@@ -2112,22 +2094,16 @@ static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_
    IGNORE_UNUSED_VARIABLE(app);
    IGNORE_UNUSED_VARIABLE(inode);
 
-   beegfs_iov_for_each(iov, loopIter, iter)
-   {
-      writeRes = FhgfsOpsRemoting_writefile(iov.iov_base, iov.iov_len, offset, ioInfo);
-      if(writeRes < 0)
-         break;
+   result = FhgfsOpsRemoting_writefileVec(iter, offset, ioInfo, false);
 
-      result += writeRes;
-      offset += writeRes;
-      if( (size_t) writeRes < iov.iov_len)
-         break;
-   }
+   if(result < 0)
+      return FhgfsOpsErr_toSysErr(-result);
+
+   iov_iter_advance(iter, result);
+
+   offset += result;
 
    task_io_account_write(result);
-
-   if(result == 0)
-      return FhgfsOpsErr_toSysErr(-writeRes);
 
    return result;
 }
@@ -2160,6 +2136,33 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
    return -EINVAL;
 }
 
+#if defined(KERNEL_HAS_IOV_DIO)
+static ssize_t beegfs_direct_IO(struct kiocb* iocb, struct iov_iter* iter)
+{
+   return __beegfs_direct_IO(iov_iter_rw(iter), iocb, iter, iocb->ki_pos);
+}
+#elif defined(KERNEL_HAS_LONG_IOV_DIO)
+static ssize_t beegfs_direct_IO(struct kiocb* iocb, struct iov_iter* iter, loff_t offset)
+{
+   return __beegfs_direct_IO(iov_iter_rw(iter), iocb, iter, offset);
+}
+#elif defined(KERNEL_HAS_DIRECT_IO_ITER)
+static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* iter, loff_t offset)
+{
+   return __beegfs_direct_IO(rw, iocb, iter, offset);
+}
+#else
+static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* iov, loff_t pos,
+      unsigned long nr_segs)
+{
+   struct iov_iter iter;
+
+   BEEGFS_IOV_ITER_INIT(&iter, rw & RW_MASK, iov, nr_segs, iov_length(iov, nr_segs) );
+
+   return __beegfs_direct_IO(rw, iocb, &iter, pos);
+}
+#endif
+
 static int beegfs_launderpage(struct page* page)
 {
    return beegfs_flush_page(page);
@@ -2171,6 +2174,7 @@ const struct address_space_operations fhgfs_addrspace_native_ops = {
    .releasepage = beegfs_releasepage,
    .set_page_dirty = beegfs_set_page_dirty,
    .invalidatepage = beegfs_invalidate_page,
+   .direct_IO = beegfs_direct_IO,
 
    .readpages = beegfs_readpages,
    .writepages = beegfs_writepages,

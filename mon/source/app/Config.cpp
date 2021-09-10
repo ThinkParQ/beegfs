@@ -12,6 +12,29 @@ Config::Config(int argc, char** argv): AbstractConfig(argc, argv)
    // check mandatory value
    if(getSysMgmtdHost().empty())
       throw InvalidConfigException("Management host undefined.");
+
+   // Load auth config file
+   if (!dbAuthFile.empty())
+   {
+      std::ifstream authConfig(dbAuthFile);
+
+      if (!authConfig.good())
+         throw InvalidConfigException("Could not open InfluxDB authentication file");
+
+      StringMap authMap;
+      MapTk::loadStringMapFromFile(dbAuthFile.c_str(), &authMap);
+
+      for (const auto& e : authMap) {
+         if (e.first == "password") {
+            dbAuthPassword = e.second;
+         } else if (e.first == "username") {
+            dbAuthUsername = e.second;
+         } else {
+            throw InvalidConfigException("The InfluxDB authentication file may only contain "
+                  "the options username and password");
+         }
+      }
+   }
 }
 
 void Config::loadDefaults(bool addDashes)
@@ -32,6 +55,7 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("dbHostName",                 "localhost");
    configMapRedefine("dbHostPort",                 "8086");
    configMapRedefine("dbDatabase",                 "beegfs_mon");
+   configMapRedefine("dbAuthFile",                 "");
 
    // those are used by influxdb only but are kept like this for compatibility
    configMapRedefine("dbMaxPointsPerRequest",      "5000");
@@ -108,7 +132,9 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       if (iter->first == std::string("dbDatabase"))
          dbDatabase = iter->second;
       else
-
+      if (iter->first == std::string("dbAuthFile"))
+         dbAuthFile = iter->second;
+      else
       // those are used by influxdb only but are kept like this for compatibility
       if (iter->first == std::string("dbMaxPointsPerRequest"))
          influxdbMaxPointsPerRequest = StringTk::strToUInt(iter->second);

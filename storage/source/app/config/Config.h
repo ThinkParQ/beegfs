@@ -30,6 +30,7 @@ class Config : public AbstractConfig
       std::string connInterfacesList; // comma-separated list
 
       std::list<Path> storageDirectories;
+      std::list<std::string> storeFsUUID;
       bool        storeAllowFirstRunInit;
 
       unsigned    tuneNumStreamListeners;
@@ -79,6 +80,11 @@ class Config : public AbstractConfig
       }
 
       const std::list<Path>& getStorageDirectories() const { return storageDirectories; }
+
+      const std::list<std::string>& getStoreFsUUID() const
+      {
+         return storeFsUUID;
+      }
 
       bool getStoreAllowFirstRunInit() const
       {

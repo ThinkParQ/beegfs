@@ -153,6 +153,7 @@ class App : public AbstractApp
       void initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID);
       void initLocalNodeNumIDFile(NumNodeID localNodeNumID) ;
       void preinitStorage();
+      void checkTargetsUUIDs();
       void initStorage();
       void initPostTargetRegistration();
       void initComponents();

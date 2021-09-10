@@ -20,6 +20,7 @@
 #define BEEGFS_PROC_ENTRY_LOGLEVELS           "log_levels"
 #define BEEGFS_PROC_ENTRY_METATARGETSTATES    "meta_target_state"
 #define BEEGFS_PROC_ENTRY_STORAGETARGETSTATES "storage_target_state"
+#define BEEGFS_PROC_ENTRY_REMAPCONNFAILURE    "remap_connection_failure"
 
 
 /**
@@ -106,6 +107,12 @@ static const struct fhgfs_proc_file_rw fhgfs_proc_files_rw[] =
       {
          BEEGFS_PROC_FOPS_INITIALIZER,
          .write   = &__ProcFs_writeV2_logLevels,
+      },
+   },
+   { BEEGFS_PROC_ENTRY_REMAPCONNFAILURE, &__ProcFs_read_remapConnectionFailure,
+      {
+         BEEGFS_PROC_FOPS_INITIALIZER,
+         .write   = &__ProcFs_write_remapConnectionFailure,
       },
    },
    { "", NULL,
@@ -254,6 +261,10 @@ void ProcFs_removeEntries(App* app)
 
    scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
       dirNameBuf, BEEGFS_PROC_ENTRY_RETRIESENABLED);
+   remove_proc_entry(entryNameBuf, NULL);
+
+   scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
+      dirNameBuf, BEEGFS_PROC_ENTRY_REMAPCONNFAILURE);
    remove_proc_entry(entryNameBuf, NULL);
 
    scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
@@ -458,6 +469,9 @@ int ProcFs_read_connRetriesEnabled(char* buf, char** start, off_t offset, int si
    return ProcFsHelper_read_connRetriesEnabled(buf, start, offset, size, eof, (App*)data);
 }
 
+/**
+ * @param data specified at entry creation
+ */
 ssize_t __ProcFs_writeV2_connRetriesEnabled(struct file *file, const char __user *buf,
    size_t count, loff_t *ppos)
 {
@@ -471,9 +485,6 @@ ssize_t __ProcFs_writeV2_connRetriesEnabled(struct file *file, const char __user
    return ProcFsHelper_write_connRetriesEnabled(buf, count, app);
 }
 
-/**
- * @param data specified at entry creation
- */
 int ProcFs_write_connRetriesEnabled(struct file* file, const char __user *buf,
    unsigned long count, void* data)
 {
@@ -482,6 +493,26 @@ int ProcFs_write_connRetriesEnabled(struct file* file, const char __user *buf,
       return -EFAULT;
 
    return ProcFsHelper_write_connRetriesEnabled(buf, count, (App*)data);
+}
+
+int __ProcFs_read_remapConnectionFailure(struct seq_file* file, void* p)
+{
+   App* app = file->private;
+
+   return ProcFsHelper_read_remapConnectionFailure(file, app);
+}
+
+ssize_t __ProcFs_write_remapConnectionFailure(struct file *file, const char __user *buf,
+   size_t count, loff_t *ppos)
+{
+   struct inode* procInode = file_inode(file);
+   App* app = __ProcFs_getProcParentDirEntryDataField(procInode); // (app is ->data in parent dir)
+
+   // check user buffer
+   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
+      return -EFAULT;
+
+   return ProcFsHelper_write_remapConnectionFailure(buf, count, app);
 }
 
 int __ProcFs_readV2_netBenchModeEnabled(struct seq_file* file, void* p)

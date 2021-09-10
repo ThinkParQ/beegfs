@@ -16,6 +16,7 @@
 #define GENDBGMSG_OP_RESYNCQUEUELEN         "resyncqueuelen"
 #define GENDBGMSG_OP_CHUNKLOCKSTORESIZE     "chunklockstoresize"
 #define GENDBGMSG_OP_CHUNKLOCKSTORECONTENTS "chunklockstore"
+#define GENDBGMSG_OP_SETREJECTIONRATE       "setrejectionrate"
 
 
 bool GenericDebugMsgEx::processIncoming(ResponseContext& ctx)
@@ -107,6 +108,9 @@ std::string GenericDebugMsgEx::processCommand()
    if(operation == GENDBGMSG_OP_LISTSTORAGESTATES)
       responseStr = MsgHelperGenericDebug::processOpListTargetStates(commandStream,
          app->getTargetStateStore() );
+   else
+   if(operation == GENDBGMSG_OP_SETREJECTIONRATE)
+      responseStr = processOpSetRejectionRate(commandStream);
    else
       responseStr = "Unknown/invalid operation";
 
@@ -404,5 +408,21 @@ std::string GenericDebugMsgEx::processOpChunkLockStoreContents(std::istringstrea
    }
 
    return outStream.str();
+}
+
+std::string GenericDebugMsgEx::processOpSetRejectionRate(std::istringstream& commandStream)
+{
+   App* app = Program::getApp();
+   Config* cfg = app->getConfig();
+   std::string rejectionRateStr;
+   std::ostringstream responseStream;
+
+   std::getline(commandStream, rejectionRateStr, ' ');
+   unsigned rejectionRate = StringTk::strToUInt(rejectionRateStr);
+
+   cfg->setConnectionRejectionRate(rejectionRate);
+
+   responseStream << "Setting connection reject rate to " << rejectionRate << std::endl;
+   return responseStream.str();
 }
 

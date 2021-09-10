@@ -163,6 +163,9 @@ struct IBVSocket
    CmEventQueue*                 delayedCmEventsQ;
 
    uint8_t                       typeOfService;
+
+   unsigned                      connectionRejectionRate;
+   unsigned                      connectionRejectionCount;
 };
 
 

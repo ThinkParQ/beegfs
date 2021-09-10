@@ -32,6 +32,10 @@ extern int ProcFsHelper_read_connRetriesEnabled(char* buf, char** start, off_t o
    int* eof, App* app);
 extern int ProcFsHelper_write_connRetriesEnabled(const char __user *buf,
    unsigned long count, App* app);
+
+extern int ProcFsHelper_read_remapConnectionFailure(struct seq_file* file, App* app);
+extern int ProcFsHelper_write_remapConnectionFailure(const char __user *buf, unsigned long count, App* app);
+
 extern int ProcFsHelper_read_netBenchModeEnabled(char* buf, char** start, off_t offset, int size,
    int* eof, App* app);
 extern int ProcFsHelper_write_netBenchModeEnabled(const char __user *buf,

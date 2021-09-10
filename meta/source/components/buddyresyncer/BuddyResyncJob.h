@@ -9,6 +9,7 @@
 #include <common/nodes/NumNodeID.h>
 #include <common/nodes/TargetStateInfo.h>
 
+#include <atomic>
 #include <mutex>
 
 class BuddyResyncerBulkSyncSlave;
@@ -22,8 +23,9 @@ class BuddyResyncJob : public PThread
 
       virtual void run();
 
-      void abort();
+      void abort(bool wait_for_completion);
       MetaBuddyResyncJobStatistics getJobStats();
+      std::atomic<unsigned int> threadCount{ 0 };
 
    private:
       BuddyResyncJobState state;
@@ -61,6 +63,16 @@ class BuddyResyncJob : public PThread
       void enqueue(MetaSyncCandidateFile syncCandidate, PThread* caller)
       {
          syncCandidates.add(std::move(syncCandidate), caller);
+      }
+
+      void registerOps()
+      {
+	 this->threadCount += 1;
+      }
+
+      void unregisterOps()
+      {
+	 this->threadCount -= 1;
       }
 
    private:

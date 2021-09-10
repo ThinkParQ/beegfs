@@ -11,10 +11,14 @@
 
 static const std::string retentionPolicyName = "auto";
 
-InfluxDB::InfluxDB(Config config) :
-   config(std::move(config)), numPoints(0)
+InfluxDB::InfluxDB(Config cfg) :
+   config(std::move(cfg))
 {
    curlWrapper = boost::make_unique<CurlWrapper>(config.httpTimeout, config.curlCheckSSLCertificates);
+
+   if (!config.username.empty())
+      curlWrapper->enableHttpAuth(config.username, config.password);
+
    setupDatabase();
 }
 

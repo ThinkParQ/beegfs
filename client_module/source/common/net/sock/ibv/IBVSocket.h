@@ -63,6 +63,8 @@ extern unsigned long IBVSocket_poll(IBVSocket* _this, short events, bool finishP
 
 // getters & setters
 extern void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService);
+extern void IBVSocket_setConnectionFailureStatus(IBVSocket* _this, unsigned value);
+
 
 struct IBVCommConfig
 {
@@ -217,6 +219,7 @@ struct IBVSocket
    volatile IBVSocketConnState_t connState;
 
    int                           typeOfService;
+   unsigned                      remapConnectionFailureStatus;
 };
 
 

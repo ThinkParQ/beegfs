@@ -478,6 +478,10 @@ IBVSocket_AcceptRes IBVSocket_accept(IBVSocket* _this, IBVSocket** outAcceptedSo
          conn_param.private_data = &acceptedSock->localDest;
          conn_param.private_data_len = sizeof(acceptedSock->localDest);
 
+        // test point for dropping the connect request
+        if(IBVSocket_connectionRejection(_this))
+           goto ignore;
+
          if(rdma_accept(child_cm_id, &conn_param) )
          {
             LOG(SOCKLIB, WARNING, "rdma_accept failed.");
@@ -2103,3 +2107,26 @@ void IBVSocket_setTypeOfService(IBVSocket* _this, uint8_t typeOfService)
 {
    _this->typeOfService = typeOfService;
 }
+
+void IBVSocket_setConnectionRejectionRate(IBVSocket* _this, unsigned rate)
+{
+   _this->connectionRejectionRate = rate;
+}
+
+bool IBVSocket_connectionRejection(IBVSocket* _this)
+{
+   if(_this->connectionRejectionRate)
+   {
+      ++_this->connectionRejectionCount;
+      if((_this->connectionRejectionCount % _this->connectionRejectionRate) != 0)
+      {
+         LOG(SOCKLIB, WARNING, "dropping connection for testing.",
+            _this->connectionRejectionCount,
+            _this->connectionRejectionRate);
+         return true;
+      }
+   }
+
+   return false;
+}
+

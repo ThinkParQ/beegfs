@@ -22,6 +22,8 @@ class CurlWrapper
 
       ~CurlWrapper() = default;
 
+      void enableHttpAuth(const std::string& user, const std::string& password);
+
       typedef std::unordered_map<std::string, std::string> ParameterMap;
 
       unsigned short sendGetRequest(const std::string& url,

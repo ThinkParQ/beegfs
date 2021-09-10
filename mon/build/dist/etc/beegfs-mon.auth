@@ -1,0 +1,5 @@
+# This file configures the credentials needed to connect to your monitoring database instance.
+# This currently only works with InfluxDB.
+
+username =
+password =

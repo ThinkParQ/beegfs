@@ -280,6 +280,9 @@ void ModeSetPattern::printHelp()
    std::cout << std::endl;
    std::cout << " This mode can be used by non-root users only if the administrator" << std::endl;
    std::cout << " enabled `sysAllowUserSetPattern` in the metadata server config." << std::endl;
+   std::cout << " This enables normal users to change the number of stripe targets" << std::endl;
+   std::cout << " (--numtargets) and the chunk size (--chunksize) for files that they" << std::endl;
+   std::cout << " own themselves. All other parameters can only be changed by root." << std::endl;
    std::cout << std::endl;
    std::cout << " Example: Set directory pattern to 1 megabyte chunks and 4 targets per file" << std::endl;
    std::cout << "  # beegfs-ctl --setpattern --chunksize=1m --numtargets=4 /mnt/beegfs/mydir" << std::endl;

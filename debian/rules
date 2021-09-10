@@ -80,6 +80,8 @@ override_dh_install:
 		debian/beegfs-mon.default
 	install -D -m644 mon/build/dist/etc/beegfs-mon.conf \
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.conf
+	install -D -m600 mon/build/dist/etc/beegfs-mon.auth \
+		debian/beegfs-mon/etc/beegfs/beegfs-mon.auth
 	@# mon-grafana
 	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
 	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/lib/grafana

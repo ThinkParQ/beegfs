@@ -59,6 +59,9 @@ extern int IBVSocket_getRecvCompletionFD(IBVSocket* _this);
 extern int IBVSocket_getConnManagerFD(IBVSocket* _this);
 extern void IBVSocket_setTypeOfService(IBVSocket* _this, uint8_t typeOfService);
 
+// testing methods
+extern void IBVSocket_setConnectionRejectionRate(IBVSocket* _this, unsigned rate);
+extern bool IBVSocket_connectionRejection(IBVSocket* _this);
 
 
 struct IBVCommConfig

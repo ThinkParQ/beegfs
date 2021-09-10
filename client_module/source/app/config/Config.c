@@ -261,6 +261,8 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "quotaEnabled",                     "false");
    _Config_configMapRedefine(this, "sysFileEventLogMask",              EVENTLOGMASK_NONE);
    _Config_configMapRedefine(this, "sysRenameEbusyAsXdev",             "false");
+
+   _Config_configMapRedefine(this, "remapConnectionFailureStatus",     "0");
 }
 
 bool _Config_applyConfigMap(Config* this, bool enableException)
@@ -566,6 +568,8 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
             StrCpyList_uninit(&parts);
          }
       }
+      else if(!strcmp(keyStr, "remapConnectionFailureStatus"))
+         this->remapConnectionFailureStatus = StringTk_strToUInt(valueStr);
       else
       { // unknown element occurred
 bad_config_elem:

@@ -84,5 +84,9 @@ void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService)
 }
 
 
+void IBVSocket_setConnectionFailureStatus(IBVSocket* _this, unsigned value)
+{
+}
+
 #endif
 

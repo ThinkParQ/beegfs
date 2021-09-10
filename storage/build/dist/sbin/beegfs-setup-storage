@@ -9,6 +9,7 @@ DEFAULT_CFG_PATH="/etc/beegfs/beegfs-storage.conf"
 STORAGE_PATH_CFG_KEY="storeStorageDirectory"
 MGMTD_CFG_KEY="sysMgmtdHost"
 ALLOW_INIT_CFG_KEY="storeAllowFirstRunInit"
+FS_UUID_CFG_KEY="storeFsUUID"
 TARGET_NUMID_FILE="targetNumID"
 TARGET_STRID_FILE="targetID"
 SERVER_NUMID_FILE="nodeNumID"
@@ -70,7 +71,7 @@ print_usage()
 	echo "               (Default: Use hostname as ID.)"
 	echo
 	echo "   -u        - Do not disable usage of uninitialized target directories in"
-	echo "               config file."
+	echo "               config file and do not store the UUID of the underlying fs."
 	echo
 	echo "NOTES:"
 	echo " * All given IDs must be unique in their service class for the whole file system"
@@ -209,6 +210,7 @@ update_config_file()
 			if [ "$GREP_RES" -eq 0 ] && [ -z "${FORCE_ACTIONS}" ]; then
 				echo " * WARNING: Skipping append. Target directory seems to be included in" \
 				"current targets list already. ('-f' disables this check.)"
+				APPEND_SKIPPED=1
 			else
 				sed -i "s|\(^${STORAGE_PATH_CFG_KEY}.*=.*$\)|\0 ,${STORAGE_PATH}|" ${CFG_PATH}
 			fi
@@ -220,6 +222,17 @@ update_config_file()
 	if [ -n "${DISABLE_UNINITED_TARGETS}" ] && [ -n "${STORAGE_PATH}" ]; then
 		echo " * Disabling usage of uninitialized storage targets in config file..."
 		sed -i "s/\(^${ALLOW_INIT_CFG_KEY}.*=\).*/\1 false/" ${CFG_PATH}
+
+		if [ -z "${APPEND_SKIPPED}" ]; then
+			echo " * Fetching the underlying device..."
+			DEVICE=$(df "${STORAGE_PATH}" | tail -n1 | cut -d\  -f1)
+			echo "Underlying device detected: ${DEVICE}"
+			echo "Fetching UUID of the file system on that device..."
+			UUID=$(blkid -s UUID ${DEVICE} | cut -d= -f2 | sed "s/\"//g")
+			echo "Found UUID ${UUID}"
+			echo "Appending UUID to config file..."
+			sed -i "s|\(^${FS_UUID_CFG_KEY}.*=.*$\)|\0 ,${UUID}|" ${CFG_PATH}
+		fi
 	fi
 }
 

@@ -27,6 +27,7 @@ class Config : public AbstractConfig
       std::string dbHostName;
       unsigned dbHostPort;
       std::string dbDatabase;
+      std::string dbAuthFile;
       unsigned influxdbMaxPointsPerRequest;
       bool influxdbSetRetentionPolicy;
       std::string influxdbRetentionDuration;
@@ -38,6 +39,9 @@ class Config : public AbstractConfig
       std::chrono::seconds statsRequestInterval;
       std::chrono::seconds nodelistRequestInterval;
       bool curlCheckSSLCertificates;
+
+      std::string dbAuthUsername;
+      std::string dbAuthPassword;
 
       virtual void loadDefaults(bool addDashes) override;
       virtual void applyConfigMap(bool enableException, bool addDashes) override;
@@ -134,6 +138,16 @@ class Config : public AbstractConfig
       const std::chrono::seconds& getNodelistRequestInterval() const
       {
          return nodelistRequestInterval;
+      }
+
+      const std::string& getDbAuthUsername() const
+      {
+         return dbAuthUsername;
+      }
+
+      const std::string& getDbAuthPassword() const
+      {
+         return dbAuthPassword;
       }
 
       bool getCurlCheckSSLCertificates() const

@@ -88,6 +88,8 @@ static inline bool Config_getConnUnmountRetries(Config* this);
 static inline unsigned Config_getConnRDMABufSize(Config* this);
 static inline unsigned Config_getConnRDMABufNum(Config* this);
 static inline int Config_getConnRDMATypeOfService(Config* this);
+static inline unsigned Config_getRemapConnectionFailureStatus(Config* this);
+static inline void Config_setRemapConnectionFailureStatus(Config* this, unsigned status);
 static inline char* Config_getConnNetFilterFile(Config* this);
 static inline unsigned Config_getConnMaxConcurrentAttempts(Config* this);
 static inline uint64_t Config_getConnAuthHash(Config* this);
@@ -239,6 +241,9 @@ struct Config
 
    // internals
    StrCpyMap configMap;
+
+   // testing
+   unsigned  remapConnectionFailureStatus;
 };
 
 char* Config_getCfgFile(Config* this)
@@ -343,6 +348,16 @@ unsigned Config_getConnRDMABufNum(Config* this)
 int Config_getConnRDMATypeOfService(Config* this)
 {
    return this->connRDMATypeOfService;
+}
+
+unsigned Config_getRemapConnectionFailureStatus(Config* this)
+{
+   return this->remapConnectionFailureStatus;
+}
+
+void Config_setRemapConnectionFailureStatus(Config* this, unsigned status)
+{
+   this->remapConnectionFailureStatus = status;
 }
 
 char* Config_getConnNetFilterFile(Config* this)

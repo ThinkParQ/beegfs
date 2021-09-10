@@ -20,6 +20,7 @@ class GenericDebugMsgEx : public GenericDebugMsg
       std::string processOpResyncQueueLen(std::istringstream& commandStream);
       std::string processOpChunkLockStoreSize(std::istringstream& commandStream);
       std::string processOpChunkLockStoreContents(std::istringstream& commandStream);
+      std::string processOpSetRejectionRate(std::istringstream& commandStream);
 };
 
 #endif /* GENERICDEBUGMSGEX_H_ */

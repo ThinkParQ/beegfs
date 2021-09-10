@@ -622,6 +622,7 @@ bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* soc
       RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
          Config_getConnRDMABufSize(cfg) );
       RDMASocket_setTypeOfService(rdmaSock, Config_getConnRDMATypeOfService(cfg));
+      RDMASocket_setConnectionFailureStatus(rdmaSock, Config_getRemapConnectionFailureStatus(cfg));
    }
 
    return true;

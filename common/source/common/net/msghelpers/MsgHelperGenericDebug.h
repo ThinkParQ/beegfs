@@ -20,6 +20,7 @@
 #define GENDBGMSG_OP_LISTMETASTATES       "listmetastates"
 #define GENDBGMSG_OP_LISTSTORAGESTATES    "liststoragestates"
 #define GENDBGMSG_OP_LISTSTORAGEPOOLS     "liststoragepools"
+#define GENDBGMSG_OP_SETREJECTIONRATE     "setrejectionrate"
 
 
 class MsgHelperGenericDebug

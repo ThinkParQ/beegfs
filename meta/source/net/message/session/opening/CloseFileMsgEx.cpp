@@ -108,7 +108,10 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
          addMsgHeaderFeatureFlag(CLOSEFILEMSG_FLAG_DYNATTRIBS);
 
       //Avoid sending early response. Let unlink of Disposal file happens.
-      //with Locks held.
+      //with Locks held. But make sure before file gets unlink we synchronise
+      //the operation with any on-going buddy mirror resync operation.
+      ResponseState responseState(closeRes);
+      buddyResyncNotify(ctx, responseState.changesObservableState());
    }
 
    if (closeSucceeded && Program::getApp()->getFileEventLogger() && getFileEvent())
@@ -134,10 +137,10 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
             entryInfo->getIsBuddyMirrored());
    }
 
-   //for alternative 2: forward the operation to secondary through earlyComplete only
+   //for alternative 2: forward the operation to secondary
    //after unlinkDisposalFile on primary is complete.
    if(!isMsgHeaderFeatureFlagSet(CLOSEFILEMSG_FLAG_EARLYRESPONSE))
-      earlyComplete(ctx, ResponseState(closeRes));
+      return boost::make_unique<ResponseState>(closeRes);
 
    return {};
 }

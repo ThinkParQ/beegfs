@@ -59,6 +59,13 @@ class RDMASocketImpl : public RDMASocket
          IBVSocket_setTypeOfService(ibvsock, typeOfService);
       }
 
+     /**
+      * Note: Only has an effect for testing.
+      */
+     virtual void setConnectionRejectionRate(unsigned rate) override
+     {
+        IBVSocket_setConnectionRejectionRate(ibvsock, rate);
+     }
 };
 
 extern "C" {

@@ -30,6 +30,7 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("connInterfacesList",       "");
 
    configMapRedefine("storeStorageDirectory",    "");
+   configMapRedefine("storeFsUUID",              "");
    configMapRedefine("storeAllowFirstRunInit",   "true");
 
    configMapRedefine("tuneNumStreamListeners",        "1");
@@ -109,6 +110,22 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
                   return Path(StringTk::trim(p));
                });
          storageDirectories.remove_if(std::mem_fn(&Path::empty));
+      }
+      else if (iter->first == std::string("storeFsUUID"))
+      {
+         storeFsUUID.clear();
+
+         std::list<std::string> split;
+
+         StringTk::explode(iter->second, CONFIG_STORAGETARGETS_DELIMITER, &split);
+
+         std::transform(
+               split.begin(), split.end(),
+               std::back_inserter(storeFsUUID),
+               [] (const std::string& p) {
+                  return StringTk::trim(p);
+               });
+         storeFsUUID.remove_if(std::mem_fn(&std::string::empty));
       }
       else if (iter->first == std::string("storeAllowFirstRunInit"))
          storeAllowFirstRunInit = StringTk::strToBool(iter->second);

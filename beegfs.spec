@@ -236,7 +236,8 @@ install -D helperd/build/dist/etc/default/beegfs-helperd ${RPM_BUILD_ROOT}/etc/d
 ########## mon extra files
 ##########
 
-cp -a mon/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs/
+install -D -m644 mon/build/dist/etc/beegfs-mon.conf ${RPM_BUILD_ROOT}/etc/beegfs
+install -D -m600 mon/build/dist/etc/beegfs-mon.auth ${RPM_BUILD_ROOT}/etc/beegfs
 
 # we use the redhat script for all rpm distros, as we now provide our own
 # daemon() and killproc() function library (derived from redhat)
@@ -542,6 +543,7 @@ This package contains the BeeGFS mon server binaries.
 %files mon
 %defattr(-,root,root)
 %config(noreplace) /etc/beegfs/beegfs-mon.conf
+%config(noreplace) /etc/beegfs/beegfs-mon.auth
 %config(noreplace) /etc/default/beegfs-mon
 /etc/init.d/beegfs-mon
 /opt/beegfs/sbin/beegfs-mon

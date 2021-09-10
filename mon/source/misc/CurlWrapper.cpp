@@ -38,6 +38,19 @@ CurlWrapper::CurlWrapper(std::chrono::milliseconds timeout, bool checkSSLCertifi
    }
 }
 
+void CurlWrapper::enableHttpAuth(const std::string& user, const std::string& password)
+{
+   if (curl_easy_setopt(curlHandle.get(), CURLOPT_HTTPAUTH, CURLAUTH_ANY))
+      throw CurlException(errorBuffer);
+
+   if (curl_easy_setopt(curlHandle.get(), CURLOPT_USERNAME, user.c_str()))
+      throw CurlException(errorBuffer);
+
+   if (curl_easy_setopt(curlHandle.get(), CURLOPT_PASSWORD, password.c_str()))
+      throw CurlException(errorBuffer);
+}
+
+
 unsigned short CurlWrapper::sendGetRequest(const std::string& url, const ParameterMap& parameters)
 {
    std::string parameterStr = makeParameterStr(parameters);

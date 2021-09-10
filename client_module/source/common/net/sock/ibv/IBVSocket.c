@@ -98,6 +98,13 @@ bool __IBVSocket_createNewID(IBVSocket* _this)
 {
    struct rdma_cm_id* new_cm_id;
 
+   // We need to unconditionally destroy the old CM id.  It is unusable at this point.
+   if(_this->cm_id)
+   {
+      rdma_destroy_id(_this->cm_id);
+      _this->cm_id = NULL;
+   }
+
    #if defined(OFED_HAS_NETNS) || defined(rdma_create_id)
       new_cm_id = rdma_create_id(&init_net, __IBVSocket_cmaHandler, _this, RDMA_PS_TCP, IB_QPT_RC);
    #elif defined(OFED_HAS_RDMA_CREATE_QPTYPE)
@@ -111,9 +118,6 @@ bool __IBVSocket_createNewID(IBVSocket* _this)
       ibv_print_info("rdma_create_id failed. ErrCode: %ld\n", PTR_ERR(new_cm_id) );
       return false;
    }
-
-   if(_this->cm_id)
-      rdma_destroy_id(_this->cm_id);
 
    _this->cm_id = new_cm_id;
 
@@ -192,6 +196,11 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       wait_event_interruptible(_this->eventWaitQ,
          _this->connState != IBVSOCKETCONNSTATE_ROUTERESOLVED);
 
+      // test point for failed connections
+      if((_this->connState != IBVSOCKETCONNSTATE_ESTABLISHED) &&
+         (_this->remapConnectionFailureStatus != 0))
+            _this->connState = _this->remapConnectionFailureStatus;
+
       // check if cm_id was reported as stale by remote side
       if(_this->connState == IBVSOCKETCONNSTATE_REJECTED_STALE)
       {
@@ -200,14 +209,19 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
          if(!numStaleRetriesLeft)
          { // no more stale retries left
             if(IBVSOCKET_STALE_RETRIES_NUM) // did we have any retries at all
-               ibv_print_info("Giving up after %d stale cm_id retries\n",
+               ibv_print_info("Giving up after %d stale connection retries\n",
                   IBVSOCKET_STALE_RETRIES_NUM);
 
             goto err_invalidateSock;
          }
 
-         printk_fhgfs_connerr(KERN_INFO, "Stale cm_id detected. Retrying with a new one...\n");
+         // We need to clean up the commContext created in the routeResolvedHandler because
+         // the next time through the loop it will get recreated.  If this is the final try,
+         // then we don't need it anymore.
+         __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
+         _this->commContext = NULL;
 
+         printk_fhgfs_connerr(KERN_INFO, "Stale connection detected. Retrying with a new one...\n");
          createIDRes = __IBVSocket_createNewID(_this);
          if(!createIDRes)
             goto err_invalidateSock;
@@ -223,7 +237,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
 
       if(numStaleRetriesLeft != IBVSOCKET_STALE_RETRIES_NUM)
       {
-         ibv_print_info_debug("Succeeded after %d stale cm_id retries\n",
+         ibv_print_info_debug("Succeeded after %d stale connection retries\n",
             IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft);
       }
 
@@ -232,8 +246,14 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
 
 
 err_invalidateSock:
-   _this->errState = -1;
+   // If we have a comm context, we need to delete it since we can't use it.
+   if (_this->commContext)
+   {
+      __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
+      _this->commContext = NULL;
+   }
 
+   _this->errState = -1;
    return false;
 }
 
@@ -498,6 +518,11 @@ void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService)
 }
 
 
+void IBVSocket_setConnectionFailureStatus(IBVSocket* _this, unsigned value)
+{
+   _this->remapConnectionFailureStatus = value;
+}
+
 
 bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    IBVCommConfig* commCfg, IBVCommContext** outCommContext)
@@ -510,6 +535,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    commContext = kzalloc(sizeof(*commContext), GFP_KERNEL);
    if(!commContext)
       goto err_cleanup;
+   ibv_print_info("Alloc CommContext @ %px\n", commContext);
 
    // prepare recv and send event notification
 
@@ -759,6 +785,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
 
 cleanup_no_dev:
 
+   ibv_print_info("Free CommContext @ %px\n", commContext);
    kfree(commContext);
 }
 

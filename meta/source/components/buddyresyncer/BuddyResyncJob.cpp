@@ -281,7 +281,7 @@ void BuddyResyncJob::stopAllWorkersOn(Barrier& barrier)
    barrier.wait(); // Wait until all workers are blocked.
 }
 
-void BuddyResyncJob::abort()
+void BuddyResyncJob::abort(bool wait_for_completion)
 {
    setState(BuddyResyncJobState_INTERRUPTED);
 
@@ -295,6 +295,30 @@ void BuddyResyncJob::abort()
    }
 
    modSyncSlave->selfTerminate();
+
+   int retry = 600;
+   /* Wait till all on-going thread events are fetched or max 30mins.
+    * (fetch waits for 3secs if there are no files to be fetched)
+    */
+   if (wait_for_completion)
+   {
+      modSyncSlave->join();
+      while (threadCount > 0 && retry)
+      {
+         LOG(MIRRORING, WARNING, "Wait for pending worker threads to finish");
+         if (!syncCandidates.isFilesEmpty())
+         {
+            MetaSyncCandidateFile candidate;
+            syncCandidates.fetch(candidate, this);
+            candidate.signal();
+         }
+         retry--;
+      }
+      if (threadCount)
+         LOG(MIRRORING, ERR, "Cleanup of aborted resync failed: I/O worker threads"
+                           " did not finish properly: ",
+                           ("threadCount", threadCount.load()));
+   }
 }
 
 bool BuddyResyncJob::startGatherSlaves()

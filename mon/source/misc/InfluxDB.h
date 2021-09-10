@@ -24,9 +24,11 @@ class InfluxDB : public TSDatabase
          bool setRetentionPolicy;
          std::string retentionDuration;
          bool curlCheckSSLCertificates;
+         std::string username;
+         std::string password;
       };
 
-      InfluxDB(Config config);
+      InfluxDB(Config cfg);
       virtual ~InfluxDB() {};
 
       virtual void insertMetaNodeData(
@@ -52,7 +54,7 @@ class InfluxDB : public TSDatabase
       std::unique_ptr<CurlWrapper> curlWrapper;
 
       std::string points;
-      unsigned numPoints;
+      unsigned numPoints = 0;
 
       mutable Mutex pointsMutex;
       mutable Mutex curlMutex;

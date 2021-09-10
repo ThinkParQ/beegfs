@@ -46,6 +46,9 @@ class ICommonConfig
       std::string sysMgmtdHost;
       unsigned    sysUpdateTargetStatesSecs;
 
+      int         connectionRejectionRate;
+      int         connectionRejectionCount;
+
    public:
       // getters & setters
       LogType getLogType() const
@@ -186,6 +189,17 @@ class ICommonConfig
       unsigned getSysUpdateTargetStatesSecs() const
       {
          return sysUpdateTargetStatesSecs;
+      }
+
+      unsigned getConnectionRejectionRate() const
+      {
+         return connectionRejectionRate;
+      }
+
+      void setConnectionRejectionRate(unsigned rate)
+      {
+         connectionRejectionRate = rate;
+         connectionRejectionCount = 0;
       }
 };
 

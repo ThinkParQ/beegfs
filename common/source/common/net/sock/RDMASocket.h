@@ -28,6 +28,8 @@ class RDMASocket : public PooledSocket
 
       virtual void setBuffers(unsigned bufNum, unsigned bufSize) = 0;
       virtual void setTypeOfService(uint8_t typeOfService) = 0;
+
+      virtual void setConnectionRejectionRate(unsigned rate) = 0;
 };
 
 

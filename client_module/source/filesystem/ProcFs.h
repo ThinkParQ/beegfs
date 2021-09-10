@@ -39,6 +39,10 @@ extern ssize_t __ProcFs_writeV2_dropConns(struct file *file, const char __user *
 extern ssize_t __ProcFs_writeV2_logLevels(struct file *file, const char __user *buf,
    size_t count, loff_t *ppos);
 
+extern int __ProcFs_read_remapConnectionFailure(struct seq_file* file, void* p);
+extern ssize_t __ProcFs_write_remapConnectionFailure(struct file *file, const char __user *buf,
+   size_t count, loff_t *ppos);
+
 extern int ProcFs_read_nothing(
    char* buf, char** start, off_t offset, int size, int* eof,void* data);
 extern int ProcFs_read_config(
@@ -60,12 +64,16 @@ extern int ProcFs_read_storageTargetStates(
 
 extern int ProcFs_read_connRetriesEnabled(char* buf, char** start, off_t offset, int size, int* eof,
    void* data);
+extern unsigned ProcFs_read_remapConnectionFailure(char* buf, char** start, off_t offset, int size, int* eof,
+   void* data);
 extern int ProcFs_read_netBenchModeEnabled(char* buf, char** start, off_t offset, int size,
    int* eof, void* data);
 extern int ProcFs_read_logLevels(char* buf, char** start, off_t offset, int size, int* eof,
    void* data);
 
 extern int ProcFs_write_connRetriesEnabled(struct file* file, const char __user *buf,
+   unsigned long count, void* data);
+extern int ProcFs_write_remapConnectionFailure(struct file* file, const char __user *buf,
    unsigned long count, void* data);
 extern int ProcFs_write_netBenchModeEnabled(struct file* file, const char __user *buf,
    unsigned long count, void* data);

@@ -37,6 +37,7 @@ extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finish
 // inliners
 static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
+static inline void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value);
 
 struct RDMASocket
 {
@@ -62,6 +63,14 @@ void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize)
 void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService)
 {
    IBVSocket_setTypeOfService(&this->ibvsock, typeOfService);
+}
+
+/**
+ * Note: Only has an effect for unconnected sockets.
+ */
+void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value)
+{
+   IBVSocket_setConnectionFailureStatus(&this->ibvsock, value);
 }
 
 #endif /*OPEN_RDMASOCKET_H_*/

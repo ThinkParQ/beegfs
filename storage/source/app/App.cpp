@@ -18,12 +18,18 @@
 #include <components/streamlistenerv2/StorageStreamListenerV2.h>
 #include <program/Program.h>
 #include <toolkit/StorageTkEx.h>
+#include <boost/format.hpp>
 #include "App.h"
 
 #include <csignal>
 #include <syslog.h>
 #include <sys/resource.h>
 #include <dlfcn.h>
+#include <blkid/blkid.h>
+#include <uuid/uuid.h>
+#include <fstream>
+#include <sstream>
+
 
 
 
@@ -191,6 +197,7 @@ void App::runNormal()
    preinitStorage(); // locks target dirs => call before anything else that accesses the disk
 
    initLogging();
+   checkTargetsUUIDs();
    initLocalNodeIDs(localNodeID, localNodeNumID);
    initDataObjects();
    initBasicNetwork();
@@ -1466,4 +1473,94 @@ bool App::closeLibZfs()
    }
 
    return true;
+}
+
+void App::checkTargetsUUIDs()
+{
+   if (!cfg->getStoreFsUUID().empty())
+   {
+      std::list<Path> paths = cfg->getStorageDirectories();
+      std::list<std::string> uuid_strs = cfg->getStoreFsUUID();
+
+      if (paths.size() != uuid_strs.size()) {
+         throw InvalidConfigException("Storage path list and storage UUID list have different sizes");
+      }
+
+      auto path = paths.begin();
+      auto cfg_uuid_str = uuid_strs.begin();
+
+      for(; path != paths.end() && cfg_uuid_str != uuid_strs.end(); ++path, ++cfg_uuid_str) {
+
+         // Find out device numbers of underlying device
+         struct stat st;
+
+         if (stat(path->str().c_str(), &st)) {
+            throw InvalidConfigException("Could not stat target directory: " + path->str());
+         }
+
+         // look for the device path
+         std::ifstream mountInfo("/proc/self/mountinfo");
+
+         if (!mountInfo) {
+            throw InvalidConfigException("Could not open /proc/self/mountinfo");
+         }
+
+         std::string line, device_path, device_majmin;
+         while (std::getline(mountInfo, line)) {
+            std::istringstream is(line);
+            std::string dummy;
+            is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;
+
+            auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);
+
+            if (majmin_f.str() == device_majmin)
+               break;
+
+            device_path = "";
+         }
+
+         if (device_path.empty()) {
+            throw InvalidConfigException("Could not find a device path that belongs to device " + device_majmin);
+         }
+
+         // Lookup the fs UUID
+         std::unique_ptr<blkid_struct_probe, void(*)(blkid_struct_probe*)>
+               probe(blkid_new_probe_from_filename(device_path.data()), blkid_free_probe);
+
+         if (!probe) {
+            throw InvalidConfigException("Failed to open device for probing: " + device_path);
+         }
+
+         if (blkid_probe_enable_superblocks(probe.get(), 1) < 0) {
+            throw InvalidConfigException("Failed to enable superblock probing");
+         }
+
+         if (blkid_do_fullprobe(probe.get()) < 0) {
+            throw InvalidConfigException("Failed to probe device");
+         }
+
+         const char* uuid = nullptr; // gets released automatically
+         if (blkid_probe_lookup_value(probe.get(), "UUID", &uuid, nullptr) < 0) {
+            throw InvalidConfigException("Failed to lookup file system UUID");
+         }
+
+         std::string uuid_str(uuid);
+
+         if (*cfg_uuid_str != uuid_str)
+         {
+            throw InvalidConfigException("UUID of the file system under the storage target "
+                  + path->str() + " (" + uuid_str
+                  + ") does not match the one configured (" + *cfg_uuid_str + ")");
+         }
+
+      }
+   }
+   else
+   {
+      LOG(GENERAL, WARNING, "UUIDs of targets underlying file systems have not been configured and will "
+            "therefore not be checked. To prevent starting the server accidentally with the wrong "
+            "data, it is strongly recommended to set the storeFsUUID config parameter to "
+            "the appropriate UUIDs.");
+   }
+
 }

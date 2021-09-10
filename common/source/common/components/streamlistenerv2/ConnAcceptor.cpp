@@ -265,6 +265,7 @@ void ConnAcceptor::onIncomingStandardConnection(StandardSocket* sock)
  */
 void ConnAcceptor::onIncomingRDMAConnection(RDMASocket* sock)
 {
+   auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
    /* accept the incoming connection (and loop until no more delayed events are waiting on
          this socket) */
    // (Note: RDMASockets use this internally also to handle other kindes of events) */
@@ -281,6 +282,7 @@ void ConnAcceptor::onIncomingRDMAConnection(RDMASocket* sock)
          struct sockaddr_in peerAddr;
          socklen_t peerAddrLen = sizeof(peerAddr);
 
+         sock->setConnectionRejectionRate(cfg->getConnectionRejectionRate());
          RDMASocket* acceptedSock =
             (RDMASocket*)sock->accept( (struct sockaddr*)&peerAddr, &peerAddrLen);
 

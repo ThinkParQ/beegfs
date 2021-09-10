@@ -54,7 +54,7 @@ void BuddyResyncerBulkSyncSlave::syncLoop()
             continue;
 
          numDirErrors.increase();
-         parentJob->abort();
+         parentJob->abort(false);
          return;
       }
 
@@ -88,7 +88,7 @@ void BuddyResyncerBulkSyncSlave::syncLoop()
       if (resyncRes != FhgfsOpsErr_SUCCESS)
       {
          numDirErrors.increase();
-         parentJob->abort();
+         parentJob->abort(false);
          return;
       }
       else

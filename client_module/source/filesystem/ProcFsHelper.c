@@ -891,6 +891,51 @@ out_fault:
    return retVal;
 }
 
+int ProcFsHelper_read_remapConnectionFailure(struct seq_file* file, App* app)
+{
+   Config* cfg = App_getConfig(app);
+   unsigned remapConnectionFailure = Config_getRemapConnectionFailureStatus(cfg);
+
+   seq_printf(file, "%d\n", remapConnectionFailure);
+
+   return 0;
+}
+
+int ProcFsHelper_write_remapConnectionFailure(const char __user *buf, unsigned long count, App* app)
+{
+   int retVal;
+   long copyVal;
+   Config* cfg = App_getConfig(app);
+
+   char* kernelBuf;
+   char* trimCopy;
+   unsigned remapConnectionFailure;
+
+   kernelBuf = os_kmalloc(count+1); // +1 for zero-term
+   kernelBuf[count] = 0;
+
+   copyVal = __copy_from_user(kernelBuf, buf, count);
+   if (copyVal != 0)
+   {
+      retVal = -EFAULT;
+      goto out_fault;
+   }
+
+   trimCopy = StringTk_trimCopy(kernelBuf);
+
+   remapConnectionFailure = StringTk_strToInt(trimCopy);
+   Config_setRemapConnectionFailureStatus(cfg, remapConnectionFailure);
+
+   retVal = count;
+
+   kfree(trimCopy);
+
+out_fault:
+   kfree(kernelBuf);
+
+   return retVal;
+}
+
 int ProcFsHelper_readV2_netBenchModeEnabled(struct seq_file* file, App* app)
 {
    bool netBenchModeEnabled = App_getNetBenchModeEnabled(app);

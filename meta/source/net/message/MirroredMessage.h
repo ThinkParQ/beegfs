@@ -131,7 +131,10 @@ class MirroredMessage : public BaseT
          else
          {
             if (resyncJob && resyncJob->isRunning())
+	    {
                BuddyResyncer::registerSyncChangeset();
+	       resyncJob->registerOps();
+	    }
 
             auto responseState = executeLocally(ctx,
                isMirrored() && this->hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond));
@@ -158,6 +161,22 @@ class MirroredMessage : public BaseT
          IncomingPreprocessedMsgWork::releaseSocket(Program::getApp(), &sock, this);
       }
 
+      void buddyResyncNotify(NetMessage::ResponseContext& ctx, bool stateChanged)
+      {
+         // pairs with the memory barrier before acquireMirrorStateSlot
+         __sync_synchronize();
+
+         if (BuddyResyncer::getSyncChangeset())
+         {
+            if (isMirrored() &&
+                  !this->hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond) &&
+                  stateChanged)
+               BuddyResyncer::commitThreadChangeSet();
+            else
+               BuddyResyncer::abandonSyncChangeset();
+         }
+      }
+
       void finishOperation(NetMessage::ResponseContext& ctx,
          std::unique_ptr<MirroredMessageResponseState> state)
       {
@@ -181,6 +200,7 @@ class MirroredMessage : public BaseT
 
          if (BuddyResyncer::getSyncChangeset())
          {
+	    resyncJob = Program::getApp()->getBuddyResyncer()->getResyncJob();
             if (isMirrored() &&
                   !this->hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond) &&
                   responsePtr &&
@@ -188,6 +208,8 @@ class MirroredMessage : public BaseT
                BuddyResyncer::commitThreadChangeSet();
             else
                BuddyResyncer::abandonSyncChangeset();
+
+	    resyncJob->unregisterOps();
          }
 
          if (responsePtr)
