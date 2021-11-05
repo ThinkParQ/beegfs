@@ -14,6 +14,7 @@ class ModeGetEntryInfo : public Mode
       ModeGetEntryInfo()
       {
          this->cfgReadFromStdin = false;
+         this->cfgNullDelim = false;
          this->cfgUseMountedPath = true;
          this->cfgVerbose = false;
          this->cfgShowTargetMappings = true;
@@ -29,11 +30,13 @@ class ModeGetEntryInfo : public Mode
       bool cfgUseMountedPath; // false if user-given path is relative to FhGFS mountpoint
       bool cfgReadFromStdin;
       bool cfgVerbose;
+      bool cfgNullDelim;
       bool cfgShowTargetMappings; // show the servers to which stripe targets are mapped
 
       bool getAndPrintEntryInfo(Node& ownerNode, EntryInfo* entryInfo, PathInfo* outPathInfo);
       void printPattern(StripePattern* pattern, DirEntryType entryType);
       void printTargetMapping(uint16_t targetID);
+      void getPathFromStdin();
 };
 
 #endif /*MODEGETENTRYINFO_H_*/

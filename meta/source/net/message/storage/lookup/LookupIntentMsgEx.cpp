@@ -350,7 +350,8 @@ FhgfsOpsErr LookupIntentMsgEx::open(EntryInfo* entryInfo, std::string* outFileHa
    bool useQuota = isMsgHeaderFeatureFlagSet(LOOKUPINTENTMSG_FLAG_USE_QUOTA);
 
    FhgfsOpsErr openRes = MsgHelperOpen::openFile(
-      entryInfo, getAccessFlags(), useQuota, getMsgHeaderUserID(), inode);
+      entryInfo, getAccessFlags(), useQuota, getMsgHeaderUserID(), inode,
+      isSecondary);
 
    if (openRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
       fixInodeTimestamp(*inode, fileTimestamps, entryInfo);

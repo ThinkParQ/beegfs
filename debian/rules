@@ -83,8 +83,8 @@ override_dh_install:
 	install -D -m600 mon/build/dist/etc/beegfs-mon.auth \
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.auth
 	@# mon-grafana
-	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
-	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/lib/grafana
+	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
+	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
 	@# upgraders
 	install -D upgrade/beegfs_mirror_md/build/beegfs-mirror-md \
 		debian/beegfs-mirror-md/opt/beegfs/sbin/beegfs-mirror-md
@@ -150,8 +150,6 @@ override_dh_install:
 		debian/beegfs-client.default
 	install -D -m644 client_module/build/dist/etc/beegfs-client.conf \
 		debian/beegfs-client/etc/beegfs/beegfs-client.conf
-	install -D -m644 client_module/build/dist/etc/beegfs-client-build.mk \
-		debian/beegfs-client/etc/beegfs/beegfs-client-build.mk
 	install -D -m644 client_module/build/dist/etc/beegfs-client-autobuild.conf \
 		debian/beegfs-client/etc/beegfs/beegfs-client-autobuild.conf
 	install -D -m644 client_module/build/dist/etc/beegfs-mounts.conf \
@@ -172,6 +170,8 @@ override_dh_install:
 		> debian/beegfs-client-dkms.dkms
 	install -D -m644 client_module/build/dist/etc/beegfs-client.conf \
 		debian/beegfs-client-dkms/etc/beegfs/beegfs-client.conf
+	install -D -m644 client_module/build/dist/etc/beegfs-client-build.mk \
+		debian/beegfs-client-dkms/etc/beegfs/beegfs-client-build.mk
 	@# client-dev
 	mkdir -p debian/beegfs-client-dev/usr/include
 	cp -a client_devel/include/beegfs debian/beegfs-client-dev/usr/include/

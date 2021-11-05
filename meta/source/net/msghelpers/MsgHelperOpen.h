@@ -11,7 +11,8 @@ class MsgHelperOpen
 {
    public:
       static FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags,
-         bool useQuota, unsigned msgUserID, MetaFileHandle& outFileInode);
+         bool useQuota, unsigned msgUserID, MetaFileHandle& outFileInode,
+	 bool isSecondary);
 
 
    private:

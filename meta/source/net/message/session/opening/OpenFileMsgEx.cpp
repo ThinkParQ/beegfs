@@ -50,7 +50,7 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
       : app->getSessions();
 
    FhgfsOpsErr openRes = MsgHelperOpen::openFile(
-      entryInfo, getAccessFlags(), useQuota, getMsgHeaderUserID(), inode);
+      entryInfo, getAccessFlags(), useQuota, getMsgHeaderUserID(), inode, isSecondary);
 
    if (openRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
       fixInodeTimestamp(*inode, fileTimestamps, entryInfo);

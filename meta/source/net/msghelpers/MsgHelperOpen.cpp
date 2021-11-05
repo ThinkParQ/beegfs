@@ -16,7 +16,8 @@
  * @param outOpenFile only set if return indicates success.
  */
 FhgfsOpsErr MsgHelperOpen::openFile(EntryInfo* entryInfo, unsigned accessFlags,
-   bool useQuota, unsigned msgUserID, MetaFileHandle& outFileInode)
+   bool useQuota, unsigned msgUserID, MetaFileHandle& outFileInode,
+   bool isSecondary)
 {
    const char* logContext = "Open File Helper";
    IGNORE_UNUSED_VARIABLE(logContext);
@@ -50,7 +51,7 @@ FhgfsOpsErr MsgHelperOpen::openFile(EntryInfo* entryInfo, unsigned accessFlags,
       return FhgfsOpsErr_INTERNAL;
    }
 
-   if(truncLocalRequired)
+   if(truncLocalRequired && !isSecondary)
    { // trunc was specified and is needed => do it
       LOG_DEBUG(logContext, Log_DEBUG, std::string("Opening with trunc local") );
 

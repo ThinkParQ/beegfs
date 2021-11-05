@@ -107,6 +107,7 @@ static inline int Config_getTuneMsgBufNum(Config* this);
 static inline unsigned Config_getTunePageCacheValidityMS(Config* this);
 static inline unsigned Config_getTuneDirSubentryCacheValidityMS(Config* this);
 static inline unsigned Config_getTuneFileSubentryCacheValidityMS(Config* this);
+static inline unsigned Config_getTuneENOENTCacheValidityMS(Config* this);
 static inline bool Config_getTuneRemoteFSync(Config* this);
 static inline bool Config_getTuneUseGlobalFileLocks(Config* this);
 static inline bool Config_getTuneRefreshOnGetAttr(Config* this);
@@ -200,6 +201,7 @@ struct Config
    unsigned       tunePageCacheValidityMS;
    unsigned       tuneDirSubentryCacheValidityMS;
    unsigned       tuneFileSubentryCacheValidityMS;
+   unsigned       tuneENOENTCacheValidityMS;
    int            tunePathBufSize;
    int            tunePathBufNum;
    int            tuneMsgBufSize;
@@ -443,6 +445,11 @@ unsigned Config_getTuneDirSubentryCacheValidityMS(Config* this)
 unsigned Config_getTuneFileSubentryCacheValidityMS(Config* this)
 {
    return this->tuneFileSubentryCacheValidityMS;
+}
+
+unsigned Config_getTuneENOENTCacheValidityMS(Config* this)
+{
+   return this->tuneENOENTCacheValidityMS;
 }
 
 bool Config_getTuneRemoteFSync(Config* this)

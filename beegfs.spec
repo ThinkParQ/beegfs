@@ -645,7 +645,6 @@ touch /var/lib/beegfs/client/force-auto-build
 %config(noreplace) /etc/beegfs/beegfs-client-autobuild.conf
 %config(noreplace) /etc/beegfs/beegfs-client-mount-hook.example
 %config(noreplace) /etc/beegfs/beegfs-client.conf
-%config(noreplace) /etc/beegfs/beegfs-client-build.mk
 %config(noreplace) /etc/beegfs/beegfs-mounts.conf
 %dir /etc/beegfs/lib/
 %config(noreplace) /etc/beegfs/lib/init-multi-mode.beegfs-client
@@ -681,6 +680,7 @@ dkms remove beegfs/%{VER} --all
 %files client-dkms
 %defattr(-,root,root)
 %config(noreplace) /etc/beegfs/beegfs-client.conf
+%config(noreplace) /etc/beegfs/beegfs-client-build.mk
 /usr/src/beegfs-%{VER}
 
 
@@ -728,6 +728,7 @@ This package contains BeeGFS client development files.
 Summary: BeeOND
 Group: Software/Other
 requires: beeond-thirdparty-gpl = %{FULL_VERSION}, beegfs-utils = %{FULL_VERSION}, beegfs-mgmtd = %{FULL_VERSION}, beegfs-meta = %{FULL_VERSION}, beegfs-storage = %{FULL_VERSION}, beegfs-client = %{FULL_VERSION}, beegfs-helperd = %{FULL_VERSION}, psmisc
+BuildArch: noarch
 
 %description -n beeond
 This package contains BeeOND.

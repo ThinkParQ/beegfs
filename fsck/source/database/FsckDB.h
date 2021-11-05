@@ -56,6 +56,17 @@ struct InodeAttribs
    uint64_t nlinks;
 };
 
+struct OptionalInodeAttribs
+{
+   boost::optional<uint64_t> size;
+   boost::optional<uint64_t> nlinks;
+
+   void reset() {
+       size.reset();
+       nlinks.reset();
+   }
+};
+
 // represents a duplicated Inode. The set contains the IDs of the nodes / buddy groups where the 
 // entries were found. The boolean flag indicates if the corresponding ID is a node ID or a buddy 
 // group ID 
@@ -95,7 +106,7 @@ class FsckDB
 
       Cursor<FsckContDir> findOrphanedContDirs();
 
-      Cursor<std::pair<FsckFileInode, checks::InodeAttribs> > findWrongInodeFileAttribs();
+      Cursor<std::pair<FsckFileInode, checks::OptionalInodeAttribs> > findWrongInodeFileAttribs();
 
       Cursor<std::pair<FsckDirInode, checks::InodeAttribs> > findWrongInodeDirAttribs();
 

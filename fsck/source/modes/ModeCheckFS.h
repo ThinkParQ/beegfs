@@ -112,7 +112,7 @@ class ModeCheckFS : public Mode
       void repairOrphanedChunk(FsckChunk& chunk, RepairChunkState& state);
       void repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt);
       void repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt);
-      void repairWrongFileAttribs(std::pair<FsckFileInode, checks::InodeAttribs>& error,
+      void repairWrongFileAttribs(std::pair<FsckFileInode, checks::OptionalInodeAttribs>& error,
          UserPrompter& prompt);
       void repairWrongDirAttribs(std::pair<FsckDirInode, checks::InodeAttribs>& error,
          UserPrompter& prompt);

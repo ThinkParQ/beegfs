@@ -228,6 +228,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "tunePageCacheValidityMS",          "2000000000");
    _Config_configMapRedefine(this, "tuneDirSubentryCacheValidityMS",   "1000");
    _Config_configMapRedefine(this, "tuneFileSubentryCacheValidityMS",  "0");
+   _Config_configMapRedefine(this, "tuneENOENTCacheValidityMS",        "0");
    _Config_configMapRedefine(this, "tunePathBufSize",                  "4096");
    _Config_configMapRedefine(this, "tunePathBufNum",                   "8");
    _Config_configMapRedefine(this, "tuneMsgBufSize",                   "65536");
@@ -430,6 +431,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       else
       if(!strcmp(keyStr, "tuneFileSubentryCacheValidityMS") )
          this->tuneFileSubentryCacheValidityMS = StringTk_strToUInt(valueStr);
+      else
+      if(!strcmp(keyStr, "tuneENOENTCacheValidityMS") )
+         this->tuneENOENTCacheValidityMS = StringTk_strToUInt(valueStr);
       else
       IGNORE_CONFIG_VALUE("tuneMaxWriteWorks")
       IGNORE_CONFIG_VALUE("tuneMaxReadWorks")

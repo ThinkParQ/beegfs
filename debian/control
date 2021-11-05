@@ -171,7 +171,7 @@ Description: BeeOND thirdparty utilities (GPL licensed)
 # Thirdparty tools used for BeeOND
 
 Package: beeond
-Architecture: any
+Architecture: all
 Depends: ${misc:Depends}, beeond-thirdparty-gpl (= ${binary:Version}),
   beegfs-utils (= ${binary:Version}), beegfs-mgmtd (= ${binary:Version}), beegfs-meta (= ${binary:Version}),
   beegfs-storage (= ${binary:Version}),

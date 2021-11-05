@@ -28,7 +28,6 @@ SERVICE_NAME="BeeGFS Client"
 # Check for missing binaries (stale symlinks should not happen)
 # Note: Special treatment of stop for LSB conformance
 CLIENT_MOD=beegfs
-CLIENT_OPENTK_MOD=beegfs-client-opentk
 
 SYSCONFIG_FILE=/etc/default/beegfs-client
 BEEGFS_MOUNT_CONF="/etc/beegfs/beegfs-mounts.conf"
@@ -160,12 +159,6 @@ test_updated_autobuild_conf()
 warn_on_ofed_mismatch()
 {
    set +e
-
-   grep '^buildArgs.*BEEGFS_OPENTK_IBVERBS=1' $AUTOBUILD_CONF > /dev/null 2>&1
-   if [ $? -ne 0 ]; then
-      set -e
-      return # ibverbs not enabled
-   fi
 
    modinfo ib_core > /dev/null 2>&1
    if [ $? -ne 0 ]; then
@@ -409,7 +402,7 @@ case "$1" in
 
       echo -n "Checking for service $SERVICE_NAME: "
 
-      lsmod | grep $CLIENT_MOD | grep -v $CLIENT_OPENTK_MOD >/dev/null 2>&1
+      lsmod | grep $CLIENT_MOD >/dev/null 2>&1
       if [ $? -eq 0 ]
       then
          echo "is running..."

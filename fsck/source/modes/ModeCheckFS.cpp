@@ -1341,7 +1341,7 @@ void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt)
    }
 }
 
-void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::InodeAttribs>& error,
+void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::OptionalInodeAttribs>& error,
    UserPrompter& prompt)
 {
    FsckRepairAction action = prompt.chooseAction("File ID: " + error.first.getID() + "; Path: " +
@@ -1357,8 +1357,10 @@ void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::InodeA
       break;
 
    case FsckRepairAction_UPDATEATTRIBS: {
-      error.first.setFileSize(error.second.size);
-      error.first.setNumHardLinks(error.second.nlinks);
+      if (error.second.size)
+         error.first.setFileSize(*error.second.size);
+      if (error.second.nlinks)
+         error.first.setNumHardLinks(*error.second.nlinks);
 
       FsckFileInodeList inodes(1, error.first);
       FsckFileInodeList failed;

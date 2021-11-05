@@ -1012,13 +1012,14 @@ struct FindWrongInodeFileAttribsGrouperChunks
    }
 };
 
+// 
 struct FindWrongInodeFileAttribsGrouper
 {
    typedef db::EntryID KeyType;
    typedef FsckFileInode ProjType;
-   typedef checks::InodeAttribs GroupType;
+   typedef checks::OptionalInodeAttribs GroupType;
 
-   checks::InodeAttribs state;
+   GroupType state;
 
    FindWrongInodeFileAttribsGrouper()
    {
@@ -1027,23 +1028,34 @@ struct FindWrongInodeFileAttribsGrouper
 
    void reset()
    {
-      memset(&state, 0, sizeof(state) );
+      state.reset();
    }
 
-   KeyType key(std::pair<db::FileInode, checks::InodeAttribs>& pair)
+   KeyType key(std::pair<db::FileInode, checks::OptionalInodeAttribs>& pair)
    {
       return pair.first.id;
    }
 
-   ProjType project(std::pair<db::FileInode, checks::InodeAttribs>& pair)
+   ProjType project(std::pair<db::FileInode, checks::OptionalInodeAttribs>& pair)
    {
       return pair.first.toInodeWithoutStripes();
    }
 
-   void step(std::pair<db::FileInode, checks::InodeAttribs>& pair)
+   void step(std::pair<db::FileInode, checks::OptionalInodeAttribs>& pair)
    {
-      this->state.size += pair.second.size;
-      this->state.nlinks += pair.second.nlinks;
+      if (pair.second.size) {
+         if (state.size)
+            *state.size += *pair.second.size;
+         else
+            state.size = pair.second.size;
+      }
+
+      if (pair.second.nlinks) {
+         if (state.nlinks)
+            *state.nlinks += *pair.second.nlinks;
+         else
+            state.nlinks = pair.second.nlinks;
+      }
    }
 
    GroupType finish()
@@ -1072,7 +1084,7 @@ struct JoinWithStripedInode
  * looks for file inodes, for which the saved attribs (e.g. filesize) are not
  * equivalent to those of the primary chunks
  */
-Cursor<std::pair<FsckFileInode, checks::InodeAttribs> > FsckDB::findWrongInodeFileAttribs()
+Cursor<std::pair<FsckFileInode, checks::OptionalInodeAttribs> > FsckDB::findWrongInodeFileAttribs()
 {
    // Note: ignore dentries in disposal as they are not counted in numHardlinks in the inodes
 
@@ -1083,10 +1095,10 @@ Cursor<std::pair<FsckFileInode, checks::InodeAttribs> > FsckDB::findWrongInodeFi
          return pair.first.fileSize != pair.second;
       }
 
-      static std::pair<db::FileInode, checks::InodeAttribs> fileAttribs(
+      static std::pair<db::FileInode, checks::OptionalInodeAttribs> fileAttribs(
          std::pair<db::FileInode, uint64_t>& pair)
       {
-         checks::InodeAttribs attribs = { pair.second, 0 };
+         checks::OptionalInodeAttribs attribs = { pair.second, {} };
          return std::make_pair(pair.first, attribs);
       }
 
@@ -1095,10 +1107,10 @@ Cursor<std::pair<FsckFileInode, checks::InodeAttribs> > FsckDB::findWrongInodeFi
          return pair.first.numHardlinks != pair.second;
       }
 
-      static std::pair<db::FileInode, checks::InodeAttribs> linkCount(
+      static std::pair<db::FileInode, checks::OptionalInodeAttribs> linkCount(
          std::pair<db::FileInode, uint64_t>& pair)
       {
-         checks::InodeAttribs attribs = { 0, pair.second };
+         checks::OptionalInodeAttribs attribs = { {}, pair.second };
          return std::make_pair(pair.first, attribs);
       }
 

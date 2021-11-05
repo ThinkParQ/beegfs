@@ -40,6 +40,7 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
 #endif // LINUX_VERSION_CODE
 {
    App* app;
+   Config* cfg;
    Logger* log;
    const char* logContext;
 
@@ -47,6 +48,9 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    struct dentry* parentDentry;
    struct inode* parentInode;
    struct inode* inode;
+   struct timespec64 now;
+   unsigned long nowTime;
+   unsigned cacheValidityMS;
 
    #ifndef KERNEL_HAS_ATOMIC_OPEN
       unsigned flags = nameidata ? nameidata->flags : 0;
@@ -69,6 +73,7 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    // access to parentDentry and inode needs to live below the rcu check.
 
    app = FhgfsOps_getApp(dentry->d_sb);
+   cfg = App_getConfig(app);
    log = App_getLogger(app);
    logContext = "FhgfsOps_revalidateIntent";
 
@@ -88,8 +93,23 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
          shrink_dcache_parent(dentry);
       }
 
-      d_drop(dentry);
-      goto cleanup_put_parent;
+      // dentry->d_time is updated with the current time during the first lookup,
+      // the cache is only valid if the difference of CURRENT_TIME and revalidate 
+      // time is less than the tuneENOENTCacheValidityMS from the config 
+
+      ktime_get_real_ts64(&now);
+      cacheValidityMS = Config_getTuneENOENTCacheValidityMS(cfg);
+      nowTime = (now.tv_sec * 1000000000UL + now.tv_nsec);
+      if (((nowTime - dentry->d_time)/1000000UL) > cacheValidityMS)
+      {
+         d_drop(dentry);
+         goto cleanup_put_parent;
+      }
+      else
+      {
+         isValid = 1;
+         goto cleanup_put_parent;
+      }
    }
 
    // active dentry => remote-stat and local-compare
@@ -241,9 +261,10 @@ out:
    int shouldBeDeleted = 0; // quasi-boolean (return value)
    struct inode* inode = dentry->d_inode;
 
-   if(!inode)
-      shouldBeDeleted = 1; // no inode attached => no need to keep dentry
-   else
+   // For both positive and negative dentry cases,
+   // dentry cache (dcache) is mainatined
+
+   if(inode)
    {
       if(is_bad_inode(inode) )
          shouldBeDeleted = 1; // inode marked as bad => no need to keep dentry

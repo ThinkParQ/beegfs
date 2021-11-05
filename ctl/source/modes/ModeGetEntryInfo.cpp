@@ -13,6 +13,7 @@
 
 #define MODEGETENTRYINFO_ARG_UNMOUNTEDPATH          "--unmounted"
 #define MODEGETENTRYINFO_ARG_READFROMSTDIN          "-"
+#define MODEGETENTRYINFO_ARG_NULLDELIM              "--null"
 #define MODEGETENTRYINFO_ARG_VERBOSE                "--verbose"
 #define MODEGETENTRYINFO_ARG_DONTSHOWTARGETMAPPINGS "--nomappings"
 
@@ -48,6 +49,13 @@ int ModeGetEntryInfo::execute()
       cfg->erase(iter);
    }
 
+   iter = cfg->find(MODEGETENTRYINFO_ARG_NULLDELIM);
+   if(iter != cfg->end() )
+   {
+      cfgNullDelim = true;
+      cfg->erase(iter);
+   }
+
    if(cfg->empty() )
    {
       std::cerr << "No path specified." << std::endl;
@@ -60,14 +68,12 @@ int ModeGetEntryInfo::execute()
    if(this->cfgPathStr == MODEGETENTRYINFO_ARG_READFROMSTDIN)
       cfgReadFromStdin = true;
 
-
    if(ModeHelper::checkInvalidArgs(cfg) )
       return APPCODE_INVALID_CONFIG;
 
    if(cfgReadFromStdin)
    { // read first path from stdin
-      this->cfgPathStr.clear();
-      getline(std::cin, this->cfgPathStr);
+      getPathFromStdin();
 
       if(this->cfgPathStr.empty() )
          return APPCODE_NO_ERROR; // no files given is not an error
@@ -158,8 +164,7 @@ finish_this_entry:
       std::cout << std::endl;
 
       // read next relPath from stdin
-      this->cfgPathStr.clear();
-      getline(std::cin, this->cfgPathStr);
+      getPathFromStdin();
 
    } while(!this->cfgPathStr.empty() );
 
@@ -172,7 +177,7 @@ void ModeGetEntryInfo::printHelp()
    std::cout << " Mandatory:" << std::endl;
    std::cout << "  <path>                 Path to a file or directory." << std::endl;
    std::cout << "                         Specify \"-\" here to read multiple paths from" << std::endl;
-   std::cout << "                         stdin (separated by newline)." << std::endl;
+   std::cout << "                         stdin (separated by newline or null (see --null))." << std::endl;
    std::cout << " Optional:" << std::endl;
    std::cout << "  --unmounted            If this is specified then the given path is relative" << std::endl;
    std::cout << "                         to the root directory of a possibly unmounted BeeGFS." << std::endl;
@@ -180,6 +185,8 @@ void ModeGetEntryInfo::printHelp()
    std::cout << "  --verbose              Print more entry information, e.g. location on server." << std::endl;
    std::cout << "  --nomappings           Do not print to which storage servers the stripe" << std::endl;
    std::cout << "                         targets of a file are mapped." << std::endl;
+   std::cout << "  --null                 Assume that paths on stdin are delimited by a null" << std::endl;
+   std::cout << "                         character instead of newline." << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
    std::cout << " This mode retrieves information about a certain file or directory, such as" << std::endl;
@@ -369,4 +376,13 @@ void ModeGetEntryInfo::printTargetMapping(uint16_t targetID)
    }
 
    std::cout << node->getTypedNodeID();
+}
+
+void ModeGetEntryInfo::getPathFromStdin()
+{
+   this->cfgPathStr.clear();
+   if(this->cfgNullDelim)
+      getline(std::cin, this->cfgPathStr, '\0');
+   else
+      getline(std::cin, this->cfgPathStr);
 }
