@@ -535,7 +535,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    commContext = kzalloc(sizeof(*commContext), GFP_KERNEL);
    if(!commContext)
       goto err_cleanup;
-   ibv_print_info("Alloc CommContext @ %px\n", commContext);
+   ibv_print_info_debug("Alloc CommContext @ %px\n", commContext);
 
    // prepare recv and send event notification
 
@@ -785,7 +785,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
 
 cleanup_no_dev:
 
-   ibv_print_info("Free CommContext @ %px\n", commContext);
+   ibv_print_info_debug("Free CommContext @ %px\n", commContext);
    kfree(commContext);
 }
 

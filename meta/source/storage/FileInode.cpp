@@ -68,7 +68,7 @@ void FileInode::initFileInfoVec()
    unsigned chunkSize     = pattern->getChunkSize();
    unsigned chunkSizeLog2 = MathTk::log2Int32(chunkSize);
 
-   unsigned stripeSetSize = chunkSize * numTargets;
+   uint64_t stripeSetSize = chunkSize * numTargets;
 
    int64_t lastStripeSetSize; // =fileLength%stripeSetSize (remainder after stripeSetStart)
    int64_t stripeSetStart; // =fileLength-stripeSetSize

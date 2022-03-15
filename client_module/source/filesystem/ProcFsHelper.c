@@ -66,6 +66,7 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "sysMountSanityCheckMS",
    "sysSyncOnClose",
    "sysSessionCheckOnClose",
+   "sysSessionChecksEnabled",
    "sysXAttrsEnabled",
    "quotaEnabled",
    "sysFileEventLogMask",
@@ -135,6 +136,7 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "sysSyncOnClose = %d\n", (int)Config_getSysSyncOnClose(cfg) );
    seq_printf(file, "sysXAttrsEnabled = %d\n", (int)Config_getSysXAttrsEnabled(cfg) );
    seq_printf(file, "sysSessionCheckOnClose = %d\n", (int)Config_getSysSessionCheckOnClose(cfg) );
+   seq_printf(file, "sysSessionChecksEnabled = %d\n", (int)Config_getSysSessionChecksEnabled(cfg) );
    seq_printf(file, "quotaEnabled = %d\n", (int)Config_getQuotaEnabled(cfg) );
    seq_printf(file, "sysFileEventLogMask = %s\n", Config_eventLogMaskToStr(cfg->eventLogMask));
    seq_printf(file, "sysRenameEbusyAsXdev = %u\n", (unsigned) cfg->sysRenameEbusyAsXdev);
@@ -320,6 +322,10 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
    if(!strcmp(currentKey, "sysSessionCheckOnClose") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey,
          Config_getSysSessionCheckOnClose(cfg) );
+   else
+   if(!strcmp(currentKey, "sysSessionChecksEnabled") )
+      count = scnprintf(buf, size, "%s = %u\n", currentKey,
+         Config_getSysSessionChecksEnabled(cfg) );
    else
    if(!strcmp(currentKey, "sysXAttrsEnabled") )
       count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getSysXAttrsEnabled(cfg) );

@@ -923,6 +923,7 @@ void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo, struct list_h
 static unsigned __commkit_readfile_prepareHeader(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
+   Config* cfg = App_getConfig(context->app);
    Node* localNode = App_getLocalNode(context->app);
    const NumNodeID localNodeNumID = Node_getNumID(localNode);
    ReadfileState* currentState = container_of(info, ReadfileState, base);
@@ -936,7 +937,7 @@ static unsigned __commkit_readfile_prepareHeader(CommKitContext* context,
 
    NetMessage_setMsgHeaderTargetID(&readMsg.netMessage, info->selectedTargetID);
 
-   if (currentState->firstWriteDoneForTarget)
+   if (currentState->firstWriteDoneForTarget && Config_getSysSessionChecksEnabled(cfg))
       NetMessage_addMsgHeaderFeatureFlag(&readMsg.netMessage, READLOCALFILEMSG_FLAG_SESSION_CHECK);
 
    if(StripePattern_getPatternType(context->ioInfo->pattern) == STRIPEPATTERN_BuddyMirror)
@@ -1127,7 +1128,7 @@ static unsigned __commkit_writefile_prepareHeader(CommKitContext* context,
       WriteLocalFileMsg_setUserdataForQuota(&writeMsg, context->ioInfo->userID,
          context->ioInfo->groupID);
 
-   if (currentState->firstWriteDoneForTarget)
+   if (currentState->firstWriteDoneForTarget && Config_getSysSessionChecksEnabled(cfg))
       NetMessage_addMsgHeaderFeatureFlag(&writeMsg.netMessage,
          WRITELOCALFILEMSG_FLAG_SESSION_CHECK);
 
@@ -1325,6 +1326,7 @@ static unsigned __commkit_fsync_prepareHeader(CommKitContext* context,
    struct FsyncContext* fctx = context->private;
    struct FsyncState* state = container_of(info, struct FsyncState, base);
 
+   Config* cfg = App_getConfig(context->app);
    Node* localNode = App_getLocalNode(context->app);
    const NumNodeID localNodeNumID = Node_getNumID(localNode);
 
@@ -1355,7 +1357,8 @@ static unsigned __commkit_fsync_prepareHeader(CommKitContext* context,
 
    // required version is checked in FSyncChunkFileWork_process and if session check is not
    // supported by the server, the value of this->checkSession was set to false
-   if(fctx->checkSession && state->firstWriteDoneForTarget)
+   if(fctx->checkSession && state->firstWriteDoneForTarget
+         && Config_getSysSessionChecksEnabled(cfg))
       NetMessage_addMsgHeaderFeatureFlag(&requestMsg.netMessage,
          FSYNCLOCALFILEMSG_FLAG_SESSION_CHECK);
 

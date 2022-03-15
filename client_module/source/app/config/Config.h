@@ -127,6 +127,7 @@ static inline bool Config_getSysCreateHardlinksAsSymlinks(Config* this);
 static inline unsigned Config_getSysMountSanityCheckMS(Config* this);
 static inline bool Config_getSysSyncOnClose(Config* this);
 static inline bool Config_getSysSessionCheckOnClose(Config* this);
+static inline bool Config_getSysSessionChecksEnabled(Config* this);
 static inline unsigned Config_getSysUpdateTargetStatesSecs(Config* this);
 static inline unsigned Config_getSysTargetOfflineTimeoutSecs(Config* this);
 static inline bool Config_getSysXAttrsEnabled(Config* this);
@@ -224,6 +225,7 @@ struct Config
    unsigned       sysMountSanityCheckMS;
    bool     sysSyncOnClose;
    bool     sysSessionCheckOnClose;
+   bool     sysSessionChecksEnabled;
    unsigned       sysUpdateTargetStatesSecs;
    unsigned       sysTargetOfflineTimeoutSecs;
 
@@ -550,6 +552,11 @@ bool Config_getSysSyncOnClose(Config* this)
 bool Config_getSysSessionCheckOnClose(Config* this)
 {
    return this->sysSessionCheckOnClose;
+}
+
+bool Config_getSysSessionChecksEnabled(Config* this)
+{
+   return this->sysSessionChecksEnabled;
 }
 
 unsigned Config_getSysUpdateTargetStatesSecs(Config* this)

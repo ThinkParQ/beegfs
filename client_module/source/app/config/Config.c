@@ -249,6 +249,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "sysMountSanityCheckMS",            "11000");
    _Config_configMapRedefine(this, "sysSyncOnClose",                   "false");
    _Config_configMapRedefine(this, "sysSessionCheckOnClose",           "false");
+   _Config_configMapRedefine(this, "sysSessionChecksEnabled",          "true");
 
    _Config_configMapRedefine(this, "sysUpdateTargetStatesSecs",        "30");
    _Config_configMapRedefine(this, "sysTargetOfflineTimeoutSecs",      "900");
@@ -505,6 +506,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       else
       if(!strcmp(keyStr, "sysSessionCheckOnClose") )
          this->sysSessionCheckOnClose = StringTk_strToBool(valueStr);
+      else
+      if(!strcmp(keyStr, "sysSessionChecksEnabled") )
+         this->sysSessionChecksEnabled = StringTk_strToBool(valueStr);
       else
       if(!strcmp(keyStr, "sysUpdateTargetStatesSecs") )
          this->sysUpdateTargetStatesSecs = StringTk_strToUInt(valueStr);

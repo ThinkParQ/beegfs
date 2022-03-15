@@ -12,7 +12,7 @@
 #include <linux/vmalloc.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <stdarg.h>
 #include <linux/types.h>
 #include <linux/stddef.h>

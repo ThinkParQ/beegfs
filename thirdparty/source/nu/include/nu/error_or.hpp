@@ -20,7 +20,26 @@ struct bad_error_or_access : std::exception {
 		return "bad_error_or_access";
 	}
 };
+
+template<typename Val>
+static constexpr bool is_nothrow_swappable() noexcept
+{
+   return noexcept(std::swap(std::declval<Val&>(), std::declval<Val&>()));
+}
+
+template<typename Val>
+static constexpr bool is_value_type() noexcept
+{
+   static_assert(!std::is_array<Val>::value, "Val must not be an array type");
+   static_assert(!std::is_reference<Val>::value, "Val must not be a reference type");
+   static_assert(!std::is_function<Val>::value, "Val must not be a function type");
+   static_assert(std::is_move_constructible<Val>::value, "Val must be move-constructible");
+   static_assert(sizeof(Val) > 0, "Val must be complete");
+
+   return true;
+}
 // LCOV_EXCL_STOP
+
 
 /// .. class:: template<typename T, typename Err = std::error_code> error_or
 ///
@@ -45,40 +64,20 @@ struct bad_error_or_access : std::exception {
 ///
 ///    .. include:: /../tests/error_or_example.cpp
 //+       :code: c++
+
 template<typename T, typename Err = std::error_code>
 class error_or {
-	// LCOV_EXCL_START
-	template<typename Val>
-	static constexpr bool is_nothrow_swappable() noexcept
-	{
-		using std::swap;
-
-		return noexcept(swap(std::declval<Val&>(), std::declval<Val&>()));
-	}
-
-	template<typename Val>
-	static constexpr bool is_value_type() noexcept
-	{
-		static_assert(!std::is_array<Val>::value, "Val must not be an array type");
-		static_assert(!std::is_reference<Val>::value, "Val must not be a reference type");
-		static_assert(!std::is_function<Val>::value, "Val must not be a function type");
-		static_assert(std::is_move_constructible<Val>::value, "Val must be move-constructible");
-		static_assert(sizeof(Val) > 0, "Val must be complete");
-
-		return true;
-	}
-	// LCOV_EXCL_STOP
 
 public:
-	static_assert(is_value_type<T>(), "");
-	static_assert(is_value_type<Err>(), "");
+	static_assert(nu::is_value_type<T>(), "");
+	static_assert(nu::is_value_type<Err>(), "");
 
 	static_assert(std::is_nothrow_default_constructible<Err>::value, "Err must be default-constructible");
 	static_assert(std::is_nothrow_move_constructible<Err>::value, "Err must be nothrow move-constructible");
 	static_assert(std::is_nothrow_copy_constructible<Err>::value, "Err must be nothrow move-constructible");
 	static_assert(std::is_nothrow_move_assignable<Err>::value, "Err must be nothrow move-assignable");
 	static_assert(std::is_nothrow_destructible<Err>::value, "Err must be nothrow-destructible");
-	static_assert(is_nothrow_swappable<Err>(), "Err must be nothrow-swappable");
+	static_assert(nu::is_nothrow_swappable<Err>(), "Err must be nothrow-swappable");
 
 	/// .. function:: error_or() noexcept
 	///
@@ -150,7 +149,7 @@ public:
 	///    Swaps the states of ``*this`` and ``other``.
 	///
 	///    :noexcept: |swap(T,T)-noexcept|
-	void swap(error_or& other) noexcept(error_or::is_nothrow_swappable<T>())
+	void swap(error_or& other) noexcept(nu::is_nothrow_swappable<T>())
 	{
 		using std::swap;
 
@@ -248,8 +247,8 @@ public:
 					decltype(f(std::declval<const Err&>()))>::type,
 				R>::type
 	{
-		static_assert(is_value_type<decltype(t(std::declval<const T&>()))>(), "");
-		static_assert(is_value_type<decltype(f(std::declval<const Err&>()))>(), "");
+		static_assert(nu::is_value_type<decltype(t(std::declval<const T&>()))>(), "");
+		static_assert(nu::is_value_type<decltype(f(std::declval<const Err&>()))>(), "");
 
 		return valid
 			? t(u.value)
@@ -268,8 +267,8 @@ public:
 					decltype(f(std::declval<const Err&>()))>::type,
 				R>::type
 	{
-		static_assert(is_value_type<decltype(t(std::declval<T&&>()))>(), "");
-		static_assert(is_value_type<decltype(f(std::declval<const Err&>()))>(), "");
+		static_assert(nu::is_value_type<decltype(t(std::declval<T&&>()))>(), "");
+		static_assert(nu::is_value_type<decltype(f(std::declval<const Err&>()))>(), "");
 
 		return valid
 			? t(std::move(u.value))
@@ -298,7 +297,7 @@ public:
 	auto operator%(Fn fn) const noexcept(noexcept(fn(std::declval<const T&>())))
 		-> decltype(fn(std::declval<const T&>()))
 	{
-		static_assert(is_value_type<decltype(fn(u.value))>(), "");
+		static_assert(nu::is_value_type<decltype(fn(u.value))>(), "");
 
 		return valid
 			? fn(u.value)
@@ -309,7 +308,7 @@ public:
 	auto operator%(Fn fn) noexcept(noexcept(fn(std::declval<T&&>())))
 		-> decltype(fn(std::declval<T&&>()))
 	{
-		static_assert(is_value_type<decltype(fn(std::move(u.value)))>(), "");
+		static_assert(nu::is_value_type<decltype(fn(std::move(u.value)))>(), "");
 
 		return valid
 			? fn(std::move(u.value))

@@ -23,8 +23,8 @@ bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen)
       buffer->lists[i].lkey = ctx->pd->local_dma_lkey;
 #endif
       buffer->lists[i].length = bufLen;
-      buffer->buffers[i] = ib_dma_alloc_coherent(ctx->pd->device, bufLen, &buffer->lists[i].addr,
-         GFP_KERNEL);
+      buffer->buffers[i] = dma_alloc_coherent(ctx->pd->device->dma_device, bufLen,
+         &buffer->lists[i].addr, GFP_KERNEL);
       if(!buffer->buffers[i])
          goto fail_dma;
    }
@@ -38,8 +38,8 @@ fail_dma:
    for(i = 0; i < count; i++)
    {
       if(buffer->buffers[i])
-         ib_dma_free_coherent(ctx->pd->device, buffer->bufferSize, buffer->buffers[i],
-            buffer->lists[i].addr);
+         dma_free_coherent(ctx->pd->device->dma_device, buffer->bufferSize,
+            buffer->buffers[i], buffer->lists[i].addr);
    }
 
 fail_alloc:
@@ -54,8 +54,8 @@ void IBVBuffer_free(IBVBuffer* buffer, IBVCommContext* ctx)
 
    for(i = 0; i < buffer->bufferCount; i++)
    {
-      ib_dma_free_coherent(ctx->pd->device, buffer->bufferSize, buffer->buffers[i],
-         buffer->lists[i].addr);
+      dma_free_coherent(ctx->pd->device->dma_device, buffer->bufferSize,
+         buffer->buffers[i], buffer->lists[i].addr);
    }
 
    kfree(buffer->buffers);

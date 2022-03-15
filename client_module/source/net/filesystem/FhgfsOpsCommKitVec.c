@@ -22,6 +22,7 @@
 void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
    FhgfsCommKitVec* comm)
 {
+   Config* cfg = App_getConfig(commHelper->app);
    TargetMapper* targetMapper = App_getTargetMapper(commHelper->app);
    NodeStoreEx* storageNodes = App_getStorageNodes(commHelper->app);
    Node* localNode = App_getLocalNode(commHelper->app);
@@ -110,7 +111,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
 
    NetMessage_setMsgHeaderTargetID( (NetMessage*)&readMsg, nodeReferenceTargetID);
 
-   if (comm->firstWriteDoneForTarget)
+   if (comm->firstWriteDoneForTarget && Config_getSysSessionChecksEnabled(cfg))
       NetMessage_addMsgHeaderFeatureFlag( (NetMessage*)&readMsg,
          READLOCALFILEMSG_FLAG_SESSION_CHECK);
 
@@ -623,7 +624,7 @@ void __FhgfsOpsCommKitVec_writefileStagePREPARE(CommKitVecHelper* commHelper,
       WriteLocalFileMsg_setUserdataForQuota(&writeMsg, commHelper->ioInfo->userID,
          commHelper->ioInfo->groupID);
 
-   if (comm->firstWriteDoneForTarget)
+   if (comm->firstWriteDoneForTarget && Config_getSysSessionChecksEnabled(cfg))
       NetMessage_addMsgHeaderFeatureFlag( (NetMessage*)&writeMsg,
          WRITELOCALFILEMSG_FLAG_SESSION_CHECK);
 
