@@ -67,6 +67,11 @@
 #include <net/message/session/rw/WriteLocalFileMsgEx.h>
 #include <net/message/session/FSyncLocalFileMsgEx.h>
 
+#ifdef BEEGFS_NVFS
+#include <net/message/session/rw/ReadLocalFileRDMAMsgEx.h>
+#include <net/message/session/rw/WriteLocalFileRDMAMsgEx.h>
+#endif /* BEEGFS_NVFS */
+
 // mon messages
 #include <net/message/mon/RequestStorageDataMsgEx.h>
 
@@ -166,6 +171,10 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_ReadLocalFileV2: { msg = new ReadLocalFileV2MsgEx(); } break;
       case NETMSGTYPE_WriteLocalFile: { msg = new WriteLocalFileMsgEx(); } break;
       case NETMSGTYPE_WriteLocalFileResp: { msg = new WriteLocalFileRespMsg(); } break;
+#ifdef BEEGFS_NVFS
+      case NETMSGTYPE_ReadLocalFileRDMA: { msg = new ReadLocalFileRDMAMsgEx(); } break;
+      case NETMSGTYPE_WriteLocalFileRDMA: { msg = new WriteLocalFileRDMAMsgEx(); } break;
+#endif // BEEGFS_NVFS
 
       // mon message
       case NETMSGTYPE_RequestStorageData: { msg = new RequestStorageDataMsgEx(); } break;

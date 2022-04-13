@@ -2,14 +2,14 @@
 #define FHGFSOPSCOMMKIT_H_
 
 #include <common/storage/PathInfo.h>
+#ifdef BEEGFS_NVFS
+#include <common/storage/RdmaInfo.h>
+#endif
 #include <os/iov_iter.h>
 #include "FhgfsOpsCommKitCommon.h"
 
-struct ReadfileState;
-typedef struct ReadfileState ReadfileState;
-struct WritefileState;
-typedef struct WritefileState WritefileState;
-
+struct FileOpState;
+typedef struct FileOpState FileOpState;
 
 struct FsyncContext;
 
@@ -23,12 +23,12 @@ extern void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo,
 
 
 extern void FhgfsOpsCommKit_readfileV2bCommunicate(App* app, RemotingIOInfo* ioInfo,
-   struct list_head* states, void (*nextIter)(CommKitContext*, ReadfileState*),
-   void (*prepare)(CommKitContext*, ReadfileState*));
+   struct list_head* states, void (*nextIter)(CommKitContext*, FileOpState*),
+   void (*prepare)(CommKitContext*, FileOpState*));
 
 extern void FhgfsOpsCommKit_writefileV2bCommunicate(App* app, RemotingIOInfo* ioInfo,
-   struct list_head* states, void (*nextIter)(CommKitContext*, WritefileState*),
-   void (*prepare)(CommKitContext*, WritefileState*));
+   struct list_head* states, void (*nextIter)(CommKitContext*, FileOpState*),
+   void (*prepare)(CommKitContext*, FileOpState*));
 
 extern void FhgfsOpsCommKit_fsyncCommunicate(App* app, RemotingIOInfo* ioInfo,
    struct FsyncContext* context);
@@ -37,9 +37,7 @@ extern void FhgfsOpsCommKit_statStorageCommunicate(App* app, struct list_head* t
 
 
 
-extern void FhgfsOpsCommKit_initReadfileState(ReadfileState* state, loff_t offset, size_t size,
-   uint16_t targetID);
-extern void FhgfsOpsCommKit_initWritefileState(WritefileState* state, loff_t offset, size_t size,
+extern void FhgfsOpsCommKit_initFileOpState(FileOpState* state, loff_t offset, size_t size,
    uint16_t targetID);
 
 
@@ -87,19 +85,19 @@ struct CommKitTargetInfo
 
 
 
-struct ReadfileState
+struct FileOpState
 {
    struct CommKitTargetInfo base;
 
    // data for spefic modes (will be assigned by the corresponding modes)
    size_t transmitted; // how much data has been transmitted already
    size_t toBeTransmitted; // how much data has to be transmitted
-   size_t totalReadSize; // how much data was requested
+   size_t totalSize; // how much data was requested
 
    // data for all modes
 
    // (assigned by the state-creator)
-   struct iov_iter data;
+   BeeGFS_IovIter data;
    loff_t offset; // target-node local offset
 
    bool firstWriteDoneForTarget; /* true if a chunk was previously written to this target in
@@ -108,29 +106,9 @@ struct ReadfileState
 
    // result data
    int64_t expectedNodeResult; // the amount of data that we wanted to read
-};
-
-
-struct WritefileState
-{
-   struct CommKitTargetInfo base;
-
-   // data for specific stages (will be assigned by the corresponding stages)
-   size_t transmitted; // how much data has been transmitted already
-   size_t toBeTransmitted; // how much data has to be transmitted
-   size_t totalWriteSize; // how much data should be sent
-
-   // data for all stages
-
-   // (assigned by the state-creator)
-   struct iov_iter data;
-   loff_t offset; // target-node local offset
-
-   bool firstWriteDoneForTarget; /* true if data was previously written to this target in
-                                          this session; used for the session check */
-
-   // result data
-   int64_t expectedNodeResult; // the amount of data that we wanted to write
+#ifdef BEEGFS_NVFS
+   RdmaInfo* rdmap;
+#endif
 };
 
 

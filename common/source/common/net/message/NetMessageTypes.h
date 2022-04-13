@@ -199,6 +199,12 @@
 #define NETMSGTYPE_BumpFileVersionResp             3034
 #define NETMSGTYPE_GetFileVersion                  3035
 #define NETMSGTYPE_GetFileVersionResp              3036
+#ifdef BEEGFS_NVFS
+#define NETMSGTYPE_WriteLocalFileRDMA              3037
+#define NETMSGTYPE_WriteLocalFileRDMAResp          3038
+#define NETMSGTYPE_ReadLocalFileRDMA               3039
+#define NETMSGTYPE_ReadLocalFileRDMAResp           3040
+#endif /* BEEGFS_NVFS */
 
 // control messages
 #define NETMSGTYPE_SetChannelDirect                4001

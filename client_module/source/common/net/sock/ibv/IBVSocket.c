@@ -56,13 +56,18 @@ typedef __typeof__(
    _bad_recv_wr;
 
 
-bool IBVSocket_init(IBVSocket* _this)
+bool IBVSocket_init(IBVSocket* _this, struct in_addr* srcIpAddr, NicAddressStats* nicStats)
 {
    memset(_this, 0, sizeof(*_this) );
 
    _this->connState = IBVSOCKETCONNSTATE_UNCONNECTED;
 
    _this->typeOfService = 0;
+   if (srcIpAddr != NULL)
+      _this->srcIpAddr = *srcIpAddr;
+   else
+      _this->srcIpAddr.s_addr = 0;
+   _this->nicStats = nicStats;
 
    init_waitqueue_head(&_this->eventWaitQ);
 
@@ -131,13 +136,14 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    IBVCommConfig* commCfg)
 {
    struct sockaddr_in sin;
+   struct sockaddr_in src;
+   struct sockaddr_in* srcp;
 
    /* note: rejected as stale means remote side still had an old open connection associated with
          our current cm_id. what most likely happened is that the client was reset (i.e. no clean
          disconnect) and our new cm_id after reboot now matches one of the old previous cm_ids.
          => only possible solution seems to be retrying with another cm_id. */
    int numStaleRetriesLeft = IBVSOCKET_STALE_RETRIES_NUM;
-
 
    for( ; ; ) // stale retry loop
    {
@@ -160,7 +166,16 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       sin.sin_family = AF_INET;
       sin.sin_port = htons(port);
 
-      if(rdma_resolve_addr(_this->cm_id, NULL, (struct sockaddr*)&sin, IBVSOCKET_CONN_TIMEOUT_MS) )
+      srcp = NULL;
+      if (_this->srcIpAddr.s_addr != 0)
+      {
+         src.sin_addr = _this->srcIpAddr;
+         src.sin_family = AF_INET;
+         src.sin_port = 0;
+         srcp = &src;
+      }
+
+      if(rdma_resolve_addr(_this->cm_id, (struct sockaddr*)srcp, (struct sockaddr*)&sin, IBVSOCKET_CONN_TIMEOUT_MS) )
       {
          ibv_print_info_debug("rdma_resolve_addr failed\n");
          goto err_invalidateSock;
@@ -329,7 +344,7 @@ bool IBVSocket_shutdown(IBVSocket* _this)
  * Continues an incomplete former recv() by returning immediately available data from the
  * corresponding buffer.
  */
-ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, struct iov_iter* iter)
+ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, BeeGFS_IovIter* iter)
 {
    IBVCommContext* commContext = _this->commContext;
    struct IBVIncompleteRecv* recv = &commContext->incompleteRecv;
@@ -341,14 +356,14 @@ ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, struct iov_iter* it
    if(unlikely(_this->errState) )
       return -1;
 
-   while(iter->count > 0 && recv->totalSize != recv->completedOffset)
+   while(beegfs_iov_iter_count(iter) > 0 && recv->totalSize != recv->completedOffset)
    {
       unsigned page = recv->completedOffset / buffer->bufferSize;
       unsigned offset = recv->completedOffset % buffer->bufferSize;
-      unsigned fragment = MIN(MIN(iter->count, buffer->bufferSize - offset),
+      unsigned fragment = MIN(MIN(beegfs_iov_iter_count(iter), buffer->bufferSize - offset),
          recv->totalSize - recv->completedOffset);
 
-      copyRes = copy_to_iter(buffer->buffers[page] + offset, fragment, iter);
+      copyRes = beegfs_copy_to_iter(buffer->buffers[page] + offset, fragment, iter);
       if(copyRes != fragment)
       {
          copyRes = 0;
@@ -388,7 +403,7 @@ err_fault:
 /**
  * @return number of received bytes on success, -ETIMEDOUT on timeout, -ECOMM on error
  */
-ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags, int timeoutMS)
+ssize_t IBVSocket_recvT(IBVSocket* _this, BeeGFS_IovIter* iter, int flags, int timeoutMS)
 {
    int checkRes;
    int wait = timeoutMS < 0 ? 1000*1000 : timeoutMS;
@@ -412,12 +427,12 @@ ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags, int 
  * @return number of bytes sent or negative error code (-EAGAIN in case of MSG_DONTWAIT if no data
  * could be sent without blocking)
  */
-ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
+ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags)
 {
    IBVCommContext* commContext = _this->commContext;
    int flowControlRes;
    size_t currentBufIndex;
-   struct iov_iter source = *iter;
+   BeeGFS_IovIter source = *iter;
    int postRes;
    size_t postedLen = 0;
    ssize_t currentPostLen;
@@ -455,7 +470,7 @@ ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
          commContext->numSendBufsLeft);
       bufLenLeft = bufNumLeft * commContext->commCfg.bufSize;
 
-      iov_iter_truncate(&source, bufLenLeft);
+      beegfs_iov_iter_truncate(&source, bufLenLeft);
    }
 
    // send data cut in buf-sized pieces...
@@ -497,9 +512,9 @@ ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
       }
 
       postedLen += currentPostLen;
-   } while(source.count);
+   } while(beegfs_iov_iter_count(&source));
 
-   iov_iter_advance(iter, postedLen);
+   beegfs_iov_iter_advance(iter, postedLen);
    return (ssize_t)postedLen;
 
 err_invalidateSock:
@@ -1813,8 +1828,13 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
    __IBVSocket_initCommDest(_this->commContext, &_this->localDest);
 
    memset(&conn_param, 0, sizeof(conn_param) );
+#ifdef BEEGFS_NVFS
+   conn_param.responder_resources = _this->commContext->pd->device->attrs.max_qp_rd_atom;
+   conn_param.initiator_depth = _this->commContext->pd->device->attrs.max_qp_init_rd_atom;
+#else
    conn_param.responder_resources = 1;
    conn_param.initiator_depth = 1;
+#endif
    conn_param.flow_control = 0;
    conn_param.retry_count = 7; // (3 bits)
    conn_param.rnr_retry_count = 7; // rnr = receiver not ready (3 bits, 7 means infinity)
@@ -1897,6 +1917,17 @@ const char* __IBVSocket_wcStatusStr(int wcStatusCode)
       default:
          return "<undefined>";
    }
+}
+
+struct in_addr IBVSocket_getSrcIpAddr(IBVSocket* _this)
+{
+   return _this->srcIpAddr;
+}
+
+
+NicAddressStats* IBVSocket_getNicStats(IBVSocket* _this)
+{
+   return _this->nicStats;
 }
 
 #endif

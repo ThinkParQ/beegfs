@@ -25,7 +25,7 @@ struct IBVCommContext;
 
 extern bool IBVBuffer_init(IBVBuffer* buffer, struct IBVCommContext* ctx, size_t bufLen);
 extern void IBVBuffer_free(IBVBuffer* buffer, struct IBVCommContext* ctx);
-extern ssize_t IBVBuffer_fill(IBVBuffer* buffer, struct iov_iter* iter);
+extern ssize_t IBVBuffer_fill(IBVBuffer* buffer, BeeGFS_IovIter* iter);
 
 
 struct IBVBuffer

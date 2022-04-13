@@ -38,6 +38,9 @@
 #include <common/net/message/session/opening/OpenFileRespMsg.h>
 #include <common/net/message/session/opening/CloseFileRespMsg.h>
 #include <common/net/message/session/rw/WriteLocalFileRespMsg.h>
+#ifdef BEEGFS_NVFS
+#include <common/net/message/session/rw/WriteLocalFileRDMARespMsg.h>
+#endif
 #include <common/net/message/session/BumpFileVersionResp.h>
 #include <common/net/message/session/FSyncLocalFileRespMsg.h>
 #include <common/net/message/session/GetFileVersionRespMsg.h>
@@ -197,6 +200,9 @@ NetMessage* NetMessageFactory_createFromMsgType(unsigned short msgType)
       HANDLE(OpenFileResp, OpenFileRespMsg);
       HANDLE(CloseFileResp, CloseFileRespMsg);
       HANDLE(WriteLocalFileResp, WriteLocalFileRespMsg);
+#ifdef BEEGFS_NVFS
+      HANDLE(WriteLocalFileRDMAResp, WriteLocalFileRDMARespMsg);
+#endif
       HANDLE(FSyncLocalFileResp, FSyncLocalFileRespMsg);
       HANDLE(FLockAppendResp, FLockAppendRespMsg);
       HANDLE(FLockEntryResp, FLockEntryRespMsg);

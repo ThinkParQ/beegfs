@@ -23,7 +23,7 @@
  *
  */
 int StorageBenchSlave::initAndStartStorageBench(UInt16List* targetIDs, int64_t blocksize,
-   int64_t size, int threads, StorageBenchType type)
+   int64_t size, int threads, bool odirect, StorageBenchType type)
 {
    const char* logContext = "Storage Benchmark (init)";
 
@@ -44,7 +44,7 @@ int StorageBenchSlave::initAndStartStorageBench(UInt16List* targetIDs, int64_t b
    }
    else
    {
-      retVal = initStorageBench(targetIDs, blocksize, size, threads, type);
+      retVal = initStorageBench(targetIDs, blocksize, size, threads, odirect, type);
    }
 
    if(retVal == STORAGEBENCH_ERROR_NO_ERROR)
@@ -95,7 +95,7 @@ int StorageBenchSlave::initAndStartStorageBench(UInt16List* targetIDs, int64_t b
  *
  */
 int StorageBenchSlave::initStorageBench(UInt16List* targetIDs, int64_t blocksize,
-   int64_t size, int threads, StorageBenchType type)
+   int64_t size, int threads, bool odirect, StorageBenchType type)
 {
    const char* logContext = "Storage Benchmark (init)";
    LogContext(logContext).log(Log_DEBUG, "Initializing benchmark ...");
@@ -105,6 +105,7 @@ int StorageBenchSlave::initStorageBench(UInt16List* targetIDs, int64_t blocksize
    this->blocksize = blocksize;
    this->size = size;
    this->numThreads = threads;
+   this->odirect = odirect;
    this->numThreadsDone = 0;
 
    initThreadData();
@@ -170,9 +171,10 @@ bool StorageBenchSlave::initTransferData()
    const char* logContext = "Storage Benchmark (init buf)";
    LogContext(logContext).log(Log_DEBUG, std::string("Initializing random data..."));
 
-   transferData.reset(new (std::nothrow) char[blocksize]);
-   if (!transferData)
+   void* rawTransferData;
+   if (posix_memalign(&rawTransferData, 4096, blocksize) != 0)
       return false;
+   transferData.reset(static_cast<char*>(rawTransferData));
 
    Random randomizer = Random();
 
@@ -523,10 +525,11 @@ bool StorageBenchSlave::openFiles()
 
       // open file
 
+      int directFlag = this->odirect ? O_DIRECT : 0;
       if(this->benchType == StorageBenchType_READ)
-         fileDescriptor = open(path.c_str(), O_RDONLY);
+         fileDescriptor = open(path.c_str(), O_RDONLY | directFlag);
       else
-         fileDescriptor = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, openMode);
+         fileDescriptor = open(path.c_str(), O_CREAT | O_WRONLY | O_TRUNC | directFlag, openMode);
 
       if (fileDescriptor != -1)
          iter->second.fileDescriptor = fileDescriptor;

@@ -91,8 +91,9 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
    struct inode* inode = dentry->d_inode;
 
    FhgfsIsizeHints iSizeHints;
-   struct timespec64 now;
-   ktime_get_real_ts64(&now);
+
+   Time now;
+   Time_setToNowReal(&now);
    
    // For validating the cache, this field is updated
    // with CURRENT_TIME on first lookup
@@ -818,6 +819,9 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
  */
 void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
 {
+   Time now;
+   Time_setToNowReal(&now);
+
    spin_lock(&outInode->i_lock);
 
    if(iAttr->ia_valid & ATTR_MODE)
@@ -836,10 +840,7 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
    else
    if(iAttr->ia_valid & ATTR_MTIME)
    { // set mtime to "now"
-      TimeAbs now;
-      TimeAbs_init(&now);
-
-      outInode->i_mtime.tv_sec = TimeAbs_getTimeval(&now)->tv_sec;
+      outInode->i_mtime.tv_sec = now.tv_sec;
    }
 
    if(iAttr->ia_valid & ATTR_ATIME_SET)
@@ -849,18 +850,12 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
    else
    if(iAttr->ia_valid & ATTR_ATIME)
    { // set atime to "now"
-      TimeAbs now;
-      TimeAbs_init(&now);
-
-      outInode->i_atime.tv_sec = TimeAbs_getTimeval(&now)->tv_sec;
+      outInode->i_atime.tv_sec = now.tv_sec;
    }
 
    if(iAttr->ia_valid & ATTR_CTIME)
    {
-      TimeAbs now;
-      TimeAbs_init(&now);
-
-      outInode->i_ctime.tv_sec = TimeAbs_getTimeval(&now)->tv_sec;
+      outInode->i_ctime.tv_sec = now.tv_sec;
    }
 
    spin_unlock(&outInode->i_lock);
@@ -1877,8 +1872,7 @@ static int __beegfs_follow_link(struct dentry* dentry, char** linkBody, void** c
 
    FhgfsInode_entryInfoReadLock(fhgfsParentInode); // LOCK EntryInfo
 
-   readRes = FhgfsOpsHelper_readlink(app, FhgfsInode_getEntryInfo(fhgfsParentInode), bufPage,
-      PAGE_SIZE-1);
+   readRes = FhgfsOpsHelper_readlink_kernel(app, FhgfsInode_getEntryInfo(fhgfsParentInode), bufPage, PAGE_SIZE-1);
 
    FhgfsInode_entryInfoReadUnlock(fhgfsParentInode); // UNLOCK EntryInfo
 
@@ -2506,7 +2500,7 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
    FhgfsOpsErr statRes;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
 
-   time_t oldMTime;
+   typeof(inode->i_mtime.tv_sec) oldMTime;
    loff_t oldSize;
    unsigned cacheElapsedMS;
    bool mtimeSizeInvalidate;

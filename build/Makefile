@@ -128,7 +128,7 @@ AR += -T
 endif
 
 CXXFLAGS = \
-   -std=gnu++1y -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
+   -std=c++17 -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 \
    -isystem $(BOOST_INC_PATH) -isystem $(NU_INC_PATH) \
    -pthread \
    -fno-strict-aliasing -fmessage-length=0 \
@@ -160,6 +160,14 @@ endif
 
 
 CXXFLAGS += -DBEEGFS_VERSION="\"$(BEEGFS_VERSION)\""
+
+ifeq ($(BEEGFS_NVFS),1)
+CXXFLAGS += -DBEEGFS_NVFS
+endif
+
+ifeq ($(BEEGFS_DEBUG_RDMA),1)
+CXXFLAGS += -DBEEGFS_DEBUG_RDMA
+endif
 
 
 ###### KNOWN LIBRARIES

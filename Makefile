@@ -2,6 +2,7 @@
 export BEEGFS_DEBUG
 export USER_CXXFLAGS
 export USER_LDFLAGS
+export BEEGFS_DEBUG_RDMA
 
 export KDIR
 export KSRCDIR
@@ -27,6 +28,11 @@ endif
 BEEGFS_VERSION_RPM := $(subst -,_,$(BEEGFS_VERSION))
 BEEGFS_VERSION_DEB := $(BEEGFS_EPOCH):$(subst _,-,$(BEEGFS_VERSION))
 export BEEGFS_VERSION
+
+ifneq ($(NVFS_H_PATH),)
+BEEGFS_NVFS=1
+endif
+export BEEGFS_NVFS
 
 PREFIX ?= /opt/beegfs
 DESTDIR ?=

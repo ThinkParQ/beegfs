@@ -175,7 +175,7 @@ void __AckManager_processAckQueue(AckManager* this)
 
          if(likely(sock) )
          { // send msg
-            sendRes = Socket_send(sock, this->ackMsgBuf, msgLen, 0);
+            sendRes = Socket_send_kernel(sock, this->ackMsgBuf, msgLen, 0);
 
             if(unlikely(sendRes != (ssize_t) msgLen) )
             { // comm error => invalidate conn

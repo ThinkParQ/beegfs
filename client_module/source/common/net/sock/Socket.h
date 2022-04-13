@@ -27,19 +27,6 @@ extern void _Socket_uninit(Socket* this);
 extern bool Socket_bind(Socket* this, unsigned short port);
 extern bool Socket_bindToAddr(Socket* this, struct in_addr* ipAddr, unsigned short port);
 
-// getters & setters
-static inline NicAddrType_t Socket_getSockType(Socket* this);
-static inline char* Socket_getPeername(Socket* this);
-static inline struct in_addr Socket_getPeerIP(Socket* this);
-
-// inliners
-static inline void Socket_virtualDestruct(Socket* this);
-static inline ssize_t Socket_recvExactT(Socket* this, void *buf, size_t len, int flags,
-   int timeoutMS);
-static inline ssize_t Socket_recvExactTEx(Socket* this, void *buf, size_t len, int flags,
-   int timeoutMS, size_t* outNumReceivedBeforeError);
-
-
 
 
 struct SocketOps
@@ -52,8 +39,8 @@ struct SocketOps
    bool (*shutdown)(Socket* this);
    bool (*shutdownAndRecvDisconnect)(Socket* this, int timeoutMS);
 
-   ssize_t (*sendto)(Socket* this, struct iov_iter* iter, int flags, fhgfs_sockaddr_in *to);
-   ssize_t (*recvT)(Socket* this, struct iov_iter* iter, int flags, int timeoutMS);
+   ssize_t (*sendto)(Socket* this, BeeGFS_IovIter* iter, int flags, fhgfs_sockaddr_in *to);
+   ssize_t (*recvT)(Socket* this, BeeGFS_IovIter* iter, int flags, int timeoutMS);
 };
 
 struct Socket
@@ -72,17 +59,17 @@ struct Socket
 };
 
 
-NicAddrType_t Socket_getSockType(Socket* this)
+static inline NicAddrType_t Socket_getSockType(Socket* this)
 {
    return this->sockType;
 }
 
-char* Socket_getPeername(Socket* this)
+static inline char* Socket_getPeername(Socket* this)
 {
    return this->peername;
 }
 
-struct in_addr Socket_getPeerIP(Socket* this)
+static inline struct in_addr Socket_getPeerIP(Socket* this)
 {
    return this->peerIP;
 }
@@ -90,32 +77,40 @@ struct in_addr Socket_getPeerIP(Socket* this)
 /**
  * Calls the virtual uninit method and kfrees the object.
  */
-void Socket_virtualDestruct(Socket* this)
+static inline void Socket_virtualDestruct(Socket* this)
 {
    this->ops->uninit(this);
    kfree(this);
 }
 
-static inline ssize_t Socket_recvT(Socket* this, void* buf, size_t len, int flags, int timeoutMS)
+static inline ssize_t Socket_recvT(Socket* this, BeeGFS_IovIter *iter,
+      size_t length, int flags, int timeoutMS)
 {
-   struct iovec iov = { buf, len };
-   struct iov_iter iter;
+   // TODO: implementation function should accept length as well.
+   BeeGFS_IovIter copy = *iter;
+   beegfs_iov_iter_truncate(&copy, length);
 
-   BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, len);
+   {
+      ssize_t nread = this->ops->recvT(this, &copy, flags, timeoutMS);
 
-   return this->ops->recvT(this, &iter, flags, timeoutMS);
+      if (nread >= 0)
+         beegfs_iov_iter_advance(iter, nread);
+
+      return nread;
+   }
 }
 
-/**
- * Receive with timeout.
- *
- * @return -ETIMEDOUT on timeout.
- */
-ssize_t Socket_recvExactT(Socket* this, void *buf, size_t len, int flags, int timeoutMS)
+static inline ssize_t Socket_recvT_kernel(Socket* this, void *buffer,
+      size_t length, int flags, int timeoutMS)
 {
-   size_t numReceivedBeforeError;
+      struct kvec kvec = {
+         .iov_base = buffer,
+         .iov_len = length,
+      };
+      BeeGFS_IovIter iter;
+      BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, length);
 
-   return Socket_recvExactTEx(this, buf, len, flags, timeoutMS, &numReceivedBeforeError);
+      return this->ops->recvT(this, &iter, flags, timeoutMS);
 }
 
 /**
@@ -128,20 +123,14 @@ ssize_t Socket_recvExactT(Socket* this, void *buf, size_t len, int flags, int ti
  * initially.
  * @return -ETIMEDOUT on timeout.
  */
-ssize_t Socket_recvExactTEx(Socket* this, void *buf, size_t len, int flags, int timeoutMS,
+static inline ssize_t Socket_recvExactTEx(Socket* this, BeeGFS_IovIter *iter, size_t len, int flags, int timeoutMS,
    size_t* outNumReceivedBeforeError)
 {
    ssize_t missingLen = len;
-   ssize_t recvRes;
 
    do
    {
-      struct iovec iov = { buf + (len - missingLen), missingLen };
-      struct iov_iter iter;
-
-      BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, missingLen);
-
-      recvRes = this->ops->recvT(this, &iter, flags, timeoutMS);
+      ssize_t recvRes = this->ops->recvT(this, iter, flags, timeoutMS);
 
       if(unlikely(recvRes <= 0) )
          return recvRes;
@@ -152,24 +141,56 @@ ssize_t Socket_recvExactTEx(Socket* this, void *buf, size_t len, int flags, int 
    } while(missingLen);
 
    // all received if we got here
-
    return len;
 }
 
-static inline ssize_t Socket_sendto(Socket* this, const void* buf, size_t len, int flags,
-   fhgfs_sockaddr_in* to)
+static inline ssize_t Socket_recvExactTEx_kernel(Socket* this, void *buf, size_t len, int flags, int timeoutMS,
+   size_t* outNumReceivedBeforeError)
 {
-   struct iovec iov = { (void*) buf, len };
-   struct iov_iter iter;
+      struct kvec kvec = {
+         .iov_base = buf,
+         .iov_len = len,
+      };
+      BeeGFS_IovIter iter;
+      BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, len);
 
-   BEEGFS_IOV_ITER_INIT(&iter, WRITE, &iov, 1, len);
+      return Socket_recvExactTEx(this, &iter, len, flags, timeoutMS, outNumReceivedBeforeError);
+}
+
+/**
+ * Receive with timeout.
+ *
+ * @return -ETIMEDOUT on timeout.
+ */
+static inline ssize_t Socket_recvExactT(Socket* this, BeeGFS_IovIter *iter, size_t len, int flags, int timeoutMS)
+{
+   size_t numReceivedBeforeError;
+
+   return Socket_recvExactTEx(this, iter, len, flags, timeoutMS, &numReceivedBeforeError);
+}
+static inline ssize_t Socket_recvExactT_kernel(Socket* this, void *buf, size_t len, int flags, int timeoutMS)
+{
+   size_t numReceivedBeforeError;
+
+   return Socket_recvExactTEx_kernel(this, buf, len, flags, timeoutMS, &numReceivedBeforeError);
+}
+
+
+
+static inline ssize_t Socket_sendto_kernel(Socket *this, const void *buf, size_t len, int flags,
+   fhgfs_sockaddr_in *to)
+{
+   struct kvec kvec = { (void *) buf, len };
+   BeeGFS_IovIter iter;
+
+   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &kvec, 1, len);
 
    return this->ops->sendto(this, &iter, flags, to);
 }
 
-static inline ssize_t Socket_send(Socket* this, const void* buf, size_t len, int flags)
+static inline ssize_t Socket_send_kernel(Socket *this, const void *buf, size_t len, int flags)
 {
-   return Socket_sendto(this, buf, len, flags, NULL);
+   return Socket_sendto_kernel(this, buf, len, flags, NULL);
 }
 
 

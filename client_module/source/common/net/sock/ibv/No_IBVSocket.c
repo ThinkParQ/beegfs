@@ -2,7 +2,7 @@
 
 #if !defined(CONFIG_INFINIBAND) && !defined(CONFIG_INFINIBAND_MODULE)
 
-bool IBVSocket_init(IBVSocket* _this)
+bool IBVSocket_init(IBVSocket* _this, struct in_addr* srcIpAddr, NicAddressStats* nicStats)
 {
    printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__);
    return false;
@@ -48,14 +48,14 @@ bool IBVSocket_shutdown(IBVSocket* _this)
 }
 
 
-ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags, int timeoutMS)
+ssize_t IBVSocket_recvT(IBVSocket* _this, BeeGFS_IovIter* iter, int flags, int timeoutMS)
 {
    printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__);
    return -1;
 }
 
 
-ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
+ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags)
 {
    printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__);
    return -1;
@@ -86,6 +86,18 @@ void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService)
 
 void IBVSocket_setConnectionFailureStatus(IBVSocket* _this, unsigned value)
 {
+}
+
+struct in_addr IBVSocket_getSrcIpAddr(IBVSocket* _this)
+{
+   struct in_addr r = {};
+   return r;
+}
+
+
+NicAddressStats* IBVSocket_getNicStats(IBVSocket* _this)
+{
+   return NULL;
 }
 
 #endif

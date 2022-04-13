@@ -56,8 +56,6 @@ struct file_operations fhgfs_file_buffered_ops =
 {
    .open             = FhgfsOps_open,
    .release          = FhgfsOps_release,
-   .read             = FhgfsOps_read,
-   .write            = FhgfsOps_write,
    .fsync            = FhgfsOps_fsync,
    .flush            = FhgfsOps_flush,
    .llseek           = FhgfsOps_llseek,
@@ -81,6 +79,8 @@ struct file_operations fhgfs_file_buffered_ops =
    .read_iter           = FhgfsOps_buffered_read_iter,
    .write_iter          = FhgfsOps_buffered_write_iter, // replacement for aio_write
 #else
+   .read                = FhgfsOps_read,
+   .write               = FhgfsOps_write,
    .aio_read            = FhgfsOps_buffered_aio_read,
    .aio_write           = FhgfsOps_buffered_aio_write,
 #endif // LINUX_VERSION_CODE
@@ -158,14 +158,8 @@ struct address_space_operations fhgfs_address_ops =
    .writepages     = FhgfsOpsPages_writepages,
    .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
-
-#ifdef KERNEL_HAS_PREPARE_WRITE
-   .prepare_write = FhgfsOps_prepare_write,
-   .commit_write  = FhgfsOps_commit_write,
-#else
    .write_begin   = FhgfsOps_write_begin,
    .write_end     = FhgfsOps_write_end,
-#endif // LINUX_VERSION_CODE
 };
 
 /**
@@ -179,14 +173,8 @@ struct address_space_operations fhgfs_address_pagecache_ops =
    .writepages     = FhgfsOpsPages_writepages,
    .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
-
-#ifdef KERNEL_HAS_PREPARE_WRITE
-   .prepare_write = FhgfsOps_prepare_write,
-   .commit_write  = FhgfsOps_commit_write,
-#else
    .write_begin   = FhgfsOps_write_begin,
    .write_end     = FhgfsOps_write_end,
-#endif // LINUX_VERSION_CODE
 };
 
 
@@ -307,7 +295,7 @@ int FhgfsOps_readlink(struct dentry* dentry, char __user* buf, int size)
 
    FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo
 
-   retVal = FhgfsOpsHelper_readlink(app, FhgfsInode_getEntryInfo(fhgfsInode), buf, size);
+   retVal = FhgfsOpsHelper_readlink_kernel(app, FhgfsInode_getEntryInfo(fhgfsInode), buf, size);
 
    FhgfsInode_entryInfoReadUnlock(fhgfsInode); // UNLOCK EntryInfo
 
@@ -923,7 +911,7 @@ int FhgfsOps_lock(struct file* file, int cmd, struct file_lock* fileLock)
 }
 
 
-ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *offsetPointer)
+static ssize_t read_common(struct file *file, BeeGFS_IovIter *iter, size_t size, loff_t *offsetPointer)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
 
@@ -951,13 +939,14 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
       invalidate_inode_pages2(file->f_mapping);
    }
 
-   readRes = FhgfsOpsHelper_readCached(buf, size, *offsetPointer, fhgfsInode, fileInfo, &ioInfo);
+   readRes = FhgfsOpsHelper_readCached(iter, size, *offsetPointer, fhgfsInode, fileInfo, &ioInfo);
    //readRes = FhgfsOpsRemoting_readfile(buf, size, *offsetPointer, &ioInfo);
 
-   if(unlikely(readRes < 0) )
+   if(readRes < 0)
    { // read error (=> transform negative fhgfs error code to system error code)
       return FhgfsOpsErr_toSysErr(-readRes);
    }
+
 
    *offsetPointer += readRes;
    FsFileInfo_setLastReadOffset(fileInfo, *offsetPointer);
@@ -965,7 +954,7 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
    if( ( (size_t)readRes < size) && (i_size_read(inode) > *offsetPointer) )
    { // sparse file compatibility mode
       ssize_t readSparseRes = __FhgfsOps_readSparse(
-         file, &buf[readRes], size - readRes, *offsetPointer);
+         file, iter, size - readRes, *offsetPointer);
 
       if(unlikely(readSparseRes < 0) )
          return readSparseRes;
@@ -982,6 +971,17 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
    return readRes;
 }
 
+ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *offsetPointer)
+{
+   struct iovec iov = {
+      .iov_base = buf,
+      .iov_len = size,
+   };
+   BeeGFS_IovIter iter;
+   BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, size);
+   return read_common(file, &iter, size, offsetPointer);
+}
+
 /**
  * Special reading mode that is slower (e.g. not parallel) but compatible with sparse files.
  *
@@ -990,7 +990,7 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
  *
  * @return negative Linux error code on error, read bytes otherwise
  */
-ssize_t __FhgfsOps_readSparse(struct file* file, char __user *buf, size_t size, loff_t offset)
+ssize_t __FhgfsOps_readSparse(struct file* file, BeeGFS_IovIter *iter, size_t size, loff_t offset)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
 
@@ -1019,7 +1019,7 @@ ssize_t __FhgfsOps_readSparse(struct file* file, char __user *buf, size_t size, 
 
    FsFileInfo_getIOInfo(fileInfo, fhgfsInode, &ioInfo);
 
-   helperReadRes = FhgfsOpsHelper_readOrClearUser(app, buf, size, offset, fileInfo, &ioInfo);
+   helperReadRes = FhgfsOpsHelper_readOrClearUser(app, iter, size, offset, fileInfo, &ioInfo);
 
    if(unlikely(helperReadRes != FhgfsOpsErr_SUCCESS) )
       return FhgfsOpsErr_toSysErr(helperReadRes);
@@ -1130,126 +1130,15 @@ static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec
 #else // LINUX_VERSION_CODE
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
-   App* app = FhgfsOps_getApp(iocb->ki_filp->f_mapping->host->i_sb);
-   ssize_t totalReadRes = 0;
-
-   (void) app;
-#ifdef KERNEL_HAS_ITER_KVEC
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; nr_segs: %lu; type %d)", (long long)iocb->ki_pos, to->nr_segs, to->type);
-#else
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; nr_segs: %lu)", (long long)iocb->ki_pos, to->nr_segs);
-#endif
-
-   if ((iov_iter_type(to) == ITER_IOVEC) ||
-       (iov_iter_type(to) == ITER_KVEC))
-   {
-      struct iovec iov;
-      struct iov_iter iter = *to;
-
-      mm_segment_t segment = get_fs();
-
-      if (to->type & ITER_KVEC)
-         set_fs(KERNEL_DS);
-
-      if (iter.count > (2<<30))
-         iter.count = 2<<30;
-
-      beegfs_iov_for_each(iov, iter, &iter)
-      {
-         ssize_t readRes;
-
-         readRes = FhgfsOps_read(iocb->ki_filp, iov.iov_base, iov.iov_len, &iocb->ki_pos);
-         if (readRes < 0 && totalReadRes == 0)
-         {
-            totalReadRes = readRes;
-            break;
-         }
-
-         if (readRes <= 0)
-            break;
-
-         totalReadRes += readRes;
-         if (readRes < iov.iov_len)
-            break;
-      }
-
-      if (to->type & ITER_KVEC)
-         set_fs(segment);
-   }
-#ifdef KERNEL_HAS_ITER_PIPE
-   else if ((iov_iter_type(to) == ITER_BVEC) ||
-            (iov_iter_type(to) == ITER_PIPE))
-#else
-   else if (iov_iter_type(to) == ITER_BVEC)
-#endif
-   {
-      struct page* buffer = alloc_page(GFP_NOFS);
-      void* kaddr;
-
-      if (!buffer)
-         return -ENOMEM;
-
-      kaddr = kmap(buffer);
-      {
-         ssize_t readRes;
-         size_t copyRes;
-
-         while (iov_iter_count(to) > 0)
-         {
-            readRes = FhgfsOps_read(iocb->ki_filp, kaddr, PAGE_SIZE, &iocb->ki_pos);
-            if (readRes < 0 && totalReadRes == 0)
-            {
-               totalReadRes = readRes;
-               break;
-            }
-
-            if (readRes <= 0)
-               break;
-
-#ifdef KERNEL_HAS_ITER_PIPE
-            // do not use copy_page_to_iter with pipe targets since that would not actually *copy*
-            // the page but *link* it instead. our subsequent uses of the page would clobber it
-            // badly, and us freeing it while the pipe still has a reference would also not be
-            // very good.
-            if (iov_iter_type(to) == ITER_PIPE)
-               copyRes = copy_to_iter(kaddr, readRes, to);
-            else
-               copyRes = copy_page_to_iter(buffer, 0, readRes, to);
-#else
-            copyRes = copy_page_to_iter(buffer, 0, readRes, to);
-#endif
-
-            if (copyRes < readRes)
-            {
-               iocb->ki_pos -= (readRes - copyRes);
-               readRes = copyRes;
-            }
-
-            totalReadRes += readRes;
-
-            if (copyRes == 0)
-               break;
-         }
-      }
-      kunmap(buffer);
-      __free_page(buffer);
-   }
-   else
-   {
-      printk(KERN_ERR "unexpected iterator type %d\n", to->type);
-      WARN_ON(1);
-      return -EINVAL;
-   }
-
-   return totalReadRes;
+   size_t result;
+   BeeGFS_IovIter beegfs_iter = beegfs_iov_iter_from_iov_iter(*to);
+   result = read_common(iocb->ki_filp, &beegfs_iter, beegfs_iov_iter_count(&beegfs_iter), &iocb->ki_pos);
+   *to = iov_iter_from_beegfs_iov_iter(beegfs_iter);
+   return result;
 }
 #endif // LINUX_VERSION_CODE
 
-
-ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
-   loff_t* offsetPointer)
+static ssize_t write_common(struct file *file, BeeGFS_IovIter *from, size_t size, loff_t *offsetPointer)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    Config* cfg = App_getConfig(app);
@@ -1332,8 +1221,8 @@ ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
 
    writeOffset = isGloballyLockedAppend ? -1 : *offsetPointer;
 
-   writeRes = FhgfsOpsHelper_writeCached(buf, size, writeOffset, fhgfsInode, fileInfo, &ioInfo);
-   //writeRes = FhgfsOpsRemoting_writefile(buf, size, *offsetPointer, &ioInfo);
+   writeRes = FhgfsOpsHelper_writeCached(from, size, writeOffset, fhgfsInode, fileInfo, &ioInfo);
+   //writeRes = FhgfsOpsRemoting_writefile(from, size, *offsetPointer, &ioInfo);
 
    if(unlikely(writeRes < 0) )
    { // write error (=> transform negative fhgfs error code to system error code)
@@ -1363,6 +1252,18 @@ unlockappend_and_exit:
       Fhgfsinode_appendUnlock(fhgfsInode); // U N L O C K (append)
 
    return writeRes;
+}
+
+ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
+   loff_t* offsetPointer)
+{
+   struct iovec iov = {
+      .iov_base = (void *) buf,
+      .iov_len = size,
+   };
+   BeeGFS_IovIter iter;
+   BEEGFS_IOV_ITER_INIT(&iter, WRITE, &iov, 1, size);
+   return write_common(file, &iter, size, offsetPointer);
 }
 
 #if defined(KERNEL_HAS_AIO_WRITE_BUF)
@@ -1519,102 +1420,9 @@ static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iove
 #else // LINUX_VERSION_CODE
 static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
-   App* app = FhgfsOps_getApp(iocb->ki_filp->f_mapping->host->i_sb);
-   ssize_t totalWriteRes = 0;
-
-   (void) app;
-#ifdef KERNEL_HAS_ITER_KVEC
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; nr_segs: %lu; type %d)", (long long)iocb->ki_pos, from->nr_segs, from->type);
-#else
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; nr_segs: %lu)", (long long)iocb->ki_pos, from->nr_segs);
-#endif
-
-   if ((iov_iter_type(from) == ITER_IOVEC) ||
-       (iov_iter_type(from) == ITER_KVEC))
-   {
-      struct iovec iov;
-      struct iov_iter iter = *from;
-
-      mm_segment_t segment = get_fs();
-
-      if (from->type & ITER_KVEC)
-         set_fs(KERNEL_DS);
-
-      if (iter.count > (2<<30))
-         iter.count = 2<<30;
-
-      beegfs_iov_for_each(iov, iter, &iter)
-      {
-         ssize_t writeRes;
-
-         writeRes = FhgfsOps_write(iocb->ki_filp, iov.iov_base, iov.iov_len, &iocb->ki_pos);
-         if (writeRes < 0 && totalWriteRes == 0)
-         {
-            totalWriteRes = writeRes;
-            break;
-         }
-
-         if (writeRes <= 0)
-            break;
-
-         totalWriteRes += writeRes;
-         if (writeRes < iov.iov_len)
-            break;
-      }
-
-      if (from->type & ITER_KVEC)
-         set_fs(segment);
-   }
-#ifdef KERNEL_HAS_ITER_PIPE
-   else if ((iov_iter_type(from) == ITER_BVEC) ||
-            (iov_iter_type(from) == ITER_PIPE))
-#else
-   else if (iov_iter_type(from) == ITER_BVEC)
-#endif
-   {
-      struct page* buffer = alloc_page(GFP_NOFS);
-      void* kaddr;
-
-      if (!buffer)
-         return -ENOMEM;
-
-      kaddr = kmap(buffer);
-      {
-         ssize_t writeRes;
-         size_t copyRes;
-
-         while (iov_iter_count(from) > 0)
-         {
-            copyRes = copy_page_from_iter(buffer, 0, PAGE_SIZE, from);
-
-            writeRes = FhgfsOps_write(iocb->ki_filp, kaddr, copyRes, &iocb->ki_pos);
-            if (writeRes < 0 && totalWriteRes == 0)
-            {
-               totalWriteRes = writeRes;
-               break;
-            }
-
-            if (writeRes <= 0)
-               break;
-
-            totalWriteRes += writeRes;
-            if (writeRes < copyRes)
-               break;
-         }
-      }
-      kunmap(buffer);
-      __free_page(buffer);
-   }
-   else
-   {
-      printk(KERN_ERR "unexpected iterator type %d\n", from->type);
-      WARN_ON(1);
-      return -EINVAL;
-   }
-
-   return totalWriteRes;
+   BeeGFS_IovIter beegfs_iter = beegfs_iov_iter_from_iov_iter(*from);
+   return write_common(iocb->ki_filp, &beegfs_iter, iov_iter_count(from), &iocb->ki_pos);
+   *from = iov_iter_from_beegfs_iov_iter(beegfs_iter);
 }
 #endif // LINUX_VERSION_CODE
 
@@ -1800,133 +1608,6 @@ exit:
    return retVal;
 }
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
-
-/**
- * Note: We never return an error code here, currently.
- *
- * @param from page inner offset start
- * @param to page inner offset end
- * @return 0 on success
- */
-int FhgfsOps_prepare_write(struct file* file, struct page* page, unsigned from, unsigned to)
-{
-   const char* logContext = __func__;
-
-   struct inode* inode = file->f_mapping->host;
-
-   App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
-   Logger* log = App_getLogger(app);
-
-   int retVal = 0;
-
-   loff_t fileSize;
-   loff_t offset;
-
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, logContext, "from: %u; to: %u", from, to);
-   IGNORE_UNUSED_VARIABLE(logContext);
-   IGNORE_UNUSED_VARIABLE(inode);
-
-   if(PageUptodate(page) )
-      goto clean_up;
-
-   if( (to == PAGE_CACHE_SIZE) && (from == 0) )
-   { // we're writing a full page
-      // full page => will be up to date => no need to read-update the page from the server
-      SetPageUptodate(page);
-      goto clean_up;
-   }
-
-   // we're not writing a full page => try to read-update the page
-
-   offset = page_offset(page);
-   fileSize = i_size_read(page->mapping->host);
-
-   LOG_DEBUG_FORMATTED(log, 5, logContext, "fileSize: %lld; offset: %lld",
-      (long long)fileSize, (long long)offset);
-   IGNORE_UNUSED_VARIABLE(log);
-
-   if( (offset >= fileSize) ||
-       ( (from == 0) && (offset + to) >= fileSize) )
-   {
-      // we don't need to read data beyond the end of the file
-      //    => zero it, and set the page uptodate
-      simple_prepare_write(file, page, from, to);
-      SetPageUptodate(page);
-   }
-   else
-   if( (file->f_flags & O_ACCMODE) != O_WRONLY)
-   {
-      // file open for reading also => read-update the page
-      retVal = FhgfsOpsPages_readpageSync(file, page);
-   }
-   else
-   { // Write-only file handle => we cannot use it to read-update this page.
-      // We could try to get a different open file handle, but the user data will be written out by
-      // commit_write, so it's fine.
-   }
-
-
-   // clean-up
-clean_up:
-
-   IGNORE_UNUSED_VARIABLE(retVal);
-   return 0;
-}
-
-/**
- * @param from page inner offset start
- * @param to page inner offset end
- *
- * @return 0 in success
- */
-int FhgfsOps_commit_write(struct file* file, struct page* page, unsigned from, unsigned to)
-{
-   App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
-   Logger* log = App_getLogger(app);
-   const char* logContext = "FhgfsOps_commit_write";
-
-   int retVal = 0;
-   struct inode* inode = file->f_mapping->host;
-   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
-
-   loff_t pageStart = page_offset(page);
-   loff_t endPos = pageStart + to;
-
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__,
-      "pageStart: %lld; from: %u; to: %u", (long long)pageStart, from, to);
-
-   // check fileSize and update it to page endPos if required
-   spin_lock(&inode->i_lock);
-   if(endPos > inode->i_size)
-   {
-      FhgfsInode_setLastWriteBackOrIsizeWriteTime(fhgfsInode);
-      FhgfsInode_setPageWriteFlag(fhgfsInode);
-      i_size_write(inode, endPos);
-   }
-   spin_unlock(&inode->i_lock);
-
-   // write the page directly or mark it for async writing
-   if (unlikely(!PageUptodate(page) ) )
-      retVal = -EIO; // something failed on reading the page, tell the user about it
-   else
-   {  // mark for async writing via writepage
-      if (!PageDirty(page) )
-      { // Only add if the page is not dirty yet (don't add the same page twice...)
-         FhgfsInode_incNumDirtyPages(fhgfsInode);
-      }
-      set_page_dirty(page);
-   }
-
-
-   LOG_DEBUG_FORMATTED(log, 5, logContext, "complete. retVal: %d", retVal);
-   IGNORE_UNUSED_VARIABLE(log);
-   IGNORE_UNUSED_VARIABLE(logContext);
-
-   return retVal;
-}
-
-#else
 
 /**
  * @param fsdata can be used to hand any data over to write_end() (but note that the old
@@ -2099,8 +1780,75 @@ int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
    return retVal;
 }
 
-#endif // LINUX_VERSION_CODE
+ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
+{
+   BeeGFS_IovIter bgfsIter = beegfs_iov_iter_from_iov_iter(*iter);
+   struct file* file = iocb->ki_filp;
+   FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(file);
+   struct dentry* dentry = file_dentry(file);
+   struct inode* inode = file_inode(file);
+   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
+   RemotingIOInfo ioInfo;
 
+   ssize_t remotingRes;
+
+
+   const char* logContext = __func__;
+   App* app = FhgfsOps_getApp(dentry->d_sb);
+   Logger* log = App_getLogger(app);
+
+   FhgfsOpsHelper_logOpDebug(app, dentry, inode, logContext, "(%s, pos: %lld, nr_seqs: %lld)",
+      (rw == WRITE) ? "WRITE" : "READ", (long long)pos);
+   IGNORE_UNUSED_VARIABLE(logContext); // non-debug builds
+
+   FsFileInfo_getIOInfo(fileInfo, fhgfsInode, &ioInfo);
+
+   if(rw == WRITE)
+   { // write
+      remotingRes = FhgfsOpsRemoting_writefileVec(&bgfsIter, pos, &ioInfo, false);
+   }
+   else if(rw == READ)
+   { // read
+      remotingRes = FhgfsOpsRemoting_readfileVec(&bgfsIter, beegfs_iov_iter_count(&bgfsIter), pos, &ioInfo, fhgfsInode);
+
+      if( (remotingRes >= 0 && beegfs_iov_iter_count(&bgfsIter))
+            && ( i_size_read(inode) > (pos + remotingRes) ) )
+      { // sparse file compatibility mode
+         ssize_t readSparseRes = __FhgfsOps_readSparse(file, &bgfsIter, beegfs_iov_iter_count(&bgfsIter), pos + remotingRes);
+
+         if(unlikely(readSparseRes < 0) )
+            remotingRes = readSparseRes;
+         else
+            remotingRes += readSparseRes;
+      }
+   }
+   else
+   {
+#ifdef WARN_ONCE
+      WARN_ONCE(1, "unexpected: rw value !=READ and !=WRITE. (int value: %d)\n", rw);
+#endif
+      return -EINVAL;
+   }
+
+   //Write back wrapped iter.
+   *iter = iov_iter_from_beegfs_iov_iter(bgfsIter);
+
+   if(unlikely(remotingRes < 0) )
+   { // error occurred
+      LOG_DEBUG_FORMATTED(log, 1, logContext, "error: %s",
+            FhgfsOpsErr_toErrString(-remotingRes) );
+      IGNORE_UNUSED_VARIABLE(log);
+
+      return FhgfsOpsErr_toSysErr(-remotingRes);
+   }
+
+   if(rw == WRITE)
+      task_io_account_write(remotingRes);
+   else
+      task_io_account_read(remotingRes);
+
+   return remotingRes;
+}
 
 /**
  * Note: This method must be defined because otherwise the kernel rejects open() with O_DIRECT in
@@ -2117,127 +1865,33 @@ int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
 ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter)
 {
    int rw = iov_iter_rw(iter);
-   const struct iovec* iov = iter->iov;
-   unsigned long nr_segs = iter->nr_segs;
    loff_t pos = iocb->ki_pos;
+   return __FhgfsOps_directIO_common(rw, iocb, iter, pos);
+}
 
 #elif defined(KERNEL_HAS_LONG_IOV_DIO)
 ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
 {
    int rw = iov_iter_rw(iter);
-   const struct iovec* iov = iter->iov;
-   unsigned long nr_segs = iter->nr_segs;
+   return __FhgfsOps_directIO_common(rw, iocb, iter, pos);
+}
 
 #elif defined(KERNEL_HAS_DIRECT_IO_ITER)
 
 ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
 {
-   const struct iovec* iov = iter->iov;
-   unsigned long nr_segs = iter->nr_segs;
+   return __FhgfsOps_directIO_common(rw, iocb, iter, pos);
+}
 
 #else // KERNEL_HAS_DIRECT_IO_ITER
 
 ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, const struct iovec *iov, loff_t pos,
    unsigned long nr_segs)
 {
-
-#endif // KERNEL_HAS_DIRECT_IO_ITER
-
-   struct file* file = iocb->ki_filp;
-   FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(file);
-   struct dentry* dentry = file_dentry(file);
-   struct inode* inode = file_inode(file);
-   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
-   RemotingIOInfo ioInfo;
-
-   ssize_t remotingRes;
-   ssize_t retVal = 0;
-
-   unsigned long i;
-
-   const char* logContext = __func__;
-   App* app = FhgfsOps_getApp(dentry->d_sb);
-   Logger* log = App_getLogger(app);
-
-   FhgfsOpsHelper_logOpDebug(app, dentry, inode, logContext, "(%s, pos: %lld, nr_seqs: %lld)",
-      (rw == WRITE) ? "WRITE" : "READ", (long long)pos, (long long)nr_segs);
-   IGNORE_UNUSED_VARIABLE(logContext); // non-debug builds
-
-   FsFileInfo_getIOInfo(fileInfo, fhgfsInode, &ioInfo);
-
-   for(i=0; i < nr_segs; i++)
-   {
-      const struct iovec* currentIOV = &iov[i];
-
-      if(rw == WRITE)
-      { // write
-         remotingRes = FhgfsOpsRemoting_writefile(
-            currentIOV->iov_base, currentIOV->iov_len, pos, &ioInfo);
-      }
-      else
-      if(rw == READ)
-      { // read
-         remotingRes = FhgfsOpsRemoting_readfile(
-            currentIOV->iov_base, currentIOV->iov_len, pos, &ioInfo, fhgfsInode);
-
-         /* note: casting remotingRes below is required to be "gcc -Wsign-compare" clean).
-            (casting potentially negative remotingRes to unsigned doesn't matter, because we also
-            have a remotingRes>=0 check in the if-statement.) */
-
-         if( ( (size_t)remotingRes < currentIOV->iov_len) &&
-             (remotingRes >= 0) &&
-             ( i_size_read(inode) > (pos + (loff_t) currentIOV->iov_len) ) )
-         { // sparse file compatibility mode
-            ssize_t readSparseRes = __FhgfsOps_readSparse(file, currentIOV->iov_base + remotingRes,
-               currentIOV->iov_len - remotingRes, pos + currentIOV->iov_len);
-
-            if(unlikely(readSparseRes < 0) )
-            {
-               retVal = readSparseRes;
-               break;
-            }
-
-            remotingRes += readSparseRes;
-         }
-      }
-      else
-      { // unhandled case
-
-         #ifdef WARN_ONCE
-         WARN_ONCE(1, "unexpected: rw value !=READ and !=WRITE. (int value: %d)\n", rw);
-         #endif
-
-         return -EINVAL;
-      }
-
-      if(unlikely(remotingRes < 0) )
-      { // error occurred
-         LOG_DEBUG_FORMATTED(log, 1, logContext, "error: %s",
-            FhgfsOpsErr_toErrString(-remotingRes) );
-         IGNORE_UNUSED_VARIABLE(log);
-
-         retVal = FhgfsOpsErr_toSysErr(-remotingRes);
-         break;
-      }
-
-      retVal += remotingRes;
-      pos += remotingRes;
-
-      if(remotingRes != (ssize_t)currentIOV->iov_len)
-         break; // read end of file or no write space left
-   }
-
-
-   if(likely(retVal > 0) )
-   { // add to /proc/<pid>/io
-      if(rw == WRITE)
-         task_io_account_write(retVal);
-      else
-         task_io_account_read(retVal);
-   }
-
-   return retVal;
+   // This is a very roundabout way to initialize an iov_iter here, because there isn't a stable way in Linux across versions.
+   BeeGFS_IovIter bgfsIter;
+   BEEGFS_IOV_ITER_INIT(&bgfsIter, rw, iov, 1, iov->iov_len);
+   return __FhgfsOps_directIO_common(rw, iocb, &bgfsIter._iov_iter, pos);
 }
 
-
-
+#endif // KERNEL_HAS_DIRECT_IO_ITER

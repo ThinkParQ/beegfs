@@ -11,7 +11,7 @@ class StorageBenchControlMsg: public NetMessageSerdes<StorageBenchControlMsg>
 {
    public:
       StorageBenchControlMsg(StorageBenchAction action, StorageBenchType type, int64_t blocksize,
-         int64_t size, int threads, UInt16List* targetIDs)
+         int64_t size, int threads, bool odirect, UInt16List* targetIDs)
       : BaseType(NETMSGTYPE_StorageBenchControlMsg)
       {
          this->action = action;
@@ -19,6 +19,7 @@ class StorageBenchControlMsg: public NetMessageSerdes<StorageBenchControlMsg>
          this->blocksize = blocksize;
          this->size = size;
          this->threads = threads;
+         this->odirect = odirect;
          this->targetIDs = targetIDs;
       }
 
@@ -38,6 +39,7 @@ class StorageBenchControlMsg: public NetMessageSerdes<StorageBenchControlMsg>
             % obj->blocksize
             % obj->size
             % obj->threads
+            % obj->odirect
             % serdes::backedPtr(obj->targetIDs, obj->parsed.targetIDs);
       }
 
@@ -47,6 +49,7 @@ class StorageBenchControlMsg: public NetMessageSerdes<StorageBenchControlMsg>
       int64_t blocksize;
       int64_t size;
       int32_t threads;
+      bool odirect;
       UInt16List* targetIDs;
 
       // deserialization info
@@ -80,6 +83,11 @@ class StorageBenchControlMsg: public NetMessageSerdes<StorageBenchControlMsg>
       int getThreads()
       {
          return this->threads;
+      }
+
+      bool getODirect()
+      {
+         return this->odirect;
       }
 
       UInt16List& getTargetIDs()

@@ -24,7 +24,7 @@ static const struct SocketOps rdmaOps = {
    .recvT = _RDMASocket_recvT,
 };
 
-bool RDMASocket_init(RDMASocket* this)
+bool RDMASocket_init(RDMASocket* this, struct in_addr* src, NicAddressStats* nicStats)
 {
    Socket* thisBase = (Socket*)this;
 
@@ -40,7 +40,7 @@ bool RDMASocket_init(RDMASocket* this)
    this->commCfg.bufNum = RDMASOCKET_DEFAULT_BUF_NUM;
    this->commCfg.bufSize = RDMASOCKET_DEFAULT_BUF_SIZE;
 
-   if(!IBVSocket_init(&this->ibvsock) )
+   if(!IBVSocket_init(&this->ibvsock, src, nicStats) )
       goto err_ibv;
 
    return true;
@@ -50,12 +50,12 @@ err_ibv:
    return false;
 }
 
-RDMASocket* RDMASocket_construct(void)
+RDMASocket* RDMASocket_construct(struct in_addr* src, NicAddressStats *nicStats)
 {
    RDMASocket* this = kmalloc(sizeof(*this), GFP_NOFS);
 
    if(!this ||
-      !RDMASocket_init(this) )
+      !RDMASocket_init(this, src, nicStats) )
    {
       kfree(this);
       return NULL;
@@ -180,18 +180,13 @@ bool _RDMASocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS)
 /**
  * @return -ETIMEDOUT on timeout
  */
-ssize_t _RDMASocket_recvT(Socket* this, struct iov_iter* iter, int flags, int timeoutMS)
+ssize_t _RDMASocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags, int timeoutMS)
 {
    RDMASocket* thisCast = (RDMASocket*)this;
 
    ssize_t retVal;
-   mm_segment_t oldfs;
-
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
    retVal = IBVSocket_recvT(&thisCast->ibvsock, iter, flags, timeoutMS);
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
 
    return retVal;
 }
@@ -201,19 +196,14 @@ ssize_t _RDMASocket_recvT(Socket* this, struct iov_iter* iter, int flags, int ti
  *
  * @param flags ignored
  */
-ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags,
+ssize_t _RDMASocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *to)
 {
    RDMASocket* thisCast = (RDMASocket*)this;
 
    ssize_t retVal;
-   mm_segment_t oldfs;
-
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
    retVal = IBVSocket_send(&thisCast->ibvsock, iter, flags);
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
 
    return retVal;
 }

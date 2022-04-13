@@ -49,12 +49,11 @@ static size_t Config_fs_read(struct file *file, char *buf, size_t size, loff_t *
 #if defined(KERNEL_HAS_KERNEL_READ)
    readRes = kernel_read(file, buf, size, pos);
 #else
-   mm_segment_t oldfs;
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
-   readRes = vfs_read(file, buf, size, pos);
+   WITH_PROCESS_CONTEXT {
+      readRes = vfs_read(file, buf, size, pos);
+   }
 
-   RELEASE_PROCESS_CONTEXT(oldfs);
 #endif
 
    return readRes;
@@ -80,6 +79,7 @@ bool Config_init(Config* this, MountConfig* mountConfig)
    this->logHelperdIP = NULL;
    this->logType = NULL;
    this->connInterfacesFile = NULL;
+   this->connRDMAInterfacesFile = NULL;
    this->connNetFilterFile = NULL;
    this->connAuthFile = NULL;
    this->connTcpOnlyFilterFile = NULL;
@@ -112,6 +112,7 @@ void Config_uninit(Config* this)
    SAFE_KFREE(this->logHelperdIP);
    SAFE_KFREE(this->logType);
    SAFE_KFREE(this->connInterfacesFile);
+   SAFE_KFREE(this->connRDMAInterfacesFile);
    SAFE_KFREE(this->connNetFilterFile);
    SAFE_KFREE(this->connAuthFile);
    SAFE_KFREE(this->connTcpOnlyFilterFile);
@@ -207,8 +208,10 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connHelperdPortTCP",               "8006");
    _Config_configMapRedefine(this, "connMgmtdPortTCP",                 "8008");
    _Config_configMapRedefine(this, "connUseRDMA",                      "true");
+   _Config_configMapRedefine(this, "connTCPFallbackEnabled",           "true");
    _Config_configMapRedefine(this, "connMaxInternodeNum",              "8");
    _Config_configMapRedefine(this, "connInterfacesFile",               "");
+   _Config_configMapRedefine(this, "connRDMAInterfacesFile",           "");
    _Config_configMapRedefine(this, "connFallbackExpirationSecs",       "900");
    _Config_configMapRedefine(this, "connCommRetrySecs",                "600");
    _Config_configMapRedefine(this, "connUnmountRetries",               "true");
@@ -342,6 +345,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "connUseRDMA") )
          this->connUseRDMA = StringTk_strToBool(valueStr);
       else
+      if(!strcmp(keyStr, "connTCPFallbackEnabled") )
+         this->connTCPFallbackEnabled = StringTk_strToBool(valueStr);
+      else
       if(!strcmp(keyStr, "connRDMATypeOfService") )
          this->connRDMATypeOfService = StringTk_strToInt(valueStr);
       else
@@ -352,6 +358,12 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       {
          SAFE_KFREE(this->connInterfacesFile);
          this->connInterfacesFile = StringTk_strDup(valueStr);
+      }
+      else
+      if(!strcmp(keyStr, "connRDMAInterfacesFile") )
+      {
+         SAFE_KFREE(this->connRDMAInterfacesFile);
+         this->connRDMAInterfacesFile = StringTk_strDup(valueStr);
       }
       else
       IGNORE_CONFIG_VALUE("connNonPrimaryExpiration")
@@ -721,7 +733,6 @@ bool __Config_loadFromFile(struct Config* this, const char* filename)
    char* line;
    char* trimLine;
    int currentLineNum; // 1-based (just for error logging)
-   mm_segment_t oldfs;
 
    //printk_fhgfs_debug(KERN_INFO, "Attempting to read config file: '%s'\n", filename);
    cfgFile = filp_open(filename, (O_RDONLY), 0);
@@ -767,9 +778,9 @@ bool __Config_loadFromFile(struct Config* this, const char* filename)
    // clean up
    kfree(line);
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-   filp_close(cfgFile, NULL);
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      filp_close(cfgFile, NULL);
+   }
 
    return retVal;
 }
@@ -786,7 +797,6 @@ bool Config_loadStringListFile(const char* filename, StrCpyList* outList)
    struct file* listFile;
    char* line;
    char* trimLine;
-   mm_segment_t oldfs;
 
    //printk_fhgfs(KERN_INFO, "Attempting to read configured list file: '%s'\n", filename);
    listFile = filp_open(filename, (O_RDONLY), 0);
@@ -833,9 +843,9 @@ bool Config_loadStringListFile(const char* filename, StrCpyList* outList)
    // clean up
    kfree(line);
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-   filp_close(listFile, NULL);
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      filp_close(listFile, NULL);
+   }
 
    return retVal;
 }
@@ -1155,7 +1165,6 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
 {
    struct file* fileHandle;
    char* buf;
-   mm_segment_t oldfs;
    ssize_t readRes;
 
 
@@ -1182,18 +1191,18 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
    {
       printk_fhgfs(KERN_WARNING, "Failed to alloc mem for auth file reading: '%s'\n", connAuthFile);
 
-      ACQUIRE_PROCESS_CONTEXT(oldfs);
-      filp_close(fileHandle, NULL);
-      RELEASE_PROCESS_CONTEXT(oldfs);
+      WITH_PROCESS_CONTEXT {
+         filp_close(fileHandle, NULL);
+      }
 
       return false;
    }
 
    readRes = Config_fs_read(fileHandle, buf, CONFIG_AUTHFILE_READSIZE, &fileHandle->f_pos);
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-   filp_close(fileHandle, NULL);
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      filp_close(fileHandle, NULL);
+   }
 
 
    if(readRes < 0)

@@ -37,14 +37,14 @@ extern bool _StandardSocket_listen(Socket* this);
 extern bool _StandardSocket_shutdown(Socket* this);
 extern bool _StandardSocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS);
 
-extern ssize_t _StandardSocket_recvT(Socket* this, struct iov_iter* iter, int flags,
+extern ssize_t _StandardSocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags,
    int timeoutMS);
-extern ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
+extern ssize_t _StandardSocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *to);
 
-extern ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* iter,
+extern ssize_t StandardSocket_recvfrom(StandardSocket* this, BeeGFS_IovIter* iter,
    int flags, fhgfs_sockaddr_in *from);
-extern ssize_t StandardSocket_recvfromT(StandardSocket* this, struct iov_iter* iter,
+extern ssize_t StandardSocket_recvfromT(StandardSocket* this, BeeGFS_IovIter* iter,
    int flags, fhgfs_sockaddr_in *from, int timeoutMS);
 
 extern bool _StandardSocket_initSock(StandardSocket* this, int domain, int type,

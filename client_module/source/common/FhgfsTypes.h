@@ -4,6 +4,8 @@
 #include <linux/in.h>
 #include <linux/time.h>
 
+#include <common/toolkit/Time.h>
+
 struct fhgfs_sockaddr_in
 {
    struct in_addr addr;
@@ -21,9 +23,9 @@ struct fhgfs_stat
    gid_t gid;
    loff_t size;
    uint64_t blocks;
-   struct timespec atime;
-   struct timespec mtime;
-   struct timespec ctime; // attrib change time (not creation time)
+   Time atime;
+   Time mtime;
+   Time ctime; // attrib change time (not creation time)
 };
 typedef struct fhgfs_stat fhgfs_stat;
 

@@ -4,15 +4,17 @@
 #include <common/net/message/control/SetChannelDirectMsg.h>
 #include <common/net/message/control/PeerInfoMsg.h>
 #include <common/net/sock/RDMASocket.h>
+#include <common/net/sock/NicAddressStatsListIter.h>
 #include <common/threading/Thread.h>
 #include <common/toolkit/ListTk.h>
 #include <common/toolkit/NetFilter.h>
+#ifdef BEEGFS_NVFS
+#include <common/storage/RdmaInfo.h>
+#endif
 #include "Node.h"
 #include "NodeConnPool.h"
 
-
 #define NODECONNPOOL_SHUTDOWN_WAITTIMEMS              100
-
 
 /**
  * Note: localNicCaps should to be initialized before acquiring a stream.
@@ -32,7 +34,7 @@ void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentN
 
    ConnectionList_init(&this->connList);
 
-   ListTk_cloneNicAddressList(nicList, &this->nicList);
+   ListTk_cloneNicAddressList(nicList, &this->nicList, true);
 
    this->establishedConns = 0;
    this->availableConns = 0;
@@ -49,7 +51,50 @@ void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentN
    memset(&this->stats, 0, sizeof(this->stats) );
    memset(&this->errState, 0, sizeof(this->errState) );
 
+   // rdmaNicStatsList should only have elements when parentNode "type" is meta or storage, but
+   // parentNode "type" isn't yet known. Initialize elements in the first call to
+   // acquireStreamSocketEx per NodeConnPool instance.
+   NicAddressStatsList_init(&this->rdmaNicStatsList);
+   NicAddressStatsList_init(&this->rdmaNicStatsRetryList);
+   this->rdmaNicCount = -1;
    this->logConnErrors = true;
+   this->enableTCPFallback = Config_getConnTCPFallbackEnabled(cfg);
+}
+
+static void NodeConnPool_loadRdmaNicStatsList(NodeConnPool* this)
+{
+   NodeType nodeType;
+   NicAddressListIter nicIter;
+
+   this->rdmaNicCount = 0;
+   nodeType = Node_getNodeType(this->parentNode);
+   if (nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage)
+   {
+      NicAddressListIter_init(&nicIter, App_getRDMANicList(this->app));
+      for ( ; !NicAddressListIter_end(&nicIter); NicAddressListIter_next(&nicIter) )
+      {
+         NicAddressStats* st = (NicAddressStats*)os_kmalloc(sizeof(NicAddressStats));
+         if (st == NULL)
+         {
+            printk_fhgfs(KERN_ERR, "%s:%d: failed to allocate NicAddressStats, size=%ld\n",
+               __func__, __LINE__, sizeof(NicAddressStats));
+            while (NicAddressStatsList_length(&this->rdmaNicStatsList) > 0)
+            {
+               NicAddressStatsListIter ni;
+               NicAddressStatsListIter_init(&ni, &this->rdmaNicStatsList);
+               st = NicAddressStatsListIter_value(&ni);
+               NicAddressStatsListIter_remove(&ni);
+               NicAddressStats_uninit(st);
+               kfree(st);
+            }
+            this->rdmaNicCount = 0;
+            break;
+         }
+         NicAddressStats_init(st, NicAddressListIter_value(&nicIter));
+         NicAddressStatsList_append(&this->rdmaNicStatsList, st);
+         this->rdmaNicCount++;
+      }
+   }
 }
 
 NodeConnPool* NodeConnPool_construct(struct App* app, struct Node* parentNode,
@@ -90,9 +135,14 @@ void NodeConnPool_uninit(NodeConnPool* this)
 
    // delete nicList elems
    ListTk_kfreeNicAddressListElems(&this->nicList);
+   ListTk_kfreeNicAddressStatsListElems(&this->rdmaNicStatsList);
+   ListTk_kfreeNicAddressStatsListElems(&this->rdmaNicStatsRetryList);
 
    // normal clean-up
    NicAddressList_uninit(&this->nicList);
+   NicAddressStatsList_uninit(&this->rdmaNicStatsList);
+   NicAddressStatsList_uninit(&this->rdmaNicStatsRetryList);
+
    Mutex_uninit(&this->mutex);
 }
 
@@ -103,6 +153,117 @@ void NodeConnPool_destruct(NodeConnPool* this)
    kfree(this);
 }
 
+static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DevicePriorityContext* ctx)
+{
+   NicAddressStats* cur;
+   NicAddressStats* min = NULL;
+   NicAddressStatsListIter statsIter;
+   bool skipped;
+#ifdef BEEGFS_NVFS
+   int minNvfsPrio = INT_MAX;
+   int nvfsPrio;
+   int numa = cpu_to_node(current->cpu);
+#endif
+
+   if (NicAddressStatsList_length(&this->rdmaNicStatsList) < 1)
+      return NULL;
+
+   NicAddressStatsListIter_init(&statsIter, &this->rdmaNicStatsList);
+   for (; !NicAddressStatsListIter_end(&statsIter); NicAddressStatsListIter_next(&statsIter))
+   {
+      skipped = false;
+      cur = NicAddressStatsListIter_value(&statsIter);
+      if (!NicAddressStats_usable(cur, ctx->maxConns))
+         skipped = true;
+      else
+      {
+#ifndef BEEGFS_NVFS
+         if (min == NULL || NicAddressStats_comparePriority(min, cur))
+            min = cur;
+#else
+         if (ctx->gpuIndex < 0)
+         {
+            if (min == NULL || NicAddressStats_comparePriority(min, cur, numa) > 0)
+               min = cur;
+         }
+         else
+         {
+            nvfsPrio = RdmaInfo_nvfsDevicePriority(cur->nic.ibdev, ctx->gpuIndex);
+#ifdef BEEGFS_DEBUG
+            printk_fhgfs(KERN_INFO, "%s:%d cur=%p minNvfsPrio=%d nvfsPrio=%d gpuIndex=%d\n",
+               __func__, __LINE__, cur, minNvfsPrio, nvfsPrio, ctx->gpuIndex);
+#endif
+            if (min == NULL || minNvfsPrio > nvfsPrio)
+            {
+               minNvfsPrio = nvfsPrio;
+               min = cur;
+            }
+            else if (minNvfsPrio == nvfsPrio && NicAddressStats_comparePriority(min, cur, numa) > 0)
+               min = cur;
+         }
+#endif
+      }
+#ifdef BEEGFS_DEBUG
+      printk_fhgfs(KERN_INFO, "%s:%d: min=%p cur=%p skipped=%d cur.avail=%d cur.established=%d cur.used=%lld\n",
+         __func__, __LINE__, min, cur, skipped, cur->available, cur->established, Time_toNS(&cur->used));
+#endif
+   }
+
+   if (min)
+      NicAddressStats_updateUsed(min);
+
+#ifdef BEEGFS_DEBUG
+   printk_fhgfs(KERN_INFO, "%s:%d: return %p\n", __func__, __LINE__, min);
+#endif
+
+   return min;
+}
+
+static inline void NodeConnPool_moveNicAddressStatsToRetry(NodeConnPool *this, NicAddressStats *srcRdma)
+{
+   NicAddressStatsListIter ni;
+
+   NicAddressStatsListIter_init(&ni, &this->rdmaNicStatsList);
+   for ( ; ! NicAddressStatsListIter_end(&ni); NicAddressStatsListIter_next(&ni))
+   {
+      if (srcRdma == NicAddressStatsListIter_value(&ni))
+      {
+         NicAddressStatsListIter_remove(&ni);
+         NicAddressStats_updateLastError(srcRdma);
+         NicAddressStatsList_append(&this->rdmaNicStatsRetryList, srcRdma);
+         break;
+      }
+   }
+}
+
+static inline bool NodeConnPool_updateRdmaNicStatsRetry(NodeConnPool *this)
+{
+   bool updated = false;
+   int rl = NicAddressStatsList_length(&this->rdmaNicStatsRetryList);
+   if (rl > 0)
+   {
+      NicAddressStatsListIter stIter;
+      NicAddressStats *st;
+      Time now;
+
+      Time_init(&now);
+      NicAddressStatsListIter_init(&stIter, &this->rdmaNicStatsRetryList);
+      while (! NicAddressStatsListIter_end(&stIter))
+      {
+         st = NicAddressStatsListIter_value(&stIter);
+         if (NicAddressStats_lastErrorExpired(st, &now, this->fallbackExpirationSecs))
+         {
+            NicAddressStatsList_append(&this->rdmaNicStatsList, st);
+            stIter = NicAddressStatsListIter_remove(&stIter);
+            updated = true;
+         }
+         else
+            NicAddressStatsListIter_next(&stIter);
+      }
+   }
+   return updated;
+}
+
 /**
  * Note: Will block if no stream socket is immediately available.
  *
@@ -110,7 +271,7 @@ void NodeConnPool_destruct(NodeConnPool* this)
  */
 Socket* NodeConnPool_acquireStreamSocket(NodeConnPool* this)
 {
-   return NodeConnPool_acquireStreamSocketEx(this, true);
+   return NodeConnPool_acquireStreamSocketEx(this, true, NULL);
 }
 
 /**
@@ -121,7 +282,8 @@ Socket* NodeConnPool_acquireStreamSocket(NodeConnPool* this)
  * that the caller will sooner or later allow waiting to detect conn errors).
  * @return connected socket; NULL on error or pending signal
  */
-Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting)
+Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting,
+   DevicePriorityContext* devPrioCtx)
 {
    const char* logContext = "NodeConn (acquire stream)";
 
@@ -135,11 +297,17 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    NicAddressListIter nicIter;
    bool isPrimaryInterface = true; // used to set expiration for non-primary interfaces;
       // "primary" means: first interface in the list that is supported by client and server
+   NicAddressStats* srcRdma = NULL;
+   NodeType nodeType;
+   bool rdmaConnectInterrupted = false;
+   bool includeTcp = true;
 
    if (unlikely(fatal_signal_pending(current)))
       return NULL; // no need to try if the process will terminate soon anyway
 
    Mutex_lock(&this->mutex); // L O C K
+   if (unlikely(this->rdmaNicCount < 0))
+      NodeConnPool_loadRdmaNicStatsList(this);
 
    if(!this->availableConns && (this->establishedConns == this->maxConns) )
    { // wait for a conn to become available (or disconnected)
@@ -161,6 +329,16 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       }
    }
 
+   if (this->rdmaNicCount > 0 && devPrioCtx)
+   {
+      devPrioCtx->maxConns = this->maxConns / this->rdmaNicCount;
+      NodeConnPool_updateRdmaNicStatsRetry(this);
+      srcRdma = NodeConnPool_rdmaNicPriority(this, devPrioCtx);
+#ifdef BEEGFS_DEBUG
+      Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
+         "Preferred IP addr is 0x%x", srcRdma == NULL? 0 : srcRdma->nic.ipAddr.s_addr);
+#endif
+   }
 
    if(likely(this->availableConns) )
    { // established connection available => grab it
@@ -168,28 +346,44 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
 
       ConnectionListIter connIter;
       ConnectionListIter_init(&connIter, &this->connList);
+      for(; !ConnectionListIter_end(&connIter); ConnectionListIter_next(&connIter))
+      {
+         pooledSock = ConnectionListIter_value(&connIter);
+         if (PooledSocket_isAvailable(pooledSock) &&
+            (srcRdma == NULL ||
+               (Socket_getSockType((Socket*) pooledSock) == NICADDRTYPE_RDMA
+                  && IBVSocket_getNicStats(&((RDMASocket*) pooledSock)->ibvsock) == srcRdma)))
+            break;
+         pooledSock = NULL;
+      }
 
-      while(!PooledSocket_isAvailable(ConnectionListIter_value(&connIter) ) )
-         ConnectionListIter_next(&connIter);
+      if (pooledSock != NULL)
+      {
+         PooledSocket_setAvailable(pooledSock, false);
+         PooledSocket_setHasActivity(pooledSock);
 
-      pooledSock = ConnectionListIter_value(&connIter);
-      PooledSocket_setAvailable(pooledSock, false);
-      PooledSocket_setHasActivity(pooledSock);
+         this->availableConns--;
+         if (srcRdma)
+            srcRdma->available--;
 
-      this->availableConns--;
+         Mutex_unlock(&this->mutex); // U N L O C K
 
-      Mutex_unlock(&this->mutex); // U N L O C K
-
-      return (Socket*)pooledSock;
+         return (Socket*)pooledSock;
+      }
    }
-
 
    // no conn available, but maxConns not reached yet => establish a new conn
 
    port = this->streamPort;
-   ListTk_cloneNicAddressList(&this->nicList, &nicListCopy);
+   nodeType = Node_getNodeType(this->parentNode);
+   if (!this->enableTCPFallback && (nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage))
+      includeTcp = false;
+
+   ListTk_cloneNicAddressList(&this->nicList, &nicListCopy, includeTcp);
 
    this->establishedConns++;
+   if (srcRdma)
+      srcRdma->established++;
 
    Mutex_unlock(&this->mutex); // U N L O C K
 
@@ -223,12 +417,23 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       {
          case NICADDRTYPE_RDMA:
          { // RDMA
+            char from[NICADDRESS_IP_STR_LEN];
+            struct in_addr *srcAddr = NULL;
+
             if(!this->localNicCaps.supportsRDMA)
                goto continue_clean_endpointStr;
 
+            if (srcRdma)
+            {
+               srcAddr = &srcRdma->nic.ipAddr;
+               NicAddress_ipToStr(*srcAddr, from);
+            }
+            else
+               strncpy(from, "any", sizeof(from));
+
             Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
-               "Establishing new RDMA connection to: %s@%s", nodeTypeStr, endpointStr);
-            sock = (Socket*)RDMASocket_construct();
+               "Establishing new RDMA connection from %s to: %s@%s", from, nodeTypeStr, endpointStr);
+            sock = (Socket*)RDMASocket_construct(srcAddr, srcRdma);
          } break;
          case NICADDRTYPE_SDP:
          { // SDP
@@ -319,6 +524,8 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
 
          // the next interface is definitely non-primary
          isPrimaryInterface = false;
+         if (nicAddr->nicType == NICADDRTYPE_RDMA && fatal_signal_pending(current))
+            rdmaConnectInterrupted = true;
 
          Socket_virtualDestruct(sock);
       }
@@ -343,6 +550,13 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    { // success => add to list (as unavailable) and update stats
       PooledSocket* pooledSock = (PooledSocket*)sock;
 
+      if (srcRdma && Socket_getSockType(sock) != NICADDRTYPE_RDMA)
+      {
+         srcRdma->established--;
+         if (!rdmaConnectInterrupted)
+            NodeConnPool_moveNicAddressStatsToRetry(this, srcRdma);
+      }
+
       ConnectionList_append(&this->connList, pooledSock);
       __NodeConnPool_statsAddNic(this, PooledSocket_getNicType(pooledSock) );
 
@@ -352,7 +566,12 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    { // absolutely unable to connect
       sock = NULL;
       this->establishedConns--;
-
+      if (srcRdma)
+      {
+         srcRdma->established--;
+         if (!rdmaConnectInterrupted)
+            NodeConnPool_moveNicAddressStatsToRetry(this, srcRdma);
+      }
       // connect may be interrupted by signals. return no connection without setting up alternate
       // routes or other error handling in that case.
       if (!fatal_signal_pending(current))
@@ -398,8 +617,13 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
    Mutex_lock(&this->mutex);
 
    this->availableConns++;
-
    PooledSocket_setAvailable(pooledSock, true);
+   if (Socket_getSockType((Socket*) pooledSock) == NICADDRTYPE_RDMA)
+   {
+      NicAddressStats* st = IBVSocket_getNicStats(&((RDMASocket*) pooledSock)->ibvsock);
+      if (st)
+         st->available++;
+   }
 
    Condition_signal(&this->changeCond);
 
@@ -458,6 +682,12 @@ void __NodeConnPool_invalidateSpecificStreamSocket(NodeConnPool* this, Socket* s
    else
    {
       this->establishedConns--;
+      if (Socket_getSockType((Socket*) sock) == NICADDRTYPE_RDMA)
+      {
+         NicAddressStats* st = IBVSocket_getNicStats(&((RDMASocket*) sock)->ibvsock);
+         if (st)
+            st->established--;
+      }
 
       ConnectionListIter_remove(&connIter);
       __NodeConnPool_statsRemoveNic(this, PooledSocket_getNicType(pooledSock) );
@@ -523,6 +753,12 @@ unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this, bool idle
 
       PooledSocket_setAvailable(sock, false);
       this->availableConns--;
+      if (Socket_getSockType((Socket*)sock) == NICADDRTYPE_RDMA)
+      {
+         NicAddressStats* st = IBVSocket_getNicStats(&((RDMASocket*) sock)->ibvsock);
+         if (st)
+            st->available--;
+      }
       ConnectionList_append(&availableConnsList, sock);
 
       numInvalidated++;
@@ -688,7 +924,7 @@ bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock
       sendBuf = (char*)os_kmalloc(sendBufLen);
 
       NetMessage_serialize( (NetMessage*)&authMsg, sendBuf, sendBufLen);
-      sendRes = Socket_send(sock, sendBuf, sendBufLen, 0);
+      sendRes = Socket_send_kernel(sock, sendBuf, sendBufLen, 0);
       if(sendRes <= 0)
       {
          Logger_log(log, Log_WARNING, logContext, "Failed to send authentication");
@@ -709,7 +945,7 @@ bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock
       sendBuf = (char*)os_kmalloc(sendBufLen);
 
       NetMessage_serialize( (NetMessage*)&directMsg, sendBuf, sendBufLen);
-      sendRes = Socket_send(sock, sendBuf, sendBufLen, 0);
+      sendRes = Socket_send_kernel(sock, sendBuf, sendBufLen, 0);
       if(sendRes <= 0)
       {
          Logger_log(log, Log_WARNING, logContext, "Failed to set channel to indirect mode");
@@ -732,7 +968,7 @@ bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock
       if (sendBuf)
       {
          NetMessage_serialize(&peerInfo.netMessage, sendBuf, sendBufLen);
-         sendRes = Socket_send(sock, sendBuf, sendBufLen, 0);
+         sendRes = Socket_send_kernel(sock, sendBuf, sendBufLen, 0);
       }
 
       if(sendRes <= 0)
@@ -877,8 +1113,14 @@ bool NodeConnPool_updateInterfaces(NodeConnPool* this, unsigned short streamPort
 
    { // update nicList (if allocation of new list fails, we just keep the old list)
       NicAddressList newNicList;
+      NodeType nodeType;
+      bool includeTcp = true;
 
-      ListTk_cloneNicAddressList(nicList, &newNicList);
+      nodeType = Node_getNodeType(this->parentNode);
+      if (!this->enableTCPFallback && (nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage))
+         includeTcp = false;
+
+      ListTk_cloneNicAddressList(nicList, &newNicList, includeTcp);
       ListTk_kfreeNicAddressListElems(&this->nicList);
       NicAddressList_uninit(&this->nicList);
 

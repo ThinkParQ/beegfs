@@ -204,6 +204,12 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_BumpFileVersionResp: return "BumpFileVersionResp (3034)";
       case NETMSGTYPE_GetFileVersion: return "GetFileVersion (3035)";
       case NETMSGTYPE_GetFileVersionResp: return "GetFileVersionResp (3036)";
+#ifdef BEEGFS_NVFS
+      case NETMSGTYPE_WriteLocalFileRDMA: return "WriteLocalFileRDMA (3037)";
+      case NETMSGTYPE_WriteLocalFileRDMAResp: return "WriteLocalFileRDMAResp (3038)";
+      case NETMSGTYPE_ReadLocalFileRDMA: return "ReadLocalFileRDMA (3039)";
+      case NETMSGTYPE_ReadLocalFileRDMAResp: return "ReadLocalFileRDMAResp (3040)";
+#endif /* BEEGFS_NVFS */
       case NETMSGTYPE_SetChannelDirect: return "SetChannelDirect (4001)";
       case NETMSGTYPE_Ack: return "Ack (4003)";
       case NETMSGTYPE_Dummy: return "Dummy (4005)";

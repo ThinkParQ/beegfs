@@ -88,8 +88,11 @@ KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(KRELEASE)/updates/fs/beegfs
 # includes.)
 BEEGFS_CFLAGS  :=  $(BUILD_ARCH) $(KERNEL_FEATURE_DETECTION) \
 	-I$(BEEGFS_BUILDDIR)/../source \
-	-Wextra -Wno-unused-parameter -Wno-missing-field-initializers \
+	-Wextra -Wno-sign-compare -Wno-empty-body -Wno-unused-parameter -Wno-missing-field-initializers \
 	-DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
+
+# Sorry but I'm hereby requesting that we can make use of "for loop initial declarations"
+BEEGFS_CFLAGS += -std=gnu99
 
 ifeq ($(shell echo | gcc -Wtype-limits -E - >/dev/null 2>&1 && echo 1),1)
    BEEGFS_CFLAGS += -Wno-type-limits
@@ -104,6 +107,20 @@ ifeq ($(BEEGFS_DEBUG),)
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_RELEASE)
 else
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_DEBUG)
+endif
+
+
+# NVFS
+ifneq ($(NVFS_H_PATH),)
+module: $(NVFS_H_PATH)/nvfs.h
+$(NVFS_H_PATH)/nvfs.h:
+	$(error NVFS_H_PATH not valid: $(NVFS_H_PATH))
+
+BEEGFS_CFLAGS += -DBEEGFS_NVFS
+BEEGFS_CFLAGS += -I$(NVFS_H_PATH)
+endif
+ifeq ($(BEEGFS_DEBUG_RDMA),1)
+BEEGFS_CFLAGS += -DBEEGFS_DEBUG_RDMA
 endif
 
 # OFED
@@ -251,6 +268,11 @@ help:
 	@echo '   BEEGFS_OFED_1_2_API={1,2}:'
 	@echo '     Defining one of these legacy modes enables OFED 1.2.0 ibverbs API'
 	@echo '     compatibility. (If not defined, OFED 1.2.5 or higher API will be used.)'
+	@echo ''
+	@echo 'NVIDIA GPUDirect Storage (GDS) arguments (optional):'
+	@echo '  NVFS_H_PATH=<path>:'
+	@echo '    Path to directory that contains nvfs.h. If not defined, GDS support is'
+	@echo '    disabled.'
 	@echo ''
 	@echo 'Targets:'
 	@echo '   all (default)     - build only'

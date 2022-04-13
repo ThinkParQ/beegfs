@@ -36,46 +36,38 @@ extern FhgfsOpsErr FhgfsOpsHelper_flushCache(App* app, FhgfsInode* fhgfsInode,
    bool discardCacheOnError);
 extern FhgfsOpsErr FhgfsOpsHelper_flushCacheNoWait(App* app, FhgfsInode* fhgfsInode,
    bool discardCacheOnError);
-extern ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
+extern ssize_t FhgfsOpsHelper_writeCached(BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo);
-extern ssize_t FhgfsOpsHelper_readCached(char __user *buf, size_t size,
+extern ssize_t FhgfsOpsHelper_readCached(BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo);
 
 extern FhgfsOpsErr __FhgfsOpsHelper_flushCacheUnlocked(App* app, FhgfsInode* fhgfsInode,
    bool discardCacheOnError);
-extern ssize_t __FhgfsOpsHelper_writeCacheFlushed(const char __user *buf, size_t size,
+extern ssize_t __FhgfsOpsHelper_writeCacheFlushed(BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo);
-extern ssize_t __FhgfsOpsHelper_readCacheFlushed(char __user *buf, size_t size,
+extern ssize_t __FhgfsOpsHelper_readCacheFlushed(BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo);
 extern void __FhgfsOpsHelper_discardCache(App* app, FhgfsInode* fhgfsInode);
-
-extern ssize_t FhgfsOpsHelper_writefileEx(FhgfsInode* fhgfsInode, const char __user *buf,
-   size_t size, loff_t offset, RemotingIOInfo* ioInfo);
 
 extern FhgfsOpsErr FhgfsOpsHelper_getAppendLock(FhgfsInode* inode, RemotingIOInfo* ioInfo);
 extern FhgfsOpsErr FhgfsOpsHelper_releaseAppendLock(FhgfsInode* inode, RemotingIOInfo* ioInfo);
 
-extern ssize_t FhgfsOpsHelper_appendfile(FhgfsInode* fhgfsInode, const char __user *buf,
-   size_t size, RemotingIOInfo* ioInfo, loff_t* outNewOffset);
-extern ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, const struct iovec* data,
-   size_t dataCount, RemotingIOInfo* ioInfo, loff_t offsetFromEnd, loff_t* outNewOffset);
+ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, BeeGFS_IovIter *iter,
+      size_t count, RemotingIOInfo* ioInfo, loff_t offsetFromEnd, loff_t* outNewOffset);
 
-extern FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, char __user *buf, size_t size,
+extern FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo);
 
 extern void FhgfsOpsHelper_getRelativeLinkStr(const char* pathFrom, const char* pathTo,
    char** pathRelativeTo);
 extern int FhgfsOpsHelper_symlink(App* app, const EntryInfo* parentInfo, const char* to,
    struct CreateInfo *createInfo, EntryInfo* outEntryInfo);
-extern int FhgfsOpsHelper_readlink(App* app, const EntryInfo* entryInfo, char __user* buf,
-   int size);
+
 
 extern ssize_t FhgfsOpsHelper_readStateless(App* app, const EntryInfo* entryInfo,
-   char __user *buf, size_t size, loff_t offset);
+   BeeGFS_IovIter *iter, size_t size, loff_t offset);
 extern ssize_t FhgfsOpsHelper_writeStateless(App* app, const EntryInfo* entryInfo,
-   const char __user *buf, size_t size, loff_t offset, unsigned uid, unsigned gid);
-extern ssize_t FhgfsOpsHelper_writeStatelessInode(FhgfsInode* fhgfsInode,
-   const char __user *buf, size_t size, loff_t offset);
+   BeeGFS_IovIter *iter, size_t size, loff_t offset, unsigned uid, unsigned gid);
 
 
 // inliners
@@ -87,6 +79,24 @@ static inline FhgfsOpsErr FhgfsOpsHelper_unlockEntryWithAsyncRetry(const EntryIn
    RWLock* eiRLock, RemotingIOInfo* ioInfo, int64_t clientFD);
 static inline FhgfsOpsErr FhgfsOpsHelper_unlockRangeWithAsyncRetry(const EntryInfo* entryInfo,
    RWLock* eiRLock, RemotingIOInfo* ioInfo, int ownerPID);
+
+/**
+ * Reads a symlink.
+ *
+ * @return number of read bytes or negative linux error code
+ */
+static inline int FhgfsOpsHelper_readlink_kernel(App* app, const EntryInfo* entryInfo,
+      char *buf, int size)
+{
+   struct kvec kvec = {
+      .iov_base = buf,
+      .iov_len = size,
+   };
+   BeeGFS_IovIter iter;
+   BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, size);
+
+   return FhgfsOpsHelper_readStateless(app, entryInfo, &iter, size, 0);
+}
 
 
 /**

@@ -16,6 +16,10 @@
 #include <infiniband/verbs.h>
 #include <rdma/rdma_cma.h>
 
+#ifdef BEEGFS_NVFS
+#include <common/threading/Mutex.h>
+#include <unordered_map>
+#endif /* BEEGFS_NVFS */
 
 #define IBVSOCKET_RECV_WORK_ID_OFFSET        (1)
 #define IBVSOCKET_SEND_WORK_ID_OFFSET        (1 + IBVSOCKET_RECV_WORK_ID_OFFSET)
@@ -41,6 +45,10 @@ struct IBVCommDest;
 typedef struct IBVCommDest IBVCommDest;
 
 typedef std::queue<struct rdma_cm_event*> CmEventQueue;
+#ifdef BEEGFS_NVFS
+typedef std::unordered_map<char *, struct ibv_mr *> MRMap;
+typedef std::unordered_map<uint64_t, int> CQMap;
+#endif /* BEEGFS_NVFS */
 
 
 extern void __IBVSocket_initFromCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
@@ -66,6 +74,12 @@ extern int __IBVSocket_postWrite(IBVSocket* _this, IBVCommDest* remoteDest,
    struct ibv_mr* localMR, char* localBuf, int bufLen);
 extern int __IBVSocket_postRead(IBVSocket* _this, IBVCommDest* remoteDest,
    struct ibv_mr* localMR, char* localBuf, int bufLen);
+#ifdef BEEGFS_NVFS
+extern int __IBVSocket_postWrite(IBVSocket* _this, char* localBuf, int bufLen, unsigned lkey,
+   uint64_t remoteBuf, unsigned rkey);
+extern int __IBVSocket_postRead(IBVSocket* _this, char* localBuf, int bufLen, unsigned lkey,
+   uint64_t remoteBuf, unsigned rkey);
+#endif /* BEEGFS_NVFS */
 extern int __IBVSocket_postSend(IBVSocket* _this, size_t bufIndex, int bufLen);
 extern int __IBVSocket_recvWC(IBVSocket* _this, int timeoutMS, struct ibv_wc* outWC);
 
@@ -130,6 +144,12 @@ struct IBVCommContext
 
    IBVIncompleteRecv          incompleteRecv;
    IBVIncompleteSend          incompleteSend;
+#ifdef BEEGFS_NVFS
+   uint64_t                   wr_id;
+   Mutex                      *cqMutex;
+   CQMap                      *cqCompletions;
+   MRMap                      *workerMRs;
+#endif /* BEEGFS_NVFS */
 };
 
 #pragma pack(push, 1)

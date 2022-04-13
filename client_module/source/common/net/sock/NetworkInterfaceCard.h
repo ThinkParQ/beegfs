@@ -8,7 +8,7 @@
 #include <common/net/sock/NicAddressListIter.h>
 
 
-extern void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA,
+extern void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA, bool onlyRDMA,
    NicAddressList* outList);
 
 extern const char* NIC_nicTypeToString(NicAddrType_t nicType);

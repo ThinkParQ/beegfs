@@ -41,6 +41,9 @@ struct RemotingIOInfo
 
       unsigned userID;     // only used in storage server write message
       unsigned groupID;    // only used in storage server write message
+#ifdef BEEGFS_NVFS
+      bool nvfs;
+#endif
 };
 
 
@@ -72,6 +75,9 @@ void RemotingIOInfo_initOpen(App* app, unsigned accessFlags, AtomicInt* maxUsedT
 
    outIOInfo->userID = 0;
    outIOInfo->groupID = 0;
+#ifdef BEEGFS_NVFS
+   outIOInfo->nvfs = false;
+#endif
 }
 
 
@@ -95,6 +101,9 @@ void RemotingIOInfo_initSpecialClose(App* app, const char* fileHandleID,
 
    outIOInfo->userID = 0;
    outIOInfo->groupID = 0;
+#ifdef BEEGFS_NVFS
+   outIOInfo->nvfs = false;
+#endif
 }
 
 /**

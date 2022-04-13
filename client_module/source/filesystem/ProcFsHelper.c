@@ -37,6 +37,7 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "connHelperdPortTCP",
    "connMaxInternodeNum",
    "connInterfacesFile",
+   "connRDMAInterfacesFile",
    "connNetFilterFile",
    "connTcpOnlyFilterFile",
    "connFallbackExpirationSecs",
@@ -95,12 +96,14 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "logClientID = %d\n", (int)Config_getLogClientID(cfg) );
    seq_printf(file, "logHelperdIP = %s\n", Config_getLogHelperdIP(cfg) );
    seq_printf(file, "connUseRDMA = %d\n", (int)Config_getConnUseRDMA(cfg) );
+   seq_printf(file, "connTCPFallbackEnabled = %d\n", (int)Config_getConnTCPFallbackEnabled(cfg) );
    seq_printf(file, "connMgmtdPortUDP = %d\n", (int)Config_getConnMgmtdPortUDP(cfg) );
    seq_printf(file, "connClientPortUDP = %d\n", (int)Config_getConnClientPortUDP(cfg) );
    seq_printf(file, "connMgmtdPortTCP = %d\n", (int)Config_getConnMgmtdPortUDP(cfg) );
    seq_printf(file, "connHelperdPortTCP = %d\n", (int)Config_getConnHelperdPortTCP(cfg) );
    seq_printf(file, "connMaxInternodeNum = %u\n", Config_getConnMaxInternodeNum(cfg) );
    seq_printf(file, "connInterfacesFile = %s\n", Config_getConnInterfacesFile(cfg) );
+   seq_printf(file, "connRDMAInterfacesFile = %s\n", Config_getConnRDMAInterfacesFile(cfg) );
    seq_printf(file, "connNetFilterFile = %s\n", Config_getConnNetFilterFile(cfg) );
    seq_printf(file, "connTcpOnlyFilterFile = %s\n", Config_getConnTcpOnlyFilterFile(cfg) );
    seq_printf(file, "connFallbackExpirationSecs = %u\n",
@@ -207,6 +210,10 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
    if(!strcmp(currentKey, "connInterfacesFile") )
       count = scnprintf(buf, size, "%s = %s\n",
          currentKey, Config_getConnInterfacesFile(cfg) );
+   else
+   if(!strcmp(currentKey, "connRDMAInterfacesFile") )
+      count = scnprintf(buf, size, "%s = %s\n",
+         currentKey, Config_getConnRDMAInterfacesFile(cfg) );
    else
    if(!strcmp(currentKey, "connNetFilterFile") )
       count = scnprintf(buf, size, "%s = %s\n",
@@ -596,21 +603,9 @@ int ProcFsHelper_read_nodes(char* buf, char** start, off_t offset, int size, int
    return count;
 }
 
-int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
+void ProcFsHelper_readV2_nics(struct seq_file* file, NicAddressList* nicList)
 {
-   Node* localNode = App_getLocalNode(app);
-   char* localNodeID = Node_getID(localNode);
-
-   NicAddressList* nicList = Node_getNicList(localNode);
    NicAddressListIter nicIter;
-
-   // print local clientID
-
-   seq_printf(file, "ClientID: %s\n", localNodeID);
-
-   // list usable network interfaces
-
-   seq_printf(file, "Interfaces:\n");
 
    NicAddressListIter_init(&nicIter, nicList);
 
@@ -627,6 +622,32 @@ int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
 
          kfree(nicAddrStr);
       }
+   }
+}
+
+int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
+{
+   Node* localNode = App_getLocalNode(app);
+   char* localNodeID = Node_getID(localNode);
+
+   NicAddressList* nicList = Node_getNicList(localNode);
+   NicAddressList* rdmaNicList = App_getRDMANicList(app);
+
+   // print local clientID
+
+   seq_printf(file, "ClientID: %s\n", localNodeID);
+
+   // list usable network interfaces
+
+   seq_printf(file, "Interfaces:\n");
+   ProcFsHelper_readV2_nics(file, nicList);
+   if (Config_getConnUseRDMA(App_getConfig(app)))
+   {
+      seq_printf(file, "Outbound RDMA Interfaces:\n");
+      if (NicAddressList_length(rdmaNicList) == 0)
+         seq_printf(file, "%sAny\n", NIC_INDENTATION_STR);
+      else
+         ProcFsHelper_readV2_nics(file, rdmaNicList);
    }
 
    return 0;

@@ -239,7 +239,6 @@ $(call define_if_matches, KERNEL_HAS_GENERIC_FILE_LLSEEK_UNLOCKED, "generic_file
    fs.h)
 $(call define_if_matches, KERNEL_HAS_SET_NLINK, "set_nlink", fs.h)
 $(call define_if_matches, KERNEL_HAS_DENTRY_PATH_RAW, "dentry_path_raw", dcache.h)
-$(call define_if_matches, KERNEL_HAS_PREPARE_WRITE, -F "(*prepare_write)", fs.h)
 $(call define_if_matches, KERNEL_HAS_FSYNC_DENTRY, -P "(\*fsync).*dentry", fs.h)
 $(call define_if_matches, KERNEL_HAS_ITER_FILE_SPLICE_WRITE, "iter_file_splice_write", fs.h)
 $(call define_if_matches, KERNEL_HAS_ITER_GENERIC_FILE_SENDFILE, "generic_file_sendfile", fs.h)
@@ -304,7 +303,6 @@ $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WAIT_QUEUE_ENTRY_T, "wait_queue_entry_t", wait.h)
 $(call define_if_matches, KERNEL_HAS_CURRENT_FS_TIME, "current_fs_time", fs.h)
 $(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64[[:space:]]\+i_atime;", fs.h)
-$(call define_if_matches, KERNEL_HAS_KTIME_GET, "ktime_get_real_ts64", timekeeping.h)
 $(call define_if_matches, KERNEL_HAS_SB_NODIRATIME, "SB_NODIRATIME", fs.h)
 
 # inodeChangeRes was changed to setattr_prepare in vanilla 4.9

@@ -44,6 +44,7 @@ class ModeStorageBench: public Mode
          this->cfgThreads = STORAGEBENCH_DEFAULT_THREAD_COUNT;
          this->cfgVerbose = false;
          this->cfgWait = false;
+         this->cfgODirect = false;
       }
 
       virtual int execute();
@@ -61,6 +62,7 @@ class ModeStorageBench: public Mode
       StorageBenchType cfgType;
       bool cfgVerbose;
       bool cfgWait;
+      bool cfgODirect;
 
       int64_t cfgBlocksize;
       int64_t cfgSize;

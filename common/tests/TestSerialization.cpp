@@ -885,7 +885,7 @@ static void testCollection(const char (&content)[N],
    // with length, value
    {
       // 64 to ensure that the result is well within the range of signed char
-      static_assert(8 + N < 64, "");
+      static_assert(8 + N < 64);
 
       std::vector<char> expected = {
          8 + N, 0, 0, 0,

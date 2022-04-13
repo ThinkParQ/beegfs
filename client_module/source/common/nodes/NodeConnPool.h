@@ -5,6 +5,7 @@
 #include <app/App.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
 #include <common/net/sock/StandardSocket.h>
+#include <common/net/sock/NicAddressStatsList.h>
 #include <common/threading/Mutex.h>
 #include <common/threading/Condition.h>
 #include <common/toolkit/ListTk.h>
@@ -12,6 +13,7 @@
 #include <common/Common.h>
 #include "ConnectionList.h"
 #include "ConnectionListIter.h"
+#include "DevicePriorityContext.h"
 
 
 // forward declaration
@@ -35,7 +37,8 @@ extern void NodeConnPool_uninit(NodeConnPool* this);
 extern void NodeConnPool_destruct(NodeConnPool* this);
 
 extern Socket* NodeConnPool_acquireStreamSocket(NodeConnPool* this);
-extern Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting);
+extern Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting,
+   DevicePriorityContext* devPrioCtx);
 extern void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock);
 extern void NodeConnPool_invalidateStreamSocket(NodeConnPool* this, Socket* sock);
 extern unsigned NodeConnPool_disconnectAvailableStreams(NodeConnPool* this);
@@ -107,6 +110,8 @@ struct NodeConnPool
    struct App* app;
 
    NicAddressList nicList;
+   NicAddressStatsList rdmaNicStatsList;
+   NicAddressStatsList rdmaNicStatsRetryList;
    ConnectionList connList;
 
    struct Node* parentNode; // backlink to the node object which to which this conn pool belongs
@@ -118,11 +123,13 @@ struct NodeConnPool
    unsigned maxConns;
    unsigned fallbackExpirationSecs; // expiration time for conns to fallback interfaces
    unsigned maxConcurrentAttempts;
+   int      rdmaNicCount;
 
    NodeConnPoolStats stats;
    NodeConnPoolErrorState errState;
 
    bool logConnErrors; // false to disable logging during acquireStream() (e.g. for helperd)
+   bool enableTCPFallback;
 
    Mutex mutex;
    Condition changeCond;

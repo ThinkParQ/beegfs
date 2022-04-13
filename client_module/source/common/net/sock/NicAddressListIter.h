@@ -12,6 +12,7 @@ static inline void NicAddressListIter_init(NicAddressListIter* this, NicAddressL
 static inline void NicAddressListIter_next(NicAddressListIter* this);
 static inline NicAddress* NicAddressListIter_value(NicAddressListIter* this);
 static inline bool NicAddressListIter_end(NicAddressListIter* this);
+static inline NicAddressListIter NicAddressListIter_remove(NicAddressListIter* this);
 
 
 struct NicAddressListIter
@@ -40,6 +41,20 @@ bool NicAddressListIter_end(NicAddressListIter* this)
    return PointerListIter_end( (PointerListIter*)this);
 }
 
+/**
+ * note: the current iterator becomes invalid after the call (use the returned iterator)
+ * @return the new iterator that points to the element just behind the erased one
+ */
+NicAddressListIter NicAddressListIter_remove(NicAddressListIter* this)
+{
+   NicAddressListIter newIter = *this;
+
+   NicAddressListIter_next(&newIter); // the new iter that will be returned
+
+   PointerListIter_remove( (PointerListIter*)this);
+
+   return newIter;
+}
 
 
 #endif /*NICADDRESSLISTITER_H_*/

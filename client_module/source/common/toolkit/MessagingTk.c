@@ -584,7 +584,7 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
 
    // send request
 
-   sendRes = Socket_send(sock, rrArgs->outRespBuf, sendBufLen, 0);
+   sendRes = Socket_send_kernel(sock, rrArgs->outRespBuf, sendBufLen, 0);
 
    if(unlikely(sendRes != (ssize_t)sendBufLen) )
       goto socket_exception;

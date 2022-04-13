@@ -78,6 +78,7 @@ rm -rf %{buildroot}
 
 export BEEGFS_VERSION=%{BEEGFS_VERSION}
 export WITHOUT_COMM_DEBUG=1
+export BEEFGS_NVFS=1
 
 make %make_j daemons utils
 
@@ -90,6 +91,7 @@ make -C utils/build %make_j java_lib
 
 export BEEGFS_VERSION=%{BEEGFS_VERSION}
 export WITHOUT_COMM_DEBUG=1
+
 
 # makefiles need some adjustments still
 mkdir -p \

@@ -4,7 +4,6 @@
 #include <common/Common.h>
 #include <linux/if.h>
 
-
 #define NICADDRESS_IP_STR_LEN    16
 
 
@@ -17,6 +16,7 @@ typedef struct NicAddress NicAddress;
 struct NicListCapabilities;
 typedef struct NicListCapabilities NicListCapabilities;
 
+struct ib_device;
 
 extern bool NicAddress_preferenceComp(const NicAddress* lhs, const NicAddress* rhs);
 
@@ -28,9 +28,12 @@ enum NicAddrType        {NICADDRTYPE_STANDARD=0, NICADDRTYPE_SDP=1, NICADDRTYPE_
 
 struct NicAddress
 {
-   struct in_addr ipAddr;
-   NicAddrType_t  nicType;
-   char           name[IFNAMSIZ];
+   struct in_addr    ipAddr;
+   NicAddrType_t     nicType;
+   char              name[IFNAMSIZ];
+#ifdef BEEGFS_NVFS
+   struct ib_device *ibdev;
+#endif
 };
 
 struct NicListCapabilities

@@ -1,5 +1,6 @@
 #include <common/nodes/ConnectionListIter.h>
 #include <common/net/sock/NicAddressListIter.h>
+#include <common/net/sock/NicAddressStatsListIter.h>
 #include <common/toolkit/list/StrCpyListIter.h>
 #include <common/toolkit/list/UInt16ListIter.h>
 #include <common/toolkit/tree/PointerRBTree.h>
@@ -42,7 +43,7 @@ static int nicaddr_sort_comp(const void* l, const void* r)
 
 
 
-void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone)
+void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicListClone, bool includeTcp)
 {
    NicAddressListIter iter;
 
@@ -53,16 +54,19 @@ void ListTk_cloneNicAddressList(NicAddressList* nicList, NicAddressList* nicList
    for( ; !NicAddressListIter_end(&iter); NicAddressListIter_next(&iter) )
    {
       NicAddress* nicAddr = NicAddressListIter_value(&iter);
-      NicAddress* nicAddrClone;
+      if (includeTcp || nicAddr->nicType != NICADDRTYPE_STANDARD)
+      {
+         NicAddress* nicAddrClone;
 
-      // clone element
+         // clone element
 
-      nicAddrClone = (NicAddress*)os_kmalloc(sizeof(NicAddress) );
+         nicAddrClone = (NicAddress*)os_kmalloc(sizeof(NicAddress) );
 
-      memcpy(nicAddrClone, nicAddr, sizeof(NicAddress) );
+         memcpy(nicAddrClone, nicAddr, sizeof(NicAddress) );
 
-      // append to the clone list
-      NicAddressList_append(nicListClone, nicAddrClone);
+         // append to the clone list
+         NicAddressList_append(nicListClone, nicAddrClone);
+      }
    }
 }
 
@@ -120,6 +124,20 @@ void ListTk_kfreeNicAddressListElems(NicAddressList* nicList)
    {
       NicAddress* nicAddr = NicAddressListIter_value(&nicIter);
       kfree(nicAddr);
+   }
+}
+
+void ListTk_kfreeNicAddressStatsListElems(NicAddressStatsList* nicStatsList)
+{
+   NicAddressStatsListIter nicStatsIter;
+
+   NicAddressStatsListIter_init(&nicStatsIter, nicStatsList);
+
+   for( ; !NicAddressStatsListIter_end(&nicStatsIter); NicAddressStatsListIter_next(&nicStatsIter) )
+   {
+      NicAddressStats* nicStats = NicAddressStatsListIter_value(&nicStatsIter);
+      NicAddressStats_uninit(nicStats);
+      kfree(nicStats);
    }
 }
 

@@ -75,10 +75,14 @@ include Version.mk
 # Prepare CFLAGS:
 BEEGFS_CFLAGS  := $(BUILD_ARCH) $(KERNEL_FEATURE_DETECTION) \
 	-I$(BEEGFS_BUILDDIR)/../source \
-	-Wno-unused-parameter -DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
+	-Wextra -Wno-sign-compare -Wno-empty-body -Wno-unused-parameter -Wno-missing-field-initializers \
+	-DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
 BEEGFS_CFLAGS_DEBUG := -g3 -rdynamic -fno-inline -DBEEGFS_DEBUG \
 	-DLOG_DEBUG_MESSAGES -DDEBUG_REFCOUNT -DBEEGFS_OPENTK_LOG_CONN_ERRORS
 BEEGFS_CFLAGS_RELEASE := -Wuninitialized
+
+BEEGFS_CFLAGS += -std=gnu99
+
 
 ifeq ($(BEEGFS_DEBUG),)
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_RELEASE)
@@ -88,6 +92,19 @@ endif
 
 ifneq ($(BEEGFS_VERSION),)
 BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"'
+endif
+
+# NVFS
+ifneq ($(NVFS_H_PATH),)
+module: $(NVFS_H_PATH)/nvfs.h
+$(NVFS_H_PATH)/nvfs.h:
+	$(error NVFS_H_PATH not valid: $(NVFS_H_PATH))
+
+BEEGFS_CFLAGS += -DBEEGFS_NVFS
+BEEGFS_CFLAGS += -I$(NVFS_H_PATH)
+endif
+ifeq ($(BEEGFS_DEBUG_RDMA),1)
+BEEGFS_CFLAGS += -DBEEGFS_DEBUG_RDMA
 endif
 
 # OFED
@@ -194,3 +211,8 @@ help:
 	@echo '  BEEGFS_OFED_1_2_API={1,2}:'
 	@echo '    Defining this enables OFED 1.2.0 ibverbs API compatibility.'
 	@echo '    (If not defined, OFED 1.2.5 or higher API will be used.)'
+	@echo ' '
+	@echo 'NVIDIA GPUDirect Storage (GDS) arguments (optional):'
+	@echo '  NVFS_H_PATH=<path>:'
+	@echo '    Path to directory that contains nvfs.h. If not defined, GDS support is'
+	@echo '    disabled.'

@@ -43,6 +43,13 @@ extern IBVSocket_AcceptRes IBVSocket_accept(IBVSocket* _this, IBVSocket** outAcc
    struct sockaddr* peerAddr, socklen_t* peerAddrLen);
 extern bool IBVSocket_shutdown(IBVSocket* _this);
 
+#ifdef BEEGFS_NVFS
+extern ssize_t IBVSocket_write(IBVSocket* _this, const char* buf, size_t bufLen, unsigned lkey,
+   const uint64_t rbuf, unsigned rkey);
+extern ssize_t IBVSocket_read(IBVSocket* _this, const char* buf, size_t bufLen, unsigned lkey,
+   const uint64_t rbuf, unsigned rkey);
+#endif /* BEEGFS_NVFS */
+
 extern ssize_t IBVSocket_recv(IBVSocket* _this, char* buf, size_t bufLen, int flags);
 extern ssize_t IBVSocket_recvT(IBVSocket* _this, char* buf, size_t bufLen, int flags,
    int timeoutMS);

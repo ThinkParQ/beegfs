@@ -19,7 +19,7 @@ bool StorageBenchControlMsgEx::processIncoming(ResponseContext& ctx)
       case StorageBenchAction_START:
       {
          cmdErrorCode = storageBench->initAndStartStorageBench(&getTargetIDs(), getBlocksize(),
-            getSize(), getThreads(), getType() );
+            getSize(), getThreads(), getODirect(), getType() );
       } break;
 
       case StorageBenchAction_STOP:

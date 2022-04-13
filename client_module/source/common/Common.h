@@ -139,11 +139,61 @@
 #define IGNORE_UNUSED_DEBUG_VARIABLE(a)   do{ if( ((long)a)==1) {} } while(0)
 #endif
 
-/* wrappers for get_fs()/set_fs() */
-#define ACQUIRE_PROCESS_CONTEXT(fs_varname) \
-   do { fs_varname = get_fs(); set_fs(KERNEL_DS); } while(0)
-#define RELEASE_PROCESS_CONTEXT(fs_varname) \
-   set_fs(fs_varname)
+
+
+////////////////////////////////////////////////////////
+/* set_fs() / get_fs() macro hackery.
+ *
+ * set_fs() and get_fs() have disappeared with Linux kernel 5.10.
+ * For older kernels, we employ some macros to make their use less of a hassle.
+ */
+////////////////////////////////////////////////////////
+
+#define BEEGFS_CONCAT_(x, y) x ## y
+#define BEEGFS_CONCAT(x, y) BEEGFS_CONCAT_(x, y)
+#define BEEGFS_UNIQUE_NAME(prefix) BEEGFS_CONCAT(prefix, __LINE__)
+
+/* Preprocessor hack to add statements that are executed on scope cleanup.
+ * A for-loop that runs exactly 1 time is misused to execute the cleanup
+ * statement. An assertion ensures that we didn't break from the inner loop,
+ * to ensure the cleanup statement is executed. */
+
+#define BEEGFS_FOR_SCOPE_(begin_stmt, end_stmt, name) \
+   for (int name = 0; !name; ({BUG_ON(!name);})) \
+      for (begin_stmt; !name++; end_stmt)
+
+#define BEEGFS_FOR_SCOPE(begin_stmt, end_stmt) \
+   BEEGFS_FOR_SCOPE_(begin_stmt, end_stmt, BEEGFS_UNIQUE_NAME(scope))
+
+#ifdef KERNEL_HAS_GET_FS
+
+static inline mm_segment_t BEEGFS_BEGIN_PROCESS_CONTEXT(void)
+{
+   mm_segment_t out = get_fs();
+   set_fs(KERNEL_DS);
+   return out;
+}
+
+static inline void BEEGFS_END_PROCESS_CONTEXT(mm_segment_t *backup)
+{
+   set_fs(*backup);
+}
+
+#define WITH_PROCESS_CONTEXT \
+   BEEGFS_FOR_SCOPE( \
+      mm_segment_t segment = BEEGFS_BEGIN_PROCESS_CONTEXT(), \
+      BEEGFS_END_PROCESS_CONTEXT(&segment))
+
+#else
+
+#define WITH_PROCESS_CONTEXT
+
+#endif
+
+////////////////////////////////////////////////////////
+
+
+
 
 
 // in 4.13 wait_queue_t got renamed to wait_queue_entry_t
@@ -154,13 +204,17 @@
 #if defined(KERNEL_HAS_64BIT_TIMESTAMPS)
 static inline struct timespec64 current_fs_time(struct super_block *sb)
 {
-#if defined(KERNEL_HAS_KTIME_GET)
    struct timespec64 now;
+#if defined(KERNEL_HAS_KTIME_GET_COARSE_REAL_TS64)
+   ktime_get_coarse_real_ts64(&now);
+   return now;
+#elif defined(KERNEL_HAS_KTIME_GET_REAL_TS64)
    ktime_get_real_ts64(&now);
-#else
-   struct timespec64 now = current_kernel_time64();
-#endif /* KERNEL_HAS_KTIME_GET */
    return timespec64_trunc(now, sb->s_time_gran);
+#else
+   now = current_kernel_time64();
+   return timespec64_trunc(now, sb->s_time_gran);
+#endif
 }
 #elif !defined(KERNEL_HAS_CURRENT_FS_TIME)
 static inline struct timespec current_fs_time(struct super_block *sb)

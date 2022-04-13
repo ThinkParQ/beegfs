@@ -77,7 +77,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
    connPool = Node_getConnPool(comm->node);
 
    // connect
-   comm->sock = NodeConnPool_acquireStreamSocketEx(connPool, true);
+   comm->sock = NodeConnPool_acquireStreamSocketEx(connPool, true, NULL);
    if(!comm->sock)
    {  // connection error
       if (fatal_signal_pending(current))
@@ -133,7 +133,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
 
    comm->nodeResult = 0; // ready to read, so set this variable to 0
 
-   sendRes = Socket_send(comm->sock, comm->msgBuf, comm->hdrLen, 0);
+   sendRes = Socket_send_kernel(comm->sock, comm->msgBuf, comm->hdrLen, 0);
 
 #if (BEEGFS_COMMKIT_DEBUG & COMMKIT_DEBUG_READ_SEND )
    if (sendRes > 0 && jiffies % CommKitErrorInjectRate == 0)
@@ -182,7 +182,7 @@ void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__, "enter");
 
-   recvRes = Socket_recvExactT(comm->sock, &dataLenBuf, sizeof(int64_t), 0, CONN_LONG_TIMEOUT);
+   recvRes = Socket_recvExactT_kernel(comm->sock, &dataLenBuf, sizeof(int64_t), 0, CONN_LONG_TIMEOUT);
 
    if(unlikely(recvRes <= 0) )
    { // error
@@ -300,7 +300,7 @@ void __FhgfsOpsCommKitVec_readfileStageRECVDATA(CommKitVecHelper* commHelper,
       requestLength = MIN(pageLen, comm->read.serverSize - receiveSum);
 
       // receive available dataPart
-      recvRes = Socket_recvExactT(comm->sock, pageDataPtr, requestLength, 0, CONN_LONG_TIMEOUT);
+      recvRes = Socket_recvExactT_kernel(comm->sock, pageDataPtr, requestLength, 0, CONN_LONG_TIMEOUT);
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__,
          "requested: %lld; received: %lld",
@@ -594,7 +594,7 @@ void __FhgfsOpsCommKitVec_writefileStagePREPARE(CommKitVecHelper* commHelper,
    connPool = Node_getConnPool(comm->node);
 
    // connect
-   comm->sock = NodeConnPool_acquireStreamSocketEx(connPool, true);
+   comm->sock = NodeConnPool_acquireStreamSocketEx(connPool, true, NULL);
    if(!comm->sock)
    {  // connection error
       if (fatal_signal_pending(current))
@@ -668,7 +668,7 @@ void __FhgfsOpsCommKitVec_writefileStageSENDHEADER(CommKitVecHelper* commHelper,
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__, "enter");
 
-   sendRes = Socket_send(comm->sock, comm->msgBuf, comm->hdrLen, 0);
+   sendRes = Socket_send_kernel(comm->sock, comm->msgBuf, comm->hdrLen, 0);
 
 #if (BEEGFS_COMMKIT_DEBUG & COMMKIT_DEBUG_WRITE_HEADER )
       if (sendRes == FhgfsOpsErr_SUCCESS && jiffies % CommKitErrorInjectRate == 0)
@@ -739,7 +739,7 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
       data = fhgfsPage->data;
 
       // send dataPart blocking
-      sendDataPartRes = Socket_send(comm->sock, data, dataLength, 0);
+      sendDataPartRes = Socket_send_kernel(comm->sock, data, dataLength, 0);
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__,
           "VecIdx: %zu; size: %lld; PgLen: %d, sendRes: %zd",

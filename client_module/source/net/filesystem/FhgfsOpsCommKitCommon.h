@@ -116,6 +116,9 @@ struct CommKitContext
 
    unsigned currentRetryNum; // number of used up retries (in case of comm errors)
    unsigned maxNumRetries; // 0 if infinite number of retries enabled
+#ifdef BEEGFS_NVFS
+   int gpudRc;
+#endif
 };
 
 

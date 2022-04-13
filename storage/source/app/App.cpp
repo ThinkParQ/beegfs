@@ -214,6 +214,10 @@ void App::runNormal()
    if(cfg->getRunDaemonized() )
       daemonize();
 
+#ifdef BEEGFS_NVFS
+   log->log(Log_NOTICE, "Built with NVFS RDMA support.");
+#endif
+
    // find RDMA interfaces (based on TCP/IP interfaces)
 
    // note: we do this here, because when we first create an RDMASocket (and this is done in this

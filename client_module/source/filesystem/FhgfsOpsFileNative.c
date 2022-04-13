@@ -684,12 +684,12 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
 static ssize_t beegfs_aio_write_iov(struct kiocb* iocb, const struct iovec* iov,
    unsigned long nr_segs, loff_t pos)
 {
-   struct iov_iter iter;
    size_t count = iov_length(iov, nr_segs);
+   BeeGFS_IovIter iter;
 
    BEEGFS_IOV_ITER_INIT(&iter, WRITE, iov, nr_segs, count);
 
-   return beegfs_write_iter(iocb, &iter);
+   return beegfs_write_iter(iocb, beegfs_get_iovec_iov_iter(&iter));
 }
 
 #if defined(KERNEL_HAS_AIO_WRITE_BUF)
@@ -782,12 +782,12 @@ static ssize_t beegfs_read_iter(struct kiocb* iocb, struct iov_iter* to)
 static ssize_t beegfs_aio_read_iov(struct kiocb* iocb, const struct iovec* iov,
    unsigned long nr_segs, loff_t pos)
 {
-   struct iov_iter iter;
    size_t count = iov_length(iov, nr_segs);
+   BeeGFS_IovIter iter;
 
    BEEGFS_IOV_ITER_INIT(&iter, READ, iov, nr_segs, count);
 
-   return beegfs_read_iter(iocb, &iter);
+   return beegfs_read_iter(iocb, beegfs_get_iovec_iov_iter(&iter));
 }
 
 #ifdef KERNEL_HAS_AIO_WRITE_BUF
@@ -1007,7 +1007,7 @@ static int writepages_block_size __read_mostly;
 struct beegfs_writepages_state
 {
    struct page** pages;
-   struct iovec* iov;
+   struct kvec* kvecs;
    unsigned nr_pages;
 
    struct beegfs_writepages_context* context;
@@ -1031,14 +1031,14 @@ static void* __writepages_pool_alloc(gfp_t mask, void* pool_data)
    if(!state->pages)
       goto fail_pages;
 
-   state->iov = kmalloc(writepages_block_size * sizeof(struct iovec), mask);
-   if(!state->iov)
-      goto fail_iov;
+   state->kvecs = kmalloc(writepages_block_size * sizeof(*state->kvecs), mask);
+   if(!state->kvecs)
+      goto fail_kvecs;
 
    return state;
 
-fail_iov:
-   kfree(state->iov);
+fail_kvecs:
+   kfree(state->kvecs);
 fail_pages:
    kfree(state);
 fail_state:
@@ -1052,7 +1052,7 @@ static void __writepages_pool_free(void* element, void* pool_data)
    if(!state)
       return;
 
-   kfree(state->iov);
+   kfree(state->kvecs);
    kfree(state->pages);
    kfree(state);
 }
@@ -1061,7 +1061,7 @@ static int writepages_init()
 {
    // a state contains a pointer to page* array and an iovec array, so fill a page with one
    // and allocate the other to match
-   writepages_block_size = PAGE_SIZE / MAX(sizeof(struct page*), sizeof(struct iovec) );
+   writepages_block_size = PAGE_SIZE / MAX(sizeof(struct page*), sizeof(struct kvec) );
 
    writepages_pool = mempool_create(1, __writepages_pool_alloc, __writepages_pool_free, NULL);
    if(!writepages_pool)
@@ -1109,14 +1109,19 @@ static int beegfs_allocate_ard(struct beegfs_writepages_state* state)
    if(!Config_getTuneUseGlobalAppendLocks(App_getConfig(app) ) )
    {
       char zero = 0;
+      size_t size = 1;
       ssize_t appendRes;
-      struct iovec reserveIov = {
-         .iov_len = 1,
-         .iov_base = &zero,
-      };
 
-      appendRes = FhgfsOpsHelper_appendfileVecOffset(BEEGFS_INODE(mapping->host), &reserveIov, 1,
+      struct kvec reserve = {
+         .iov_base = &zero,
+         .iov_len = size,
+      };
+      BeeGFS_IovIter iter;
+      BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &reserve, 1, size);
+
+      appendRes = FhgfsOpsHelper_appendfileVecOffset(BEEGFS_INODE(mapping->host), &iter, size,
          &state->context->ioInfo, ard->size - 1, &ard->fileOffset);
+
       if (appendRes >= 0)
          ard->fileOffset -= ard->size;
       else
@@ -1187,8 +1192,8 @@ static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* off
          else
             length = pvr_get_last(page) - pvr_get_first(page) + 1;
 
-         state->iov[i].iov_base = page_address(page) + pvr_get_first(page);
-         state->iov[i].iov_len = length;
+         state->kvecs[i].iov_base = page_address(page) + pvr_get_first(page);
+         state->kvecs[i].iov_len = length;
 
          *size += length;
       }
@@ -1219,11 +1224,11 @@ static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* off
       else
          offsetInPage = 0;
 
-      state->iov[i].iov_base = page_address(page) + offsetInPage;
-      state->iov[i].iov_len = min_t(size_t, appendEnd - (page_offset(page) + offsetInPage),
+      state->kvecs[i].iov_base = page_address(page) + offsetInPage;
+      state->kvecs[i].iov_len = min_t(size_t, appendEnd - (page_offset(page) + offsetInPage),
             PAGE_SIZE - offsetInPage);
 
-      *size += state->iov[i].iov_len;
+      *size += state->kvecs[i].iov_len;
    }
 
    return 0;
@@ -1232,7 +1237,7 @@ static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* off
 static int beegfs_writepages_work(struct beegfs_writepages_state* state)
 {
    App* app;
-   struct iov_iter iter;
+   BeeGFS_IovIter iter;
    unsigned i;
    int result = 0;
    ssize_t written;
@@ -1258,7 +1263,7 @@ static int beegfs_writepages_work(struct beegfs_writepages_state* state)
       goto artifical_write_error;
    }
 
-   BEEGFS_IOV_ITER_INIT(&iter, WRITE, state->iov, state->nr_pages, size);
+   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, state->kvecs, state->nr_pages, size);
    written = FhgfsOpsRemoting_writefileVec(&iter, offset, &state->context->ioInfo,
       state->context->appendLockTaken);
 
@@ -1284,9 +1289,9 @@ writes_done:
    {
       struct page* page = state->pages[i];
 
-      if(size >= state->iov[i].iov_len)
+      if(size >= state->kvecs[i].iov_len)
       {
-         size -= state->iov[i].iov_len;
+         size -= state->kvecs[i].iov_len;
 
          if(pvr_present(page) )
             pvr_clear(page);
@@ -1547,7 +1552,7 @@ static int beegfs_readpage(struct file* filp, struct page* page)
    if(BEEGFS_SHOULD_FAIL(readpage, 1) )
       goto out;
 
-   readRes = FhgfsOpsRemoting_readfile(page_address(page), PAGE_SIZE, offset, &ioInfo,
+   readRes = FhgfsOpsRemoting_readfile_kernel(page_address(page), PAGE_SIZE, offset, &ioInfo,
       fhgfsInode);
 
    if(readRes < 0)
@@ -1631,7 +1636,7 @@ static void rpc_put(struct beegfs_readpages_context* context)
 struct beegfs_readpages_state
 {
    struct page** pages;
-   struct iovec* iov;
+   struct kvec *kvecs;
    unsigned nr_pages;
 
    struct beegfs_readpages_context* context;
@@ -1644,7 +1649,7 @@ static int readpages_block_size __read_mostly;
 static void readpages_init()
 {
    // much the same as writepages_block_size
-   readpages_block_size = PAGE_SIZE / MAX(sizeof(struct page*), sizeof(struct iovec) );
+   readpages_block_size = PAGE_SIZE / MAX(sizeof(struct page*), sizeof(struct kvec) );
 }
 
 static struct beegfs_readpages_state* rps_alloc(struct beegfs_readpages_context* context)
@@ -1660,9 +1665,9 @@ static struct beegfs_readpages_state* rps_alloc(struct beegfs_readpages_context*
    if(!state->pages)
       goto fail_pages;
 
-   state->iov = kmalloc(readpages_block_size * sizeof(struct iovec), GFP_NOFS);
-   if(!state->iov)
-      goto fail_iov;
+   state->kvecs = kmalloc(readpages_block_size * sizeof(*state->kvecs), GFP_NOFS);
+   if(!state->kvecs)
+      goto fail_kvecs;
 
    state->nr_pages = 0;
    state->context = context;
@@ -1670,7 +1675,7 @@ static struct beegfs_readpages_state* rps_alloc(struct beegfs_readpages_context*
 
    return state;
 
-fail_iov:
+fail_kvecs:
    kfree(state->pages);
 fail_pages:
    kfree(state);
@@ -1684,7 +1689,7 @@ static void rps_free(struct beegfs_readpages_state* state)
       return;
 
    rpc_put(state->context);
-   kfree(state->iov);
+   kfree(state->kvecs);
    kfree(state->pages);
    kfree(state);
 }
@@ -1694,7 +1699,7 @@ static void beegfs_readpages_work(struct work_struct* w)
    struct beegfs_readpages_state* state = container_of(w, struct beegfs_readpages_state, work);
 
    App* app;
-   struct iov_iter iter;
+   BeeGFS_IovIter iter;
    ssize_t readRes;
    unsigned validPages = 0;
    int err = 0;
@@ -1715,10 +1720,10 @@ static void beegfs_readpages_work(struct work_struct* w)
       goto endio;
    }
 
-   BEEGFS_IOV_ITER_INIT(&iter, READ, state->iov, state->nr_pages,
+   BEEGFS_IOV_ITER_KVEC(&iter, READ, state->kvecs, state->nr_pages,
       state->nr_pages * PAGE_SIZE);
 
-   readRes = FhgfsOpsRemoting_readfileVec(&iter, page_offset(state->pages[0]),
+   readRes = FhgfsOpsRemoting_readfileVec(&iter, beegfs_iov_iter_count(&iter), page_offset(state->pages[0]),
       &state->context->ioInfo, BEEGFS_INODE(state->pages[0]->mapping->host) );
    if(readRes < 0)
       err = FhgfsOpsErr_toSysErr(-readRes);
@@ -1777,8 +1782,8 @@ static int beegfs_readpages_add_page(void* data, struct page* page)
    }
 
    state->pages[state->nr_pages] = page;
-   state->iov[state->nr_pages].iov_base = page_address(page);
-   state->iov[state->nr_pages].iov_len = PAGE_SIZE;
+   state->kvecs[state->nr_pages].iov_base = page_address(page);
+   state->kvecs[state->nr_pages].iov_len = PAGE_SIZE;
    state->nr_pages += 1;
 
    return 0;
@@ -1933,17 +1938,6 @@ out:
    return result;
 }
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
-static int beegfs_prepare_write(struct file* filp, struct page* page, unsigned from, unsigned to)
-{
-   return __beegfs_write_begin(filp, from, to - from + 1, page);
-}
-
-static int beegfs_commit_write(struct file* filp, struct page* page, unsigned from, unsigned to)
-{
-   return __beegfs_write_end(filp, from, to - from + 1, to - from + 1, page);
-}
-#else
 static int beegfs_write_begin(struct file* filp, struct address_space* mapping, loff_t pos,
    unsigned len, unsigned flags, struct page** pagep, void** fsdata)
 {
@@ -1961,7 +1955,6 @@ static int beegfs_write_end(struct file* filp, struct address_space* mapping, lo
 {
    return __beegfs_write_end(filp, pos, len, copied, page);
 }
-#endif
 
 static int beegfs_releasepage(struct page* page, gfp_t gfp)
 {
@@ -2037,7 +2030,7 @@ static void beegfs_invalidate_page(struct page* page, unsigned begin, unsigned e
 }
 #endif
 
-static ssize_t beegfs_dIO_read(struct kiocb* iocb, struct iov_iter* iter, loff_t offset,
+static ssize_t beegfs_dIO_read(struct kiocb* iocb, BeeGFS_IovIter* iter, loff_t offset,
    RemotingIOInfo* ioInfo)
 {
    struct file* filp = iocb->ki_filp;
@@ -2049,25 +2042,21 @@ static ssize_t beegfs_dIO_read(struct kiocb* iocb, struct iov_iter* iter, loff_t
    ssize_t result = 0;
 
    FhgfsOpsHelper_logOpDebug(app, dentry, inode, __func__, "pos: %lld, nr_segs: %lld",
-      offset, iter->nr_segs);
+      offset, beegfs_iov_iter_nr_segs(iter));
    IGNORE_UNUSED_VARIABLE(app);
 
-   result = FhgfsOpsRemoting_readfileVec(iter, offset, ioInfo, BEEGFS_INODE(inode));
+   result = FhgfsOpsRemoting_readfileVec(iter, beegfs_iov_iter_count(iter), offset, ioInfo, BEEGFS_INODE(inode));
 
    if(result < 0)
       return FhgfsOpsErr_toSysErr(-result);
 
-   iov_iter_advance(iter, result);
    offset += result;
 
-   if(iter->count > 0)
+   if(beegfs_iov_iter_count(iter) > 0)
    {
-      ssize_t readRes = __FhgfsOps_readSparse(filp, iter->iov->iov_base + offset + result, iter->count,
-         offset + result);
+      ssize_t readRes = __FhgfsOps_readSparse(filp, iter, beegfs_iov_iter_count(iter), offset + result);
 
       result += readRes;
-
-      iov_iter_advance(iter, readRes);
    }
 
    task_io_account_read(result);
@@ -2078,7 +2067,7 @@ static ssize_t beegfs_dIO_read(struct kiocb* iocb, struct iov_iter* iter, loff_t
    return result;
 }
 
-static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_t offset,
+static ssize_t beegfs_dIO_write(struct kiocb* iocb, BeeGFS_IovIter* iter, loff_t offset,
    RemotingIOInfo* ioInfo)
 {
    struct file* filp = iocb->ki_filp;
@@ -2090,7 +2079,7 @@ static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_
    ssize_t result = 0;
 
    FhgfsOpsHelper_logOpDebug(app, dentry, inode, __func__, "pos: %lld, nr_segs: %lld",
-      offset, iter->nr_segs);
+      offset, beegfs_iov_iter_nr_segs(iter));
    IGNORE_UNUSED_VARIABLE(app);
    IGNORE_UNUSED_VARIABLE(inode);
 
@@ -2098,8 +2087,6 @@ static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_
 
    if(result < 0)
       return FhgfsOpsErr_toSysErr(-result);
-
-   iov_iter_advance(iter, result);
 
    offset += result;
 
@@ -2123,17 +2110,28 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
       return -EINVAL;
    }
 
-   switch(rw)
    {
-      case READ:
-         return beegfs_dIO_read(iocb, iter, offset, &ioInfo);
+      ssize_t result;
+      BeeGFS_IovIter beegfs_iter = beegfs_iov_iter_from_iov_iter(*iter);
 
-      case WRITE:
-         return beegfs_dIO_write(iocb, iter, offset, &ioInfo);
+      switch(rw)
+      {
+         case READ:
+            result = beegfs_dIO_read(iocb, &beegfs_iter, offset, &ioInfo);
+            break;
+
+         case WRITE:
+            result = beegfs_dIO_write(iocb, &beegfs_iter, offset, &ioInfo);
+            break;
+
+         default:
+            BUG();
+            return -EINVAL;
+      }
+
+      *iter = iov_iter_from_beegfs_iov_iter(beegfs_iter);
+      return result;
    }
-
-   BUG();
-   return -EINVAL;
 }
 
 #if defined(KERNEL_HAS_IOV_DIO)
@@ -2155,11 +2153,11 @@ static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* ite
 static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* iov, loff_t pos,
       unsigned long nr_segs)
 {
-   struct iov_iter iter;
+   BeeGFS_IovIter iter;
 
    BEEGFS_IOV_ITER_INIT(&iter, rw & RW_MASK, iov, nr_segs, iov_length(iov, nr_segs) );
 
-   return __beegfs_direct_IO(rw, iocb, &iter, pos);
+   return __beegfs_direct_IO(rw, iocb, beegfs_get_iovec_iov_iter(&iter), pos);
 }
 #endif
 
@@ -2181,11 +2179,6 @@ const struct address_space_operations fhgfs_addrspace_native_ops = {
 
    .launder_page = beegfs_launderpage,
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
-   .prepare_write = beegfs_prepare_write,
-   .commit_write = beegfs_commit_write,
-#else
    .write_begin = beegfs_write_begin,
    .write_end = beegfs_write_end,
-#endif
 };

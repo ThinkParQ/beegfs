@@ -1,8 +1,20 @@
-BEEGFS_FEATURE_DETECTION := $(shell $(dir $(lastword $(MAKEFILE_LIST)))/../build/feature-detect.sh)
+# NOTE(jstimpfle, 2022-04): I changed the interface of the feature-detect.sh
+# script to take some arguments explicitly from the command-line, as opposed to
+# implicitly from the environment.
+#
+# The reason is that we hit a case where there was a string literal in
+# KBUILD_CFLAGS (generated in Linux kernel Makefiles), and since this variable
+# is normally used as part of shell commands contained in Makefiles this
+# string literal is wrapped in a pair of single quotes,
+# like this '"string literal"'.
+
+BEEGFS_FEATURE_DETECTION := $(shell $(dir $(lastword $(MAKEFILE_LIST)))/../build/feature-detect.sh $(KBUILD_CFLAGS) $(KBUILD_CPPFLAGS))
+
 ifneq ($(lastword $(BEEGFS_FEATURE_DETECTION)),--~~success~~--)
    $(error feature detection reported an error)
 else
    BEEGFS_FEATURE_DETECTION := $(filter-out --~~success~~--,$(BEEGFS_FEATURE_DETECTION))
+   $(info feature detection gives: $(BEEGFS_FEATURE_DETECTION))
 endif
 
 # ccflags-y was introduced in 2.6.24, earlier kernels use EXTRA_CFLAGS for the same purpose
@@ -48,7 +60,9 @@ SOURCES := \
    common/net/message/session/locking/FLockRangeMsg.c \
    common/net/message/session/GetFileVersionRespMsg.c \
    common/net/message/session/rw/ReadLocalFileV2Msg.c \
+   common/net/message/session/rw/ReadLocalFileRDMAMsg.c \
    common/net/message/session/rw/WriteLocalFileMsg.c \
+   common/net/message/session/rw/WriteLocalFileRDMAMsg.c \
    common/net/message/session/FSyncLocalFileMsg.c \
    common/net/message/session/GetFileVersionMsg.c \
    common/net/message/session/opening/OpenFileMsg.c \
@@ -109,7 +123,6 @@ SOURCES := \
    common/toolkit/NodesTk.c \
    common/toolkit/SocketTk.c \
    common/toolkit/MetadataTk.c \
-   common/toolkit/TimeAbs.c \
    common/toolkit/StringTk.c \
    common/toolkit/ListTk.c \
    common/Types.c \
@@ -129,6 +142,8 @@ SOURCES := \
    common/storage/striping/Raid10Pattern.c \
    common/storage/striping/Raid0Pattern.c \
    common/storage/PathInfo.c \
+   common/storage/RdmaInfo.c \
+   common/storage/Nvfs.c \
    common/storage/EntryInfo.c \
    common/storage/StoragePoolId.c \
    common/storage/FileEvent.c \

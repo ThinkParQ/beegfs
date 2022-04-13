@@ -111,6 +111,100 @@ void FhgfsOpsHelper_logOpMsg(int level, App* app, struct dentry* dentry, struct 
       NoAllocBufferStore_addBuf(bufStore, pathStoreBuf);
 }
 
+ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, BeeGFS_IovIter *iter,
+      size_t count, RemotingIOInfo* ioInfo, loff_t offsetFromEnd, loff_t* outNewOffset)
+{
+   App* app = ioInfo->app;
+
+   ssize_t writeRes = 0;
+   FhgfsOpsErr lockRes;
+   FhgfsOpsErr statRes;
+   fhgfs_stat fhgfsStat;
+
+   // get MDS append lock...
+   lockRes = FhgfsOpsHelper_getAppendLock(fhgfsInode, ioInfo);
+   if(unlikely(lockRes != FhgfsOpsErr_SUCCESS) )
+      return -lockRes;
+
+   // get current file size from servers...
+
+   FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo
+
+   statRes = FhgfsOpsRemoting_statDirect(app, FhgfsInode_getEntryInfo(fhgfsInode), &fhgfsStat);
+
+   FhgfsInode_entryInfoReadUnlock(fhgfsInode); // UNLOCK EntryInfo
+
+   if(unlikely(statRes != FhgfsOpsErr_SUCCESS) )
+   { // remote stat error
+      writeRes = -statRes;
+      goto unlock_and_exit;
+   }
+
+   // the actual remote write...
+
+   fhgfsStat.size += offsetFromEnd;
+
+   (void) count; // count currently not used, writefileVec looks at iter->count
+   BUG_ON(count != beegfs_iov_iter_count(iter));
+   writeRes = FhgfsOpsRemoting_writefileVec(iter, fhgfsStat.size, ioInfo, false);
+
+   if(writeRes >= 0)
+      fhgfsStat.size += writeRes;
+
+   *outNewOffset = fhgfsStat.size;
+
+unlock_and_exit:
+   FhgfsOpsHelper_releaseAppendLock(fhgfsInode, ioInfo);
+   return writeRes;
+}
+
+/**
+ * Append data to a file, protected by MDS locking.
+ *
+ * Note: This method does not try to flush local file buffers after acquiring the MDS lock, because
+ * this method might be called during a file buffer flush (so callers must ensure that there are
+ * no conflicing local file buffers).
+ *
+ * @param size buffer length to be appended
+ * @param outNewOffset new file offset after append completes (only valid if no error returned)
+ * @return number of bytes written or negative fhgfs error code
+ */
+ssize_t FhgfsOpsHelper_appendfile_kernel(FhgfsInode* fhgfsInode, const char *buf, size_t size,
+   RemotingIOInfo* ioInfo, loff_t* outNewOffset)
+{
+   struct kvec kvec = {
+      .iov_len = size,
+      .iov_base = (void*) buf
+   };
+   BeeGFS_IovIter iter;
+   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &kvec, 1, size);
+
+   return FhgfsOpsHelper_appendfileVecOffset(fhgfsInode, &iter, size, ioInfo, 0, outNewOffset);
+}
+
+/**
+ * Wrapper for FhgfsOpsRemoting_writefile, but this automatically calls _appendfile() if -1 offset
+ * is given.
+ *
+ * @param offset offset in file, -1 for append
+ */
+static ssize_t FhgfsOpsHelper_writefileEx(FhgfsInode* fhgfsInode,
+      BeeGFS_IovIter *iter, size_t size, loff_t offset, RemotingIOInfo* ioInfo)
+{
+   if(offset == -1)
+      return FhgfsOpsHelper_appendfileVecOffset(fhgfsInode, iter, size, ioInfo, 0, &offset);
+   else
+      return FhgfsOpsRemoting_writefileVec(iter, offset, ioInfo, false);
+}
+static ssize_t FhgfsOpsHelper_writefileEx_kernel(FhgfsInode* fhgfsInode,
+      const char *buf, size_t size, loff_t offset, RemotingIOInfo* ioInfo)
+{
+   if(offset == -1)
+      return FhgfsOpsHelper_appendfile_kernel(fhgfsInode, buf, size, ioInfo, &offset);
+   else
+      return FhgfsOpsRemoting_writefile_kernel(buf, size, offset, ioInfo);
+}
+
 /**
  * Refreshes the dirInfo by retrieving a new version from the nodes (but only if required or
  * forced).
@@ -184,27 +278,6 @@ int FhgfsOpsHelper_refreshDirInfoIncremental(App* app, const EntryInfo* entryInf
    return retVal;
 }
 
-
-/**
- * Flush cache buffer and return it to the store.
- *
- * @param discardCacheOnError true to discard a write cache if the remote write
- * was not successful; false to just release it to the store in this case
- */
-FhgfsOpsErr FhgfsOpsHelper_flushCache(App* app, FhgfsInode* fhgfsInode,
-   bool discardCacheOnError)
-{
-   FhgfsOpsErr retVal;
-
-   FhgfsInode_fileCacheExclusiveLock(fhgfsInode); // L O C K
-
-   retVal = __FhgfsOpsHelper_flushCacheUnlocked(app, fhgfsInode, discardCacheOnError);
-
-   FhgfsInode_fileCacheExclusiveUnlock(fhgfsInode); // U N L O C K
-
-   return retVal;
-}
-
 /**
  * Flush cache buffer and return it to the store, but return immediately if the cache lock cannot
  * be acquired immediately.
@@ -231,56 +304,6 @@ FhgfsOpsErr FhgfsOpsHelper_flushCacheNoWait(App* app, FhgfsInode* fhgfsInode,
 }
 
 /**
- * Flush cache buffer and return it to the store.
- *
- * Note: Unlocked, so caller must hold inode cache lock.
- *
- * @param discardCacheOnError true to discard a write cache if the remote write
- * was not successful; false to just release it to the store in this case
- */
-FhgfsOpsErr __FhgfsOpsHelper_flushCacheUnlocked(App* app, FhgfsInode* fhgfsInode,
-   bool discardCacheOnError)
-{
-   /* note: we don't take a handle to an open file here, because we wouldn't know whether the
-      given handle is a read-only handle that just needs to flush the write cache to establish a new
-      read cache. that's why we use the _writeStatlessInode() method here. */
-
-   CacheBuffer* cacheBuffer = Fhgfsinode_getFileCacheBuffer(fhgfsInode);
-   enum FileBufferType cacheType = cacheBuffer->bufType;
-   ssize_t writeRes;
-
-   if(cacheType == FileBufferType_NONE)
-      return FhgfsOpsErr_SUCCESS;
-
-   if(cacheType == FileBufferType_READ)
-   { // file has a read cache => just discard the cached data
-      __FhgfsOpsHelper_discardCache(app, fhgfsInode);
-      return FhgfsOpsErr_SUCCESS;
-   }
-
-   // file has a write cache => send the cached data to the storage nodes
-
-   writeRes = FhgfsOpsHelper_writeStatelessInode(fhgfsInode, cacheBuffer->buf,
-      cacheBuffer->bufUsageLen, cacheBuffer->fileOffset);
-   if(unlikely(writeRes < (ssize_t)cacheBuffer->bufUsageLen) )
-   { // write did not succeed
-      if(discardCacheOnError)
-         __FhgfsOpsHelper_discardCache(app, fhgfsInode);
-
-      if(writeRes > 0)
-         return FhgfsOpsErr_NOSPACE;
-
-      return -writeRes;
-   }
-
-   // write succeeded
-
-   __FhgfsOpsHelper_discardCache(app, fhgfsInode);
-
-   return FhgfsOpsErr_SUCCESS;
-}
-
-/**
  * Buffered writing.
  * Tries to add written data to an existing cache or flushes the cache (if any) and delegates to
  * writeCacheFlushed().
@@ -290,7 +313,7 @@ FhgfsOpsErr __FhgfsOpsHelper_flushCacheUnlocked(App* app, FhgfsInode* fhgfsInode
  * @param offset offset in file, -1 for append
  * @return number of bytes written or negative fhgfs error code
  */
-ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
+ssize_t FhgfsOpsHelper_writeCached(BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -314,7 +337,7 @@ ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
          FsFileInfo_decCacheHits(fileInfo);
          i_mmap_unlock_read(fhgfsInode->vfs_inode.i_mapping);
 
-         return FhgfsOpsHelper_writefileEx(fhgfsInode, buf, size, offset, ioInfo);
+         return FhgfsOpsHelper_writefileEx(fhgfsInode, iter, size, offset, ioInfo);
       }
 
       i_mmap_unlock_read(fhgfsInode->vfs_inode.i_mapping);
@@ -343,7 +366,7 @@ ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
             FsFileInfo_decCacheHits(fileInfo); // would probably not have been a cache hit
       }
 
-      retVal = __FhgfsOpsHelper_writeCacheFlushed(buf, size, offset, fhgfsInode, fileInfo, ioInfo);
+      retVal = __FhgfsOpsHelper_writeCacheFlushed(iter, size, offset, fhgfsInode, fileInfo, ioInfo);
       goto unlock_and_exit;
    }
 
@@ -353,7 +376,7 @@ ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
 
       __FhgfsOpsHelper_discardCache(app, fhgfsInode);
 
-      retVal = __FhgfsOpsHelper_writeCacheFlushed(buf, size, offset, fhgfsInode, fileInfo, ioInfo);
+      retVal = __FhgfsOpsHelper_writeCacheFlushed(iter, size, offset, fhgfsInode, fileInfo, ioInfo);
       goto unlock_and_exit;
    }
 
@@ -378,7 +401,7 @@ ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
          goto unlock_and_exit;
       }
 
-      retVal = __FhgfsOpsHelper_writeCacheFlushed(buf, size, offset, fhgfsInode, fileInfo, ioInfo);
+      retVal = __FhgfsOpsHelper_writeCacheFlushed(iter, size, offset, fhgfsInode, fileInfo, ioInfo);
       goto unlock_and_exit;
    }
 
@@ -386,8 +409,8 @@ ssize_t FhgfsOpsHelper_writeCached(const char __user *buf, size_t size,
 
    FsFileInfo_incCacheHits(fileInfo);
 
-   userBufCopyRes = __copy_from_user(&(cacheBuffer->buf)[cacheBuffer->bufUsageLen], buf, size);
-   if(unlikely(userBufCopyRes) )
+   userBufCopyRes = beegfs_copy_from_iter(&(cacheBuffer->buf)[cacheBuffer->bufUsageLen], size, iter);
+   if(unlikely(userBufCopyRes != size))
    { // copy failed
       Logger* log = App_getLogger(app);
       Logger_log(log, Log_DEBUG, __func__, "Buffer copy from userspace failed (invalid buffer)");
@@ -431,7 +454,7 @@ unlock_and_exit:
  *
  * @return number of bytes read or negative fhgfs error code
  */
-ssize_t FhgfsOpsHelper_readCached(char __user *buf, size_t size, loff_t offset,
+ssize_t FhgfsOpsHelper_readCached(BeeGFS_IovIter *iter, size_t size, loff_t offset,
    FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -445,7 +468,6 @@ ssize_t FhgfsOpsHelper_readCached(char __user *buf, size_t size, loff_t offset,
    ssize_t remoteReadSize;
    loff_t cacheCopyOffset;
    size_t cacheCopySize;
-   int userBufCopyRes;
 
    if (app->cfg->tuneCoherentBuffers)
    {
@@ -456,7 +478,7 @@ ssize_t FhgfsOpsHelper_readCached(char __user *buf, size_t size, loff_t offset,
          FsFileInfo_decCacheHits(fileInfo);
          i_mmap_unlock_read(fhgfsInode->vfs_inode.i_mapping);
 
-         return FhgfsOpsRemoting_readfile(buf, size, offset, ioInfo, fhgfsInode);
+         return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
       }
 
       i_mmap_unlock_read(fhgfsInode->vfs_inode.i_mapping);
@@ -480,7 +502,7 @@ ssize_t FhgfsOpsHelper_readCached(char __user *buf, size_t size, loff_t offset,
          goto exclusive_lock_path;
       }
 
-      readRes = FhgfsOpsRemoting_readfile(buf, size, offset, ioInfo, fhgfsInode);
+      readRes = FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
 
       FhgfsInode_fileCacheSharedUnlock(fhgfsInode); // U N L O C K (shared)
 
@@ -507,7 +529,7 @@ exclusive_lock_path:
       else
          FsFileInfo_decCacheHits(fileInfo); // would probably not have been a cache hit
 
-      retVal = __FhgfsOpsHelper_readCacheFlushed(buf, size, offset, fhgfsInode, fileInfo, ioInfo);
+      retVal = __FhgfsOpsHelper_readCacheFlushed(iter, size, offset, fhgfsInode, fileInfo, ioInfo);
       goto unlock_and_exit;
    }
 
@@ -525,7 +547,7 @@ exclusive_lock_path:
          goto unlock_and_exit;
       }
 
-      retVal = __FhgfsOpsHelper_readCacheFlushed(buf, size, offset, fhgfsInode, fileInfo, ioInfo);
+      retVal = __FhgfsOpsHelper_readCacheFlushed(iter, size, offset, fhgfsInode, fileInfo, ioInfo);
       goto unlock_and_exit;
    }
 
@@ -548,7 +570,7 @@ exclusive_lock_path:
          goto unlock_and_exit;
       }
 
-      retVal = __FhgfsOpsHelper_readCacheFlushed(buf, size, offset, fhgfsInode, fileInfo, ioInfo);
+      retVal = __FhgfsOpsHelper_readCacheFlushed(iter, size, offset, fhgfsInode, fileInfo, ioInfo);
       goto unlock_and_exit;
    }
 
@@ -565,7 +587,7 @@ exclusive_lock_path:
 
       remoteReadSize = cacheBuffer->fileOffset - offset;
 
-      readRes = FhgfsOpsRemoting_readfile(buf, remoteReadSize, offset, ioInfo, fhgfsInode);
+      readRes = FhgfsOpsRemoting_readfileVec(iter, remoteReadSize, offset, ioInfo, fhgfsInode);
       if(readRes < remoteReadSize)
       { // error or end-of-file => invalidate cache
          __FhgfsOpsHelper_discardCache(app, fhgfsInode);
@@ -580,15 +602,16 @@ exclusive_lock_path:
    cacheCopySize = MIN(cacheBuffer->fileOffset + cacheBuffer->bufUsageLen, offset + size) -
       (cacheBuffer->fileOffset + cacheCopyOffset);
 
-   userBufCopyRes = __copy_to_user(
-      &buf[remoteReadSize], &(cacheBuffer->buf)[cacheCopyOffset], cacheCopySize);
-   if(unlikely(userBufCopyRes) )
-   { // copy failed
-      Logger* log = App_getLogger(app);
-      Logger_log(log, Log_DEBUG, __func__, "Buffer copy to userspace failed (invalid buffer)");
+   {
+      size_t numCopied = beegfs_copy_to_iter(&(cacheBuffer->buf)[cacheCopyOffset], cacheCopySize, iter);
+      if (unlikely(numCopied != cacheCopySize))
+      { // copy failed
+         Logger* log = App_getLogger(app);
+         Logger_log(log, Log_DEBUG, __func__, "Buffer copy to userspace failed (invalid buffer)");
 
-      retVal = -FhgfsOpsErr_ADDRESSFAULT;
-      goto unlock_and_exit;
+         retVal = -FhgfsOpsErr_ADDRESSFAULT;
+         goto unlock_and_exit;
+      }
    }
 
 
@@ -596,14 +619,14 @@ exclusive_lock_path:
 
    if(readEndOffset > cacheEndOffset)
    { // there is a remainder behind the cacheBuf => discard cache (to allow new caching)
-      loff_t remainderBufOffset = remoteReadSize + cacheCopySize;
+      //loff_t remainderBufOffset = remoteReadSize + cacheCopySize;
       loff_t remainderFileOffset = cacheEndOffset + 1;
       size_t remainderSize = readEndOffset - cacheEndOffset;
       ssize_t remainderRes;
 
       __FhgfsOpsHelper_discardCache(app, fhgfsInode);
 
-      remainderRes = __FhgfsOpsHelper_readCacheFlushed(&buf[remainderBufOffset],
+      remainderRes = __FhgfsOpsHelper_readCacheFlushed(iter,
          remainderSize, remainderFileOffset, fhgfsInode, fileInfo, ioInfo);
       if(unlikely(remainderRes < 0) )
       { // reading failed
@@ -637,7 +660,7 @@ unlock_and_exit:
  * @param offset offset in file, -1 for append
  * @return number of bytes written or negative fhgfs error code
  */
-ssize_t __FhgfsOpsHelper_writeCacheFlushed(const char __user *buf,
+ssize_t __FhgfsOpsHelper_writeCacheFlushed(BeeGFS_IovIter *iter,
    size_t size, loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -653,7 +676,7 @@ ssize_t __FhgfsOpsHelper_writeCacheFlushed(const char __user *buf,
    // caching disabled?
    if(!FsFileInfo_getAllowCaching(fileInfo) ||
       (!isAppendWrite && (FsFileInfo_getCacheHits(fileInfo) <= 0) ) )
-      return FhgfsOpsHelper_writefileEx(fhgfsInode, buf, size, offset, ioInfo);
+      return FhgfsOpsHelper_writefileEx(fhgfsInode, iter, size, offset, ioInfo);
 
 
    // check whether the write size is larger than cacheBuf or would span multiple chunks
@@ -669,7 +692,7 @@ ssize_t __FhgfsOpsHelper_writeCacheFlushed(const char __user *buf,
 
    if(size >= maxCacheLen) // (Note: '=' because we don't want a completely filled up buffer)
    { // scenario not allowed => write through
-      return FhgfsOpsHelper_writefileEx(fhgfsInode, buf, size, offset, ioInfo);
+      return FhgfsOpsHelper_writefileEx(fhgfsInode, iter, size, offset, ioInfo);
    }
 
 
@@ -686,14 +709,14 @@ ssize_t __FhgfsOpsHelper_writeCacheFlushed(const char __user *buf,
    cacheBuffer->buf = NoAllocBufferStore_instantBuf(cacheStore);
    if(!cacheBuffer->buf)
    { // no cache buffer left in the store => write through
-      return FhgfsOpsHelper_writefileEx(fhgfsInode, buf, size, offset, ioInfo);
+      return FhgfsOpsHelper_writefileEx(fhgfsInode, iter, size, offset, ioInfo);
    }
 
    cacheBuffer->bufType = FileBufferType_WRITE; // (needed here for _discardCache() below)
 
    // init cache entry fields and copy data to cacheBuf
-   userBufCopyRes = __copy_from_user(cacheBuffer->buf, buf, size);
-   if(unlikely(userBufCopyRes) )
+   userBufCopyRes = beegfs_copy_from_iter(cacheBuffer->buf, size, iter);
+   if(unlikely(userBufCopyRes != size))
    { // copy failed
       Logger* log = App_getLogger(app);
       Logger_log(log, Log_DEBUG, __func__, "Buffer copy from userspace failed (invalid buffer)");
@@ -721,7 +744,7 @@ ssize_t __FhgfsOpsHelper_writeCacheFlushed(const char __user *buf,
  *
  * @return number of bytes read or negative fhgfs error code
  */
-ssize_t __FhgfsOpsHelper_readCacheFlushed(char __user *buf, size_t size, loff_t offset,
+ssize_t __FhgfsOpsHelper_readCacheFlushed(BeeGFS_IovIter *iter, size_t size, loff_t offset,
    FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -733,20 +756,21 @@ ssize_t __FhgfsOpsHelper_readCacheFlushed(char __user *buf, size_t size, loff_t 
    size_t maxCacheLen;
    CacheBuffer* cacheBuffer;
    ssize_t readRes;
-   int userBufCopyRes;
+   ssize_t numIterCopy;
 
 
    // caching disabled?
    if(!FsFileInfo_getAllowCaching(fileInfo) || (FsFileInfo_getCacheHits(fileInfo) <= 0) ||
       FhgfsInode_getIsFileOpenByMultipleReaders(fhgfsInode) )
-      return FhgfsOpsRemoting_readfile(buf, size, offset, ioInfo, fhgfsInode);
+      return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
 
    // check whether the read size is larger than a single cacheBuf or would span multiple chunks
    currentChunkSize = StripePattern_getChunkEnd(pattern, offset) - offset + 1;
    maxCacheLen = MIN(currentChunkSize, NoAllocBufferStore_getBufSize(cacheStore) );
+
    if(size >= maxCacheLen) // (Note: '=' because we don't want a completely used up buffer)
    { // scenario not allowed => read direct
-      return FhgfsOpsRemoting_readfile(buf, size, offset, ioInfo, fhgfsInode);
+      return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
    }
 
    // looks like we got something to cache here (read size is smaller than a single cacheBuf)
@@ -762,7 +786,7 @@ ssize_t __FhgfsOpsHelper_readCacheFlushed(char __user *buf, size_t size, loff_t 
    cacheBuffer->buf = NoAllocBufferStore_instantBuf(cacheStore);
    if(!cacheBuffer->buf)
    { // no cache buffer left in the store => read direct
-      return FhgfsOpsRemoting_readfile(buf, size, offset, ioInfo, fhgfsInode);
+      return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
    }
 
    cacheBuffer->bufType = FileBufferType_READ; // (needed here for _discardCache() below)
@@ -774,22 +798,27 @@ ssize_t __FhgfsOpsHelper_readCacheFlushed(char __user *buf, size_t size, loff_t 
          reads. good if e.g. a process is only looking at file starts */
 
 
-   readRes = FhgfsOpsRemoting_readfile(cacheBuffer->buf, maxCacheLen, offset, ioInfo, fhgfsInode);
+   readRes = FhgfsOpsRemoting_readfile_kernel(cacheBuffer->buf, maxCacheLen, offset, ioInfo, fhgfsInode);
    if(readRes <= 0)
    { // error or immediate end of file
       __FhgfsOpsHelper_discardCache(app, fhgfsInode);
       return readRes;
    }
 
-   // init cache entry fields and copy data from cache buffer to user buffer
-   userBufCopyRes = __copy_to_user(buf, cacheBuffer->buf, MIN(size, (size_t)readRes) );
-   if(unlikely(userBufCopyRes) )
-   { // copy failed
-      Logger* log = App_getLogger(app);
-      Logger_log(log, Log_DEBUG, __func__, "Buffer copy to userspace failed (invalid buffer)");
+   numIterCopy = MIN((ssize_t) size, readRes);
 
-      __FhgfsOpsHelper_discardCache(app, fhgfsInode);
-      return -FhgfsOpsErr_ADDRESSFAULT;
+   // init cache entry fields and copy data from cache buffer to client iter
+   {
+      size_t numCopied = beegfs_copy_to_iter(cacheBuffer->buf, numIterCopy, iter);
+
+      if (unlikely(numCopied != numIterCopy))
+      { // copy failed
+         Logger* log = App_getLogger(app);
+         Logger_log(log, Log_DEBUG, __func__, "Buffer copy to userspace failed (invalid buffer)");
+
+         __FhgfsOpsHelper_discardCache(app, fhgfsInode);
+         return -FhgfsOpsErr_ADDRESSFAULT;
+      }
    }
 
    cacheBuffer->bufUsageLen = readRes;
@@ -799,7 +828,7 @@ ssize_t __FhgfsOpsHelper_readCacheFlushed(char __user *buf, size_t size, loff_t 
    // add to inode ref store for async flush
    InodeRefStore_addAndReferenceInode(refStore, BEEGFS_VFSINODE(fhgfsInode) );
 
-   return MIN(size, (size_t)readRes);
+   return numIterCopy;
 }
 
 /**
@@ -829,21 +858,6 @@ void __FhgfsOpsHelper_discardCache(App* app, FhgfsInode* fhgfsInode)
 
    // remove inode from async flush store
    InodeRefStore_removeAndReleaseInode(refStore, BEEGFS_VFSINODE(fhgfsInode) );
-}
-
-/**
- * Wrapper for FhgfsOpsRemoting_writefile, but this automatically calls _appendfile() if -1 offset
- * is given.
- *
- * @param offset offset in file, -1 for append
- */
-ssize_t FhgfsOpsHelper_writefileEx(FhgfsInode* fhgfsInode, const char __user *buf, size_t size,
-   loff_t offset, RemotingIOInfo* ioInfo)
-{
-   if(offset == -1)
-      return FhgfsOpsHelper_appendfile(fhgfsInode, buf, size, ioInfo, &offset);
-   else
-      return FhgfsOpsRemoting_writefile(buf, size, offset, ioInfo);
 }
 
 FhgfsOpsErr FhgfsOpsHelper_getAppendLock(FhgfsInode* inode, RemotingIOInfo* ioInfo)
@@ -884,80 +898,6 @@ FhgfsOpsErr FhgfsOpsHelper_releaseAppendLock(FhgfsInode* inode, RemotingIOInfo* 
    return unlockRes;
 }
 
-/**
- * Append data to a file, protected by MDS locking.
- *
- * Note: This method does not try to flush local file buffers after acquiring the MDS lock, because
- * this method might be called during a file buffer flush (so callers must ensure that there are
- * no conflicing local file buffers).
- *
- * @param size buffer length to be appended
- * @param outNewOffset new file offset after append completes (only valid if no error returned)
- * @return number of bytes written or negative fhgfs error code
- */
-ssize_t FhgfsOpsHelper_appendfile(FhgfsInode* fhgfsInode, const char __user *buf, size_t size,
-   RemotingIOInfo* ioInfo, loff_t* outNewOffset)
-{
-   struct iovec iov = {
-      .iov_len = size,
-      .iov_base = (void*) buf
-   };
-
-   return FhgfsOpsHelper_appendfileVecOffset(fhgfsInode, &iov, 1, ioInfo, 0, outNewOffset);
-}
-
-ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, const struct iovec* data,
-   size_t dataCount, RemotingIOInfo* ioInfo, loff_t offsetFromEnd, loff_t* outNewOffset)
-{
-   App* app = ioInfo->app;
-
-   ssize_t writeRes = 0;
-   FhgfsOpsErr lockRes;
-   FhgfsOpsErr statRes;
-   fhgfs_stat fhgfsStat;
-
-   // get MDS append lock...
-   lockRes = FhgfsOpsHelper_getAppendLock(fhgfsInode, ioInfo);
-   if(unlikely(lockRes != FhgfsOpsErr_SUCCESS) )
-      return -lockRes;
-
-   // get current file size from servers...
-
-   FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo
-
-   statRes = FhgfsOpsRemoting_statDirect(app, FhgfsInode_getEntryInfo(fhgfsInode), &fhgfsStat);
-
-   FhgfsInode_entryInfoReadUnlock(fhgfsInode); // UNLOCK EntryInfo
-
-   if(unlikely(statRes != FhgfsOpsErr_SUCCESS) )
-   { // remote stat error
-      writeRes = -statRes;
-      goto unlock_and_exit;
-   }
-
-   // the actual remote write...
-
-   fhgfsStat.size += offsetFromEnd;
-
-   while(dataCount > 0)
-   {
-      writeRes = FhgfsOpsRemoting_writefile(data->iov_base, data->iov_len, fhgfsStat.size, ioInfo);
-      if(writeRes < 0)
-         goto unlock_and_exit_some_written;
-
-      fhgfsStat.size += writeRes;
-      dataCount--;
-      data++;
-   }
-
-unlock_and_exit_some_written:
-   *outNewOffset = fhgfsStat.size;
-
-unlock_and_exit:
-   FhgfsOpsHelper_releaseAppendLock(fhgfsInode, ioInfo);
-   return writeRes;
-}
-
 
 /**
  * Reads chunk by chunk from the servers and zero-fills the buffer if a server returns EOF.
@@ -966,23 +906,18 @@ unlock_and_exit:
  * Note: Intended for sparse file reading.
  * Note: There is also a similar version for kernel buffers.
  */
-FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, char __user *buf, size_t size,
+FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, BeeGFS_IovIter *iter, size_t size,
    loff_t offset, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
-   size_t toBeRead = size;
-   loff_t currentOffset = offset;
    StripePattern* pattern = ioInfo->pattern;
 
-   while(toBeRead)
+   while(size)
    {
-      size_t currentBufOffset = size - toBeRead;
-      size_t currentChunkSize = StripePattern_getChunkEnd(
-         pattern, currentOffset) - currentOffset + 1;
-      size_t currentReadSize = MIN(currentChunkSize, toBeRead);
+      size_t currentChunkSize = StripePattern_getChunkEnd(pattern, offset) - offset + 1;
+      size_t currentReadSize = MIN(currentChunkSize, size);
       ssize_t currentReadRes;
 
-      currentReadRes = FhgfsOpsRemoting_readfile(&buf[currentBufOffset], currentReadSize,
-         currentOffset, ioInfo, NULL);
+      currentReadRes = FhgfsOpsRemoting_readfileVec(iter, currentReadSize, offset, ioInfo, NULL);
 
       if(unlikely(currentReadRes < 0) )
          return -currentReadRes;
@@ -990,15 +925,15 @@ FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, char __user *buf, size_t si
       if( (size_t)currentReadRes < currentReadSize)
       { // zero-fill the remainder
          long clearVal;
+         ssize_t nclear = currentReadSize - currentReadRes;
 
-         clearVal = clear_user(&buf[currentBufOffset + currentReadRes],
-            currentReadSize - currentReadRes);
-         if (clearVal != 0)
+         clearVal = beegfs_iov_iter_zero(nclear, iter);
+         if (clearVal != nclear)
             return FhgfsOpsErr_ADDRESSFAULT;
       }
 
-      currentOffset += currentReadSize;
-      toBeRead -= currentReadSize;
+      offset += currentReadSize;
+      size -= currentReadSize;
    }
 
    return FhgfsOpsErr_SUCCESS;
@@ -1105,10 +1040,13 @@ int FhgfsOpsHelper_symlink(App* app, const EntryInfo* parentInfo, const char* to
    ioInfo.firstWriteDone = &firstWriteDone;
    ioInfo.userID = createInfo->userID;
    ioInfo.groupID = createInfo->groupID;
+#ifdef BEEGFS_NVFS
+   ioInfo.nvfs = false;
+#endif
 
    // write link-destination to the file
 
-   writeRes = FhgfsOpsRemoting_writefile(to, toStrLen, 0, &ioInfo);
+   writeRes = FhgfsOpsRemoting_writefile_kernel(to, toStrLen, 0, &ioInfo);
    if(writeRes < (ssize_t)toStrLen)
    { // error
       FhgfsOpsHelper_closefileWithAsyncRetry(outEntryInfo, &ioInfo, NULL);
@@ -1157,16 +1095,6 @@ err_exit:
 }
 
 /**
- * Reads a symlink.
- *
- * @return number of read bytes or negative linux error code
- */
-int FhgfsOpsHelper_readlink(App* app, const EntryInfo* entryInfo, char __user* buf, int size)
-{
-   return FhgfsOpsHelper_readStateless(app, entryInfo, buf, size, 0);
-}
-
-/**
  * Opens a file (the file must exist), reads data from it and closes it.
  *
  * Note: This is really slow currently, because of the open/close overhead.
@@ -1174,7 +1102,7 @@ int FhgfsOpsHelper_readlink(App* app, const EntryInfo* entryInfo, char __user* b
  * @return number of read bytes or negative linux error code
  */
 ssize_t FhgfsOpsHelper_readStateless(App* app, const EntryInfo* entryInfo,
-   char __user *buf, size_t size, loff_t offset)
+   BeeGFS_IovIter *iter, size_t size, loff_t offset)
 {
    int retVal = -EREMOTEIO;
 
@@ -1209,7 +1137,7 @@ ssize_t FhgfsOpsHelper_readStateless(App* app, const EntryInfo* entryInfo,
 
    // read file
 
-   readRes = FhgfsOpsRemoting_readfile(buf, size, offset, &ioInfo, NULL);
+   readRes = FhgfsOpsRemoting_readfileVec(iter, size, offset, &ioInfo, NULL);
    if(readRes < 0)
    { // error
       FhgfsOpsHelper_closefileWithAsyncRetry(entryInfo, &ioInfo, NULL);
@@ -1242,6 +1170,62 @@ clean_up_open:
 }
 
 /**
+ * Writes the given buffer by getting a reference handle from the inode and releasing that handle
+ * immediately after the write.
+ *
+ * Note: This can safe the overhead for remote open/close if the file is already open for writing
+ * (or reading+writing) by any other process, so it is way better than the _writeStateless()
+ * method.
+ *
+ * @param offset offset in file, -1 for append
+ * @return bytes written or negative fhgfs error code
+ */
+static ssize_t FhgfsOpsHelper_writeStatelessInode(FhgfsInode* fhgfsInode, const char *buf,
+   size_t size, loff_t offset)
+{
+   FileHandleType handleType;
+   RemotingIOInfo ioInfo;
+
+   FhgfsOpsErr referenceRes;
+   ssize_t writeRes;
+   FhgfsOpsErr releaseRes;
+
+
+   // open file
+
+   /* referenceHandle needs a dentry only for possible TRUNC operations. */
+   referenceRes = FhgfsInode_referenceHandle(fhgfsInode, NULL, OPENFILE_ACCESS_WRITE, true, NULL,
+         &handleType, NULL);
+   if(unlikely(referenceRes != FhgfsOpsErr_SUCCESS) )
+   { // error
+      return -referenceRes;
+   }
+
+   // write file
+
+   FhgfsInode_getRefIOInfo(fhgfsInode, handleType, FhgfsInode_handleTypeToOpenFlags(handleType),
+      &ioInfo);
+
+   writeRes = FhgfsOpsHelper_writefileEx_kernel(fhgfsInode, buf, size, offset, &ioInfo);
+   if(unlikely(writeRes < 0) )
+   { // error
+      FhgfsInode_releaseHandle(fhgfsInode, handleType, NULL);
+
+      return writeRes;
+   }
+
+   // close file
+
+   releaseRes = FhgfsInode_releaseHandle(fhgfsInode, handleType, NULL);
+   if(unlikely(releaseRes != FhgfsOpsErr_SUCCESS) )
+   { // error
+      return -releaseRes;
+   }
+
+   return writeRes;
+}
+
+/**
  * Opens a file (the file must exist), writes the data to it and closes it.
  *
  * Note: This is really slow, because of the open/close overhead - use _writeStatelessInode()
@@ -1250,7 +1234,7 @@ clean_up_open:
  * @return number of written bytes or negative linux error code
  */
 ssize_t FhgfsOpsHelper_writeStateless(App* app, const EntryInfo* entryInfo,
-   const char __user *buf, size_t size, loff_t offset, unsigned uid, unsigned gid)
+   BeeGFS_IovIter *iter, size_t size, loff_t offset, unsigned uid, unsigned gid)
 {
    int retVal = -EREMOTEIO;
 
@@ -1284,10 +1268,13 @@ ssize_t FhgfsOpsHelper_writeStateless(App* app, const EntryInfo* entryInfo,
    ioInfo.firstWriteDone = &firstWriteDone;
    ioInfo.userID = uid;
    ioInfo.groupID = gid;
+#ifdef BEEGFS_NVFS
+   ioInfo.nvfs = false;
+#endif
 
    // write file
 
-   writeRes = FhgfsOpsRemoting_writefile(buf, size, offset, &ioInfo);
+   writeRes = FhgfsOpsRemoting_writefileVec(iter, offset, &ioInfo, false);
    if(writeRes < 0)
    { // error
       FhgfsOpsHelper_closefileWithAsyncRetry(entryInfo, &ioInfo, NULL);
@@ -1320,57 +1307,72 @@ clean_up_open:
 }
 
 /**
- * Writes the given buffer by getting a reference handle from the inode and releasing that handle
- * immediately after the write.
+ * Flush cache buffer and return it to the store.
  *
- * Note: This can safe the overhead for remote open/close if the file is already open for writing
- * (or reading+writing) by any other process, so it is way better than the _writeStateless()
- * method.
+ * Note: Unlocked, so caller must hold inode cache lock.
  *
- * @param offset offset in file, -1 for append
- * @return bytes written or negative fhgfs error code
+ * @param discardCacheOnError true to discard a write cache if the remote write
+ * was not successful; false to just release it to the store in this case
  */
-ssize_t FhgfsOpsHelper_writeStatelessInode(FhgfsInode* fhgfsInode, const char __user *buf,
-   size_t size, loff_t offset)
+FhgfsOpsErr __FhgfsOpsHelper_flushCacheUnlocked(App* app, FhgfsInode* fhgfsInode,
+   bool discardCacheOnError)
 {
-   FileHandleType handleType;
-   RemotingIOInfo ioInfo;
+   /* note: we don't take a handle to an open file here, because we wouldn't know whether the
+      given handle is a read-only handle that just needs to flush the write cache to establish a new
+      read cache. that's why we use the _writeStatelessInode() method here. */
 
-   FhgfsOpsErr referenceRes;
+   CacheBuffer* cacheBuffer = Fhgfsinode_getFileCacheBuffer(fhgfsInode);
+   enum FileBufferType cacheType = cacheBuffer->bufType;
    ssize_t writeRes;
-   FhgfsOpsErr releaseRes;
 
+   if(cacheType == FileBufferType_NONE)
+      return FhgfsOpsErr_SUCCESS;
 
-   // open file
-
-   /* referenceHandle needs a dentry only for possible TRUNC operations. */
-   referenceRes = FhgfsInode_referenceHandle(fhgfsInode, NULL, OPENFILE_ACCESS_WRITE, true, NULL,
-         &handleType, NULL);
-   if(unlikely(referenceRes != FhgfsOpsErr_SUCCESS) )
-   { // error
-      return -referenceRes;
+   if(cacheType == FileBufferType_READ)
+   { // file has a read cache => just discard the cached data
+      __FhgfsOpsHelper_discardCache(app, fhgfsInode);
+      return FhgfsOpsErr_SUCCESS;
    }
 
-   // write file
+   // file has a write cache => send the cached data to the storage nodes
 
-   FhgfsInode_getRefIOInfo(fhgfsInode, handleType, FhgfsInode_handleTypeToOpenFlags(handleType),
-      &ioInfo);
+   writeRes = FhgfsOpsHelper_writeStatelessInode(fhgfsInode, cacheBuffer->buf,
+      cacheBuffer->bufUsageLen, cacheBuffer->fileOffset);
+   if(unlikely(writeRes < (ssize_t)cacheBuffer->bufUsageLen) )
+   { // write did not succeed
+      if(discardCacheOnError)
+         __FhgfsOpsHelper_discardCache(app, fhgfsInode);
 
-   writeRes = FhgfsOpsHelper_writefileEx(fhgfsInode, buf, size, offset, &ioInfo);
-   if(unlikely(writeRes < 0) )
-   { // error
-      FhgfsInode_releaseHandle(fhgfsInode, handleType, NULL);
+      if(writeRes > 0)
+         return FhgfsOpsErr_NOSPACE;
 
-      return writeRes;
+      return -writeRes;
    }
 
-   // close file
+   // write succeeded
 
-   releaseRes = FhgfsInode_releaseHandle(fhgfsInode, handleType, NULL);
-   if(unlikely(releaseRes != FhgfsOpsErr_SUCCESS) )
-   { // error
-      return -releaseRes;
-   }
+   __FhgfsOpsHelper_discardCache(app, fhgfsInode);
 
-   return writeRes;
+   return FhgfsOpsErr_SUCCESS;
+}
+
+
+/**
+ * Flush cache buffer and return it to the store.
+ *
+ * @param discardCacheOnError true to discard a write cache if the remote write
+ * was not successful; false to just release it to the store in this case
+ */
+FhgfsOpsErr FhgfsOpsHelper_flushCache(App* app, FhgfsInode* fhgfsInode,
+   bool discardCacheOnError)
+{
+   FhgfsOpsErr retVal;
+
+   FhgfsInode_fileCacheExclusiveLock(fhgfsInode); // L O C K
+
+   retVal = __FhgfsOpsHelper_flushCacheUnlocked(app, fhgfsInode, discardCacheOnError);
+
+   FhgfsInode_fileCacheExclusiveUnlock(fhgfsInode); // U N L O C K
+
+   return retVal;
 }

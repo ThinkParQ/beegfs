@@ -5,6 +5,7 @@
 #include <common/toolkit/list/PointerListIter.h>
 #include <common/toolkit/list/StrCpyListIter.h>
 #include <common/toolkit/list/UInt16ListIter.h>
+#include <common/net/sock/NicAddressList.h>
 #include <common/threading/AtomicInt.h>
 #include <common/threading/Mutex.h>
 #include <common/threading/Thread.h>
@@ -75,6 +76,7 @@ static inline struct Config* App_getConfig(App* this);
 static inline struct MountConfig* App_getMountConfig(App* this);
 static inline struct NetFilter* App_getNetFilter(App* this);
 static inline struct NetFilter* App_getTcpOnlyFilter(App* this);
+static inline NicAddressList* App_getRDMANicList(App* this);
 static inline UInt16List* App_getPreferredStorageTargets(App* this);
 static inline UInt16List* App_getPreferredMetaNodes(App* this);
 static inline struct Node* App_getLocalNode(App* this);
@@ -129,8 +131,14 @@ struct App
    struct NetFilter* netFilter; // empty filter means "all nets allowed"
    struct NetFilter* tcpOnlyFilter; // for IPs which allow only plain TCP (no RDMA etc)
    StrCpyList allowedInterfaces; // empty list means "all interfaces accepted"
+   StrCpyList allowedRDMAInterfaces; // empty list means "all interfaces eligible"
    UInt16List preferredMetaNodes; // empty list means "no preferred nodes => use any"
    UInt16List preferredStorageTargets; // empty list means "no preferred nodes => use any"
+   // rdmaNicList contains the addresses of specific RDMA NICs to use for outbound RDMA.
+   // This is only populated when the configuration specifies a list of interfaces. If this
+   // list is empty, any RDMA NIC on the client may be used for outbound RDMA.
+   // allowedRDMAInterfaces contains the interface names used to populate this list.
+   NicAddressList rdmaNicList;
 
    struct Node* localNode;
    struct NodeStoreEx* mgmtNodes;
@@ -216,6 +224,11 @@ UInt16List* App_getPreferredMetaNodes(App* this)
 UInt16List* App_getPreferredStorageTargets(App* this)
 {
    return &this->preferredStorageTargets;
+}
+
+NicAddressList* App_getRDMANicList(App* this)
+{
+   return &this->rdmaNicList;
 }
 
 struct Node* App_getLocalNode(App* this)

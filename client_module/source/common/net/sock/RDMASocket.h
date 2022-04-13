@@ -7,14 +7,16 @@
 #include <common/Common.h>
 #include <common/net/sock/ibv/IBVSocket.h>
 #include <common/net/sock/PooledSocket.h>
-
+#include <common/net/sock/NicAddressStats.h>
 
 struct RDMASocket;
 typedef struct RDMASocket RDMASocket;
+struct NicAddressStats;
+typedef struct NicAddressStats NicAddressStats;
 
 
-extern __must_check bool RDMASocket_init(RDMASocket* this);
-extern RDMASocket* RDMASocket_construct(void);
+extern __must_check bool RDMASocket_init(RDMASocket* this, struct in_addr* srcIpAddr, NicAddressStats* nicStats);
+extern RDMASocket* RDMASocket_construct(struct in_addr* srcIpAddr, NicAddressStats* nicStats);
 extern void _RDMASocket_uninit(Socket* this);
 
 extern bool RDMASocket_rdmaDevicesExist(void);
@@ -27,14 +29,20 @@ extern bool _RDMASocket_listen(Socket* this);
 extern bool _RDMASocket_shutdown(Socket* this);
 extern bool _RDMASocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS);
 
-extern ssize_t _RDMASocket_recvT(Socket* this, struct iov_iter* iter, int flags,
+extern ssize_t _RDMASocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags,
    int timeoutMS);
-extern ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags,
+extern ssize_t _RDMASocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *to);
 
 extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finishPoll);
 
 // inliners
+#ifdef BEEGFS_NVFS
+struct ib_device;
+static inline struct ib_device *RDMASocket_getDevice(RDMASocket* this);
+static inline unsigned RDMASocket_getKey(RDMASocket* this);
+#endif
+
 static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
 static inline void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value);
@@ -47,6 +55,22 @@ struct RDMASocket
 
    IBVCommConfig commCfg;
 };
+
+#ifdef BEEGFS_NVFS
+unsigned RDMASocket_getKey(RDMASocket *this)
+{
+#ifndef OFED_UNSAFE_GLOBAL_RKEY
+   return this->ibvsock.commContext->dmaMR->lkey;
+#else
+   return this->ibvsock.commContext->pd->unsafe_global_rkey;
+#endif
+}
+
+struct ib_device* RDMASocket_getDevice(RDMASocket *this)
+{
+   return this->ibvsock.commContext->pd->device;
+}
+#endif /* BEEGFS_NVFS */
 
 /**
  * Note: Only has an effect for unconnected sockets.

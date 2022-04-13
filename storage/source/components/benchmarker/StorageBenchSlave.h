@@ -21,6 +21,10 @@ struct StorageBenchThreadData
    int64_t neededTime;
 };
 
+// deleter functor for transferData
+struct TransferDataDeleter {
+   void operator()(char* transferData) { free(transferData); }
+};
 
 // map for the informations about a thread; key: virtual threadID, value: information about thread
 typedef std::map<int, StorageBenchThreadData> StorageBenchThreadDataMap;
@@ -45,7 +49,7 @@ class StorageBenchSlave : public PThread
          numThreads(1), // useless defaults
          numThreadsDone(0),
          targetIDs(NULL),
-         transferData(NULL)
+         transferData(nullptr)
       { }
 
       virtual ~StorageBenchSlave()
@@ -55,7 +59,7 @@ class StorageBenchSlave : public PThread
       }
 
       int initAndStartStorageBench(UInt16List* targetIDs, int64_t blocksize, int64_t size,
-         int threads, StorageBenchType type);
+         int threads, bool odirect, StorageBenchType type);
 
       int cleanup(UInt16List* targetIDs);
       int stopBenchmark();
@@ -79,11 +83,12 @@ class StorageBenchSlave : public PThread
       int64_t blocksize;
       int64_t size;
       int numThreads;
+      bool odirect;
       unsigned int numThreadsDone;
 
       UInt16List* targetIDs;
       StorageBenchThreadDataMap threadData;
-      boost::scoped_array<char> transferData;
+      std::unique_ptr<char[], TransferDataDeleter> transferData;
 
       TimeFine startTime;
 
@@ -91,7 +96,7 @@ class StorageBenchSlave : public PThread
       virtual void run();
 
       int initStorageBench(UInt16List* targetIDs, int64_t blocksize, int64_t size,
-         int threads, StorageBenchType type);
+         int threads, bool odirect, StorageBenchType type);
       bool initTransferData(void);
       void initThreadData();
       void freeTransferData();

@@ -7,6 +7,13 @@
 #include <common/net/message/storage/StatStoragePathRespMsg.h>
 #include <common/net/message/session/rw/WriteLocalFileMsg.h>
 #include <common/net/message/session/rw/WriteLocalFileRespMsg.h>
+#ifdef BEEGFS_NVFS
+#include <common/net/message/session/rw/ReadLocalFileRDMAMsg.h>
+#include <common/net/message/session/rw/WriteLocalFileRDMAMsg.h>
+#include <common/net/message/session/rw/WriteLocalFileRDMARespMsg.h>
+#endif
+#include <common/net/sock/RDMASocket.h>
+#include <net/filesystem/FhgfsOpsRemoting.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/TargetStateStore.h>
 #include <common/storage/StorageErrors.h>
@@ -74,14 +81,14 @@ static const struct CommKitContextOps writefileOps;
 
 struct ReadfileIterOps
 {
-   void (*nextIter)(CommKitContext*, ReadfileState*);
-   void (*prepare)(CommKitContext*, ReadfileState*);
+   void (*nextIter)(CommKitContext*, FileOpState*);
+   void (*prepare)(CommKitContext*, FileOpState*);
 };
 
 struct WritefileIterOps
 {
-   void (*nextIter)(CommKitContext*, WritefileState*);
-   void (*prepare)(CommKitContext*, WritefileState*);
+   void (*nextIter)(CommKitContext*, FileOpState*);
+   void (*prepare)(CommKitContext*, FileOpState*);
 };
 
 static void commkit_initTargetInfo(struct CommKitTargetInfo* info, uint16_t targetID)
@@ -98,39 +105,25 @@ static void commkit_initTargetInfo(struct CommKitTargetInfo* info, uint16_t targ
 
 /**
  * Note: Initializes the expectedNodeResult attribute from the size argument
+ * Note: defaults to server-side mirroring enabled.
  */
-void FhgfsOpsCommKit_initReadfileState(ReadfileState* state, loff_t offset, size_t size,
+void FhgfsOpsCommKit_initFileOpState(FileOpState* state, loff_t offset, size_t size,
    uint16_t targetID)
 {
-   *state = (ReadfileState) {
+   *state = (FileOpState) {
       .offset = offset,
       .transmitted = 0,
-      .toBeTransmitted = 0, // RECVHEADER will bump this in each HEADER-DATA loop iteration
-      .totalReadSize = size,
+      // For read: RECVHEADER will bump this in each HEADER-DATA loop iteration
+      // For write: PREPARE sets this to totalSize
+      .toBeTransmitted = 0,
+      .totalSize = size,
 
       .firstWriteDoneForTarget = false,
       .receiveFileData = false,
       .expectedNodeResult = size,
-   };
-
-   commkit_initTargetInfo(&state->base, targetID);
-}
-
-/**
- * Note: Initializes the expectedNodeResult attribute from the size argument
- * Note: defaults to server-side mirroring enabled.
- */
-void FhgfsOpsCommKit_initWritefileState(WritefileState* state, loff_t offset, size_t size,
-   uint16_t targetID)
-{
-   *state = (WritefileState) {
-      .offset = offset,
-      .transmitted = 0,
-      .toBeTransmitted = 0, // PREPARE sets this to totalWriteSize
-      .totalWriteSize = size,
-
-      .firstWriteDoneForTarget = false,
-      .expectedNodeResult = size,
+#ifdef BEEGFS_NVFS
+      .rdmap = NULL,
+#endif
    };
 
    commkit_initTargetInfo(&state->base, targetID);
@@ -198,9 +191,28 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
 
    FhgfsOpsErr resolveErr;
    NodeConnPool* connPool;
+#ifdef BEEGFS_NVFS
+    FileOpState* currentState = container_of(info, struct FileOpState, base);
+    BeeGFS_IovIter* data = NULL;
+#endif
+   DevicePriorityContext devPrioCtx =
+   {
+      .maxConns = 0,
+#ifdef BEEGFS_NVFS
+      .gpuIndex = -1,
+#endif
+   };
+
    bool allowWaitForConn = !context->numAcquiredConns; // don't wait if we got at least
       // one conn already (this is important to avoid a deadlock between racing commkit processes)
 
+#ifdef BEEGFS_NVFS
+   if (context->ioInfo)
+   {
+      struct FileOpVecState* vs = container_of(currentState, struct FileOpVecState, base);
+      data = &vs->data;
+   }
+#endif
    info->socket = NULL;
    info->nodeResult = -FhgfsOpsErr_COMMUNICATION;
    info->selectedTargetID = info->targetID;
@@ -270,14 +282,20 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
       goto cleanup;
    }
 
-   info->headerSize = context->ops->prepareHeader(context, info);
-   if(info->headerSize == 0)
-      goto cleanup;
-
    connPool = Node_getConnPool(info->node);
+#ifdef BEEGFS_NVFS
+   // perform first test for GPUD
+   context->gpudRc = 0;
+
+   // nvfs is false if I/O did not come in through
+   // nvidia_fs (e.g. POSIX I/O)
+   // ioInfo is NULL if this is not a storage call
+   if (context->ioInfo && data && context->ioInfo->nvfs)
+      context->gpudRc = RdmaInfo_detectNVFSRequest(&devPrioCtx, data);
+#endif
 
    // connect
-   info->socket = NodeConnPool_acquireStreamSocketEx(connPool, allowWaitForConn);
+   info->socket = NodeConnPool_acquireStreamSocketEx(connPool, allowWaitForConn, &devPrioCtx);
    if(!info->socket)
    { // no conn available => error or didn't want to wait
       if(likely(!allowWaitForConn) )
@@ -307,6 +325,10 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
       }
    }
 
+   info->headerSize = context->ops->prepareHeader(context, info);
+   if(info->headerSize == 0)
+      goto cleanup;
+
    context->numAcquiredConns++;
 
    info->state = CommKitState_SENDHEADER;
@@ -331,7 +353,7 @@ static void __commkit_sendheader_generic(CommKitContext* context,
    if(BEEGFS_SHOULD_FAIL(commkit_sendheader_timeout, 1) )
       sendRes = -ETIMEDOUT;
    else
-      sendRes = Socket_send(info->socket, info->headerBuffer, info->headerSize, 0);
+      sendRes = Socket_send_kernel(info->socket, info->headerBuffer, info->headerSize, 0);
 
    if(unlikely(sendRes != info->headerSize) )
    {
@@ -405,8 +427,11 @@ static void __commkit_recvheader_generic(CommKitContext* context, struct CommKit
 
       if(info->headerSize < NETMSG_MIN_LENGTH)
       {
-         recvRes = Socket_recvT(info->socket, info->headerBuffer + info->headerSize,
-            NETMSG_MIN_LENGTH - info->headerSize, MSG_DONTWAIT, 0);
+         void *buffer = info->headerBuffer + info->headerSize;
+         ssize_t size = NETMSG_MIN_LENGTH - info->headerSize;
+
+         recvRes = Socket_recvT_kernel(info->socket, buffer, size, MSG_DONTWAIT, 0);
+
          if(recvRes <= 0)
          {
             Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
@@ -432,8 +457,11 @@ static void __commkit_recvheader_generic(CommKitContext* context, struct CommKit
 
       if(info->headerSize < msgLength)
       {
-         recvRes = Socket_recvT(info->socket, info->headerBuffer + info->headerSize,
-            msgLength - info->headerSize, MSG_DONTWAIT, 0);
+         void *buffer = info->headerBuffer + info->headerSize;
+         size_t size = msgLength - info->headerSize;
+
+         recvRes = Socket_recvT_kernel(info->socket, buffer, size, MSG_DONTWAIT, 0);
+
          if(recvRes <= 0)
          {
             Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
@@ -552,6 +580,31 @@ static void __commkit_socketinvalidate_generic(CommKitContext* context,
 
 static void __commkit_cleanup_generic(CommKitContext* context, struct CommKitTargetInfo* info)
 {
+
+#ifdef BEEGFS_NVFS
+   //
+   // Clean up the RDMA mapping.
+   //
+   if (context->ops == &readfileOps)
+   {
+      FileOpState* currentState = container_of(info, FileOpState, base);
+      if (currentState->rdmap)
+      {
+         RdmaInfo_unmapRead(currentState->rdmap);
+         currentState->rdmap = NULL;
+      }
+   }
+   else if (context->ops == &writefileOps)
+   {
+      FileOpState* currentState = container_of(info, FileOpState, base);
+      if (currentState->rdmap)
+      {
+         RdmaInfo_unmapWrite(currentState->rdmap);
+         currentState->rdmap = NULL;
+      }
+   }
+#endif // BEEGFS_NVFS
+
    if(likely(info->socket) )
    {
       NodeConnPool_releaseStreamSocket(Node_getConnPool(info->node), info->socket);
@@ -830,6 +883,9 @@ void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo, struct list_h
 
       .currentRetryNum = 0,
       .maxNumRetries = Config_getConnNumCommRetries(cfg),
+#ifdef BEEGFS_NVFS
+      .gpudRc = -1,
+#endif
    };
 
    do
@@ -926,58 +982,94 @@ static unsigned __commkit_readfile_prepareHeader(CommKitContext* context,
    Config* cfg = App_getConfig(context->app);
    Node* localNode = App_getLocalNode(context->app);
    const NumNodeID localNodeNumID = Node_getNumID(localNode);
-   ReadfileState* currentState = container_of(info, ReadfileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
    struct ReadfileIterOps* ops = context->private;
-   ReadLocalFileV2Msg readMsg;
+
+   NetMessage *netMessage = NULL;
+   ReadLocalFileV2Msg readV2Msg;
+#ifdef BEEGFS_NVFS
+   ReadLocalFileRDMAMsg readRDMAMsg;
+
+   currentState->rdmap = NULL;
+   if (context->gpudRc > 0)
+   {
+      struct FileOpVecState* vecState = container_of(currentState, struct FileOpVecState, base);
+      currentState->rdmap = RdmaInfo_mapRead(&vecState->data, info->socket);
+   }
+   if (context->gpudRc < 0 || IS_ERR(currentState->rdmap))
+   {
+      int st = currentState->rdmap != NULL? PTR_ERR(currentState->rdmap) : context->gpudRc;
+      info->state = CommKitState_CLEANUP;
+      info->nodeResult = (st == -ENOMEM)? -FhgfsOpsErr_OUTOFMEM : -FhgfsOpsErr_INVAL;
+      currentState->rdmap = NULL;
+      return 0;
+   }
 
    // prepare message
-   ReadLocalFileV2Msg_initFromSession(&readMsg, localNodeNumID,
-      context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
-      context->ioInfo->accessFlags, currentState->offset, currentState->totalReadSize);
+   if (!currentState->rdmap)
+#endif //  BEEGFS_NVFS
+   {
+      ReadLocalFileV2Msg_initFromSession(&readV2Msg, localNodeNumID,
+         context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
+         context->ioInfo->accessFlags, currentState->offset, currentState->totalSize);
 
-   NetMessage_setMsgHeaderTargetID(&readMsg.netMessage, info->selectedTargetID);
+      netMessage = &readV2Msg.netMessage;
+   }
+#ifdef BEEGFS_NVFS
+   else
+   {
+      ReadLocalFileRDMAMsg_initFromSession(&readRDMAMsg, localNodeNumID,
+         context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
+         context->ioInfo->accessFlags, currentState->offset, currentState->totalSize,
+         currentState->rdmap);
+
+      netMessage = &readRDMAMsg.netMessage;
+   }
+#endif // BEEGFS_NVFS
+
+   NetMessage_setMsgHeaderTargetID(netMessage, info->selectedTargetID);
 
    if (currentState->firstWriteDoneForTarget && Config_getSysSessionChecksEnabled(cfg))
-      NetMessage_addMsgHeaderFeatureFlag(&readMsg.netMessage, READLOCALFILEMSG_FLAG_SESSION_CHECK);
+      NetMessage_addMsgHeaderFeatureFlag(netMessage, READLOCALFILEMSG_FLAG_SESSION_CHECK);
 
    if(StripePattern_getPatternType(context->ioInfo->pattern) == STRIPEPATTERN_BuddyMirror)
    {
-      NetMessage_addMsgHeaderFeatureFlag(&readMsg.netMessage, READLOCALFILEMSG_FLAG_BUDDYMIRROR);
+      NetMessage_addMsgHeaderFeatureFlag(netMessage, READLOCALFILEMSG_FLAG_BUDDYMIRROR);
 
       if(info->useBuddyMirrorSecond)
-         NetMessage_addMsgHeaderFeatureFlag(&readMsg.netMessage,
+         NetMessage_addMsgHeaderFeatureFlag(netMessage,
             READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND);
    }
 
    if(App_getNetBenchModeEnabled(context->app) )
-      NetMessage_addMsgHeaderFeatureFlag(&readMsg.netMessage, READLOCALFILEMSG_FLAG_DISABLE_IO);
+      NetMessage_addMsgHeaderFeatureFlag(netMessage, READLOCALFILEMSG_FLAG_DISABLE_IO);
 
-   NetMessage_serialize(&readMsg.netMessage, info->headerBuffer, BEEGFS_COMMKIT_MSGBUF_SIZE);
+   NetMessage_serialize(netMessage, info->headerBuffer, BEEGFS_COMMKIT_MSGBUF_SIZE);
 
    currentState->transmitted = 0;
    currentState->toBeTransmitted = 0;
-   currentState->data.count = 0;
    currentState->receiveFileData = false;
+   beegfs_iov_iter_clear(&currentState->data);
 
    if(ops->prepare)
       ops->prepare(context, currentState);
 
-   return NetMessage_getMsgLength(&readMsg.netMessage);
+   return NetMessage_getMsgLength(netMessage);
 }
 
 static void __commkit_readfile_printSocketDetails(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
-   ReadfileState* currentState = container_of(info, ReadfileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
 
    Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
       "Sent request: node: %s; fileHandleID: %s; offset: %lld; size: %zu",
       Node_getNodeIDWithTypeStr(info->node), context->ioInfo->fileHandleID,
-      (long long)currentState->offset, currentState->totalReadSize);
+      (long long)currentState->offset, currentState->totalSize);
 }
 
-static ssize_t __commkit_readfile_receive(CommKitContext* context, ReadfileState* currentState,
-   void* buffer, size_t length, bool exact)
+static ssize_t __commkit_readfile_receive(CommKitContext* context, FileOpState* currentState,
+   BeeGFS_IovIter *iter, size_t length, bool exact)
 {
    ssize_t recvRes;
    Socket* socket = currentState->base.socket;
@@ -985,10 +1077,15 @@ static ssize_t __commkit_readfile_receive(CommKitContext* context, ReadfileState
    if(BEEGFS_SHOULD_FAIL(commkit_readfile_receive_timeout, 1) )
       recvRes = -ETIMEDOUT;
    else
+
    if(exact)
-      recvRes = Socket_recvExactT(socket, buffer, length, 0, CONN_LONG_TIMEOUT);
+   {
+      recvRes = Socket_recvExactT(socket, iter, length, 0, CONN_LONG_TIMEOUT);
+   }
    else
-      recvRes = Socket_recvT(socket, buffer, length, 0, CONN_LONG_TIMEOUT);
+   {
+      recvRes = Socket_recvT(socket, iter, length, 0, CONN_LONG_TIMEOUT);
+   }
 
    if(unlikely(recvRes < 0) )
    {
@@ -1000,14 +1097,22 @@ static ssize_t __commkit_readfile_receive(CommKitContext* context, ReadfileState
    return recvRes;
 }
 
-static int __commkit_readfile_recvdata_prefix(CommKitContext* context, ReadfileState* currentState)
+static int __commkit_readfile_recvdata_prefix(CommKitContext* context, FileOpState* currentState)
 {
    ssize_t recvRes;
    char dataLenBuf[sizeof(int64_t)]; // length info in fhgfs network byte order
+   size_t size = sizeof dataLenBuf;
    int64_t lengthInfo; // length info in fhgfs host byte order
    DeserializeCtx ctx = { dataLenBuf, sizeof(int64_t) };
 
-   recvRes = __commkit_readfile_receive(context, currentState, dataLenBuf, sizeof(int64_t), true);
+   struct kvec kvec = {
+      .iov_base = dataLenBuf,
+      .iov_len = size,
+   };
+   BeeGFS_IovIter iter;
+   BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, size);
+
+   recvRes = __commkit_readfile_receive(context, currentState, &iter, size, true);
    if(recvRes < 0)
       return recvRes;
    if (recvRes == 0)
@@ -1031,12 +1136,12 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, ReadfileS
    }
 
    // buffer overflow check
-   if(unlikely(currentState->transmitted + lengthInfo > currentState->totalReadSize) )
+   if(unlikely(currentState->transmitted + lengthInfo > currentState->totalSize) )
    {
       Logger_logErrFormatted(context->log, context->ops->logContext,
          "Bug: Received a lengthInfo that would overflow request from %s: %lld %zu %zu",
          Node_getNodeIDWithTypeStr(currentState->base.node), (long long)lengthInfo,
-         currentState->transmitted, currentState->totalReadSize);
+         currentState->transmitted, currentState->totalSize);
 
       return -EREMOTEIO;
    }
@@ -1049,30 +1154,45 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, ReadfileS
 
 static int __commkit_readfile_recvdata(CommKitContext* context, struct CommKitTargetInfo* info)
 {
-   ReadfileState* currentState = container_of(info, ReadfileState, base);
-   size_t missingLength;
+   FileOpState* currentState = container_of(info, FileOpState, base);
+   BeeGFS_IovIter *iter = &currentState->data;
+   size_t missingLength = currentState->toBeTransmitted - currentState->transmitted;
    ssize_t recvRes;
-   struct iovec iov;
+
+#ifdef BEEGFS_NVFS
+   //
+   // If we are using the RDMA message, then the protocol is simply to wait for
+   // a reply which is either an error code ( < 0 ), no data ( = 0 ) or length of
+   // data already transferred ( > 0 ).
+   //
+   if (currentState->rdmap)
+   {
+      __commkit_readfile_recvdata_prefix(context, currentState);
+      if (currentState->toBeTransmitted > 0)
+      {
+         currentState->transmitted = currentState->toBeTransmitted;
+         currentState->base.nodeResult = currentState->transmitted;
+      }
+      currentState->receiveFileData = false;
+      return 0;
+   }
+#endif // BEEGFS_NVFS
 
    if(!currentState->receiveFileData)
       return __commkit_readfile_recvdata_prefix(context, currentState);
 
-   if(currentState->data.count == 0)
+   if(beegfs_iov_iter_count(iter) == 0)
    {
       ((struct ReadfileIterOps*) context->private)->nextIter(context, currentState);
-      BUG_ON(currentState->data.count == 0);
+      BUG_ON(beegfs_iov_iter_count(iter) == 0);
    }
 
-   iov = iov_iter_iovec(&currentState->data);
-   missingLength = MIN(iov.iov_len, currentState->toBeTransmitted - currentState->transmitted);
-
    // receive available dataPart
-   recvRes = __commkit_readfile_receive(context, currentState, iov.iov_base, missingLength, false);
+   recvRes = __commkit_readfile_receive(context, currentState, iter, missingLength, false);
    if(recvRes < 0)
       return recvRes;
 
    currentState->transmitted += recvRes;
-   iov_iter_advance(&currentState->data, recvRes);
 
    if(currentState->toBeTransmitted == currentState->transmitted)
    { // all of the data has been received => receive the next lengthInfo in the header stage
@@ -1093,8 +1213,8 @@ static const struct CommKitContextOps readfileOps = {
 };
 
 void FhgfsOpsCommKit_readfileV2bCommunicate(App* app, RemotingIOInfo* ioInfo,
-   struct list_head* states, void (*nextIter)(CommKitContext*, ReadfileState*),
-   void (*prepare)(CommKitContext*, ReadfileState*))
+   struct list_head* states, void (*nextIter)(CommKitContext*, FileOpState*),
+   void (*prepare)(CommKitContext*, FileOpState*))
 {
    struct ReadfileIterOps iops = {
       .nextIter = nextIter,
@@ -1112,68 +1232,122 @@ static unsigned __commkit_writefile_prepareHeader(CommKitContext* context,
    Config* cfg = App_getConfig(context->app);
    Node* localNode = App_getLocalNode(context->app);
    const NumNodeID localNodeNumID = Node_getNumID(localNode);
-   WritefileState* currentState = container_of(info, WritefileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
    struct WritefileIterOps* ops = context->private;
-
+   NetMessage *netMessage = NULL;
    WriteLocalFileMsg writeMsg;
 
-   // prepare message
-   WriteLocalFileMsg_initFromSession(&writeMsg, localNodeNumID,
-      context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
-      context->ioInfo->accessFlags, currentState->offset, currentState->totalWriteSize);
+#ifdef BEEGFS_NVFS
+   WriteLocalFileRDMAMsg writeRDMAMsg;
+   //
+   // Determine if we can RDMA the data.
+   //
+   currentState->rdmap = NULL;
+   if(context->gpudRc > 0)
+   {
+      struct FileOpVecState* vecState = container_of(currentState, struct FileOpVecState, base);
+      currentState->rdmap = RdmaInfo_mapWrite(&vecState->data, info->socket);
+   }
+   if (context->gpudRc < 0 || IS_ERR(currentState->rdmap))
+   {
+      int st = currentState->rdmap != NULL? PTR_ERR(currentState->rdmap) : context->gpudRc;
+      info->state = CommKitState_CLEANUP;
+      info->nodeResult = (st == -ENOMEM)? -FhgfsOpsErr_OUTOFMEM : -FhgfsOpsErr_INVAL;
+      currentState->rdmap = NULL;
+      return 0;
+   }
 
-   NetMessage_setMsgHeaderTargetID(&writeMsg.netMessage, info->selectedTargetID);
+   // prepare message
+   if (!currentState->rdmap)
+#endif // BEEGFS_NVFS
+   {
+      WriteLocalFileMsg_initFromSession(&writeMsg, localNodeNumID,
+         context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
+         context->ioInfo->accessFlags, currentState->offset, currentState->totalSize);
+
+      netMessage = &writeMsg.netMessage;
+   }
+#ifdef BEEGFS_NVFS
+   else
+   {
+      WriteLocalFileRDMAMsg_initFromSession(&writeRDMAMsg, localNodeNumID,
+         context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
+         context->ioInfo->accessFlags, currentState->offset, currentState->totalSize,
+         currentState->rdmap);
+
+      netMessage = &writeRDMAMsg.netMessage;
+   }
+#endif // BEEGFS_NVFS
+
+   NetMessage_setMsgHeaderTargetID(netMessage, info->selectedTargetID);
 
    if (Config_getQuotaEnabled(cfg) )
-      WriteLocalFileMsg_setUserdataForQuota(&writeMsg, context->ioInfo->userID,
-         context->ioInfo->groupID);
+   {
+#ifdef BEEGFS_NVFS
+      if (currentState->rdmap)
+         WriteLocalFileRDMAMsg_setUserdataForQuota(&writeRDMAMsg, context->ioInfo->userID,
+            context->ioInfo->groupID);
+      else
+#endif
+         WriteLocalFileMsg_setUserdataForQuota(&writeMsg, context->ioInfo->userID,
+            context->ioInfo->groupID);
+   }
 
    if (currentState->firstWriteDoneForTarget && Config_getSysSessionChecksEnabled(cfg))
-      NetMessage_addMsgHeaderFeatureFlag(&writeMsg.netMessage,
+      NetMessage_addMsgHeaderFeatureFlag(netMessage,
          WRITELOCALFILEMSG_FLAG_SESSION_CHECK);
 
    if(StripePattern_getPatternType(context->ioInfo->pattern) == STRIPEPATTERN_BuddyMirror)
    {
-      NetMessage_addMsgHeaderFeatureFlag(&writeMsg.netMessage, WRITELOCALFILEMSG_FLAG_BUDDYMIRROR);
+      NetMessage_addMsgHeaderFeatureFlag(netMessage, WRITELOCALFILEMSG_FLAG_BUDDYMIRROR);
 
-      NetMessage_addMsgHeaderFeatureFlag(&writeMsg.netMessage,
+      NetMessage_addMsgHeaderFeatureFlag(netMessage,
          WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_FORWARD);
 
       if(info->useBuddyMirrorSecond)
-         NetMessage_addMsgHeaderFeatureFlag(&writeMsg.netMessage,
+         NetMessage_addMsgHeaderFeatureFlag(netMessage,
             WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND);
    }
 
    if(App_getNetBenchModeEnabled(context->app) )
-      NetMessage_addMsgHeaderFeatureFlag(&writeMsg.netMessage, WRITELOCALFILEMSG_FLAG_DISABLE_IO);
+      NetMessage_addMsgHeaderFeatureFlag(netMessage, WRITELOCALFILEMSG_FLAG_DISABLE_IO);
 
-   NetMessage_serialize(&writeMsg.netMessage, info->headerBuffer, BEEGFS_COMMKIT_MSGBUF_SIZE);
+   NetMessage_serialize(netMessage, info->headerBuffer, BEEGFS_COMMKIT_MSGBUF_SIZE);
 
    currentState->transmitted = 0;
-   currentState->toBeTransmitted = currentState->totalWriteSize;
-   currentState->data.count = 0;
+   currentState->toBeTransmitted = currentState->totalSize;
+   beegfs_iov_iter_clear(&currentState->data);
 
    if(ops->prepare)
       ops->prepare(context, currentState);
 
-   return NetMessage_getMsgLength(&writeMsg.netMessage);
+   return NetMessage_getMsgLength(netMessage);
 }
 
 static int __commkit_writefile_sendData(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
-   WritefileState* currentState = container_of(info, WritefileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
    ssize_t sendRes = 0;
-   struct iov_iter* data = &currentState->data;
-   size_t partLen = data->count;
+   BeeGFS_IovIter* data = &currentState->data;
+   size_t partLen = beegfs_iov_iter_count(data);
+
+#ifdef BEEGFS_NVFS
+   //
+   // If this is an RDMA transfer, then we are immediately done.  In this case,
+   // the server is RDMA reading the data and hence we have nothing to do.
+   //
+   if(currentState->rdmap)
+      return 0;
+#endif // BEEGFS_NVFS
 
    if(currentState->toBeTransmitted == 0)
       return 0;
 
-   if(data->count == 0)
+   if(beegfs_iov_iter_count(data) == 0)
    {
       ((struct WritefileIterOps*) context->private)->nextIter(context, currentState);
-      BUG_ON(data->count == 0);
+      BUG_ON(beegfs_iov_iter_count(data) == 0);
    }
 
    if(BEEGFS_SHOULD_FAIL(commkit_writefile_senddata_timeout, 1) )
@@ -1182,7 +1356,7 @@ static int __commkit_writefile_sendData(CommKitContext* context,
       goto sendsDone;
    }
 
-   while(data->count)
+   while(beegfs_iov_iter_count(data))
    {
       sendRes = info->socket->ops->sendto(info->socket, data, MSG_DONTWAIT, NULL);
       if (sendRes < 0)
@@ -1201,7 +1375,7 @@ sendsDone:
          Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
             "SocketError. ErrCode: %zd", sendRes);
          Logger_logFormatted(context->log, Log_SPAM, context->ops->logContext,
-            "partLen/missing: %zd/%zd", partLen, data->count);
+            "partLen/missing: %zd/%zd", partLen, beegfs_iov_iter_count(data));
       }
 
       return sendRes;
@@ -1216,7 +1390,7 @@ sendsDone:
 static void __commkit_writefile_printSendDataDetails(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
-   WritefileState* currentState = container_of(info, WritefileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
 
    Logger_logFormatted(context->log, Log_SPAM, context->ops->logContext,
       "Request details: transmitted/toBeTransmitted: %lld/%lld",
@@ -1226,7 +1400,7 @@ static void __commkit_writefile_printSendDataDetails(CommKitContext* context,
 static void __commkit_writefile_printSocketDetails(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
-   WritefileState* currentState = container_of(info, WritefileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
 
    Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
       "Sent request: node: %s; fileHandleID: %s; offset: %lld; size: %lld",
@@ -1236,29 +1410,57 @@ static void __commkit_writefile_printSocketDetails(CommKitContext* context,
 
 static int __commkit_writefile_recvHeader(CommKitContext* context, struct CommKitTargetInfo* info)
 {
-   WritefileState* currentState = container_of(info, WritefileState, base);
+   FileOpState* currentState = container_of(info, FileOpState, base);
    bool deserRes;
    int64_t writeRespValue;
    WriteLocalFileRespMsg writeRespMsg;
+   unsigned expectedType = 0;
+#ifdef BEEGFS_NVFS
+   WriteLocalFileRDMARespMsg writeRDMARespMsg;
 
    // got response => deserialize it
-   WriteLocalFileRespMsg_init(&writeRespMsg);
+   if(!currentState->rdmap)
+#endif // BEEGFS_NVFS
+   {
+      WriteLocalFileRespMsg_init(&writeRespMsg);
 
-   deserRes = NetMessageFactory_deserializeFromBuf(context->app, currentState->base.headerBuffer,
-      info->headerSize, (NetMessage*)&writeRespMsg, NETMSGTYPE_WriteLocalFileResp);
+      deserRes = NetMessageFactory_deserializeFromBuf(context->app, currentState->base.headerBuffer,
+         info->headerSize, (NetMessage*)&writeRespMsg, NETMSGTYPE_WriteLocalFileResp);
+      expectedType = NETMSGTYPE_WriteLocalFileResp;
+   }
+#ifdef BEEGFS_NVFS
+   else
+   {
+      WriteLocalFileRDMARespMsg_init(&writeRDMARespMsg);
+
+      deserRes = NetMessageFactory_deserializeFromBuf(context->app, currentState->base.headerBuffer,
+         info->headerSize, (NetMessage*)&writeRDMARespMsg, NETMSGTYPE_WriteLocalFileRDMAResp);
+      expectedType = NETMSGTYPE_WriteLocalFileRDMAResp;
+   }
+#endif // BEEGFS_NVFS
 
    if(unlikely(!deserRes) )
    { // response invalid
       Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
          "Received invalid response from %s. Expected type: %d. Disconnecting: %s",
-         Node_getNodeIDWithTypeStr(currentState->base.node), NETMSGTYPE_WriteLocalFileResp,
+         Node_getNodeIDWithTypeStr(currentState->base.node), expectedType,
          Socket_getPeername(currentState->base.socket) );
 
       return -FhgfsOpsErr_COMMUNICATION;
    }
 
-   // correct response
-   writeRespValue = WriteLocalFileRespMsg_getValue(&writeRespMsg);
+#ifdef BEEGFS_NVFS
+   if(!currentState->rdmap)
+#endif
+   {
+      writeRespValue = WriteLocalFileRespMsg_getValue(&writeRespMsg);
+   }
+#ifdef BEEGFS_NVFS
+   else
+   {
+      writeRespValue = WriteLocalFileRDMARespMsg_getValue(&writeRDMARespMsg);
+   }
+#endif
 
    if(unlikely(writeRespValue == -FhgfsOpsErr_COMMUNICATION) && !context->connFailedLogged)
    { // server was unable to communicate with another server
@@ -1285,8 +1487,8 @@ static const struct CommKitContextOps writefileOps = {
 };
 
 void FhgfsOpsCommKit_writefileV2bCommunicate(App* app, RemotingIOInfo* ioInfo,
-   struct list_head* states, void (*nextIter)(CommKitContext*, WritefileState*),
-   void (*prepare)(CommKitContext*, WritefileState*))
+   struct list_head* states, void (*nextIter)(CommKitContext*, FileOpState*),
+   void (*prepare)(CommKitContext*, FileOpState*))
 {
    struct WritefileIterOps iops = {
       .nextIter = nextIter,

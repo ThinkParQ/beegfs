@@ -4,6 +4,11 @@
 
 #include <common/app/log/Logger.h>
 
+#ifdef BEEGFS_NVFS
+// only for WORKER_BUFOUT_SIZE
+#include <common/components/worker/Worker.h>
+#endif /* BEEGFS_NVFS */
+
 #define IBVSOCKET_CONN_TIMEOUT_MS                  3000
 #define IBVSOCKET_LISTEN_BACKLOG                    128
 #define IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS  180000
@@ -13,6 +18,9 @@
 #define IBVSOCKET_MIN_BUF_NUM                         1
 #define IBVSOCKET_MIN_BUF_SIZE                        4096   // 4kiB
 #define IBVSOCKET_MAX_BUF_SIZE_NUM                    134217728 // num * size <= 128MiB
+#ifdef BEEGFS_NVFS
+#define IBVSOCKET_WC_ENTRIES 1
+#endif /* BEEGFS_NVFS */
 
 void IBVSocket_init(IBVSocket* _this)
 {
@@ -252,8 +260,13 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    __IBVSocket_initCommDest(_this->commContext, &_this->localDest);
 
    memset(&conn_param, 0, sizeof(conn_param) );
+#ifdef BEEGFS_NVFS
+   conn_param.responder_resources = RDMA_MAX_RESP_RES;
+   conn_param.initiator_depth = RDMA_MAX_INIT_DEPTH;
+#else
    conn_param.responder_resources = 1;
    conn_param.initiator_depth = 1;
+#endif /* BEEGFS_NVFS */
    conn_param.flow_control = 0;
    conn_param.retry_count = 7; // (3 bits)
    conn_param.rnr_retry_count = 7; // rnr = receiver not ready (3 bits, 7 means infinity)
@@ -470,8 +483,13 @@ IBVSocket_AcceptRes IBVSocket_accept(IBVSocket* _this, IBVSocket** outAcceptedSo
          __IBVSocket_initCommDest(childCommContext, &acceptedSock->localDest);
 
          memset(&conn_param, 0, sizeof(conn_param) );
+#ifdef BEEGFS_NVFS
+         conn_param.responder_resources = RDMA_MAX_RESP_RES;
+         conn_param.initiator_depth = RDMA_MAX_INIT_DEPTH;
+#else
          conn_param.responder_resources = 1;
          conn_param.initiator_depth = 1;
+#endif /* BEEGFS_NVFS */
          conn_param.flow_control = 0;
          conn_param.retry_count = 7; // (3 bits)
          conn_param.rnr_retry_count = 7; // rnr = receiver not ready (3 bits, 7 means infinity)
@@ -1024,6 +1042,14 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       goto err_cleanup;
    }
 
+#ifdef BEEGFS_NVFS
+   commContext->workerMRs = new MRMap();
+   commContext->cqMutex = new Mutex();
+   commContext->cqCompletions = new CQMap();
+   // RDMA id.  (This variable will increment for each RDMA operation.)
+   commContext->wr_id = 1;
+#endif /* BEEGFS_NVFS */
+
    *outCommContext = commContext;
    return true;
 
@@ -1105,6 +1131,27 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
       if(ibv_dereg_mr(commContext->sendMR) )
          LOG(SOCKLIB, WARNING, "Failed to deregister sendMR.");
    }
+
+#ifdef BEEGFS_NVFS
+   if (commContext->workerMRs)
+   {
+      for (auto& iter: *(commContext->workerMRs))
+      {
+         if(ibv_dereg_mr(iter.second) )
+            LOG(SOCKLIB, WARNING, "Failed to deregister workerMR.");
+      }
+      commContext->workerMRs->clear();
+      delete(commContext->workerMRs);
+   }
+
+   if (commContext->cqCompletions)
+   {
+      commContext->cqCompletions->clear();
+      delete(commContext->cqCompletions);
+   }
+
+   delete(commContext->cqMutex);
+#endif /* BEEGFS_NVFS */
 
    SAFE_FREE(commContext->recvBuf);
    SAFE_FREE(commContext->sendBuf);
@@ -1311,6 +1358,194 @@ int __IBVSocket_postRead(IBVSocket* _this, IBVCommDest* remoteDest,
 
    return 0;
 }
+
+#ifdef BEEGFS_NVFS
+static bool __IBVSocket_getBufferKey(IBVCommContext *commContext, char *buffer, unsigned *key)
+{
+   struct ibv_mr *mr = NULL;
+
+   MRMap::const_iterator iter = commContext->workerMRs->find(buffer);
+
+   if (iter == commContext->workerMRs->end())
+   {
+      if (unlikely(__IBVSocket_registerBuf(commContext, buffer, WORKER_BUFOUT_SIZE, &mr)))
+      {
+         LOG(SOCKLIB, WARNING, "ibv_postWrite(): failed to register buffer.");
+         return false;
+      }
+
+      commContext->workerMRs->insert({buffer, mr});
+   }
+   else
+   {
+      mr = iter->second;
+   }
+
+   *key = mr->lkey;
+   return true;
+}
+
+/**
+ * Wait for the completion of a specific RDMA operation.
+ * @return number of completed elements or -1 in case of an error
+ */
+static int __IBVSocket_waitForRDMACompletion(IBVCommContext* commContext, uint64_t id)
+{
+   struct ibv_wc wc[IBVSOCKET_WC_ENTRIES];
+   int i = 0;
+   int found = 0;
+   int status = 0;
+   int num_wc = 0;
+
+   /*
+    * This function is locked so that we don't get a race condition between two workers
+    * looking for completions.
+    */
+   commContext->cqMutex->lock();
+   CQMap::const_iterator iter = commContext->cqCompletions->find(id);
+
+   /*
+    * Check to see if we have already found the completion we are looking for.
+    */
+   if (iter != commContext->cqCompletions->end())
+   {
+      commContext->cqCompletions->erase(id);
+      commContext->cqMutex->unlock();
+      return 0;
+   }
+
+   /*
+    * Continue to poll the CQ until we find the entry in question or we encounter a
+    * bad status.
+    */
+   while (!found && !status)
+   {
+      num_wc = ibv_poll_cq(commContext->sendCQ, IBVSOCKET_WC_ENTRIES, wc);
+      if (num_wc > 0)
+      {
+         for (i = 0; i < num_wc; i++)
+         {
+            if (unlikely(wc[i].status != IBV_WC_SUCCESS))
+            {
+               LOG(SOCKLIB, DEBUG, "Connection error.", wc[i].status);
+               status = -1;
+               break;
+            }
+
+            if ((wc[i].opcode == IBV_WC_RDMA_WRITE) || (wc[i].opcode == IBV_WC_RDMA_READ))
+            {
+               if (wc[i].wr_id == id)
+               {
+                  found = 1;
+               }
+               else
+               {
+                  commContext->cqCompletions->insert({wc[i].wr_id, wc[i].opcode});
+               }
+            }
+            else if (wc[i].opcode == IBV_WC_SEND)
+            {
+               if (likely(commContext->incompleteSend.numAvailable))
+               {
+                  commContext->incompleteSend.numAvailable--;
+               }
+               else
+               {
+                  LOG(SOCKLIB, WARNING, "Received bad/unexpected send completion.");
+                  status = -1;
+                  break;
+               }
+            }
+            else
+            {
+               LOG(SOCKLIB, WARNING, "Received unexpected CQ opcode.", wc[i].opcode);
+               status = -1;
+               break;
+            }
+         }
+      }
+   }
+
+   commContext->cqMutex->unlock();
+   return status;
+}
+
+/**
+ * Process RDMA requests.
+ *
+ * @return 0 on success, -1 on error
+ */
+static int __IBVSocket_postRDMA(IBVSocket* _this, ibv_wr_opcode opcode,
+   char* localBuf, int bufLen, unsigned lkey,
+   uint64_t remoteBuf, unsigned rkey)
+{
+   IBVCommContext* commContext = _this->commContext;
+   struct ibv_sge list;
+   struct ibv_send_wr wr;
+   struct ibv_send_wr *bad_wr;
+   int postRes;
+   int waitRes;
+
+   if (unlikely(lkey == 0))
+   {
+      if (unlikely(!__IBVSocket_getBufferKey(commContext, localBuf, &lkey)))
+      {
+         LOG(SOCKLIB, WARNING, "ibv_postRDMA(): no local key.");
+         return -1;
+      }
+   }
+
+   list.addr = (uint64_t) localBuf;
+   list.length = bufLen;
+   list.lkey = lkey;
+
+   wr.wr_id      = __atomic_fetch_add(&commContext->wr_id, 1, __ATOMIC_SEQ_CST);
+   wr.next       = NULL;
+   wr.sg_list    = &list;
+   wr.num_sge    = 1;
+   wr.opcode     = opcode;
+   wr.send_flags = IBV_SEND_SIGNALED;
+   wr.wr.rdma.remote_addr = remoteBuf;
+   wr.wr.rdma.rkey = rkey;
+
+   postRes = ibv_post_send(commContext->qp, &wr, &bad_wr);
+   if(unlikely(postRes) )
+   {
+      LOG(SOCKLIB, WARNING, "ibv_post_send() failed.", sysErr(postRes));
+      return -1;
+   }
+
+   waitRes = __IBVSocket_waitForRDMACompletion(commContext, wr.wr_id);
+   return waitRes;
+}
+
+int __IBVSocket_postWrite(IBVSocket* _this, char* localBuf, int bufLen,
+   unsigned lkey, uint64_t remoteBuf, unsigned rkey)
+{
+   return __IBVSocket_postRDMA(_this, IBV_WR_RDMA_WRITE, localBuf, bufLen,
+      lkey, remoteBuf, rkey);
+}
+
+int __IBVSocket_postRead(IBVSocket* _this, char* localBuf, int bufLen,
+   unsigned lkey, uint64_t remoteBuf, unsigned rkey)
+{
+   return __IBVSocket_postRDMA(_this, IBV_WR_RDMA_READ, localBuf, bufLen,
+      lkey, remoteBuf, rkey);
+}
+
+ssize_t IBVSocket_read(IBVSocket* _this, const char* buf, size_t bufLen,
+   unsigned lkey, const uint64_t rbuf, unsigned rkey)
+{
+   return __IBVSocket_postRead(_this, (char *)buf, bufLen, lkey, rbuf, rkey);
+}
+
+ssize_t IBVSocket_write(IBVSocket* _this, const char* buf, size_t bufLen,
+ unsigned lkey, const uint64_t rbuf, unsigned rkey)
+{
+   return __IBVSocket_postWrite(_this, (char *)buf, bufLen, lkey, rbuf, rkey);
+}
+
+#endif /* BEEGFS_NVFS */
 
 /**
  * Note: Contains flow control.

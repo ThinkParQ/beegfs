@@ -26,6 +26,7 @@
 #define MODESTORAGEBENCH_ARG_THREADS                 "--threads"
 #define MODESTORAGEBENCH_ARG_VERBOSE                 "--verbose"
 #define MODESTORAGEBENCH_ARG_WAIT                    "--wait"
+#define MODESTORAGEBENCH_ARG_ODIRECT                 "--odirect"
 
 
 /**
@@ -419,6 +420,15 @@ int ModeStorageBench::checkConfig(Node& mgmtNode, NodeStoreServers* storageNodes
       cfg->erase(iter);
    }
 
+
+
+   // parse odirect argument
+   iter = cfg->find(MODESTORAGEBENCH_ARG_ODIRECT);
+   if(iter != cfg->end())
+   {
+      this->cfgODirect = true;
+      cfg->erase(iter);
+   }
 
 
    //check if wrong arguments are given
@@ -875,6 +885,7 @@ void ModeStorageBench::printHelp()
    std::cout << " Optional:" << std::endl;
    std::cout << "    --verbose  Print result of every target." << std::endl;
    std::cout << "    --wait     Waits until the benchmark is finished." << std::endl;
+   std::cout << "    --odirect  Use direct I/O (O_DIRECT) on the storage servers." << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE:" << std::endl;
    std::cout << " This mode runs a streaming benchmark on the storage targets without any extra" << std::endl;
@@ -914,7 +925,7 @@ bool ModeStorageBench::sendCmdAndCollectResult(NumNodeID nodeID,
    this->cfgTargetIDs.getTargetsByNode(nodeID, targets);
 
    StorageBenchControlMsg msg(this->cfgAction, this->cfgType, this->cfgBlocksize, this->cfgSize,
-      this->cfgThreads, &targets);
+      this->cfgThreads, this->cfgODirect, &targets);
 
    auto node = nodes->referenceNode(nodeID);
    if(!node)

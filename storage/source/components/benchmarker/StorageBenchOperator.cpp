@@ -2,9 +2,9 @@
 
 
 int StorageBenchOperator::initAndStartStorageBench(UInt16List* targetIDs, int64_t blocksize,
-   int64_t size, int threads, StorageBenchType type)
+   int64_t size, int threads, bool odirect, StorageBenchType type)
 {
-   return this->slave.initAndStartStorageBench(targetIDs, blocksize, size, threads, type);
+   return this->slave.initAndStartStorageBench(targetIDs, blocksize, size, threads, odirect, type);
 }
 
 int StorageBenchOperator::cleanup(UInt16List* targetIDs)

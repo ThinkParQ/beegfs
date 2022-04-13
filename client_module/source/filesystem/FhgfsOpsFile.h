@@ -96,17 +96,10 @@ extern ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t 
 
 extern int FhgfsOps_mmap(struct file *, struct vm_area_struct *);
 
-#ifdef KERNEL_HAS_PREPARE_WRITE
-   extern int FhgfsOps_prepare_write(struct file *file, struct page *page, unsigned from,
-      unsigned to);
-   extern int FhgfsOps_commit_write(struct file *file, struct page *page, unsigned from,
-      unsigned to);
-#else
-   extern int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
+extern int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
       loff_t pos, unsigned len, unsigned flags, struct page** pagep, void** fsdata);
-   extern int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
+extern int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
       loff_t pos, unsigned len, unsigned copied, struct page* page, void* fsdata);
-#endif // LINUX_VERSION_CODE
 
 #if defined(KERNEL_HAS_IOV_DIO)
    extern ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter);
@@ -120,7 +113,7 @@ extern int FhgfsOps_mmap(struct file *, struct vm_area_struct *);
 #endif // KERNEL_HAS_DIRECT_IO_ITER
 
 extern int FhgfsOps_releaseCancelLocks(struct inode* inode, struct file* file);
-extern ssize_t __FhgfsOps_readSparse(struct file* file, char __user *buf, size_t size,
+extern ssize_t __FhgfsOps_readSparse(struct file* file, BeeGFS_IovIter *iter, size_t size,
    loff_t offset);
 
 

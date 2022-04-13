@@ -5,6 +5,7 @@ PAREN = )
 BEEGFS_VERSION = $(shell head -n1 debian/changelog | grep -P --only-matching '(?<=\d:)[^$(PAREN)~]+')
 BEEGFS_MAJOR = $(shell head -n1 debian/changelog | grep -P --only-matching '(?<=\d:)\d+')
 
+BEEFGS_NVFS=1
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 
@@ -17,7 +18,6 @@ endif
 
 override_dh_auto_build:
 	make -j$(NUMJOBS) common-all daemons utils
-	make -j$(NUMJOBS) -C upgrade/beegfs_mirror_md/build all
 	make -j$(NUMJOBS) -C java_lib/build
 
 # no build-runnable tests exist (yet)
@@ -85,9 +85,6 @@ override_dh_install:
 	@# mon-grafana
 	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
 	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
-	@# upgraders
-	install -D upgrade/beegfs_mirror_md/build/beegfs-mirror-md \
-		debian/beegfs-mirror-md/opt/beegfs/sbin/beegfs-mirror-md
 	@# utils
 	make -j$(NUMJOBS) DESTDIR=debian/beegfs-utils ctl-install fsck-install event_listener-install
 	mkdir -p debian/beegfs-utils/sbin
@@ -186,7 +183,6 @@ override_dh_strip:
 	dh_strip -pbeegfs-helperd    --dbg-package=beegfs-helperd-dbg
 	dh_strip -pbeegfs-meta       --dbg-package=beegfs-meta-dbg
 	dh_strip -pbeegfs-mgmtd      --dbg-package=beegfs-mgmtd-dbg
-	dh_strip -pbeegfs-mirror-md  --dbg-package=beegfs-mirror-md-dbg
 	dh_strip -pbeegfs-mon        --dbg-package=beegfs-mon-dbg
 	dh_strip -pbeegfs-storage    --dbg-package=beegfs-storage-dbg
 	dh_strip -pbeegfs-utils      --dbg-package=beegfs-utils-dbg

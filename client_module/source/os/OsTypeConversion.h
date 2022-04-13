@@ -3,7 +3,7 @@
 
 #include <common/Common.h>
 #include <os/OsTypeConversion.h>
-#include <common/toolkit/TimeAbs.h>
+#include <common/toolkit/Time.h>
 #include <common/storage/StorageDefinitions.h>
 
 #include <linux/fs.h>
@@ -85,6 +85,9 @@ void OsTypeConv_kstatFhgfsToOs(fhgfs_stat* fhgfsStat, struct kstat* kStat)
 void OsTypeConv_iattrOsToFhgfs(struct iattr* iAttr, SettableFileAttribs* fhgfsAttr,
    int* outValidAttribs)
 {
+   Time now;
+   Time_setToNowReal(&now);
+
    *outValidAttribs = 0;
 
    if(iAttr->ia_valid & ATTR_MODE)
@@ -113,11 +116,8 @@ void OsTypeConv_iattrOsToFhgfs(struct iattr* iAttr, SettableFileAttribs* fhgfsAt
    else
    if(iAttr->ia_valid & ATTR_MTIME)
    { // set mtime to "now"
-      TimeAbs now;
-      TimeAbs_init(&now);
-
       (*outValidAttribs) |= SETATTR_CHANGE_MODIFICATIONTIME;
-      fhgfsAttr->modificationTimeSecs = TimeAbs_getTimeval(&now)->tv_sec;
+      fhgfsAttr->modificationTimeSecs = now.tv_sec;
    }
 
    if(iAttr->ia_valid & ATTR_ATIME_SET)
@@ -128,11 +128,8 @@ void OsTypeConv_iattrOsToFhgfs(struct iattr* iAttr, SettableFileAttribs* fhgfsAt
    else
    if(iAttr->ia_valid & ATTR_ATIME)
    { // set atime to "now"
-      TimeAbs now;
-      TimeAbs_init(&now);
-
       (*outValidAttribs) |= SETATTR_CHANGE_LASTACCESSTIME;
-      fhgfsAttr->lastAccessTimeSecs = TimeAbs_getTimeval(&now)->tv_sec;
+      fhgfsAttr->lastAccessTimeSecs = now.tv_sec;
    }
 }
 

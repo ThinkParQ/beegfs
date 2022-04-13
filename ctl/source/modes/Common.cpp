@@ -8,11 +8,13 @@
 namespace {
 struct InfoDownloadError : std::error_category
 {
+    [[nodiscard]]
    const char* name() const noexcept override
    {
       return "Info Download Error";
    }
 
+    [[nodiscard]]
    std::string message(int condition) const override
    {
       using ctl::common::InfoDownloadErrorCode;

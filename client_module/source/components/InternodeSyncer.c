@@ -355,7 +355,7 @@ bool __InternodeSyncer_waitForMgmtHeartbeat(InternodeSyncer* this)
       { // we got an ip => send request and wait
          int tryTimeoutWarpMS = Random_getNextInRange(-(waitTimeoutMS/4), waitTimeoutMS/4);
 
-         DatagramListener_sendtoIP(this->dgramLis, heartbeatReqBuf, NETMSG_MIN_LENGTH, 0,
+         DatagramListener_sendtoIP_kernel(this->dgramLis, heartbeatReqBuf, sizeof heartbeatReqBuf, 0,
             ipAddr, port);
 
          if(NodeStoreEx_waitForFirstNode(this->mgmtNodes, waitTimeoutMS + tryTimeoutWarpMS) )
@@ -895,6 +895,9 @@ void __InternodeSyncer_delayedClosePrepareRemoting(InternodeSyncer* this,
    outIOInfo->firstWriteDone = NULL;
    outIOInfo->userID = 0;
    outIOInfo->groupID = 0;
+#ifdef BEEGFS_NVFS
+   outIOInfo->nvfs = false;
+#endif
 }
 
 /**
@@ -915,6 +918,9 @@ void __InternodeSyncer_delayedEntryUnlockPrepareRemoting(InternodeSyncer* this,
    outIOInfo->firstWriteDone = NULL;
    outIOInfo->userID = 0;
    outIOInfo->groupID = 0;
+#ifdef BEEGFS_NVFS
+   outIOInfo->nvfs = false;
+#endif
 }
 
 /**
@@ -935,6 +941,9 @@ void __InternodeSyncer_delayedRangeUnlockPrepareRemoting(InternodeSyncer* this,
    outIOInfo->firstWriteDone = NULL;
    outIOInfo->userID = 0;
    outIOInfo->groupID = 0;
+#ifdef BEEGFS_NVFS
+   outIOInfo->nvfs = false;
+#endif
 }
 
 /**

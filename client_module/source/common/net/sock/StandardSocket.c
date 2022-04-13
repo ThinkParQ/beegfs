@@ -247,19 +247,20 @@ int _StandardSocket_setsockopt(StandardSocket* this, int level,
    int optname, char* optval, int optlen)
 {
    int retVal = -EINVAL;
-   mm_segment_t oldfs;
 
-   if(optlen < 0)
-      return retVal;
+#if defined(KERNEL_HAS_SOCK_SETSOCKOPT_SOCKPTR_T_PARAM)
+   sockptr_t optvalptr = KERNEL_SOCKPTR(optval);
+#else
+   char* optvalptr = (char*)optval;
+#endif
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
-   if (level == SOL_SOCKET)
-      retVal = sock_setsockopt(this->sock, level, optname, optval, optlen);
-   else
-      retVal = this->sock->ops->setsockopt(this->sock, level, optname, optval, optlen);
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      if (level == SOL_SOCKET)
+         retVal = sock_setsockopt(this->sock, level, optname, optvalptr, optlen);
+      else
+         retVal = this->sock->ops->setsockopt(this->sock, level, optname, optvalptr, optlen);
+   }
 
    return retVal;
 }
@@ -277,39 +278,33 @@ int _StandardSocket_getsockopt(StandardSocket* this, int level, int optname,
    char* optval, int* optlen)
 {
    int retVal = -EINVAL;
-   mm_segment_t oldfs;
-
-   if(*optlen < 0)
-      return retVal;
-
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
    // note: sock_getsockopt() is not exported to modules
 
-   if(level == SOL_SOCKET)
-   {
-      switch(optname)
+   WITH_PROCESS_CONTEXT {
+      if(level == SOL_SOCKET)
       {
-         case SO_RCVBUF:
+         switch(optname)
          {
-            if(*optlen == sizeof(int) )
-            {
-               struct socket* sock = StandardSocket_getRawSock(this);
-               *(int*)optval = sock->sk->sk_rcvbuf;
-               retVal = 0;
-            }
-         } break;
+            case SO_RCVBUF:
+               {
+                  if(*optlen == sizeof(int) )
+                  {
+                     struct socket* sock = StandardSocket_getRawSock(this);
+                     *(int*)optval = sock->sk->sk_rcvbuf;
+                     retVal = 0;
+                  }
+               } break;
 
-         default:
-         {
-            retVal = -ENOTSUPP;
-         } break;
+            default:
+               {
+                  retVal = -ENOTSUPP;
+               } break;
+         }
       }
+      else
+         retVal = this->sock->ops->getsockopt(this->sock, level, optname, optval, optlen);
    }
-   else
-      retVal = this->sock->ops->getsockopt(this->sock, level, optname, optval, optlen);
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
 
    return retVal;
 }
@@ -450,7 +445,6 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
 
    StandardSocket* thisCast = (StandardSocket*)this;
 
-   mm_segment_t oldfs;
    int connRes;
 
    struct sockaddr_in serveraddr =
@@ -461,15 +455,13 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
    };
 
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-
-   connRes = thisCast->sock->ops->connect(
-      thisCast->sock,
-      (struct sockaddr*) &serveraddr,
-      sizeof(serveraddr),
-      O_NONBLOCK); // non-blocking connect
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      connRes = thisCast->sock->ops->connect(
+            thisCast->sock,
+            (struct sockaddr*) &serveraddr,
+            sizeof(serveraddr),
+            O_NONBLOCK); // non-blocking connect
+   }
 
    if(connRes)
    {
@@ -582,13 +574,10 @@ bool _StandardSocket_shutdown(Socket* this)
    StandardSocket* thisCast = (StandardSocket*)this;
 
    int sendshutRes;
-   mm_segment_t oldfs;
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-
-   sendshutRes = thisCast->sock->ops->shutdown(thisCast->sock, SEND_SHUTDOWN);
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      sendshutRes = thisCast->sock->ops->shutdown(thisCast->sock, SEND_SHUTDOWN);
+   }
 
    if( (sendshutRes < 0) && (sendshutRes != -ENOTCONN) )
    {
@@ -604,21 +593,18 @@ bool _StandardSocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS)
    bool shutRes;
    char buf[SOCKET_SHUTDOWN_RECV_BUF_LEN];
    int recvRes;
-   mm_segment_t oldfs;
 
    shutRes = this->ops->shutdown(this);
    if(!shutRes)
       return false;
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-
-   // receive until shutdown arrives
-   do
-   {
-      recvRes = Socket_recvT(this, buf, SOCKET_SHUTDOWN_RECV_BUF_LEN, 0, timeoutMS);
-   } while(recvRes > 0);
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   WITH_PROCESS_CONTEXT {
+      // receive until shutdown arrives
+      do
+      {
+         recvRes = Socket_recvT_kernel(this, buf, SOCKET_SHUTDOWN_RECV_BUF_LEN, 0, timeoutMS);
+      } while(recvRes > 0);
+   }
 
    if(recvRes &&
       (recvRes != -ECONNRESET) )
@@ -633,22 +619,29 @@ bool _StandardSocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS)
 /**
  * @return -ETIMEDOUT on timeout
  */
-ssize_t _StandardSocket_recvT(Socket* this, struct iov_iter* iter, int flags, int timeoutMS)
+ssize_t _StandardSocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags, int timeoutMS)
 {
    StandardSocket* thisCast = (StandardSocket*)this;
 
    return StandardSocket_recvfromT(thisCast, iter, flags, NULL, timeoutMS);
 }
 
-ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
+
+#ifdef KERNEL_HAS_MSGHDR_ITER
+#define WITH_PROCESS_CONTEXT_IF_NO_ITER
+#else
+#define WITH_PROCESS_CONTEXT_IF_NO_ITER WITH_PROCESS_CONTEXT
+#endif
+
+
+
+ssize_t _StandardSocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *to)
 {
    StandardSocket* thisCast = (StandardSocket*)this;
 
    int sendRes;
    size_t len;
-   mm_segment_t oldfs;
-
    struct sockaddr_in toSockAddr;
 
    struct msghdr msg =
@@ -661,14 +654,16 @@ ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
    };
 
 #ifndef KERNEL_HAS_MSGHDR_ITER
-   struct iovec iov = iov_iter_iovec(iter);
+   //XXX Note that if the BeeGFS_IovIter is of type ITER_KVEC, we're type punning
+   //it here to get a struct iovec. Not sure if this is even supposed to work... :/
+   struct iovec iov = iov_iter_iovec(beegfs_get_iovec_iov_iter(iter));
 
    msg.msg_iov       = &iov;
    msg.msg_iovlen    = 1;
    len = iov.iov_len;
 #else
-   msg.msg_iter = *iter;
-   len = iter->count;
+   msg.msg_iter = iter->_iov_iter;  //XXX XXX assuming that this is valid here... TODO make sure.
+   len = beegfs_iov_iter_count(iter);
 #endif // LINUX_VERSION_CODE
 
    if(to)
@@ -678,29 +673,26 @@ ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
       toSockAddr.sin_port = to->port;
    }
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
 
+   WITH_PROCESS_CONTEXT_IF_NO_ITER {
 #ifndef KERNEL_HAS_SOCK_SENDMSG_NOLEN
-   sendRes = sock_sendmsg(thisCast->sock, &msg, len);
+      sendRes = sock_sendmsg(thisCast->sock, &msg, len);
 #else
-   sendRes = sock_sendmsg(thisCast->sock, &msg);
+      sendRes = sock_sendmsg(thisCast->sock, &msg);
 #endif
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   }
 
    if(sendRes >= 0)
-      iov_iter_advance(iter, sendRes);
+      beegfs_iov_iter_advance(iter, sendRes);
 
    return sendRes;
 }
 
-ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* iter, int flags,
+ssize_t StandardSocket_recvfrom(StandardSocket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *from)
 {
    int recvRes;
-   mm_segment_t oldfs;
    size_t len;
-
    struct sockaddr_in fromSockAddr;
 
    struct msghdr msg =
@@ -713,28 +705,28 @@ ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* iter, int
    };
 
 #ifndef KERNEL_HAS_MSGHDR_ITER
-   struct iovec iov = iov_iter_iovec(iter);
+   //XXX Note that if the BeeGFS_IovIter is of type ITER_KVEC, we're type punning
+   //it here to get a struct iovec. Not sure if this is even supposed to work... :/
+   struct iovec iov = iov_iter_iovec(beegfs_get_iovec_iov_iter(iter));
 
    msg.msg_iov       = &iov;
    msg.msg_iovlen    = 1;
    len = iov.iov_len;
 #else
-   msg.msg_iter = *iter;
-   len = iter->count;
+   msg.msg_iter = iter->_iov_iter;  //XXX XXX assuming that this is valid here... TODO make sure.
+   len = beegfs_iov_iter_count(iter);
 #endif // LINUX_VERSION_CODE
 
-   ACQUIRE_PROCESS_CONTEXT(oldfs);
-
+   WITH_PROCESS_CONTEXT_IF_NO_ITER {
 #ifdef KERNEL_HAS_RECVMSG_SIZE
-   recvRes = sock_recvmsg(this->sock, &msg, len, flags);
+      recvRes = sock_recvmsg(this->sock, &msg, len, flags);
 #else
-   recvRes = sock_recvmsg(this->sock, &msg, flags);
+      recvRes = sock_recvmsg(this->sock, &msg, flags);
 #endif
-
-   RELEASE_PROCESS_CONTEXT(oldfs);
+   }
 
    if(recvRes > 0)
-      iov_iter_advance(iter, recvRes);
+      beegfs_iov_iter_advance(iter, recvRes);
 
    if(from)
    {
@@ -748,7 +740,7 @@ ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* iter, int
 /**
  * @return -ETIMEDOUT on timeout
  */
-ssize_t StandardSocket_recvfromT(StandardSocket* this, struct iov_iter* iter, int flags,
+ssize_t StandardSocket_recvfromT(StandardSocket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *from, int timeoutMS)
 {
    Socket* thisBase = (Socket*)this;

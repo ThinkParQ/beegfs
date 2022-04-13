@@ -44,10 +44,10 @@ bool MsgHelperAck_respondToAckRequest(App* app, const char* ackID,
    if(fromAddr)
    { // datagram => sync via dgramLis send method
       DatagramListener* dgramLis = App_getDatagramListener(app);
-      sendRes = DatagramListener_sendto(dgramLis, respBuf, respLen, 0, fromAddr);
+      sendRes = DatagramListener_sendto_kernel(dgramLis, respBuf, respLen, 0, fromAddr);
    }
    else
-      sendRes = Socket_sendto(sock, respBuf, respLen, 0, NULL);
+      sendRes = Socket_sendto_kernel(sock, respBuf, respLen, 0, NULL);
 
    if(unlikely(sendRes <= 0) )
       Logger_logErrFormatted(log, logContext, "Send error. ErrCode: %lld", (long long)sendRes);

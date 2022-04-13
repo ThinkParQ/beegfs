@@ -16,7 +16,7 @@ static bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType,
    NicAddress* outAddr);
 
 
-void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA,
+void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA, bool onlyRDMA,
    NicAddressList* outList)
 {
    // find standard TCP/IP interfaces
@@ -26,6 +26,7 @@ void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA,
    if(useRDMA && RDMASocket_rdmaDevicesExist() )
    {
       NicAddressList tcpInterfaces;
+
       NicAddressList_init(&tcpInterfaces);
 
       __NIC_findAllTCP(allowedInterfaces, &tcpInterfaces);
@@ -34,6 +35,23 @@ void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA,
 
       ListTk_kfreeNicAddressListElems(&tcpInterfaces);
       NicAddressList_uninit(&tcpInterfaces);
+   }
+
+   if (onlyRDMA)
+   {
+      NicAddressListIter nicIter;
+      NicAddressListIter_init(&nicIter, outList);
+      while (!NicAddressListIter_end(&nicIter))
+      {
+         NicAddress* nicAddr = NicAddressListIter_value(&nicIter);
+         if (nicAddr->nicType != NICADDRTYPE_RDMA)
+         {
+            nicIter = NicAddressListIter_remove(&nicIter);
+            kfree(nicAddr);
+         }
+         else
+            NicAddressListIter_next(&nicIter);
+      }
    }
 }
 
@@ -74,6 +92,10 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
    struct ifreq ifr;
    struct in_device* in_dev;
    struct in_ifaddr *ifa;
+
+#ifdef BEEGFS_NVFS
+   outAddr->ibdev = NULL;
+#endif
 
    // name
    strcpy(outAddr->name, dev->name);
@@ -276,7 +298,7 @@ void __NIC_filterInterfacesForRDMA(NicAddressList* nicList, NicAddressList* outL
       NicAddress* nicAddr = NicAddressListIter_value(&iter);
       bool bindRes;
 
-      if(!RDMASocket_init(&rdmaSock) )
+      if(!RDMASocket_init(&rdmaSock, &nicAddr->ipAddr, NULL) )
          continue;
 
       bindRes = sock->ops->bindToAddr(sock, &nicAddr->ipAddr, 0);
@@ -286,6 +308,10 @@ void __NIC_filterInterfacesForRDMA(NicAddressList* nicList, NicAddressList* outL
          NicAddress* nicAddrCopy = os_kmalloc(sizeof(NicAddress) );
 
          *nicAddrCopy = *nicAddr;
+
+#ifdef BEEGFS_NVFS
+         nicAddrCopy->ibdev = rdmaSock.ibvsock.cm_id->device;
+#endif
 
          nicAddrCopy->nicType = NICADDRTYPE_RDMA;
 

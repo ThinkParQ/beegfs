@@ -7,7 +7,7 @@
 #include <common/system/System.h>
 #include <common/toolkit/ackstore/AcknowledgmentStore.h>
 #include <common/toolkit/NetFilter.h>
-#include <common/toolkit/TimeAbs.h>
+#include <common/toolkit/Time.h>
 #include <components/AckManager.h>
 #include <components/DatagramListener.h>
 #include <components/Flusher.h>
@@ -49,6 +49,7 @@ void App_init(App* this, MountConfig* mountConfig)
    this->logger = NULL;
    this->helperd = NULL;
    StrCpyList_init(&this->allowedInterfaces);
+   StrCpyList_init(&this->allowedRDMAInterfaces);
    UInt16List_init(&this->preferredMetaNodes);
    UInt16List_init(&this->preferredStorageTargets);
    this->cacheBufStore = NULL;
@@ -76,6 +77,8 @@ void App_init(App* this, MountConfig* mountConfig)
    this->symlinkInodeOps = NULL;
    this->dirInodeOps = NULL;
    this->specialInodeOps = NULL;
+
+   NicAddressList_init(&this->rdmaNicList);
 
 #ifdef BEEGFS_DEBUG
    Mutex_init(&this->debugCounterMutex);
@@ -116,6 +119,7 @@ void App_uninit(App* this)
    UInt16List_uninit(&this->preferredStorageTargets);
    UInt16List_uninit(&this->preferredMetaNodes);
    StrCpyList_uninit(&this->allowedInterfaces);
+   StrCpyList_uninit(&this->allowedRDMAInterfaces);
    SAFE_DESTRUCT(this->helperd, ExternalHelperd_destruct);
    SAFE_DESTRUCT(this->logger, Logger_destruct);
    SAFE_DESTRUCT(this->tcpOnlyFilter, NetFilter_destruct);
@@ -125,6 +129,9 @@ void App_uninit(App* this)
    AtomicInt_uninit(&this->lockAckAtomicCounter);
 
    SAFE_DESTRUCT(this->mountConfig, MountConfig_destruct);
+
+   ListTk_kfreeNicAddressListElems(&this->rdmaNicList);
+   NicAddressList_uninit(&this->rdmaNicList);
 
    kfree(this->fileInodeOps);
    kfree(this->symlinkInodeOps);
@@ -138,7 +145,12 @@ void App_uninit(App* this)
 
 int App_run(App* this)
 {
-   // init data objects & storage
+
+#ifdef BEEGFS_NVFS
+   printk_fhgfs(KERN_INFO, "Built with NVFS RDMA support.\n");
+#endif
+
+// init data objects & storage
 
    if(!__App_initDataObjects(this, this->mountConfig) )
    {
@@ -222,6 +234,7 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    const char* logContext = "App (init data objects)";
 
    char* interfacesFilename;
+   char* rdmaInterfacesFilename;
    char* preferredMetaFile;
    char* preferredStorageFile;
    size_t numCacheBufs;
@@ -287,6 +300,23 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
       Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured interfaces file: %s", interfacesFilename);
+      return false;
+   }
+
+   // load allowed RDMA interface file
+   rdmaInterfacesFilename = Config_getConnRDMAInterfacesFile(this->cfg);
+   if(strlen(rdmaInterfacesFilename) &&
+      !Config_loadStringListFile(rdmaInterfacesFilename, &this->allowedRDMAInterfaces) )
+   {
+      // if loading of file failed, we need to set LogType Syslog as fallback here, because
+      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
+      // but that's initialized later.
+      // Of course, using printk could be another option here, but the code calling this function
+      // proceeds with some more log messages, that should be logged to log file if possible, but
+      // need to be redirected to syslog in this case here as well
+      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
+      Logger_logErrFormatted(this->logger, logContext,
+         "Unable to load configured RDMA interfaces file: %s", rdmaInterfacesFilename);
       return false;
    }
 
@@ -494,14 +524,14 @@ bool __App_initLocalNodeInfo(App* this)
    NicAddressList nicList;
    NicAddressList sortedNicList;
    char* hostname;
-   TimeAbs nowT;
+   Time now;
    pid_t currentPID;
    char* nodeID;
    bool useRDMA = Config_getConnUseRDMA(this->cfg);
 
    NicAddressList_init(&nicList);
 
-   NIC_findAll(&this->allowedInterfaces, useRDMA, &nicList);
+   NIC_findAll(&this->allowedInterfaces, useRDMA, false, &nicList);
 
    if(!NicAddressList_length(&nicList) )
    {
@@ -515,14 +545,36 @@ bool __App_initLocalNodeInfo(App* this)
    // created sorted nicList clone
    ListTk_cloneSortNicAddressList(&nicList, &sortedNicList, &this->allowedInterfaces);
 
+   if (useRDMA && StrCpyList_length(&this->allowedRDMAInterfaces) > 0)
+   {
+      NicAddressList rdmaNicList;
+
+      NicAddressList_init(&rdmaNicList);
+      NIC_findAll(&this->allowedRDMAInterfaces, true, true, &rdmaNicList);
+
+      if(!NicAddressList_length(&rdmaNicList) )
+      {
+         Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
+         Logger_logErr(this->logger, logContext, "Couldn't find any filtered and usable outbound RDMA NIC, using any");
+      }
+      else
+      {
+         NicAddressList_uninit(&this->rdmaNicList);
+         // created sorted rdmaNicList clone
+         ListTk_cloneSortNicAddressList(&rdmaNicList, &this->rdmaNicList, &this->allowedRDMAInterfaces);
+      }
+      ListTk_kfreeNicAddressListElems(&rdmaNicList);
+
+      NicAddressList_uninit(&rdmaNicList);
+   }
 
    // prepare clientID and create localNode
-   TimeAbs_init(&nowT);
+   Time_setToNowReal(&now);
    hostname = System_getHostnameCopy();
    currentPID = current->pid;
 
    nodeID = StringTk_kasprintf("%llX-%llX-%s",
-      (uint64_t)currentPID, (uint64_t)TimeAbs_getTimeval(&nowT)->tv_sec, hostname);
+      (uint64_t)currentPID, (uint64_t)now.tv_sec, hostname);
 
    // note: numeric ID gets initialized with 0; will be set by management later in InternodeSyncer
    this->localNode = Node_construct(this, nodeID, (NumNodeID){0},

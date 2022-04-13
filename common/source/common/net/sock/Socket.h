@@ -38,6 +38,10 @@ class Socket : public Channel
       virtual void shutdown() = 0;
       virtual void shutdownAndRecvDisconnect(int timeoutMS) = 0;
 
+#ifdef BEEGFS_NVFS
+      virtual ssize_t read(const void *buf, size_t len, unsigned lkey, const uint64_t rbuf, unsigned rkey) = 0;
+      virtual ssize_t write(const void *buf, size_t len, unsigned lkey, const uint64_t rbuf, unsigned rkey) = 0;
+#endif /* BEEGFS_NVFS */
 
       virtual ssize_t send(const void *buf, size_t len, int flags) = 0;
       virtual ssize_t sendto(const void *buf, size_t len, int flags,

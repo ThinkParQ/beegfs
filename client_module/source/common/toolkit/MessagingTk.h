@@ -85,7 +85,7 @@ ssize_t MessagingTk_recvMsgBuf(App* app, Socket* sock, char* bufIn, size_t bufIn
 
    // receive at least the message header
 
-   recvRes = Socket_recvExactTEx(sock, bufIn, NETMSG_MIN_LENGTH, 0, CONN_LONG_TIMEOUT,
+   recvRes = Socket_recvExactTEx_kernel(sock, bufIn, NETMSG_MIN_LENGTH, 0, CONN_LONG_TIMEOUT,
          &numReceived);
 
    if(unlikely(recvRes <= 0) )
@@ -115,7 +115,7 @@ ssize_t MessagingTk_recvMsgBuf(App* app, Socket* sock, char* bufIn, size_t bufIn
       return -EMSGSIZE;
    }
 
-   recvRes = Socket_recvExactTEx(sock, &bufIn[numReceived], msgLength-numReceived, 0,
+   recvRes = Socket_recvExactTEx_kernel(sock, &bufIn[numReceived], msgLength-numReceived, 0,
          CONN_LONG_TIMEOUT, &numReceived);
 
    if(unlikely(recvRes <= 0) )

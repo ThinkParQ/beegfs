@@ -12,16 +12,15 @@
 #define READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND  8 /* secondary of group, otherwise primary */
 
 
-class ReadLocalFileV2Msg : public NetMessageSerdes<ReadLocalFileV2Msg>
+class ReadLocalFileV2MsgBase
 {
    public:
 
       /**
        * @param fileHandleID just a reference, so do not free it as long as you use this object!
        */
-      ReadLocalFileV2Msg(NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID,
-         PathInfo* pathInfoPtr, unsigned accessFlags, int64_t offset, int64_t count) :
-         BaseType(NETMSGTYPE_ReadLocalFileV2)
+      ReadLocalFileV2MsgBase(NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID,
+         PathInfo* pathInfoPtr, unsigned accessFlags, int64_t offset, int64_t count)
       {
          this->clientNumID = clientNumID;
 
@@ -41,7 +40,7 @@ class ReadLocalFileV2Msg : public NetMessageSerdes<ReadLocalFileV2Msg>
       /**
        * For deserialization only!
        */
-      ReadLocalFileV2Msg() : BaseType(NETMSGTYPE_ReadLocalFileV2) {}
+      ReadLocalFileV2MsgBase() {}
 
       template<typename This, typename Ctx>
       static void serialize(This obj, Ctx& ctx)
@@ -56,14 +55,7 @@ class ReadLocalFileV2Msg : public NetMessageSerdes<ReadLocalFileV2Msg>
             % obj->targetID;
       }
 
-      unsigned getSupportedHeaderFeatureFlagsMask() const
-      {
-         return READLOCALFILEMSG_FLAG_SESSION_CHECK | READLOCALFILEMSG_FLAG_DISABLE_IO |
-            READLOCALFILEMSG_FLAG_BUDDYMIRROR | READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND;
-      }
-
-
-   private:
+   protected:
       int64_t offset;
       int64_t count;
       uint32_t accessFlags;
@@ -114,7 +106,35 @@ class ReadLocalFileV2Msg : public NetMessageSerdes<ReadLocalFileV2Msg>
       {
          return &this->pathInfo;
       }
+
+      virtual unsigned getSupportedHeaderFeatureFlagsMask() const = 0;
+
 };
 
+class ReadLocalFileV2Msg : public ReadLocalFileV2MsgBase, public NetMessageSerdes<ReadLocalFileV2Msg>
+{
+   public:
+      /**
+       * @param fileHandleID just a reference, so do not free it as long as you use this object!
+       */
+      ReadLocalFileV2Msg(NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID,
+         PathInfo* pathInfoPtr, unsigned accessFlags, int64_t offset, int64_t count) :
+         ReadLocalFileV2MsgBase(clientNumID, fileHandleID, targetID, pathInfoPtr, accessFlags,
+            offset, count),
+         BaseType(NETMSGTYPE_ReadLocalFileV2) {}
+
+      /**
+       * For deserialization only!
+       */
+      ReadLocalFileV2Msg() :
+         ReadLocalFileV2MsgBase(),
+         BaseType(NETMSGTYPE_ReadLocalFileV2) {}
+
+      unsigned getSupportedHeaderFeatureFlagsMask() const
+      {
+         return READLOCALFILEMSG_FLAG_SESSION_CHECK | READLOCALFILEMSG_FLAG_DISABLE_IO |
+            READLOCALFILEMSG_FLAG_BUDDYMIRROR | READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND;
+      }
+};
 
 #endif /*READLOCALFILEV2MSG_H_*/

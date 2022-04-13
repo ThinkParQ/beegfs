@@ -331,6 +331,24 @@ void StandardSocket::shutdownAndRecvDisconnect(int timeoutMS)
 
 }
 
+#ifdef BEEGFS_NVFS
+/**
+ * Note: This is a synchronous (blocking) version
+ *
+ * @throw SocketException
+ */
+
+ssize_t StandardSocket::read(const void *buf, size_t len, unsigned lkey, const uint64_t rbuf, unsigned rkey)
+{
+      throw SocketException("Standard socket doesn't support RDMA read");
+}
+
+ssize_t StandardSocket::write(const void *buf, size_t len, unsigned lkey, const uint64_t rbuf, unsigned rkey)
+{
+      throw SocketException("Standard socket doesn't support RDMA write");
+}
+#endif /* BEEGFS_NVFS */
+
 /**
  * Note: This is a synchronous (blocking) version
  *

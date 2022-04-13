@@ -79,7 +79,16 @@ void os_printStackTrace(void* trace, int spaces)
       return;
    }
 
-   print_stack_trace((struct stack_trace *)trace, spaces);
+   {
+      struct stack_trace *stack_trace = trace;
+#if defined(KERNEL_HAS_PRINT_STACK_TRACE)
+      print_stack_trace(stack_trace, spaces);
+#elif defined(KERNEL_HAS_STACK_TRACE_PRINT)
+      stack_trace_print(stack_trace->entries, stack_trace->nr_entries, spaces);
+#else
+      (void) stack_trace;
+#endif
+   }
 }
 
 

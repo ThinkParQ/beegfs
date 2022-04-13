@@ -35,10 +35,10 @@ void __DatagramListener_listenLoop(DatagramListener* this)
    {
       NetMessage* msg;
       ssize_t recvRes;
-      struct iovec iov = { this->recvBuf, DGRAMMGR_RECVBUF_SIZE };
-      struct iov_iter iter;
 
-      BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, iov.iov_len);
+      struct kvec kvec = { this->recvBuf, DGRAMMGR_RECVBUF_SIZE };
+      BeeGFS_IovIter iter;
+      BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, kvec.iov_len);
 
       recvRes = StandardSocket_recvfromT(this->udpSock, &iter, 0, &fromAddr, recvTimeoutMS);
 
@@ -198,7 +198,7 @@ void __DatagramListener_initBuffers(DatagramListener* this)
 /**
  * Sends the buffer to all available node interfaces.
  */
-void DatagramListener_sendBufToNode(DatagramListener* this, Node* node,
+static void DatagramListener_sendBufToNode_kernel(DatagramListener* this, Node* node,
    char* buf, size_t bufLen)
 {
    NodeConnPool* connPool = Node_getConnPool(node);
@@ -218,7 +218,7 @@ void DatagramListener_sendBufToNode(DatagramListener* this, Node* node,
       if(!NetFilter_isAllowed(this->netFilter, nicAddr->ipAddr) )
          continue;
 
-      DatagramListener_sendtoIP(this, buf, bufLen, 0, nicAddr->ipAddr, port);
+      DatagramListener_sendtoIP_kernel(this, buf, bufLen, 0, nicAddr->ipAddr, port);
    }
 }
 
@@ -230,7 +230,7 @@ void DatagramListener_sendMsgToNode(DatagramListener* this, Node* node, NetMessa
    char* msgBuf = MessagingTk_createMsgBuf(msg);
    unsigned msgLen = NetMessage_getMsgLength(msg);
 
-   DatagramListener_sendBufToNode(this, node, msgBuf, msgLen);
+   DatagramListener_sendBufToNode_kernel(this, node, msgBuf, msgLen);
 
    kfree(msgBuf);
 }

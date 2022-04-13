@@ -26,8 +26,6 @@ static inline void DatagramListener_destruct(DatagramListener* this);
 
 //extern ssize_t DatagramListener_broadcast(DatagramListener* this, void* buf, size_t len,
 //   int flags, unsigned short port); // no longer needed
-extern void DatagramListener_sendBufToNode(DatagramListener* this, Node* node,
-   char* buf, size_t bufLen);
 extern void DatagramListener_sendMsgToNode(DatagramListener* this, Node* node, NetMessage* msg);
 
 extern void __DatagramListener_run(Thread* this);
@@ -40,12 +38,6 @@ extern bool __DatagramListener_initSock(DatagramListener* this, unsigned short u
 extern void __DatagramListener_initBuffers(DatagramListener* this);
 extern bool __DatagramListener_isDGramFromLocalhost(DatagramListener* this,
    fhgfs_sockaddr_in* fromAddr);
-
-// inliners
-static inline ssize_t DatagramListener_sendto(DatagramListener* this, void* buf, size_t len,
-   int flags, fhgfs_sockaddr_in* to);
-static inline ssize_t DatagramListener_sendtoIP(DatagramListener* this, void *buf, size_t len,
-   int flags, struct in_addr ipAddr, unsigned short port);
 
 
 struct DatagramListener
@@ -136,21 +128,21 @@ void DatagramListener_destruct(DatagramListener* this)
 }
 
 
-ssize_t DatagramListener_sendto(DatagramListener* this, void* buf, size_t len, int flags,
+static inline ssize_t DatagramListener_sendto_kernel(DatagramListener* this, void* buf, size_t len, int flags,
    fhgfs_sockaddr_in* to)
 {
    ssize_t sendRes;
 
    Mutex_lock(&this->sendMutex);
 
-   sendRes = Socket_sendto(&this->udpSock->pooledSocket.socket, buf, len, flags, to);
+   sendRes = Socket_sendto_kernel(&this->udpSock->pooledSocket.socket, buf, len, flags, to);
 
    Mutex_unlock(&this->sendMutex);
 
    return sendRes;
 }
 
-ssize_t DatagramListener_sendtoIP(DatagramListener* this, void *buf, size_t len, int flags,
+static inline ssize_t DatagramListener_sendtoIP_kernel(DatagramListener* this, void *buf, size_t len, int flags,
    struct in_addr ipAddr, unsigned short port)
 {
    fhgfs_sockaddr_in peer = {
@@ -158,7 +150,7 @@ ssize_t DatagramListener_sendtoIP(DatagramListener* this, void *buf, size_t len,
       .port = htons(port),
    };
 
-   return DatagramListener_sendto(this, buf, len, flags, &peer);
+   return DatagramListener_sendto_kernel(this, buf, len, flags, &peer);
 }
 
 #endif /*DATAGRAMLISTENER_H_*/

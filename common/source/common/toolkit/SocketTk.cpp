@@ -8,11 +8,13 @@
 namespace {
 struct GetAddrInfoError : public std::error_category
 {
+   [[nodiscard]]
    const char* name() const noexcept override
    {
       return "Name Resolution Error";
    }
 
+   [[nodiscard]]
    std::string message(int condition) const override
    {
       return gai_strerror(condition);

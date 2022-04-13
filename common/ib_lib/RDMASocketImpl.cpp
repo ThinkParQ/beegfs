@@ -179,6 +179,30 @@ void RDMASocketImpl::shutdownAndRecvDisconnect(int timeoutMS)
    this->shutdown();
 }
 
+#ifdef BEEGFS_NVFS
+/**
+ * Note: This is a synchronous (blocking) version
+ *
+ * @throw SocketException
+ */
+ssize_t RDMASocketImpl::read(const void *buf, size_t len, unsigned lkey, const uint64_t rbuf, unsigned rkey)
+{
+   size_t status = IBVSocket_read(this->ibvsock, (char *)buf, len, lkey, rbuf, rkey);
+   return (status == 0) ? len : -1;
+}
+
+/**
+ * Note: This is a synchronous (blocking) version
+ *
+ * @throw SocketException
+ */
+ssize_t RDMASocketImpl::write(const void *buf, size_t len, unsigned lkey, const uint64_t rbuf, unsigned rkey)
+{
+   size_t status = IBVSocket_write(this->ibvsock, (char *)buf, len, lkey, rbuf, rkey);
+   return (status == 0) ? len : -1;
+}
+#endif /* BEEGFS_NVFS */
+
 /**
  * Note: This is a synchronous (blocking) version
  *

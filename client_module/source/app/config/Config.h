@@ -75,12 +75,14 @@ static inline void Config_setLogTypeNum(Config* this, LogType logType);
 static inline bool Config_getLogClientID(Config* this);
 static inline char* Config_getLogHelperdIP(Config* this);
 static inline bool Config_getConnUseRDMA(Config* this);
+static inline bool Config_getConnTCPFallbackEnabled(Config* this);
 static inline int Config_getConnClientPortUDP(Config* this);
 static inline int Config_getConnMgmtdPortUDP(Config* this);
 static inline int Config_getConnHelperdPortTCP(Config* this);
 static inline int Config_getConnMgmtdPortTCP(Config* this);
 static inline unsigned Config_getConnMaxInternodeNum(Config* this);
 static inline char* Config_getConnInterfacesFile(Config* this);
+static inline char* Config_getConnRDMAInterfacesFile(Config* this);
 static inline unsigned Config_getConnFallbackExpirationSecs(Config* this);
 static inline unsigned Config_getConnNumCommRetries(Config* this);
 static inline unsigned Config_getConnCommRetrySecs(Config* this);
@@ -178,8 +180,10 @@ struct Config
    int            connHelperdPortTCP;
    int            connMgmtdPortTCP;
    bool     connUseRDMA;
+   bool           connTCPFallbackEnabled;
    unsigned       connMaxInternodeNum;
    char*          connInterfacesFile;
+   char*          connRDMAInterfacesFile;
    unsigned       connFallbackExpirationSecs;
    unsigned       connNumCommRetries; // auto-computed from connCommRetrySecs
    unsigned       connCommRetrySecs;
@@ -309,6 +313,11 @@ bool Config_getConnUseRDMA(Config* this)
    return this->connUseRDMA;
 }
 
+bool Config_getConnTCPFallbackEnabled(Config* this)
+{
+   return this->connTCPFallbackEnabled;
+}
+
 unsigned Config_getConnMaxInternodeNum(Config* this)
 {
    return this->connMaxInternodeNum;
@@ -317,6 +326,11 @@ unsigned Config_getConnMaxInternodeNum(Config* this)
 char* Config_getConnInterfacesFile(Config* this)
 {
    return this->connInterfacesFile;
+}
+
+char* Config_getConnRDMAInterfacesFile(Config* this)
+{
+   return this->connRDMAInterfacesFile;
 }
 
 unsigned Config_getConnFallbackExpirationSecs(Config* this)

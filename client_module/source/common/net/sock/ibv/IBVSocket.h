@@ -37,9 +37,11 @@ typedef struct IBVSocket IBVSocket;
 struct IBVCommConfig;
 typedef struct IBVCommConfig IBVCommConfig;
 
+struct NicAddressStats;
+typedef struct NicAddressStats NicAddressStats;
 
 // construction/destruction
-extern __must_check bool IBVSocket_init(IBVSocket* _this);
+extern __must_check bool IBVSocket_init(IBVSocket* _this, struct in_addr* srcIpAddr, NicAddressStats* nicStats);
 extern void IBVSocket_uninit(IBVSocket* _this);
 
 // static
@@ -53,9 +55,9 @@ extern bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr* ipAddr,
 extern bool IBVSocket_listen(IBVSocket* _this);
 extern bool IBVSocket_shutdown(IBVSocket* _this);
 
-extern ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags,
+extern ssize_t IBVSocket_recvT(IBVSocket* _this, BeeGFS_IovIter* iter, int flags,
    int timeoutMS);
-extern ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags);
+extern ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags);
 
 extern int IBVSocket_checkConnection(IBVSocket* _this);
 
@@ -64,7 +66,11 @@ extern unsigned long IBVSocket_poll(IBVSocket* _this, short events, bool finishP
 // getters & setters
 extern void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService);
 extern void IBVSocket_setConnectionFailureStatus(IBVSocket* _this, unsigned value);
+extern struct in_addr IBVSocket_getSrcIpAddr(IBVSocket* _this);
 
+// Only access members of NicAddressStats when the owner NodeConnPool mutex is held.
+// OK to access "nic" without holding mutex.
+extern NicAddressStats* IBVSocket_getNicStats(IBVSocket* _this);
 
 struct IBVCommConfig
 {
@@ -111,7 +117,7 @@ extern int __IBVSocket_waitForSendCompletionEvent(IBVSocket* _this, int oldSendC
 extern int __IBVSocket_waitForTotalSendCompletion(IBVSocket* _this,
    unsigned* numSendElements, unsigned* numWriteElements, unsigned* numReadElements, int timeoutMS);
 
-extern ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, struct iov_iter* iter);
+extern ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, BeeGFS_IovIter* iter);
 
 extern int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event);
 extern void __IBVSocket_cqSendEventHandler(struct ib_event* event, void* data);
@@ -208,6 +214,7 @@ struct IBVSocket
 
 
    struct rdma_cm_id*            cm_id;
+   struct in_addr                srcIpAddr;
 
    IBVCommDest                   localDest;
    IBVCommDest*                  remoteDest;
@@ -220,6 +227,9 @@ struct IBVSocket
 
    int                           typeOfService;
    unsigned                      remapConnectionFailureStatus;
+   NicAddressStats*              nicStats;  // Owned by a NodeConnPool instance. Do not access
+                                            // members without locking the NodeConnPool mutex.
+                                            // Possibly NULL.
 };
 
 
