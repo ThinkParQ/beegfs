@@ -86,6 +86,7 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connRDMATypeOfService",      "0", addDashes);
    configMapRedefine("connNetFilterFile",          "", addDashes);
    configMapRedefine("connAuthFile",               "", addDashes);
+   configMapRedefine("connDisableAuthentication",  "false", addDashes);
    configMapRedefine("connTcpOnlyFilterFile",      "", addDashes);
 
    configMapRedefine("sysMgmtdHost",               "",    addDashes);
@@ -158,6 +159,8 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          connNetFilterFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "connAuthFile", addDashes))
          connAuthFile = iter->second;
+      else if (testConfigMapKeyMatch(iter, "connDisableAuthentication", addDashes))
+         connDisableAuthentication = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connTcpOnlyFilterFile", addDashes))
          connTcpOnlyFilterFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "sysMgmtdHost", addDashes))
@@ -236,10 +239,14 @@ void AbstractConfig::initInterfacesList(const std::string& connInterfacesFile,
  */
 void AbstractConfig::initConnAuthHash(const std::string& connAuthFile, uint64_t* outConnAuthHash)
 {
-   if(connAuthFile.empty() )
+   if(connAuthFile.empty())
    {
-      *outConnAuthHash = 0;
-      return; // no file given => no hash to be generated
+      if (connDisableAuthentication) {
+         *outConnAuthHash = 0;
+         return; // connAuthFile explicitly disabled => no hash to be generated
+      }
+      else
+         throw ConnAuthFileException("No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
    }
 
    // open file...

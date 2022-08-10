@@ -23,7 +23,8 @@ typedef struct IBVBuffer IBVBuffer;
 struct IBVCommContext;
 
 
-extern bool IBVBuffer_init(IBVBuffer* buffer, struct IBVCommContext* ctx, size_t bufLen);
+extern bool IBVBuffer_init(IBVBuffer* buffer, struct IBVCommContext* ctx, size_t bufLen,
+   enum dma_data_direction dma_dir);
 extern void IBVBuffer_free(IBVBuffer* buffer, struct IBVCommContext* ctx);
 extern ssize_t IBVBuffer_fill(IBVBuffer* buffer, struct iov_iter* iter);
 
@@ -37,6 +38,7 @@ struct IBVBuffer
    unsigned bufferCount;
 
    unsigned listLength;
+   enum dma_data_direction dma_dir;
 };
 
 #endif

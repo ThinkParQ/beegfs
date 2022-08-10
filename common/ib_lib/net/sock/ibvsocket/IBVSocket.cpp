@@ -572,14 +572,11 @@ IBVSocket_AcceptRes IBVSocket_accept(IBVSocket* _this, IBVSocket** outAcceptedSo
       default:
       { // ignore other events
 
-      #ifdef SYSTEM_HAS_RDMA_CM_EVENT_TIMEWAIT_EXIT
          if (event->event == RDMA_CM_EVENT_TIMEWAIT_EXIT)
          { // log only with enabled debug code
-            log_fhgfs_connerr("Ignoring conn manager event.",
-                  ("event", rdma_event_str(event->event)));
+            LOG(SOCKLIB, DEBUG, "Ignoring conn manager event RDMA_CM_EVENT_TIMEWAIT_EXIT.");
          }
          else
-      #endif // SYSTEM_HAS_RDMA_CM_EVENT_TIMEWAIT_EXIT
          { // always log
             LOG(SOCKLIB, WARNING, "Ignoring conn manager event.",
                ("event", rdma_event_str(event->event)));

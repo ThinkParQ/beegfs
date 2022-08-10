@@ -591,7 +591,8 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
 
    for(i=0; i < commCfg->bufNum; i++)
    {
-      if(!IBVBuffer_init(&commContext->recvBufs[i], commContext, commCfg->bufSize) )
+      if(!IBVBuffer_init(&commContext->recvBufs[i], commContext, commCfg->bufSize,
+            DMA_FROM_DEVICE) )
       {
          ibv_print_info("couldn't prepare recvBuf #%d\n", i + 1);
          goto err_cleanup;
@@ -607,14 +608,16 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
 
    for(i=0; i < commCfg->bufNum; i++)
    {
-      if(!IBVBuffer_init(&commContext->sendBufs[i], commContext, commCfg->bufSize) )
+      if(!IBVBuffer_init(&commContext->sendBufs[i], commContext, commCfg->bufSize,
+            DMA_TO_DEVICE) )
       {
          ibv_print_info("couldn't prepare sendBuf #%d\n", i + 1);
          goto err_cleanup;
       }
    }
 
-   if(!IBVBuffer_init(&commContext->checkConBuffer, commContext, sizeof(u64) ) )
+   if(!IBVBuffer_init(&commContext->checkConBuffer, commContext, sizeof(u64),
+         DMA_FROM_DEVICE) )
    {
       ibv_print_info("couldn't alloc dma control memory region\n");
       goto err_cleanup;

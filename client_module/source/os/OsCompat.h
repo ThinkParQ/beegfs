@@ -8,7 +8,6 @@
 #include <common/Common.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
-#include <asm/kmap_types.h>
 #include <linux/compat.h>
 #include <linux/list.h>
 #include <linux/mount.h>

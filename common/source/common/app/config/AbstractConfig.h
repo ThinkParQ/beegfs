@@ -5,6 +5,7 @@
 #include <common/Common.h>
 #include <common/toolkit/MapTk.h>
 #include "InvalidConfigException.h"
+#include "ConnAuthFileException.h"
 #include "ICommonConfig.h"
 
 

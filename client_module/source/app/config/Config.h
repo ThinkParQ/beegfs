@@ -92,6 +92,7 @@ static inline unsigned Config_getRemapConnectionFailureStatus(Config* this);
 static inline void Config_setRemapConnectionFailureStatus(Config* this, unsigned status);
 static inline char* Config_getConnNetFilterFile(Config* this);
 static inline unsigned Config_getConnMaxConcurrentAttempts(Config* this);
+static inline char* Config_getConnAuthFile(Config* this);
 static inline uint64_t Config_getConnAuthHash(Config* this);
 static inline char* Config_getConnTcpOnlyFilterFile(Config* this);
 static inline char* Config_getTunePreferredMetaFile(Config* this);
@@ -190,6 +191,7 @@ struct Config
    char*          connNetFilterFile; // allowed IP addresses (all IPs allowed, if empty)
    unsigned       connMaxConcurrentAttempts;
    char*          connAuthFile;
+   bool           connDisableAuthentication;
    uint64_t       connAuthHash; // implicitly set based on hash of connAuthFile contents
    char*          connTcpOnlyFilterFile; // allow only plain TCP (no RDMA etc) to these IPs
 
@@ -372,6 +374,11 @@ char* Config_getConnNetFilterFile(Config* this)
 unsigned Config_getConnMaxConcurrentAttempts(Config* this)
 {
    return this->connMaxConcurrentAttempts;
+}
+
+char* Config_getConnAuthFile(Config* this)
+{
+   return this->connAuthFile;
 }
 
 uint64_t Config_getConnAuthHash(Config* this)

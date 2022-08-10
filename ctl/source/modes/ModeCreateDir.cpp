@@ -136,7 +136,7 @@ bool ModeCreateDir::initDirSettings(DirSettings* settings)
    if(iter != cfg->end() )
    {
       settings->mode = StringTk::strOctalToUInt(iter->second);
-      settings->mode = settings->mode & 0777; // trim invalid flags from mode
+      settings->mode = settings->mode & 07777; // trim invalid flags from mode
       cfg->erase(iter);
    }
 

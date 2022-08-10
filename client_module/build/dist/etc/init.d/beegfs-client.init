@@ -280,7 +280,7 @@ case "$1" in
 	      exec_mount_hook pre-mount "${mnt}"
 
          mount -t ${fstype} beegfs_nodev ${mnt} \
-            -ocfgFile=${cfg},_netdev,${SELINUX_OPT},${extra_mount_opts}
+            -ocfgFile=${cfg},_netdev,nosuid,${SELINUX_OPT},${extra_mount_opts}
 
 	      exec_mount_hook post-mount "${mnt}"
 

@@ -38,6 +38,7 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "connMaxInternodeNum",
    "connInterfacesFile",
    "connNetFilterFile",
+   "connAuthFile",
    "connTcpOnlyFilterFile",
    "connFallbackExpirationSecs",
    "connRDMABufSize",
@@ -102,6 +103,7 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connMaxInternodeNum = %u\n", Config_getConnMaxInternodeNum(cfg) );
    seq_printf(file, "connInterfacesFile = %s\n", Config_getConnInterfacesFile(cfg) );
    seq_printf(file, "connNetFilterFile = %s\n", Config_getConnNetFilterFile(cfg) );
+   seq_printf(file, "connAuthFile = %s\n", Config_getConnAuthFile(cfg) );
    seq_printf(file, "connTcpOnlyFilterFile = %s\n", Config_getConnTcpOnlyFilterFile(cfg) );
    seq_printf(file, "connFallbackExpirationSecs = %u\n",
       Config_getConnFallbackExpirationSecs(cfg) );

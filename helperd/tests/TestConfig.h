@@ -5,6 +5,7 @@
 
 #include <common/app/log/LogContext.h>
 #include <gtest/gtest.h>
+#include <common/app/config/ConnAuthFileException.h>
 
 #include <libgen.h>
 

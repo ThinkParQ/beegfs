@@ -218,6 +218,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connNetFilterFile",                "");
    _Config_configMapRedefine(this, "connMaxConcurrentAttempts",        "0");
    _Config_configMapRedefine(this, "connAuthFile",                     "");
+   _Config_configMapRedefine(this, "connDisableAuthentication",        "false");
    _Config_configMapRedefine(this, "connTcpOnlyFilterFile",            "");
 
    _Config_configMapRedefine(this, "tunePreferredMetaFile",            "");
@@ -387,6 +388,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          SAFE_KFREE(this->connAuthFile);
          this->connAuthFile = StringTk_strDup(valueStr);
       }
+      else
+      if(!strcmp(keyStr, "connDisableAuthentication") )
+         this->connDisableAuthentication = StringTk_strToBool(valueStr);
       else
       if(!strcmp(keyStr, "connTcpOnlyFilterFile") )
       {
@@ -1159,10 +1163,18 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
    ssize_t readRes;
 
 
-   if(!connAuthFile || !StringTk_hasLength(connAuthFile) )
+   if(!connAuthFile || !StringTk_hasLength(connAuthFile))
    {
-      *outConnAuthHash = 0;
-      return true; // no file given => no hash to be generated
+      if (this->connDisableAuthentication)
+      {
+         *outConnAuthHash = 0;
+         return true; // connAuthFile explicitly disabled => no hash to be generated
+      }
+      else
+      {
+         printk_fhgfs(KERN_WARNING, "No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
+         return false;
+      }
    }
 
 

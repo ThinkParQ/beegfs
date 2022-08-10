@@ -40,6 +40,7 @@ class ICommonConfig
       uint8_t     connRDMATypeOfService;
       std::string connNetFilterFile; // for allowed IPs (empty means "allow all")
       std::string connAuthFile;
+      bool        connDisableAuthentication;
       uint64_t    connAuthHash; // implicitly set based on hash of connAuthFile contents
       std::string connTcpOnlyFilterFile; // for IPs that only allow plain TCP (no RDMA etc)
 
