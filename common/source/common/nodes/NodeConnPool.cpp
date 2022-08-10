@@ -477,11 +477,10 @@ void NodeConnPool::applySocketOptionsPreConnect(RDMASocket* sock)
 void NodeConnPool::applySocketOptionsPreConnect(StandardSocket* sock)
 {
    auto cfg = app->getCommonConfig();
+   int bufsize = cfg->getConnTCPRcvBufSize();
 
-   /* note: we're just re-using the rdma buffer settings here. should later be changed to separate
-      settings */
-
-   sock->setSoRcvBuf(cfg->getConnRDMABufNum() * cfg->getConnRDMABufSize() );
+   if (bufsize > 0)
+      sock->setSoRcvBuf(bufsize);
 }
 
 void NodeConnPool::applySocketOptionsConnected(StandardSocket* sock)

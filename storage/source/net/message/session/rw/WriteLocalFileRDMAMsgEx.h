@@ -3,50 +3,86 @@
 
 #ifdef BEEGFS_NVFS
 #include <common/net/message/session/rw/WriteLocalFileRDMAMsg.h>
-#include "WriteLocalFileMsgEx.h"
+#include <common/net/message/session/rw/WriteLocalFileRDMARespMsg.h>
 #include <session/SessionLocalFile.h>
 #include <common/storage/StorageErrors.h>
+#include "WriteLocalFileMsgEx.h"
 
-// TBD: This class unnecessarily duplicates the logic of WriteLocalFileMsgEx
-// with a few modifications to support RDMA. This was done to satisfy the design
-// requirement of minimizing changes to the upstream code. A future project
-// should refactor this and WriteLocalFileMsgEx with a delegation pattern to
-// reduce duplicated code.
 
-class WriteLocalFileRDMAMsgEx : public WriteLocalFileRDMAMsg
+/**
+ * Implements RDMA read protocol.
+ */
+class WriteLocalFileRDMAMsgSender : public WriteLocalFileRDMAMsg
 {
    public:
-      WriteLocalFileRDMAMsgEx() : WriteLocalFileRDMAMsg()
+      struct WriteState : public WriteStateBase
       {
-         mirrorToSock = NULL;
-         mirrorRetriesLeft = WRITEMSG_MIRROR_RETRIES_NUM;
-      }
+         RdmaInfo* rdma;
+         uint64_t rBuf;
+         size_t rLen;
+         uint64_t rOff;
+         int64_t recvSize;
 
-      virtual bool processIncoming(ResponseContext& ctx);
+         WriteState(const char* logContext, ssize_t exactStaticRecvSize,
+            int64_t toBeReceived, off_t writeOffset, SessionLocalFile* sessionLocalFile) :
+            WriteStateBase(logContext, exactStaticRecvSize, toBeReceived, writeOffset,
+               sessionLocalFile)
+         {
+            recvSize = toBeReceived;
+         }
+      };
 
    private:
-      Socket* mirrorToSock;
-      unsigned mirrorRetriesLeft;
+      friend class WriteLocalFileMsgExBase<WriteLocalFileRDMAMsgSender, WriteState>;
 
-      std::pair<bool, int64_t> write(ResponseContext& ctx);
+      static const std::string logContextPref;
 
-      int64_t incrementalRecvAndWriteStateful(ResponseContext& ctx,
-         SessionLocalFile* sessionLocalFile);
-      void incrementalRecvPadding(ResponseContext& ctx, int64_t padLen,
-         SessionLocalFile* sessionLocalFile);
+      ssize_t recvPadding(ResponseContext& ctx, int64_t toBeReceived);
 
-      ssize_t doWrite(int fd, char* buf, size_t count, off_t offset, int& outErrno);
+      inline void sendResponse(ResponseContext& ctx, int err)
+      {
+         ctx.sendResponse(WriteLocalFileRDMARespMsg(err));
+      }
 
-      FhgfsOpsErr openFile(const StorageTarget& target, SessionLocalFile* sessionLocalFile);
+      inline bool writeStateInit(WriteState& ws)
+      {
+         ws.rdma = getRdmaInfo();
+         if (unlikely(!ws.rdma->next(ws.rBuf, ws.rLen, ws.rOff)))
+         {
+            LogContext(ws.logContext).logErr("No entities in RDMA buffers.");
+            return false;
+         }
+         return true;
+      }
 
-      FhgfsOpsErr prepareMirroring(char* buf, size_t bufLen,
-         SessionLocalFile* sessionLocalFile, StorageTarget& target);
-      FhgfsOpsErr sendToMirror(const char* buf, size_t bufLen, int64_t offset, int64_t toBeMirrored,
-         SessionLocalFile* sessionLocalFile);
-      FhgfsOpsErr finishMirroring(SessionLocalFile* sessionLocalFile, StorageTarget& target);
+      inline ssize_t writeStateRecvData(ResponseContext& ctx, WriteState& ws)
+      {
+         ws.recvLength = BEEGFS_MIN(ws.exactStaticRecvSize, ws.toBeReceived);
+         ws.recvLength = BEEGFS_MIN(ws.recvLength, (ssize_t)(ws.rLen - ws.rOff));
+         return ctx.getSocket()->read(ctx.getBuffer(), ws.recvLength, 0, ws.rBuf + ws.rOff, ws.rdma->key);
+      }
 
-      bool doSessionCheck();
+      inline size_t writeStateNext(WriteState& ws, ssize_t writeRes)
+      {
+         ws.rOff += writeRes;
+         if (ws.toBeReceived > 0 && ws.rOff == ws.rLen)
+         {
+            if (unlikely(!ws.rdma->next(ws.rBuf, ws.rLen, ws.rOff)))
+            {
+               LogContext(ws.logContext).logErr("RDMA buffers expended but not all data received. toBeReceived=" +
+                  StringTk::uint64ToStr(ws.toBeReceived) + "; "
+                  "target: " + StringTk::uintToStr(ws.sessionLocalFile->getTargetID() ) + "; "
+                  "file: " + ws.sessionLocalFile->getFileID() + "; ");
+               return ws.recvSize - ws.toBeReceived;
+            }
+         }
+         return 0;
+      }
+
 };
+
+typedef WriteLocalFileMsgExBase<WriteLocalFileRDMAMsgSender,
+                                WriteLocalFileRDMAMsgSender::WriteState> WriteLocalFileRDMAMsgEx;
 
 #endif /* BEEGFS_NVFS */
 

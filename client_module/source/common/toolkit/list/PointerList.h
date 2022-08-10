@@ -17,10 +17,13 @@ static inline void PointerList_append(PointerList* this, void* valuePointer);
 static inline void PointerList_removeHead(PointerList* this);
 static inline void PointerList_removeTail(PointerList* this);
 static inline void PointerList_removeElem(PointerList* this, PointerListElem* elem);
+static inline void PointerList_moveToHead(PointerList* this, PointerListElem* elem);
+static inline void PointerList_moveToTail(PointerList* this, PointerListElem* elem);
 static inline size_t PointerList_length(const PointerList* this);
 static inline void PointerList_clear(PointerList* this);
 
 static inline PointerListElem* PointerList_getTail(PointerList* this);
+static inline PointerListElem* PointerList_getHead(PointerList* this);
 
 
 struct PointerListElem
@@ -52,11 +55,8 @@ void PointerList_uninit(PointerList* this)
    PointerList_clear(this);
 }
 
-void PointerList_addHead(PointerList* this, void* valuePointer)
+static inline void __PointerList_addHead(PointerList* this, PointerListElem* elem)
 {
-   PointerListElem* elem = (PointerListElem*)os_kmalloc(
-      sizeof(PointerListElem) );
-
    if(this->length)
    { // elements exist => replace head
       elem->next = this->head;
@@ -72,14 +72,19 @@ void PointerList_addHead(PointerList* this, void* valuePointer)
    }
 
    elem->prev = NULL;
-   elem->valuePointer = valuePointer;
    this->length++;
 }
 
-void PointerList_addTail(PointerList* this, void* valuePointer)
+void PointerList_addHead(PointerList* this, void* valuePointer)
 {
-   PointerListElem* elem = (PointerListElem*)os_kmalloc(sizeof(PointerListElem) );
+   PointerListElem* elem = (PointerListElem*)os_kmalloc(
+      sizeof(PointerListElem) );
+   elem->valuePointer = valuePointer;
+   __PointerList_addHead(this, elem);
+}
 
+static inline void __PointerList_addTail(PointerList* this, PointerListElem* elem)
+{
    if(this->length)
    { // elements exist => replace tail
       elem->prev = this->tail;
@@ -95,8 +100,14 @@ void PointerList_addTail(PointerList* this, void* valuePointer)
    }
 
    elem->next = NULL;
-   elem->valuePointer = valuePointer;
    this->length++;
+}
+
+void PointerList_addTail(PointerList* this, void* valuePointer)
+{
+   PointerListElem* elem = (PointerListElem*)os_kmalloc(sizeof(PointerListElem) );
+   elem->valuePointer = valuePointer;
+   __PointerList_addTail(this, elem);
 }
 
 void PointerList_append(PointerList* this, void* valuePointer)
@@ -104,7 +115,7 @@ void PointerList_append(PointerList* this, void* valuePointer)
    PointerList_addTail(this, valuePointer);
 }
 
-void PointerList_removeHead(PointerList* this)
+static inline void __PointerList_removeHead(PointerList* this, bool freeElem)
 {
    #ifdef BEEGFS_DEBUG
       if(!this->length)
@@ -116,7 +127,8 @@ void PointerList_removeHead(PointerList* this)
 
    if(this->length == 1)
    { // removing the last element
-      kfree(this->head);
+      if (freeElem)
+         kfree(this->head);
       this->head = NULL;
       this->tail = NULL;
       this->length = 0;
@@ -125,7 +137,8 @@ void PointerList_removeHead(PointerList* this)
    { // there are more elements in the list
       PointerListElem* newHead = this->head->next;
 
-      kfree(this->head);
+      if (freeElem)
+         kfree(this->head);
 
       this->head = newHead;
       this->head->prev = NULL;
@@ -135,7 +148,12 @@ void PointerList_removeHead(PointerList* this)
 
 }
 
-void PointerList_removeTail(PointerList* this)
+void PointerList_removeHead(PointerList* this)
+{
+   __PointerList_removeHead(this, true);
+}
+
+static inline void __PointerList_removeTail(PointerList* this, bool freeElem)
 {
    #ifdef BEEGFS_DEBUG
       if(!this->length)
@@ -147,7 +165,8 @@ void PointerList_removeTail(PointerList* this)
 
    if(this->length == 1)
    { // removing the last element
-      kfree(this->tail);
+      if (freeElem)
+         kfree(this->tail);
       this->head = NULL;
       this->tail = NULL;
       this->length = 0;
@@ -156,7 +175,8 @@ void PointerList_removeTail(PointerList* this)
    { // there are more elements in the list
       PointerListElem* newTail = this->tail->prev;
 
-      kfree(this->tail);
+      if (freeElem)
+         kfree(this->tail);
 
       this->tail = newTail;
       this->tail->next = NULL;
@@ -165,13 +185,18 @@ void PointerList_removeTail(PointerList* this)
    }
 }
 
-void PointerList_removeElem(PointerList* this, PointerListElem* elem)
+void PointerList_removeTail(PointerList* this)
+{
+   __PointerList_removeTail(this, true);
+}
+
+static inline void __PointerList_removeElem(PointerList* this, PointerListElem* elem, bool freeElem)
 {
    if(elem == this->head)
-      PointerList_removeHead(this);
+      __PointerList_removeHead(this, freeElem);
    else
    if(elem == this->tail)
-      PointerList_removeTail(this);
+      __PointerList_removeTail(this, freeElem);
    else
    {
       // not head and not tail, so this elem is somewhere in the middle
@@ -182,12 +207,17 @@ void PointerList_removeElem(PointerList* this, PointerListElem* elem)
       prev->next = next;
       next->prev = prev;
 
-      kfree(elem);
+      if (freeElem)
+         kfree(elem);
 
       this->length--;
    }
 }
 
+void PointerList_removeElem(PointerList* this, PointerListElem* elem)
+{
+   __PointerList_removeElem(this, elem, true);
+}
 
 size_t PointerList_length(const PointerList* this)
 {
@@ -215,6 +245,23 @@ void PointerList_clear(PointerList* this)
 PointerListElem* PointerList_getTail(PointerList* this)
 {
    return this->tail;
+}
+
+PointerListElem* PointerList_getHead(PointerList* this)
+{
+   return this->head;
+}
+
+void PointerList_moveToHead(PointerList* this, PointerListElem *elem)
+{
+   __PointerList_removeElem(this, elem, false);
+   __PointerList_addHead(this, elem);
+}
+
+void PointerList_moveToTail(PointerList* this, PointerListElem *elem)
+{
+   __PointerList_removeElem(this, elem, false);
+   __PointerList_addTail(this, elem);
 }
 
 #endif /*POINTERLIST_H_*/

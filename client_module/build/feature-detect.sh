@@ -284,6 +284,66 @@ check_function   ktime_get_ts64             'void (struct timespec64 *)'  KERNEL
 check_function   ktime_get_real_ts64        'void (struct timespec64 *)'  KERNEL_HAS_KTIME_GET_REAL_TS64          linux/ktime.h
 check_function   ktime_get_coarse_real_ts64 'void (struct timespec64 *)'  KERNEL_HAS_KTIME_GET_COARSE_REAL_TS64   linux/ktime.h
 
+check_function \
+   generic_permission "int (struct inode *, int)" \
+   KERNEL_HAS_GENERIC_PERMISSION_2 \
+   linux/fs.h
+
+check_function \
+   generic_permission "int (struct inode *, int, int (*check_acl)(struct inode *, int)" \
+   KERNEL_HAS_GENERIC_PERMISSION_4 \
+   linux/fs.h
+
+check_function \
+   setattr_prepare "int (struct dentry *dentry, struct iattr *attr)" \
+   KERNEL_HAS_SETATTR_PREPARE \
+   linux/fs.h
+
+check_function \
+   setattr_prepare "int (struct user_namespace *, struct dentry *, struct iattr *)" \
+   KERNEL_HAS_SETATTR_PREPARE \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::get_acl "struct posix_acl* (*)(struct inode *, int)" \
+   KERNEL_HAS_POSIX_GET_ACL \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::get_acl "struct posix_acl* (*)(struct inode *, int, bool)" \
+   KERNEL_HAS_POSIX_GET_ACL \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::get_acl "struct posix_acl* (*)(struct inode *, int, bool)" \
+   KERNEL_POSIX_GET_ACL_HAS_RCU \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::set_acl "int (*)(struct inode *, struct posix_acl *, int)" \
+   KERNEL_HAS_SET_ACL \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::set_acl "int (*)(struct user_namespace *, struct inode *, struct posix_acl *, int)" \
+   KERNEL_HAS_SET_ACL \
+   linux/fs.h
+
+check_function \
+   vfs_create "int (struct user_namespace *, struct inode *, struct dentry *, umode_t, bool)" \
+   KERNEL_HAS_IDMAPPED_MOUNTS \
+   linux/fs.h
+
+check_struct_field_type \
+   xattr_handler::set "int (*)(const struct xattr_handler *, struct dentry *, struct inode *, const char *, const void *, size_t, int)" \
+   KERNEL_HAS_XATTR_HANDLERS_INODE_ARG \
+   linux/xattr.h
+
+check_struct_field_type \
+   xattr_handler::set "int (*)(const struct xattr_handler *, struct user_namespace *, struct dentry *, struct inode *, const char *, const void *, size_t, int)" \
+   KERNEL_HAS_XATTR_HANDLERS_INODE_ARG \
+   linux/xattr.h
+
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to
 # detect and remove again.

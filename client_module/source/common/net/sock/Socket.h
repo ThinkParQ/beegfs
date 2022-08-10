@@ -11,6 +11,7 @@
 
 
 #define PF_SDP                AF_INET_SDP // the Sockets Direct Protocol (Family)
+#define SOCKET_PEERNAME_LEN   24
 
 /*
  * This is an abstract class.
@@ -46,8 +47,9 @@ struct SocketOps
 struct Socket
 {
    NicAddrType_t sockType;
-   char* peername;
+   char peername[SOCKET_PEERNAME_LEN];
    struct in_addr peerIP;
+   int boundPort;
 
    const struct SocketOps* ops;
 

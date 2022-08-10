@@ -215,12 +215,15 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connFallbackExpirationSecs",       "900");
    _Config_configMapRedefine(this, "connCommRetrySecs",                "600");
    _Config_configMapRedefine(this, "connUnmountRetries",               "true");
+   _Config_configMapRedefine(this, "connTCPRcvBufSize",                "0");
+   _Config_configMapRedefine(this, "connUDPRcvBufSize",                "0");
    _Config_configMapRedefine(this, "connRDMABufSize",                  "8192");
    _Config_configMapRedefine(this, "connRDMABufNum",                   "70");
    _Config_configMapRedefine(this, "connRDMATypeOfService",            "0");
    _Config_configMapRedefine(this, "connNetFilterFile",                "");
    _Config_configMapRedefine(this, "connMaxConcurrentAttempts",        "0");
    _Config_configMapRedefine(this, "connAuthFile",                     "");
+   _Config_configMapRedefine(this, "connDisableAuthentication",        "false");
    _Config_configMapRedefine(this, "connTcpOnlyFilterFile",            "");
 
    _Config_configMapRedefine(this, "tunePreferredMetaFile",            "");
@@ -377,6 +380,12 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "connUnmountRetries") )
          this->connUnmountRetries = StringTk_strToBool(valueStr);
       else
+      if(!strcmp(keyStr, "connTCPRcvBufSize") )
+         this->connTCPRcvBufSize = StringTk_strToInt(valueStr);
+      else
+      if(!strcmp(keyStr, "connUDPRcvBufSize") )
+         this->connUDPRcvBufSize = StringTk_strToInt(valueStr);
+      else
       if(!strcmp(keyStr, "connRDMABufSize") )
          this->connRDMABufSize = StringTk_strToUInt(valueStr);
       else
@@ -399,6 +408,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          SAFE_KFREE(this->connAuthFile);
          this->connAuthFile = StringTk_strDup(valueStr);
       }
+      else
+      if(!strcmp(keyStr, "connDisableAuthentication") )
+         this->connDisableAuthentication = StringTk_strToBool(valueStr);
       else
       if(!strcmp(keyStr, "connTcpOnlyFilterFile") )
       {
@@ -723,6 +735,7 @@ void __Config_loadFromMountConfig(Config* this, MountConfig* mountConfig)
       _Config_configMapRedefine(this, "sysMountSanityCheckMS", valueStr);
       kfree(valueStr);
    }
+
 }
 
 bool __Config_loadFromFile(struct Config* this, const char* filename)
@@ -981,6 +994,20 @@ bool __Config_initImplicitVals(Config* this)
    if(!this->tuneUseGlobalAppendLocks)
       this->tuneUseBufferedAppend = false;
 
+   if (this->connTCPRcvBufSize == 0)
+   {
+      /* 0 indicates that legacy behavior should be preserved. Legacy behavior used RDMA
+         settings for TCP bufsize. */
+      this->connTCPRcvBufSize = this->connRDMABufNum * this->connRDMABufSize;
+   }
+
+   if (this->connUDPRcvBufSize == 0)
+   {
+      /* 0 indicates that legacy behavior should be preserved. Legacy behavior used RDMA
+         settings for UDP bufsize. */
+      this->connUDPRcvBufSize = this->connRDMABufNum * this->connRDMABufSize;
+   }
+
    // Automatically enable XAttrs if ACLs have been enabled
    if (this->sysACLsEnabled && !this->sysXAttrsEnabled)
    {
@@ -1168,10 +1195,18 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
    ssize_t readRes;
 
 
-   if(!connAuthFile || !StringTk_hasLength(connAuthFile) )
+   if(!connAuthFile || !StringTk_hasLength(connAuthFile))
    {
-      *outConnAuthHash = 0;
-      return true; // no file given => no hash to be generated
+      if (this->connDisableAuthentication)
+      {
+         *outConnAuthHash = 0;
+         return true; // connAuthFile explicitly disabled => no hash to be generated
+      }
+      else
+      {
+         printk_fhgfs(KERN_WARNING, "No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
+         return false;
+      }
    }
 
 

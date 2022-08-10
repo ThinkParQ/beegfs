@@ -142,6 +142,7 @@ bool __DatagramListener_initSock(DatagramListener* this, unsigned short udpPort)
    bool broadcastRes;
    bool bindRes;
    Socket* udpSockBase;
+   int bufsize;
 
    this->udpPortNetByteOrder = htons(udpPort);
 
@@ -164,8 +165,9 @@ bool __DatagramListener_initSock(DatagramListener* this, unsigned short udpPort)
       goto err_valid;
    }
 
-   StandardSocket_setSoRcvBuf(this->udpSock,
-      Config_getConnRDMABufNum(cfg) * Config_getConnRDMABufSize(cfg) );
+   bufsize = Config_getConnUDPRcvBufSize(cfg);
+   if (bufsize > 0)
+      StandardSocket_setSoRcvBuf(this->udpSock, bufsize);
 
    // bind the socket
 

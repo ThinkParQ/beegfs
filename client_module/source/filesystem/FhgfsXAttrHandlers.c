@@ -18,8 +18,14 @@
  * ACL mask.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+   struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
+   int flags)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
 static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, const void* value, size_t size, int flags)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    int handler_flags = handler->flags;
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
@@ -43,7 +49,7 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
    if(strcmp(name, "") )
       return -EINVAL;
 
-   if(!inode_owner_or_capable(inode) )
+   if(!os_inode_owner_or_capable(inode) )
       return -EPERM;
 
    if(S_ISLNK(inode->i_mode) )
@@ -76,7 +82,11 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
          return -EINVAL;
       }
 
+#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+      setAttrRes = FhgfsOps_setattr(&init_user_ns, dentry, &attr);
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
       setAttrRes = FhgfsOps_setattr(dentry, &attr);
+#endif
       if(setAttrRes < 0)
          return setAttrRes;
 
@@ -208,8 +218,14 @@ int FhgfsXAttr_getUser(struct inode* inode, const char* name, void* value, size_
  * The set-function which is used for all the user.* xattrs.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+   struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
+   int flags)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
 int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, const void* value, size_t size, int flags)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
 int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct dentry* dentry,
    const char* name, const void* value, size_t size, int flags)
@@ -311,8 +327,14 @@ int FhgfsXAttr_getSecurity(struct inode* inode, const char* name, void* value, s
  * The set-function which is used for all the security.* xattrs.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+   struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
+   int flags)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
 int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, const void* value, size_t size, int flags)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
 int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct dentry* dentry,
    const char* name, const void* value, size_t size, int flags)

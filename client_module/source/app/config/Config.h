@@ -87,6 +87,8 @@ static inline unsigned Config_getConnFallbackExpirationSecs(Config* this);
 static inline unsigned Config_getConnNumCommRetries(Config* this);
 static inline unsigned Config_getConnCommRetrySecs(Config* this);
 static inline bool Config_getConnUnmountRetries(Config* this);
+static inline int Config_getConnTCPRcvBufSize(Config* this);
+static inline int Config_getConnUDPRcvBufSize(Config* this);
 static inline unsigned Config_getConnRDMABufSize(Config* this);
 static inline unsigned Config_getConnRDMABufNum(Config* this);
 static inline int Config_getConnRDMATypeOfService(Config* this);
@@ -94,6 +96,7 @@ static inline unsigned Config_getRemapConnectionFailureStatus(Config* this);
 static inline void Config_setRemapConnectionFailureStatus(Config* this, unsigned status);
 static inline char* Config_getConnNetFilterFile(Config* this);
 static inline unsigned Config_getConnMaxConcurrentAttempts(Config* this);
+static inline char* Config_getConnAuthFile(Config* this);
 static inline uint64_t Config_getConnAuthHash(Config* this);
 static inline char* Config_getConnTcpOnlyFilterFile(Config* this);
 static inline char* Config_getTunePreferredMetaFile(Config* this);
@@ -188,12 +191,15 @@ struct Config
    unsigned       connNumCommRetries; // auto-computed from connCommRetrySecs
    unsigned       connCommRetrySecs;
    bool     connUnmountRetries;
+   int            connTCPRcvBufSize;
+   int            connUDPRcvBufSize;
    unsigned       connRDMABufSize;
    unsigned       connRDMABufNum;
    int            connRDMATypeOfService;
    char*          connNetFilterFile; // allowed IP addresses (all IPs allowed, if empty)
    unsigned       connMaxConcurrentAttempts;
    char*          connAuthFile;
+   bool           connDisableAuthentication;
    uint64_t       connAuthHash; // implicitly set based on hash of connAuthFile contents
    char*          connTcpOnlyFilterFile; // allow only plain TCP (no RDMA etc) to these IPs
 
@@ -353,6 +359,16 @@ bool Config_getConnUnmountRetries(Config* this)
    return this->connUnmountRetries;
 }
 
+int Config_getConnTCPRcvBufSize(Config* this)
+{
+   return this->connTCPRcvBufSize;
+}
+
+int Config_getConnUDPRcvBufSize(Config* this)
+{
+   return this->connUDPRcvBufSize;
+}
+
 unsigned Config_getConnRDMABufSize(Config* this)
 {
    return this->connRDMABufSize;
@@ -386,6 +402,11 @@ char* Config_getConnNetFilterFile(Config* this)
 unsigned Config_getConnMaxConcurrentAttempts(Config* this)
 {
    return this->connMaxConcurrentAttempts;
+}
+
+char* Config_getConnAuthFile(Config* this)
+{
+   return this->connAuthFile;
 }
 
 uint64_t Config_getConnAuthHash(Config* this)

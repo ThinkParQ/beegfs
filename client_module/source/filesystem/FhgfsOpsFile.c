@@ -30,10 +30,6 @@
 #include <asm/compat.h>
 #endif // CONFIG_COMPAT
 
-#define FHGFSOPS_WRITEPAGES_POINTER_RESERVE   (1024) /* number of page pointers in write buffer */
-
-#define INITIAL_FIND_PAGES (256) // search initially for this number of pages
-
 #if defined(KERNEL_HAS_AIO_WRITE_BUF)
 static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
       loff_t pos);

@@ -78,7 +78,7 @@ rm -rf %{buildroot}
 
 export BEEGFS_VERSION=%{BEEGFS_VERSION}
 export WITHOUT_COMM_DEBUG=1
-export BEEFGS_NVFS=1
+export BEEGFS_NVFS=1
 
 make %make_j daemons utils
 

@@ -214,7 +214,8 @@ uint32_t HashTk_hash32(HashTkHashTypes hashType, const char* data, int len)
       {
          printk_fhgfs(KERN_INFO, "Unknown hashtype: %d\n", hashType);
          hashType = HashTkDefaultHash;
-      } // fall through
+      }
+      BEEGFS_FALLTHROUGH;
 
       case HASHTK_HSIEHHASH32:
       {
@@ -254,7 +255,8 @@ uint64_t HashTk_hash64(HashTkHashTypes hashType, const char* data, int len)
       {
          printk_fhgfs(KERN_INFO, "Unknown hashtype: %d\n", hashType);
          hashType = HashTkDefaultHash;
-      } // fall through
+      }
+      BEEGFS_FALLTHROUGH;
 
       case HASHTK_HSIEHHASH32:
       {

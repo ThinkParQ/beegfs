@@ -252,6 +252,11 @@ void Config::initImplicitVals()
    // connInterfacesList(/File)
    AbstractConfig::initInterfacesList(connInterfacesFile, connInterfacesList);
 
+   /*
+     note: don't call AbstractConfig::initSocketBufferSizes. Those configs don't exist for
+     mgmtd and the default values are not used.
+   */
+
    // connAuthHash
    AbstractConfig::initConnAuthHash(connAuthFile, &connAuthHash);
 

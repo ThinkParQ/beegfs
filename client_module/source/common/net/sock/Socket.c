@@ -8,11 +8,11 @@ void _Socket_init(Socket* this)
    memset(this, 0, sizeof(*this) );
 
    this->sockType = NICADDRTYPE_STANDARD;
+   this->boundPort = -1;
 }
 
 void _Socket_uninit(Socket* this)
 {
-   SAFE_KFREE(this->peername);
 }
 
 

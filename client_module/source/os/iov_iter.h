@@ -24,13 +24,24 @@
 #include <linux/uio.h>
 #endif
 
+
+#ifndef KERNEL_HAS_ITER_KVEC
+#error ITER_KVEC is a required feature
+#endif
+
+#ifndef KERNEL_HAS_ITER_IS_IOVEC
+#error iter_is_iovec() is a required feature
+#endif
+
+#ifndef KERNEL_HAS_IOV_ITER_IOVEC
+#error iov_iter_iovec() is a required feature
+#endif
+
 #ifndef KERNEL_HAS_IOV_ITER_TYPE
-#ifdef KERNEL_HAS_ITER_KVEC
 static inline int iov_iter_type(const struct iov_iter *i)
 {
    return i->type & ~(READ | WRITE);
 }
-#endif
 #endif
 
 
@@ -50,16 +61,6 @@ static inline int iov_iter_type(const struct iov_iter *i)
           iov_iter_advance(&(iter), (iov).iov_len))
 #endif
 
-#if !defined(KERNEL_HAS_IOV_ITER_IOVEC)
-static inline struct iovec iov_iter_iovec(const struct iov_iter *iter)
-{
-   return (struct iovec) {
-      .iov_base = iter->iov->iov_base + iter->iov_offset,
-      .iov_len = min(iter->count, iter->iov->iov_len - iter->iov_offset),
-   };
-}
-#endif
-
 #ifndef KERNEL_HAS_IOV_ITER_TRUNCATE
 static inline void iov_iter_truncate(struct iov_iter *i, size_t count)
 {
@@ -68,18 +69,6 @@ static inline void iov_iter_truncate(struct iov_iter *i, size_t count)
 }
 #endif
 
-
-#if !defined(KERNEL_HAS_ITER_BVEC)
-static inline bool iter_is_iovec(struct iov_iter* i)
-{
-   return true;
-}
-#elif !defined(KERNEL_HAS_ITER_IS_IOVEC)
-static inline bool iter_is_iovec(struct iov_iter* i)
-{
-   return !(i->type & (ITER_BVEC | ITER_KVEC) );
-}
-#endif
 
 #ifndef KERNEL_HAS_COPY_FROM_ITER
 static inline size_t copy_from_iter(void* to, size_t bytes, struct iov_iter* i)
@@ -222,23 +211,26 @@ static inline size_t iov_iter_zero(size_t bytes, struct iov_iter *i)
 
 
 
+// TODO: we can consider removing this wrapper. By now, only the struct
+// iov_iter member is left.
 typedef struct
 {
-#ifndef KERNEL_HAS_IOV_ITER_TYPE
-   int is_kvec;
-#endif
    struct iov_iter _iov_iter;
 } BeeGFS_IovIter;
 
 static inline int beegfs_iov_iter_is_iovec(const BeeGFS_IovIter *iter)
 {
-#ifdef KERNEL_HAS_IOV_ITER_TYPE
-   return iter->_iov_iter.type == ITER_IOVEC;
-#else
-   return !iter->is_kvec;
-#endif
+   return iov_iter_type(&iter->_iov_iter) == ITER_IOVEC;
 }
 
+// by now, we can assume that we have ITER_IOVEC and ITER_KVEC available
+// TODO: we can get rid of more compat code because of this assumption
+static inline int beegfs_iov_iter_type(BeeGFS_IovIter *iter)
+{
+   return iov_iter_type(&iter->_iov_iter);
+}
+
+// TODO: Now that ITER_KVEC is required across all kernels, is this function still needed?
 static inline struct iov_iter *beegfs_get_iovec_iov_iter(BeeGFS_IovIter *iter)
 {
    BUG_ON(!beegfs_iov_iter_is_iovec(iter));
@@ -247,11 +239,7 @@ static inline struct iov_iter *beegfs_get_iovec_iov_iter(BeeGFS_IovIter *iter)
 
 static inline struct iov_iter iov_iter_from_beegfs_iov_iter(BeeGFS_IovIter i)
 {
-   struct iov_iter result = i._iov_iter;
-#ifndef KERNEL_HAS_IOV_ITER_TYPE
-   BUG_ON(!beegfs_iov_iter_is_iovec(&i));
-#endif
-   return result;
+   return i._iov_iter;
 }
 
 static inline BeeGFS_IovIter beegfs_iov_iter_from_iov_iter(struct iov_iter i)
@@ -305,7 +293,7 @@ static inline void beegfs_iov_iter_advance(BeeGFS_IovIter *iter, size_t bytes)
 static inline bool beegfs_is_pipe_iter(BeeGFS_IovIter * iter)
 {
 #ifdef KERNEL_HAS_ITER_PIPE
-   return iter->_iov_iter.type & ITER_PIPE;
+   return iov_iter_type(&iter->_iov_iter) & ITER_PIPE;
 #else
    return false;
 #endif
@@ -314,37 +302,26 @@ static inline bool beegfs_is_pipe_iter(BeeGFS_IovIter * iter)
 static inline void BEEGFS_IOV_ITER_INIT(BeeGFS_IovIter *iter, int direction,
    const struct iovec* iov, unsigned long nr_segs, size_t count)
 {
-#ifdef KERNEL_HAS_IOV_ITER_INIT_DIR
-   iov_iter_init(&iter->_iov_iter, direction, iov, nr_segs, count);
-#else
-   iov_iter_init(&iter->_iov_iter, iov, nr_segs, count, 0);
+
+#ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
+#error We require kernels that have a "direction" parameter to iov_iter_init().
 #endif
+
+   iov_iter_init(&iter->_iov_iter, direction, iov, nr_segs, count);
 }
 
 static inline void BEEGFS_IOV_ITER_KVEC(BeeGFS_IovIter *iter, int direction,
    const struct kvec* kvec, unsigned long nr_segs, size_t count)
 {
+#ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
+#error We require kernels that have a "direction" parameter to iov_iter_init().
+#endif
 
-#ifdef KERNEL_HAS_IOV_ITER_INIT_DIR
 #ifndef KERNEL_HAS_IOV_ITER_KVEC_NO_TYPE_FLAG_IN_DIRECTION
    direction |= ITER_KVEC;
 #endif
-#ifdef KERNEL_HAS_ITER_KVEC
+
    iov_iter_kvec(&iter->_iov_iter, direction, kvec, nr_segs, count);
-#else
-   iov_iter_init(&iter->_iov_iter, direction, (struct iovec * /*XXX*/) kvec, nr_segs, count);
-#endif
-#else
-   // XXX I believe iov_iter_kvec() only ever existed _with_ the direction parameter (contrary to iov_iter_init())
-   // Probably we can remove this
-   (void) direction;
-#ifdef KERNEL_HAS_IOV_ITER_TYPE
-   iov_iter_kvec(&iter->_iov_iter, kvec, nr_segs, count, 0);
-#else
-   iov_iter_init(&iter->_iov_iter, (struct iovec * /*XXX*/) kvec, nr_segs, count, 0);
-   iter->is_kvec = 1;
-#endif
-#endif
 }
 
 #endif

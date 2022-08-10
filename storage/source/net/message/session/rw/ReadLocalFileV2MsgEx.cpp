@@ -4,10 +4,11 @@
 #include <net/msghelpers/MsgHelperIO.h>
 #include <toolkit/StorageTkEx.h>
 #include "ReadLocalFileV2MsgEx.h"
-
+#ifdef BEEGFS_NVFS
+#include "ReadLocalFileRDMAMsgEx.h"
+#endif
 #include <sys/sendfile.h>
 #include <sys/mman.h>
-
 
 #define READ_USE_TUNEFILEREAD_TRIGGER   (4*1024*1024)  /* seq IO trigger for tuneFileReadSize */
 
@@ -26,9 +27,21 @@ const size_t READ_BUF_LEN_PROTOCOL_CUTOFF =
    READ_BUF_OFFSET + READ_BUF_END_RESERVE;
 
 
-bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
+// A linker error occurs for processIncoming without having this forced linkage.
+static ReadLocalFileV2MsgEx forcedLinkageV2;
+#ifdef BEEGFS_NVFS
+static ReadLocalFileRDMAMsgEx forcedLinkageRDMA;
+#endif
+
+std::string ReadLocalFileV2MsgSender::logContextPref = "ReadChunkFileV2Msg";
+#ifdef BEEGFS_NVFS
+std::string ReadLocalFileRDMAMsgSender::logContextPref = "ReadChunkFileRDMAMsg";
+#endif
+
+template <class Msg, typename ReadState>
+bool ReadLocalFileMsgExBase<Msg, ReadState>::processIncoming(NetMessage::ResponseContext& ctx)
 {
-   const char* logContext = "ReadChunkFileV2Msg incoming";
+   std::string logContext = Msg::logContextPref + " incoming";
 
    bool retVal = true; // return value
 
@@ -88,7 +101,7 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
    { // sessionLocalFile not exists yet => create, insert, re-get it
       if(useSessionCheck)
       { // server crashed during the write, maybe lost some data send error to client
-         LogContext log("ReadChunkFileV2Msg incoming");
+         LogContext log(logContext);
          log.log(Log_WARNING, "Potential cache loss for open file handle. (Server crash detected.) "
             "No session for file available. "
             "FileHandleID: " + fileHandleID);
@@ -112,7 +125,7 @@ bool ReadLocalFileV2MsgEx::processIncoming(ResponseContext& ctx)
    { // session file exists
       if(useSessionCheck && sessionLocalFile->isServerCrashed() )
       { // server crashed during the write, maybe lost some data send error to client
-         LogContext log("ReadChunkFileV2Msg incoming");
+         LogContext log(logContext);
          log.log(Log_SPAM, "Potential cache loss for open file handle. (Server crash detected.) "
             "The session is marked as dirty. "
             "FileHandleID: " + fileHandleID);
@@ -183,11 +196,17 @@ release_session:
    return retVal;
 }
 
+inline size_t ReadLocalFileV2MsgSender::getBuffers(ResponseContext& ctx, char** dataBuf, char** sendBuf)
+{
+   *dataBuf = ctx.getBuffer() + READ_BUF_OFFSET; // offset for prepended data length info
+   *sendBuf = *dataBuf - READ_BUF_OFFSET_PROTO_MIN;
+   return ctx.getBufferLength() - READ_BUF_LEN_PROTOCOL_CUTOFF; /* cutoff for
+                                                                   prepended and finalizing length info */
+}
 
 /**
  * Note: This is similar to incrementalReadAndSend, but uses the offset from sessionLocalFile
  * to avoid calling seek every time.
- * Note: This is Version 2, it uses a preceding length info for each chunk.
  *
  * Warning: Do not use the returned value to set the new offset, as there might be other threads
  * that also did something with the file (i.e. the io-lock is released somewhere within this
@@ -195,22 +214,19 @@ release_session:
  *
  * @return number of bytes read or some arbitrary negative value otherwise
  */
-int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& ctx,
+template <class Msg, typename ReadState>
+int64_t ReadLocalFileMsgExBase<Msg, ReadState>::incrementalReadStatefulAndSendV2(NetMessage::ResponseContext& ctx,
    SessionLocalFile* sessionLocalFile)
 {
-   /* note on protocol: this works by sending an int64 before each data chunk, which contains the
-      length of the next data chunk; or a zero if no more data can be read; or a negative fhgfs
-      error code in case of an error */
-
    /* note on session offset: the session offset must always be set before sending the data to the
       client (otherwise the client could send the next request before we updated the offset, which
       would lead to a race condition) */
 
-   const char* logContext = "ReadChunkFileV2Msg (read incremental)";
+   std::string logContext = Msg::logContextPref + " (read incremental)";
    Config* cfg = Program::getApp()->getConfig();
 
-   char* dataBuf = ctx.getBuffer() + READ_BUF_OFFSET; // offset for prepended data length info
-   char* sendBuf = dataBuf - READ_BUF_OFFSET_PROTO_MIN;
+   char* dataBuf;
+   char* sendBuf;
 
    if (READ_BUF_LEN_PROTOCOL_CUTOFF >= ctx.getBufferLength())
    { // buffer too small. That shouldn't happen and is an error
@@ -218,8 +234,7 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
       return -1;
    }
 
-   const ssize_t dataBufLen = ctx.getBufferLength() - READ_BUF_LEN_PROTOCOL_CUTOFF; /* cutoff for
-      prepended and finalizing length info */
+   const ssize_t dataBufLen = getBuffers(ctx, &dataBuf, &sendBuf);
 
    auto& fd = sessionLocalFile->getFD();
    int64_t oldOffset = sessionLocalFile->getOffset();
@@ -244,8 +259,6 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
          "offset: " + StringTk::int64ToStr(getOffset() ) );
    }
 
-
-   uint64_t toBeRead = getCount();
    size_t maxReadAtOnceLen = dataBufLen;
 
    // reduce maxReadAtOnceLen to achieve better read/send aync overlap
@@ -255,37 +268,51 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
        !sessionLocalFile->getIsDirectIO() )
       maxReadAtOnceLen = BEEGFS_MIN(dataBufLen, cfg->getTuneFileReadSize() );
 
-
    off_t readOffset = getOffset();
+   ReadState readState(logContext.c_str(), getCount(), sessionLocalFile);
+
+   if (!isMsgValid() || !readStateInit(readState))
+   {
+      LogContext(logContext).logErr("Invalid read message.");
+      sessionLocalFile->setOffset(-1);
+      sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_INVAL);
+      return -1;
+   }
 
    for( ; ; )
    {
-      ssize_t readLength = BEEGFS_MIN(maxReadAtOnceLen, toBeRead);
+      ssize_t readLength = getReadLength(readState, BEEGFS_MIN(maxReadAtOnceLen, readState.toBeRead));
 
-      ssize_t readRes = unlikely(isMsgHeaderFeatureFlagSet(READLOCALFILEMSG_FLAG_DISABLE_IO) ) ?
-         readLength : MsgHelperIO::pread(*fd, dataBuf, readLength,  readOffset);
+      readState.readRes = unlikely(isMsgHeaderFeatureFlagSet(READLOCALFILEMSG_FLAG_DISABLE_IO) ) ?
+         readLength : MsgHelperIO::pread(*fd, dataBuf, readLength, readOffset);
 
       LOG_DEBUG(logContext, Log_SPAM,
-         "toBeRead: " + StringTk::int64ToStr(toBeRead) + "; "
+         "toBeRead: " + StringTk::int64ToStr(readState.toBeRead) + "; "
          "readLength: " + StringTk::int64ToStr(readLength) + "; "
-         "readRes: " + StringTk::int64ToStr(readRes) );
+         "readRes: " + StringTk::int64ToStr(readState.readRes) );
 
-      if(readRes == readLength)
+      if(readState.readRes == readLength)
       { // simple success case
-         toBeRead -= readRes;
+         readState.toBeRead -= readState.readRes;
 
-         readOffset += readRes;
+         readOffset += readState.readRes;
 
-         int64_t newOffset = getOffset() + getCount() - toBeRead;
+         int64_t newOffset = getOffset() + getCount() - readState.toBeRead;
          sessionLocalFile->setOffset(newOffset); // update offset
 
-         sessionLocalFile->incReadCounter(readRes); // update sequential read length
+         sessionLocalFile->incReadCounter(readState.readRes); // update sequential read length
 
-         ctx.getStats()->incVals.diskReadBytes += readRes; // update stats
+         ctx.getStats()->incVals.diskReadBytes += readState.readRes; // update stats
 
-         bool isFinal = !toBeRead;
+         bool isFinal = !readState.toBeRead;
 
-         sendLengthInfoAndData(ctx.getSocket(), readRes, sendBuf, isFinal);
+         if (readStateSendData(ctx.getSocket(), readState, sendBuf, isFinal) < 0)
+         {
+            LogContext(logContext).logErr("readStateSendData failed.");
+            sessionLocalFile->setOffset(-1);
+            sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_COMMUNICATION);
+            return -1;
+         }
 
          checkAndStartReadAhead(sessionLocalFile, readAheadTriggerSize, newOffset, readAheadSize);
 
@@ -293,11 +320,19 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
          { // we reached the end of the requested data
             return getCount();
          }
+
+         if (!readStateNext(readState))
+         {
+            LogContext(logContext).logErr("readStateNext failed.");
+            sessionLocalFile->setOffset(-1);
+            sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_COMMUNICATION);
+            return -1;
+         }
       }
       else
       { // readRes not as it should be => might be an error or just an end-of-file
 
-         if(readRes == -1)
+         if(readState.readRes == -1)
          { // read error occurred
             LogContext(logContext).log(Log_WARNING, "Unable to read file data. "
                "FileID: " + sessionLocalFile->getFileID() + "; "
@@ -315,31 +350,38 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
                "offset: " + StringTk::int64ToStr(getOffset() ) + "; "
                "count: " + StringTk::int64ToStr(getCount() ) + "; "
                "readLength: " + StringTk::int64ToStr(readLength) + "; " +
-               "readRes: " + StringTk::int64ToStr(readRes) + "; " +
-               "toBeRead: " + StringTk::int64ToStr(toBeRead) );
+               "readRes: " + StringTk::int64ToStr(readState.readRes) + "; " +
+               "toBeRead: " + StringTk::int64ToStr(readState.toBeRead) );
 
-            readOffset += readRes;
-            toBeRead -= readRes;
+            readOffset += readState.readRes;
+            readState.toBeRead -= readState.readRes;
 
-            sessionLocalFile->setOffset(getOffset() + getCount() - toBeRead); // update offset
+            sessionLocalFile->setOffset(getOffset() + getCount() - readState.toBeRead); // update offset
 
-            sessionLocalFile->incReadCounter(readRes); // update sequential read length
+            sessionLocalFile->incReadCounter(readState.readRes); // update sequential read length
 
-            ctx.getStats()->incVals.diskReadBytes += readRes; // update stats
+            ctx.getStats()->incVals.diskReadBytes += readState.readRes; // update stats
 
-            if(readRes > 0)
-               sendLengthInfoAndData(ctx.getSocket(), readRes, sendBuf, true);
+            if(readState.readRes > 0)
+            {
+               if (readStateSendData(ctx.getSocket(), readState, sendBuf, true) < 0)
+               {
+                  LogContext(logContext).logErr("readStateSendData failed.");
+                  sessionLocalFile->setOffset(-1);
+                  sendLengthInfo(ctx.getSocket(), -FhgfsOpsErr_COMMUNICATION);
+                  return -1;
+               }
+            }
             else
                sendLengthInfo(ctx.getSocket(), 0);
 
-            return(getCount() - toBeRead);
+            return(getCount() - readState.toBeRead);
          }
 
       }
 
    } // end of for-loop
 
-   return(getCount() - toBeRead);
 }
 
 /**
@@ -352,10 +394,11 @@ int64_t ReadLocalFileV2MsgEx::incrementalReadStatefulAndSendV2(ResponseContext& 
  * @param readAheadTriggerSize the length of sequential IO that triggers read-ahead
  * @param currentOffset current file offset (where read-ahead would start)
  */
-void ReadLocalFileV2MsgEx::checkAndStartReadAhead(SessionLocalFile* sessionLocalFile,
+template <class Msg, typename ReadState>
+void ReadLocalFileMsgExBase<Msg, ReadState>::checkAndStartReadAhead(SessionLocalFile* sessionLocalFile,
    ssize_t readAheadTriggerSize, off_t currentOffset, off_t readAheadSize)
 {
-   const char* logContext = "ReadChunkFileV2Msg (read-ahead)";
+   std::string logContext = Msg::logContextPref + " (read-ahead)";
 
    if(!readAheadSize)
       return;
@@ -374,7 +417,6 @@ void ReadLocalFileV2MsgEx::checkAndStartReadAhead(SessionLocalFile* sessionLocal
       std::string("Starting read-ahead... ") +
       "offset: " + StringTk::int64ToStr(currentOffset) + "; "
       "size: " + StringTk::int64ToStr(readAheadSize) );
-   IGNORE_UNUSED_VARIABLE(logContext);
 
    MsgHelperIO::readAhead(*sessionLocalFile->getFD(), currentOffset, readAheadSize);
 
@@ -392,10 +434,11 @@ void ReadLocalFileV2MsgEx::checkAndStartReadAhead(SessionLocalFile* sessionLocal
  * @return we return the special value FhgfsOpsErr_COMMUNICATION here in some cases to indirectly
  * ask the client for a retry (e.g. if target consistency is not good for buddymirrored chunks).
  */
-FhgfsOpsErr ReadLocalFileV2MsgEx::openFile(const StorageTarget& target,
+template <class Msg, typename ReadState>
+FhgfsOpsErr ReadLocalFileMsgExBase<Msg, ReadState>::openFile(const StorageTarget& target,
       SessionLocalFile* sessionLocalFile)
 {
-   const char* logContext = "ReadChunkFileV2Msg (open)";
+   std::string logContext = Msg::logContextPref + " (open)";
 
    bool isBuddyMirrorChunk = sessionLocalFile->getIsMirrorSession();
 
@@ -421,5 +464,3 @@ FhgfsOpsErr ReadLocalFileV2MsgEx::openFile(const StorageTarget& target,
 
    return openChunkRes;
 }
-
-

@@ -136,10 +136,6 @@ $(call define_if_matches, KERNEL_HAS_STRNICMP, "strnicmp", string.h)
 # Find out whether the kernel has BDI_CAP_MAP_COPY defined.
 $(call define_if_matches, KERNEL_HAS_BDI_CAP_MAP_COPY, "define BDI_CAP_MAP_COPY", backing-dev.h)
 
-# Find out whether the kernel has the get_acl inode operation
-$(call define_if_matches, KERNEL_HAS_POSIX_GET_ACL, \
-   -F "struct posix_acl * (*get_acl)(struct inode *, int);", fs.h)
-
 # Find out whether xattr_handler** s_xattr in super_block is const.
 $(call define_if_matches, KERNEL_HAS_CONST_XATTR_HANDLER, \
    -F "const struct xattr_handler **s_xattr;", fs.h)
@@ -193,12 +189,6 @@ $(call define_if_matches, KERNEL_HAS_LONG_IOV_DIO, \
    -F "ssize_t (*direct_IO)(struct kiocb *, struct iov_iter *iter, loff_t offset);", fs.h)
 $(call define_if_matches, KERNEL_HAS_IOV_DIO, \
    -F "ssize_t (*direct_IO)(struct kiocb *, struct iov_iter *iter);", fs.h)
-$(call define_if_matches, KERNEL_HAS_XATTR_HANDLERS_INODE_ARG, \
-   -P "generic_getxattr.*struct inode", xattr.h)
-KERNEL_FEATURE_DETECTION += $(shell \
-   grep -sPA1 "\(\*set\).const struct xattr_handler" $(KSRCDIR_PRUNED_HEAD)/include/linux/xattr.h \
-      | grep -qsP "^\s+struct inode" \
-      && echo "-DKERNEL_HAS_XATTR_HANDLERS_INODE_ARG")
 $(call define_if_matches, KERNEL_HAS_INODE_LOCK, "static inline void inode_lock", fs.h)
 
 #<linuy-4.8
@@ -252,11 +242,6 @@ $(call define_if_matches, KERNEL_HAS_POSIX_ACL_XATTR_USERNS_ARG, \
 $(call define_if_matches, KERNEL_HAS_D_MAKE_ROOT, d_make_root, dcache.h)
 $(call define_if_matches, KERNEL_HAS_GENERIC_WRITE_CHECKS_ITER, \
    -P "generic_write_checks.*iov_iter", fs.h)
-$(call define_if_matches, KERNEL_HAS_GENERIC_PERMISSION_2, \
-   -P "extern int generic_permission\(struct inode \*. int\);", fs.h)
-# fourth arg is a callback on the next line.
-$(call define_if_matches, KERNEL_HAS_GENERIC_PERMISSION_4, \
-   -P "extern int generic_permission.struct inode \*. int. unsigned int.", fs.h)
 $(call define_if_matches, KERNEL_HAS_WRITE_ITER, -F "ssize_t (*write_iter)", fs.h)
 $(call define_if_matches, KERNEL_HAS_AIO_WRITE_BUF, \
    -P "ssize_t \(\*aio_write\).*const char", fs.h)
@@ -289,8 +274,6 @@ KERNEL_FEATURE_DETECTION += $(shell \
    grep -sFA20 "struct address_space {" ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
       | grep -qsP "struct backing_dev_info *backing_dev_info;" \
       && echo "-DKERNEL_HAS_ADDRESS_SPACE_BDI")
-$(call define_if_matches, KERNEL_HAS_SET_ACL, \
-   -P "int \(\*set_acl\)\(struct inode \*. struct posix_acl \*. int\);", fs.h)
 $(call define_if_matches, KERNEL_HAS_IOCB_DIRECT, "IOCB_DIRECT", fs.h)
 KERNEL_FEATURE_DETECTION += $(shell \
    grep -sPA1 "generic_file_direct_write.*,$$" \
@@ -304,9 +287,6 @@ $(call define_if_matches, KERNEL_HAS_WAIT_QUEUE_ENTRY_T, "wait_queue_entry_t", w
 $(call define_if_matches, KERNEL_HAS_CURRENT_FS_TIME, "current_fs_time", fs.h)
 $(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64[[:space:]]\+i_atime;", fs.h)
 $(call define_if_matches, KERNEL_HAS_SB_NODIRATIME, "SB_NODIRATIME", fs.h)
-
-# inodeChangeRes was changed to setattr_prepare in vanilla 4.9
-$(call define_if_matches, KERNEL_HAS_SETATTR_PREPARE, "int setattr_prepare", fs.h)
 
 $(call define_if_matches, KERNEL_HAS_GENERIC_GETXATTR, "generic_getxattr", xattr.h)
 

@@ -33,49 +33,6 @@ static inline loff_t FhgfsOpsCommKitVec_getOffset(FhgfsCommKitVec* comm);
 
 
 
-#ifdef FhgfsOpsCommKitVec // local (file/class-like) declarations
-
-static void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_readfileStageRECVDATA(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_handleReadError(CommKitVecHelper* commHelper, FhgfsCommKitVec* comm,
-   FhgfsPage* fhgfsPage, ssize_t recvRes, size_t missingPgLen);
-static void __FhgfsOpsCommKitVec_readfileStageSOCKETEXCEPTION(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_readfileStageCLEANUP(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_readfileStageHandlePages(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-
-
-
-static void __FhgfsOpsCommKitVec_writefileStagePREPARE(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_writefileStageSENDHEADER(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_writefileStageRECV(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_writefileStageSOCKETEXCEPTION(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_writefileStageCLEANUP(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static void __FhgfsOpsCommKitVec_writefileStageHandlePages(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-
-static int64_t __FhgfsOpsCommKitVec_writefileCommunicate(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-static int64_t __FhgfsOpsCommKitVec_readfileCommunicate(CommKitVecHelper* commHelper,
-   FhgfsCommKitVec* comm);
-
-
-#endif // local (file/class-like) declarations
-
-
 struct FhgfsCommKitVec
 {
    // Depending if we are going to read or write, the corresponding struct will be used

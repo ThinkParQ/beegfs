@@ -153,6 +153,15 @@
 #define BEEGFS_CONCAT(x, y) BEEGFS_CONCAT_(x, y)
 #define BEEGFS_UNIQUE_NAME(prefix) BEEGFS_CONCAT(prefix, __LINE__)
 
+
+// Lifted from Linux 5.10
+#if __has_attribute(__fallthrough__)
+#define BEEGFS_FALLTHROUGH __attribute__((__fallthrough__))
+#else
+#define BEEGFS_FALLTHROUGH do {} while (0) /* FALLTHROUGH */
+#endif
+
+
 /* Preprocessor hack to add statements that are executed on scope cleanup.
  * A for-loop that runs exactly 1 time is misused to execute the cleanup
  * statement. An assertion ensures that we didn't break from the inner loop,

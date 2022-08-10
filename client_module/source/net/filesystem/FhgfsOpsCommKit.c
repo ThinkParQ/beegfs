@@ -909,8 +909,7 @@ void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo, struct list_h
             case CommKitState_PREPARE:
                if(!__commkit_prepare_generic(&context, info) )
                   break;
-               /* fall through */
-
+               BEEGFS_FALLTHROUGH;
             case CommKitState_SENDHEADER:
                __commkit_sendheader_generic(&context, info);
                __commkit_add_socket_pollstate(&context, info,
@@ -923,7 +922,7 @@ void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo, struct list_h
                    __commkit_senddata_generic(&context, info);
                   break;
                }
-               /* fall-through -if no sendData state is set */
+               BEEGFS_FALLTHROUGH;
 
             case CommKitState_RECVHEADER:
                if(context.ops->recvHeader)
@@ -931,7 +930,7 @@ void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo, struct list_h
                   __commkit_recvheader_generic(&context, info);
                   break;
                }
-               /* fall-through -if no recvHeader state is set */
+               BEEGFS_FALLTHROUGH;
 
             case CommKitState_RECVDATA:
                if(context.ops->recvData)
@@ -939,7 +938,7 @@ void FhgfsOpsCommkit_communicate(App* app, RemotingIOInfo* ioInfo, struct list_h
                   __commkit_recvdata_generic(&context, info);
                   break;
                }
-               /* fall-through -if no recvData state is set */
+               BEEGFS_FALLTHROUGH;
 
             case CommKitState_CLEANUP:
                __commkit_cleanup_generic(&context, info);

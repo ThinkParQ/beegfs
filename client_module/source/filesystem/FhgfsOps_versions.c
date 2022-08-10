@@ -18,7 +18,9 @@
   *
   * @return 0 on success, negative linux error code otherwise
   */
-#if defined(KERNEL_HAS_PERMISSION_2)
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+   int FhgfsOps_permission(struct user_namespace* mnt_userns, struct inode *inode, int mask)
+#elif defined(KERNEL_HAS_PERMISSION_2)
    int FhgfsOps_permission(struct inode *inode, int mask)
 #elif defined(KERNEL_HAS_PERMISSION_FLAGS)
    int FhgfsOps_permission(struct inode *inode, int mask, unsigned int flags)

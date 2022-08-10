@@ -1,5 +1,4 @@
 #include <program/Program.h>
-#include <common/net/message/session/rw/WriteLocalFileRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/SessionTk.h>
 #include <common/toolkit/StorageTk.h>
@@ -7,21 +6,41 @@
 #include <storage/StorageTargets.h>
 #include <toolkit/StorageTkEx.h>
 #include "WriteLocalFileMsgEx.h"
+#ifdef BEEGFS_NVFS
+#include "WriteLocalFileRDMAMsgEx.h"
+#endif
 
 #include <boost/lexical_cast.hpp>
 
-bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
+static WriteLocalFileMsgEx forcedLinkage;
+#ifdef BEEGFS_NVFS
+static WriteLocalFileRDMAMsgEx forcedLinkageRDMA;
+#endif
+
+const std::string WriteLocalFileMsgSender::logContextPref = "WriteChunkFileMsg";
+#ifdef BEEGFS_NVFS
+const std::string WriteLocalFileRDMAMsgSender::logContextPref = "WriteChunkFileRDMAMsg";
+#endif
+
+template <class Msg, typename WriteState>
+bool WriteLocalFileMsgExBase<Msg, WriteState>::processIncoming(NetMessage::ResponseContext& ctx)
 {
    App* app = Program::getApp();
 
    bool success;
    int64_t writeClientRes;
 
+   if (!isMsgValid())
+   {
+      sendResponse(ctx, FhgfsOpsErr_INVAL);
+      return false;
+   }
+
    std::tie(success, writeClientRes) = write(ctx);
 
    if (success)
    {
-      ctx.sendResponse(WriteLocalFileRespMsg(writeClientRes) );
+      sendResponse(ctx, writeClientRes);
 
       // update operation counters
 
@@ -33,9 +52,10 @@ bool WriteLocalFileMsgEx::processIncoming(ResponseContext& ctx)
    return success;
 }
 
-std::pair<bool, int64_t> WriteLocalFileMsgEx::write(ResponseContext& ctx)
+template <class Msg, typename WriteState>
+std::pair<bool, int64_t> WriteLocalFileMsgExBase<Msg, WriteState>::write(NetMessage::ResponseContext& ctx)
 {
-   const char* logContext = "WriteChunkFileMsg incoming";
+   std::string logContext = Msg::logContextPref + " incoming";
 
    App* app = Program::getApp();
 
@@ -120,7 +140,7 @@ std::pair<bool, int64_t> WriteLocalFileMsgEx::write(ResponseContext& ctx)
 
       if(doSessionCheck() && sessionLocalFile->isServerCrashed() )
       { // server crashed during the write, maybe lost some data send error to client
-         LogContext log("WriteChunkFileMsg incoming");
+         LogContext log(logContext);
          log.log(Log_SPAM, "Potential cache loss for open file handle. (Server crash detected.)"
             "The session is marked as dirty. "
             "FileHandleID: " + fileHandleID);
@@ -246,17 +266,41 @@ cleanup:
    return {true, writeClientRes};
 }
 
+ssize_t WriteLocalFileMsgSender::recvPadding(ResponseContext& ctx, int64_t toBeReceived)
+{
+   return ctx.getSocket()->recvT(ctx.getBuffer(),
+         BEEGFS_MIN(toBeReceived, ctx.getBufferLength()), 0, CONN_MEDIUM_TIMEOUT);
+}
+
+#ifdef BEEGFS_NVFS
+
+ssize_t WriteLocalFileRDMAMsgSender::recvPadding(ResponseContext& ctx, int64_t toBeReceived)
+{
+   RdmaInfo* rdma = getRdmaInfo();
+   uint64_t rBuf;
+   size_t rLen;
+   uint64_t rOff;
+
+   if (!rdma->next(rBuf, rLen, rOff))
+      return -1;
+
+   ssize_t recvLength = BEEGFS_MIN(ctx.getBufferLength(), toBeReceived);
+   recvLength = BEEGFS_MIN(recvLength, (ssize_t)(rLen - rOff));
+   return ctx.getSocket()->read(ctx.getBuffer(), recvLength, 0, rBuf+rOff, rdma->key);
+}
+
+#endif /* BEEGFS_NVFS */
+
 /**
  * Note: New offset is saved in the session by the caller afterwards (to make life easier).
  * @return number of written bytes or negative fhgfs error code
  */
-int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ctx,
+template <class Msg, typename WriteState>
+int64_t WriteLocalFileMsgExBase<Msg, WriteState>::incrementalRecvAndWriteStateful(NetMessage::ResponseContext& ctx,
    SessionLocalFile* sessionLocalFile)
 {
-   const char* logContext = "WriteChunkFileMsg (write incremental)";
+   std::string logContext = Msg::logContextPref + " (write incremental)";
    Config* cfg = Program::getApp()->getConfig();
-
-   const int timeoutMS = CONN_MEDIUM_TIMEOUT;
 
    // we can securely cast getTuneFileWriteSize to size_t below to make a comparision possible, as
    // it can technically never be negative and will therefore always fit into size_t
@@ -269,7 +313,6 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
    int64_t oldOffset = sessionLocalFile->getOffset();
    int64_t newOffset = getOffset();
    bool useSyncRange = false; // true if sync_file_range should be called
-
 
    if( (oldOffset < 0) || (oldOffset != newOffset) )
       sessionLocalFile->resetWriteCounter(); // reset sequential write counter
@@ -287,27 +330,32 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
 
    // incrementally receive file contents...
 
-   int64_t toBeReceived = getCount();
-   off_t writeOffset = getOffset();
-
+   WriteState writeState(logContext.c_str(), exactStaticRecvSize,
+      getCount(), getOffset(), sessionLocalFile);
+   if (!writeStateInit(writeState))
+      return -FhgfsOpsErr_COMMUNICATION;
 
    do
    {
       // receive some bytes...
 
       LOG_DEBUG(logContext, Log_SPAM,
-         "receiving... (remaining: " + StringTk::intToStr(toBeReceived) + ")");
+         "receiving... (remaining: " + StringTk::intToStr(writeState.toBeReceived) + ")");
 
-      ssize_t recvLength = BEEGFS_MIN(exactStaticRecvSize, toBeReceived);
-      ssize_t recvRes = ctx.getSocket()->recvExactT(ctx.getBuffer(), recvLength, 0, timeoutMS);
+      ssize_t recvRes = writeStateRecvData(ctx, writeState);
+      if (recvRes < 0)
+      {
+         LogContext(logContext).log(Log_WARNING, "Socket data transfer error occurred. ");
+         return -FhgfsOpsErr_COMMUNICATION;
+      }
 
       // forward to mirror...
 
-      FhgfsOpsErr mirrorRes = sendToMirror(ctx.getBuffer(), recvRes, writeOffset, toBeReceived,
-         sessionLocalFile);
+      FhgfsOpsErr mirrorRes = sendToMirror(ctx.getBuffer(), recvRes,
+         writeState.writeOffset, writeState.toBeReceived, sessionLocalFile);
       if(unlikely(mirrorRes != FhgfsOpsErr_SUCCESS) )
       { // mirroring failed
-         incrementalRecvPadding(ctx, toBeReceived, sessionLocalFile);
+         incrementalRecvPadding(ctx, writeState.toBeReceived, sessionLocalFile);
 
          return -FhgfsOpsErr_COMMUNICATION;
       }
@@ -317,9 +365,9 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
       int errCode = 0;
       ssize_t writeRes = unlikely(isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_DISABLE_IO) )
          ? recvRes
-         : doWrite(*fd, ctx.getBuffer(), recvRes, writeOffset, errCode);
+         : doWrite(*fd, ctx.getBuffer(), recvRes, writeState.writeOffset, errCode);
 
-      toBeReceived -= recvRes;
+      writeState.toBeReceived -= recvRes;
 
       // handle write errors...
 
@@ -338,7 +386,7 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
                "OpenFlags: " + StringTk::intToStr(sessionLocalFile->getOpenFlags() ) + " " +
                "received: " + StringTk::intToStr(recvRes) + ".");
 
-            incrementalRecvPadding(ctx, toBeReceived, sessionLocalFile);
+            incrementalRecvPadding(ctx, writeState.toBeReceived, sessionLocalFile);
 
             return -FhgfsOpsErrTk::fromSysErr(errCode);
          }
@@ -350,17 +398,19 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
                "file: " + sessionLocalFile->getFileID() + "; "
                "sysErr: " + System::getErrString(errCode) );
 
-            incrementalRecvPadding(ctx, toBeReceived, sessionLocalFile);
+            incrementalRecvPadding(ctx, writeState.toBeReceived, sessionLocalFile);
 
             // return bytes received so far minus num bytes that were not written with last write
-            return (getCount() - toBeReceived) - (recvRes - writeRes);
+            return (getCount() - writeState.toBeReceived) - (recvRes - writeRes);
          }
 
       }
 
-      writeOffset += writeRes;
-
-   } while(toBeReceived);
+      writeState.writeOffset += writeRes;
+      recvRes = writeStateNext(writeState, writeRes);
+      if (recvRes != 0)
+         return recvRes;
+   } while(writeState.toBeReceived);
 
    LOG_DEBUG(logContext, Log_SPAM,
       std::string("Received and wrote all the data") );
@@ -387,7 +437,8 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
 /**
  * Write until everything was written (handle short-writes) or an error occured
  */
-ssize_t WriteLocalFileMsgEx::doWrite(int fd, char* buf, size_t count, off_t offset, int& outErrno)
+template <class Msg, typename WriteState>
+ssize_t WriteLocalFileMsgExBase<Msg, WriteState>::doWrite(int fd, char* buf, size_t count, off_t offset, int& outErrno)
 {
    size_t sumWriteRes = 0;
 
@@ -413,18 +464,17 @@ ssize_t WriteLocalFileMsgEx::doWrite(int fd, char* buf, size_t count, off_t offs
 /**
  * Receive and discard data.
  */
-void WriteLocalFileMsgEx::incrementalRecvPadding(ResponseContext& ctx,
+template <class Msg, typename WriteState>
+void WriteLocalFileMsgExBase<Msg, WriteState>::incrementalRecvPadding(NetMessage::ResponseContext& ctx,
    int64_t padLen, SessionLocalFile* sessionLocalFile)
 {
-   const int timeoutMS = CONN_MEDIUM_TIMEOUT;
-
    uint64_t toBeReceived = padLen;
 
    while(toBeReceived)
    {
-      ssize_t recvRes = ctx.getSocket()->recvT(ctx.getBuffer(),
-         BEEGFS_MIN(toBeReceived, ctx.getBufferLength()), 0, timeoutMS);
-
+      ssize_t recvRes = recvPadding(ctx, toBeReceived);
+      if (recvRes == -1)
+         break;
       // forward to mirror...
 
       FhgfsOpsErr mirrorRes = sendToMirror(ctx.getBuffer(), recvRes,
@@ -439,11 +489,11 @@ void WriteLocalFileMsgEx::incrementalRecvPadding(ResponseContext& ctx,
    }
 }
 
-
-FhgfsOpsErr WriteLocalFileMsgEx::openFile(const StorageTarget& target,
+template <class Msg, typename WriteState>
+FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::openFile(const StorageTarget& target,
       SessionLocalFile* sessionLocalFile)
 {
-   const char* logContext = "WriteChunkFileMsg (write incremental)";
+   std::string logContext = Msg::logContextPref + " (write incremental)";
 
    bool useQuota = isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_USE_QUOTA);
    bool enforceQuota = Program::getApp()->getConfig()->getQuotaEnableEnforcement();
@@ -488,10 +538,11 @@ FhgfsOpsErr WriteLocalFileMsgEx::openFile(const StorageTarget& target,
  * @param requestorSock used to receive padding if mirroring fails.
  * @return FhgfsOpsErr_COMMUNICATION if communication with mirror failed.
  */
-FhgfsOpsErr WriteLocalFileMsgEx::prepareMirroring(char* buf, size_t bufLen,
+template <class Msg, typename WriteState>
+FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::prepareMirroring(char* buf, size_t bufLen,
    SessionLocalFile* sessionLocalFile, StorageTarget& target)
 {
-   const char* logContext = "WriteFileMsg (prepare mirroring)";
+   std::string logContext = Msg::logContextPref + " (prepare mirroring)";
 
    // check if mirroring is enabled
 
@@ -653,10 +704,11 @@ FhgfsOpsErr WriteLocalFileMsgEx::prepareMirroring(char* buf, size_t bufLen,
  * @param toBeMirrored total remaining mirror data including given bufLen (only used for retries).
  * @return FhgfsOpsErr_COMMUNICATION if mirroring fails.
  */
-FhgfsOpsErr WriteLocalFileMsgEx::sendToMirror(const char* buf, size_t bufLen,
+template <class Msg, typename WriteState>
+FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::sendToMirror(const char* buf, size_t bufLen,
    int64_t offset, int64_t toBeMirrored, SessionLocalFile* sessionLocalFile)
 {
-   const char* logContext = "WriteFileMsg (send to mirror)";
+   std::string logContext = Msg::logContextPref + " (send to mirror)";
 
    // check if mirroring enabled
 
@@ -754,10 +806,11 @@ FhgfsOpsErr WriteLocalFileMsgEx::sendToMirror(const char* buf, size_t bufLen,
  *
  * Note: Does not do retries on communication errors
  */
-FhgfsOpsErr WriteLocalFileMsgEx::finishMirroring(SessionLocalFile* sessionLocalFile,
+template <class Msg, typename WriteState>
+FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::finishMirroring(SessionLocalFile* sessionLocalFile,
       StorageTarget& target)
 {
-   const char* logContext = "WriteFileMsg (finish mirroring)";
+   std::string logContext = Msg::logContextPref + " (finish mirroring)";
 
    // check if mirroring enabled
 
@@ -864,7 +917,8 @@ cleanup_commerr:
    return FhgfsOpsErr_COMMUNICATION;
 }
 
-bool WriteLocalFileMsgEx::doSessionCheck()
+template <class Msg, typename WriteState>
+bool WriteLocalFileMsgExBase<Msg, WriteState>::doSessionCheck()
 { // do session check only when it is not a mirror session
    return isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_BUDDYMIRROR) ? false :
       isMsgHeaderFeatureFlagSet(WRITELOCALFILEMSG_FLAG_SESSION_CHECK);

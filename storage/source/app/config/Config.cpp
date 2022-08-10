@@ -227,6 +227,8 @@ void Config::initImplicitVals()
    // connInterfacesList(/File)
    AbstractConfig::initInterfacesList(connInterfacesFile, connInterfacesList);
 
+   AbstractConfig::initSocketBufferSizes();
+
    // check if sync_file_range was enabled on a distro that doesn't support it
    #ifndef CONFIG_DISTRO_HAS_SYNC_FILE_RANGE
       if(tuneFileWriteSyncSize)

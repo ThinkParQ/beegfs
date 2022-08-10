@@ -7,6 +7,8 @@
 
 struct PooledSocket;
 typedef struct PooledSocket PooledSocket;
+struct ConnectionList;
+typedef struct ConnectionList ConnectionList;
 
 
 static inline void _PooledSocket_init(PooledSocket* this, NicAddrType_t nicType);
@@ -24,6 +26,10 @@ static inline void PooledSocket_resetHasActivity(PooledSocket* this);
 static inline bool PooledSocket_getHasExpirationTimer(PooledSocket* this);
 static inline void PooledSocket_setExpireTimeStart(PooledSocket* this);
 static inline NicAddrType_t PooledSocket_getNicType(PooledSocket* this);
+static inline ConnectionList* PooledSocket_getPool(PooledSocket* this);
+static inline PointerListElem* PooledSocket_getPoolElem(PooledSocket* this);
+static inline void PooledSocket_setPool(PooledSocket* this, ConnectionList* pool,
+   PointerListElem* poolElem);
 
 
 /**
@@ -32,7 +38,8 @@ static inline NicAddrType_t PooledSocket_getNicType(PooledSocket* this);
 struct PooledSocket
 {
    Socket socket;
-
+   ConnectionList* pool;
+   PointerListElem* poolElem;
    bool available; // == !acquired
    bool hasActivity; // true if channel was not idle (part of channel class in fhgfs_common)
    bool closeOnRelease; /* release must close socket. used for signal handling */
@@ -50,6 +57,8 @@ void _PooledSocket_init(PooledSocket* this, NicAddrType_t nicType)
    this->closeOnRelease = false;
    Time_initZero(&this->expireTimeStart);
    this->nicType = nicType;
+   this->pool = NULL;
+   this->poolElem = NULL;
 }
 
 void _PooledSocket_uninit(Socket* this)
@@ -112,6 +121,23 @@ void PooledSocket_setExpireTimeStart(PooledSocket* this)
 NicAddrType_t PooledSocket_getNicType(PooledSocket* this)
 {
    return this->nicType;
+}
+
+void PooledSocket_setPool(PooledSocket* this, ConnectionList* pool,
+   PointerListElem* poolElem)
+{
+   this->pool = pool;
+   this->poolElem = poolElem;
+}
+
+ConnectionList* PooledSocket_getPool(PooledSocket* this)
+{
+   return this->pool;
+}
+
+PointerListElem* PooledSocket_getPoolElem(PooledSocket* this)
+{
+   return this->poolElem;
 }
 
 #endif /*POOLEDSOCKET_H_*/

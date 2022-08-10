@@ -35,11 +35,14 @@ class ICommonConfig
       unsigned    connBacklogTCP;
       unsigned    connMaxInternodeNum;
       unsigned    connFallbackExpirationSecs;
+      int         connTCPRcvBufSize;
+      int         connUDPRcvBufSize;
       unsigned    connRDMABufSize;
       unsigned    connRDMABufNum;
       uint8_t     connRDMATypeOfService;
       std::string connNetFilterFile; // for allowed IPs (empty means "allow all")
       std::string connAuthFile;
+      bool        connDisableAuthentication;
       uint64_t    connAuthHash; // implicitly set based on hash of connAuthFile contents
       std::string connTcpOnlyFilterFile; // for IPs that only allow plain TCP (no RDMA etc)
 
@@ -144,6 +147,16 @@ class ICommonConfig
       int getConnFallbackExpirationSecs() const
       {
          return connFallbackExpirationSecs;
+      }
+
+      int getConnTCPRcvBufSize() const
+      {
+         return connTCPRcvBufSize;
+      }
+
+      int getConnUDPRcvBufSize() const
+      {
+         return connUDPRcvBufSize;
       }
 
       unsigned getConnRDMABufSize() const

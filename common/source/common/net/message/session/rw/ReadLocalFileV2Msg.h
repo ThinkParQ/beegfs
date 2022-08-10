@@ -23,7 +23,6 @@ class ReadLocalFileV2MsgBase
          PathInfo* pathInfoPtr, unsigned accessFlags, int64_t offset, int64_t count)
       {
          this->clientNumID = clientNumID;
-
          this->fileHandleID = fileHandleID;
          this->fileHandleIDLen = strlen(fileHandleID);
 
@@ -107,8 +106,16 @@ class ReadLocalFileV2MsgBase
          return &this->pathInfo;
       }
 
-      virtual unsigned getSupportedHeaderFeatureFlagsMask() const = 0;
+      unsigned getSupportedHeaderFeatureFlagsMask() const
+      {
+         return READLOCALFILEMSG_FLAG_SESSION_CHECK | READLOCALFILEMSG_FLAG_DISABLE_IO |
+            READLOCALFILEMSG_FLAG_BUDDYMIRROR | READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND;
+      }
 
+      bool isMsgValid() const
+      {
+         return true;
+      }
 };
 
 class ReadLocalFileV2Msg : public ReadLocalFileV2MsgBase, public NetMessageSerdes<ReadLocalFileV2Msg>
@@ -132,8 +139,7 @@ class ReadLocalFileV2Msg : public ReadLocalFileV2MsgBase, public NetMessageSerde
 
       unsigned getSupportedHeaderFeatureFlagsMask() const
       {
-         return READLOCALFILEMSG_FLAG_SESSION_CHECK | READLOCALFILEMSG_FLAG_DISABLE_IO |
-            READLOCALFILEMSG_FLAG_BUDDYMIRROR | READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND;
+         return ReadLocalFileV2MsgBase::getSupportedHeaderFeatureFlagsMask();
       }
 };
 

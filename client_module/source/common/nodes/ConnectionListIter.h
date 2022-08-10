@@ -47,10 +47,12 @@ bool ConnectionListIter_end(ConnectionListIter* this)
 ConnectionListIter ConnectionListIter_remove(ConnectionListIter* this)
 {
    ConnectionListIter newIter = *this;
+   PooledSocket* sock = ConnectionListIter_value(this);
 
    ConnectionListIter_next(&newIter); // the new iter that will be returned
 
    PointerListIter_remove( (PointerListIter*)this);
+   PooledSocket_setPool(sock, NULL, NULL);
 
    return newIter;
 }

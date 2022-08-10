@@ -8,7 +8,6 @@
 #include <common/Common.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
-#include <asm/kmap_types.h>
 #include <linux/compat.h>
 #include <linux/list.h>
 #include <linux/mount.h>
@@ -29,8 +28,6 @@
    extern struct dentry *d_make_root(struct inode *root_inode);
 #endif
 
-static inline int os_generic_permission(struct inode *inode, int mask);
-
 #if defined(KERNEL_HAS_SB_BDI) && !defined(KERNEL_HAS_BDI_SETUP_AND_REGISTER)
    extern int bdi_setup_and_register(struct backing_dev_info *bdi, char *name, unsigned int cap);
 #endif
@@ -46,17 +43,47 @@ extern int have_submounts(struct dentry *parent);
  *       support it anyway for now, we do not need a complete kernel version check for it.
  *       Also, in order to skip useless pointer references we just pass NULL here.
  */
-int os_generic_permission(struct inode *inode, int mask)
+static inline int os_generic_permission(struct inode *inode, int mask)
 {
    #ifdef KERNEL_HAS_GENERIC_PERMISSION_2
       return generic_permission(inode, mask);
    #elif defined(KERNEL_HAS_GENERIC_PERMISSION_4)
       return generic_permission(inode, mask, 0, NULL);
+   #elif defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      return generic_permission(&init_user_ns, inode, mask);
    #else
       return generic_permission(inode, mask, NULL);
    #endif
 }
 
+static inline void os_generic_fillattr(struct inode *inode, struct kstat *kstat)
+{
+   #ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+      generic_fillattr(&init_user_ns, inode, kstat);
+   #else
+      generic_fillattr(inode, kstat);
+   #endif
+}
+
+#ifdef KERNEL_HAS_SETATTR_PREPARE
+static inline int os_setattr_prepare(struct dentry *dentry, struct iattr *attr)
+{
+   #ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+      return setattr_prepare(&init_user_ns, dentry, attr);
+   #else
+      return setattr_prepare(dentry, attr);
+   #endif
+}
+#endif // KERNEL_HAS_SETATTR_PREPARE
+
+static inline bool os_inode_owner_or_capable(const struct inode *inode)
+{
+   #ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+      return inode_owner_or_capable(&init_user_ns, inode);
+   #else
+      return inode_owner_or_capable(inode);
+   #endif
+}
 
 #ifndef KERNEL_HAS_D_MATERIALISE_UNIQUE
 extern struct dentry* d_materialise_unique(struct dentry *dentry, struct inode *inode);
@@ -165,6 +192,17 @@ static inline int os_posix_acl_to_xattr(const struct posix_acl* acl, void* buffe
    return posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
 #endif
 }
+
+#ifdef KERNEL_HAS_SET_ACL
+static inline int os_posix_acl_chmod(struct inode *inode, umode_t mode)
+{
+#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+   return posix_acl_chmod(&init_user_ns, inode, mode);
+#else
+   return posix_acl_chmod(inode, mode);
+#endif
+}
+#endif // KERNEL_HAS_SET_ACL
 
 #ifndef KERNEL_HAS_PAGE_ENDIO
 static inline void page_endio(struct page *page, int rw, int err)

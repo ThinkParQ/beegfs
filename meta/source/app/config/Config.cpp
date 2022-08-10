@@ -250,6 +250,8 @@ void Config::initImplicitVals()
    // connInterfacesList(/File)
    AbstractConfig::initInterfacesList(connInterfacesFile, connInterfacesList);
 
+   AbstractConfig::initSocketBufferSizes();
+
    // connAuthHash
    AbstractConfig::initConnAuthHash(connAuthFile, &connAuthHash);
 

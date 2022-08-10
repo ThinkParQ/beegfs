@@ -20,15 +20,13 @@ extern StandardSocket* StandardSocket_constructTCP(void);
 extern StandardSocket* StandardSocket_constructSDP(void);
 extern void _StandardSocket_uninit(Socket* this);
 
+int StandardSocket_getSoRcvBuf(StandardSocket* this);
 extern bool StandardSocket_setSoKeepAlive(StandardSocket* this, bool enable);
 extern bool StandardSocket_setSoBroadcast(StandardSocket* this, bool enable);
-extern bool StandardSocket_getSoRcvBuf(StandardSocket* this, int* outSize);
 extern bool StandardSocket_setSoRcvBuf(StandardSocket* this, int size);
 extern bool StandardSocket_setTcpNoDelay(StandardSocket* this, bool enable);
 extern bool StandardSocket_setTcpCork(StandardSocket* this, bool enable);
 
-//extern bool StandardSocket_connectByName(StandardSocket* this, const char* hostname,
-//   unsigned short port, ExternalHelperd* helperd);
 extern bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress,
    unsigned short port);
 extern bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress,
@@ -52,20 +50,13 @@ extern bool _StandardSocket_initSock(StandardSocket* this, int domain, int type,
 extern void __StandardSocket_setAllocMode(StandardSocket* this, gfp_t flags);
 extern int _StandardSocket_setsockopt(StandardSocket* this, int level, int optname, char* optval,
    int optlen);
-extern int _StandardSocket_getsockopt(StandardSocket* this, int level, int optname,
-   char *optval, int *optlen);
 
 // getters & setters
 static inline struct socket* StandardSocket_getRawSock(StandardSocket* this);
 
-// inliners
-static inline struct socket* StandardSocket_getRawSock(StandardSocket* this);
-
-
 struct StandardSocket
 {
    PooledSocket pooledSocket;
-
    struct socket* sock;
    unsigned short sockDomain;
 };

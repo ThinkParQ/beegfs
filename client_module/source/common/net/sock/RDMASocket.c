@@ -105,9 +105,9 @@ bool _RDMASocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned s
    // connected
 
    // set peername if not done so already (e.g. by connect(hostname) )
-   if(!this->peername)
+   if(!this->peername[0])
    {
-      this->peername = SocketTk_endpointAddrToString(ipaddress, port);
+      SocketTk_endpointAddrToStringNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
       this->peerIP = *ipaddress;
    }
 
@@ -119,7 +119,6 @@ bool _RDMASocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigned sh
    RDMASocket* thisCast = (RDMASocket*)this;
 
    bool bindRes;
-   size_t peernameLen;
 
    bindRes = IBVSocket_bindToAddr(&thisCast->ibvsock, ipaddress, port);
    if(!bindRes)
@@ -128,11 +127,7 @@ bool _RDMASocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigned sh
       return false;
    }
 
-
-   // 16 chars text + 8 (include max port len + colon + terminating zero)
-   peernameLen = 16 + 8;
-   this->peername = os_kmalloc(peernameLen);
-   snprintf(this->peername, peernameLen, "Listen(Port: %u)", (unsigned)port);
+   this->boundPort = port;
 
    return true;
 }
@@ -149,6 +144,8 @@ bool _RDMASocket_listen(Socket* this)
       printk_fhgfs(KERN_WARNING, "Failed to set RDMASocket to listening mode.\n");
       return false;
    }
+
+   snprintf(this->peername, SOCKET_PEERNAME_LEN, "Listen(Port: %u)", this->boundPort);
 
    return true;
 }

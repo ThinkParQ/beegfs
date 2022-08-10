@@ -83,6 +83,9 @@ BEEGFS_CFLAGS_RELEASE := -Wuninitialized
 
 BEEGFS_CFLAGS += -std=gnu99
 
+ifeq ($(shell echo | gcc -Wtype-limits -E - >/dev/null 2>&1 && echo 1),1)
+   BEEGFS_CFLAGS += -Wno-type-limits
+endif
 
 ifeq ($(BEEGFS_DEBUG),)
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_RELEASE)

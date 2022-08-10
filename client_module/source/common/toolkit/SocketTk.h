@@ -6,7 +6,7 @@
 #include <common/toolkit/Time.h>
 #include <linux/poll.h>
 
-#define SOCKETTK_ENDPOINTSTR_LEN       24 // size for _endpointAddrToStringNoAlloc()
+#define SOCKETTK_ENDPOINTSTR_LEN       SOCKET_PEERNAME_LEN // size for _endpointAddrToStringNoAlloc()
 
 
 // forward declarations

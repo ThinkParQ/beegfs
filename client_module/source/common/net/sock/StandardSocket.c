@@ -246,118 +246,59 @@ void __StandardSocket_setAllocMode(StandardSocket* this, gfp_t flags)
 int _StandardSocket_setsockopt(StandardSocket* this, int level,
    int optname, char* optval, int optlen)
 {
-   int retVal = -EINVAL;
+   struct socket *sock = this->sock;
 
-#if defined(KERNEL_HAS_SOCK_SETSOCKOPT_SOCKPTR_T_PARAM)
-   sockptr_t optvalptr = KERNEL_SOCKPTR(optval);
-#else
-   char* optvalptr = (char*)optval;
-#endif
+   #if defined(KERNEL_HAS_SOCK_SETSOCKOPT_SOCKPTR_T_PARAM)
 
+      sockptr_t ptr = KERNEL_SOCKPTR(optval);
 
-   WITH_PROCESS_CONTEXT {
       if (level == SOL_SOCKET)
-         retVal = sock_setsockopt(this->sock, level, optname, optvalptr, optlen);
+         return sock_setsockopt(sock, level, optname, ptr, optlen);
       else
-         retVal = this->sock->ops->setsockopt(this->sock, level, optname, optvalptr, optlen);
-   }
+         return sock->ops->setsockopt(sock, level, optname, ptr, optlen);
 
-   return retVal;
-}
+   #elif defined(KERNEL_HAS_GET_FS)
 
-/**
- * Use this to query socket options.
- * Note: Behaves (almost) like user-space setsockopt.
- * Note: Only limited set of optnames supported.
- *
- * @param optname currently, only
- * @param optlen is an in and out argument
- * @return 0 on success, negative error code otherwise (=> different from userspace version)
- */
-int _StandardSocket_getsockopt(StandardSocket* this, int level, int optname,
-   char* optval, int* optlen)
-{
-   int retVal = -EINVAL;
+      char __user *ptr = (char __user __force *) optval;
+      int r;
 
-   // note: sock_getsockopt() is not exported to modules
+      WITH_PROCESS_CONTEXT
+         if (level == SOL_SOCKET)
+            r = sock_setsockopt(sock, level, optname, ptr, optlen);
+         else
+            r = sock->ops->setsockopt(sock, level, optname, ptr, optlen);
+      return r;
 
-   WITH_PROCESS_CONTEXT {
-      if(level == SOL_SOCKET)
-      {
-         switch(optname)
-         {
-            case SO_RCVBUF:
-               {
-                  if(*optlen == sizeof(int) )
-                  {
-                     struct socket* sock = StandardSocket_getRawSock(this);
-                     *(int*)optval = sock->sk->sk_rcvbuf;
-                     retVal = 0;
-                  }
-               } break;
+   #else
+      #error need set_fs()/get_fs() if sockptr_t is not available.
+   #endif
 
-            default:
-               {
-                  retVal = -ENOTSUPP;
-               } break;
-         }
-      }
-      else
-         retVal = this->sock->ops->getsockopt(this->sock, level, optname, optval, optlen);
-   }
-
-   return retVal;
+      // unreachable
+      BUG();
 }
 
 bool StandardSocket_setSoKeepAlive(StandardSocket* this, bool enable)
 {
-   int keepAliveVal = (enable ? 1 : 0);
+   int val = (enable ? 1 : 0);
 
-   int setRes = _StandardSocket_setsockopt(this,
-      SOL_SOCKET,
-      SO_KEEPALIVE,
-      (char*)&keepAliveVal,
-      sizeof(keepAliveVal) );
+   int r = _StandardSocket_setsockopt(this, SOL_SOCKET, SO_KEEPALIVE, (char *) &val, sizeof val);
 
-   if(setRes != 0)
-      return false;
-
-   return true;
+   return r == 0;
 }
 
 bool StandardSocket_setSoBroadcast(StandardSocket* this, bool enable)
 {
-   int broadcastVal = (enable ? 1 : 0);
+   int val = (enable ? 1 : 0);
 
-   int setRes = _StandardSocket_setsockopt(this,
-      SOL_SOCKET,
-      SO_BROADCAST,
-      (char*)&broadcastVal,
-      sizeof(broadcastVal) );
+   int r = _StandardSocket_setsockopt(this, SOL_SOCKET, SO_BROADCAST, (char *) &val, sizeof val);
 
-   if(setRes != 0)
-      return false;
-
-   return true;
+   return r == 0;
 }
 
-bool StandardSocket_getSoRcvBuf(StandardSocket* this, int* outSize)
+int StandardSocket_getSoRcvBuf(StandardSocket* this)
 {
-   int optlen = sizeof(*outSize);
-
-   int getRes = _StandardSocket_getsockopt(this,
-      SOL_SOCKET,
-      SO_RCVBUF,
-      (char*)outSize,
-      &optlen);
-
-   if(getRes)
-   {
-      printk_fhgfs_debug(KERN_INFO, "getSoRcvBuf: error code: %d\n", getRes);
-      return false;
-   }
-
-   return true;
+   //TODO: should this be READ_ONCE()? There are different uses in the Linux kernel
+   return this->sock->sk->sk_rcvbuf;
 }
 
 /**
@@ -367,69 +308,52 @@ bool StandardSocket_getSoRcvBuf(StandardSocket* this, int* outSize)
  */
 bool StandardSocket_setSoRcvBuf(StandardSocket* this, int size)
 {
-   /* note: according to socket(7) man page, the value given to setsockopt() is doubled and the
-      doubled value is returned by getsockopt() */
+   int origBufLen = StandardSocket_getSoRcvBuf(this);
 
-   int halfSize = size/2;
-   bool getOrigRes;
-   int origBufLen;
-   int newBufLen;
-   int setRes;
-
-   getOrigRes = StandardSocket_getSoRcvBuf(this, &origBufLen);
-   if(!getOrigRes)
-      return false;
-
-   if(origBufLen >= (size) )
-   { // we don't decrease buf sizes (but this is not an error)
+   if (origBufLen >= size)
+   {
+      // we don't decrease buf sizes (but this is not an error)
       return true;
    }
+   else
+   {
+      /* note: according to socket(7) man page, the value given to setsockopt()
+       * is doubled and the doubled value is returned by getsockopt()
+       *
+       * update 2022-05-13: the kernel doubles the value passed to
+       * setsockopt(SO_RCVBUF) to allow for bookkeeping overhead. Halving the
+       * value is probably "not correct" but it's been this way since 2010 and
+       * changing it will potentially do more harm than good at this point.
+       */
 
-   setRes = _StandardSocket_setsockopt(this,
-      SOL_SOCKET,
-      SO_RCVBUF,
-      (char*)&halfSize,
-      sizeof(halfSize) );
+      int val = size/2;
 
-   if(setRes)
-      printk_fhgfs_debug(KERN_INFO, "%s: setSoRcvBuf error: %d;\n", __func__, setRes);
+      int r = _StandardSocket_setsockopt(this, SOL_SOCKET, SO_RCVBUF, (char *)
+            &val, sizeof val);
 
-   StandardSocket_getSoRcvBuf(this, &newBufLen);
+      if(r != 0)
+         printk_fhgfs_debug(KERN_INFO, "%s: setSoRcvBuf error: %d;\n", __func__, r);
 
-   return true;
+      return r == 0;
+   }
 }
-
 
 bool StandardSocket_setTcpNoDelay(StandardSocket* this, bool enable)
 {
-   int noDelayVal = (enable ? 1 : 0);
+   int val = (enable ? 1 : 0);
 
-   int noDelayRes = _StandardSocket_setsockopt(this,
-      IPPROTO_TCP,
-      TCP_NODELAY,
-      (char*)&noDelayVal,
-      sizeof(noDelayVal) );
+   int r = _StandardSocket_setsockopt(this, SOL_TCP, TCP_NODELAY, (char*) &val, sizeof val);
 
-   if(noDelayRes != 0)
-      return false;
-
-   return true;
+   return r == 0;
 }
 
 bool StandardSocket_setTcpCork(StandardSocket* this, bool enable)
 {
-   int corkVal = (enable ? 1 : 0);
+   int val = (enable ? 1 : 0);
 
-   int setRes = _StandardSocket_setsockopt(this,
-      SOL_TCP,
-      TCP_CORK,
-      (char*)&corkVal,
-      sizeof(corkVal) );
+   int r = _StandardSocket_setsockopt(this, SOL_TCP, TCP_CORK, (char*) &val, sizeof val);
 
-   if(setRes != 0)
-      return false;
-
-   return true;
+   return r == 0;
 }
 
 bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned short port)
@@ -454,14 +378,10 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
       .sin_port = htons(port),
    };
 
-
-   WITH_PROCESS_CONTEXT {
-      connRes = thisCast->sock->ops->connect(
-            thisCast->sock,
-            (struct sockaddr*) &serveraddr,
-            sizeof(serveraddr),
-            O_NONBLOCK); // non-blocking connect
-   }
+   connRes = kernel_connect(thisCast->sock,
+      (struct sockaddr*) &serveraddr,
+      sizeof(serveraddr),
+      O_NONBLOCK);
 
    if(connRes)
    {
@@ -486,9 +406,9 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
 
             // connection successfully established
 
-            if(!this->peername)
+            if(!this->peername[0])
             {
-               this->peername = SocketTk_endpointAddrToString(ipaddress, port);
+               SocketTk_endpointAddrToStringNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
                this->peerIP = *ipaddress;
             }
 
@@ -506,9 +426,9 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
    { // connected immediately
 
       // set peername if not done so already (e.g. by connect(hostname) )
-      if(!this->peername)
+      if(!this->peername[0])
       {
-         this->peername = SocketTk_endpointAddrToString(ipaddress, port);
+         SocketTk_endpointAddrToStringNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
          this->peerIP = *ipaddress;
       }
 
@@ -526,16 +446,11 @@ bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigne
    struct sockaddr_in bindAddr;
    int bindRes;
 
-   size_t peernameLen;
-
    bindAddr.sin_family = thisCast->sockDomain;
    bindAddr.sin_addr = *ipaddress;
    bindAddr.sin_port = htons(port);
 
-   bindRes = thisCast->sock->ops->bind(
-      thisCast->sock,
-      (struct sockaddr*)&bindAddr,
-      sizeof(bindAddr) );
+   bindRes = kernel_bind(thisCast->sock, (struct sockaddr*)&bindAddr, sizeof(bindAddr) );
 
    if(bindRes)
    {
@@ -543,11 +458,7 @@ bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigne
       return false;
    }
 
-
-   // 16 chars text + 8 (include max port len + colon + terminating zero)
-   peernameLen = 16 + 8;
-   this->peername = os_kmalloc(peernameLen);
-   snprintf(this->peername, peernameLen, "Listen(Port: %u)", (unsigned)port);
+   this->boundPort = port;
 
    return true;
 }
@@ -555,16 +466,17 @@ bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigne
 bool _StandardSocket_listen(Socket* this)
 {
    StandardSocket* thisCast = (StandardSocket*)this;
+   int r;
 
-   int listenRes;
-
-   listenRes = thisCast->sock->ops->listen(thisCast->sock, SOCKET_LISTEN_BACKLOG);
-   if(listenRes)
+   r = kernel_listen(thisCast->sock, SOCKET_LISTEN_BACKLOG);
+   if(r)
    {
       printk_fhgfs(KERN_WARNING, "Failed to set socket to listening mode. ErrCode: %d\n",
-         listenRes);
+         r);
       return false;
    }
+
+   snprintf(this->peername, SOCKET_PEERNAME_LEN, "Listen(Port: %d)", this->boundPort);
 
    return true;
 }
@@ -575,9 +487,7 @@ bool _StandardSocket_shutdown(Socket* this)
 
    int sendshutRes;
 
-   WITH_PROCESS_CONTEXT {
-      sendshutRes = thisCast->sock->ops->shutdown(thisCast->sock, SEND_SHUTDOWN);
-   }
+   sendshutRes = kernel_sock_shutdown(thisCast->sock, SEND_SHUTDOWN);
 
    if( (sendshutRes < 0) && (sendshutRes != -ENOTCONN) )
    {
@@ -598,13 +508,11 @@ bool _StandardSocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS)
    if(!shutRes)
       return false;
 
-   WITH_PROCESS_CONTEXT {
-      // receive until shutdown arrives
-      do
-      {
-         recvRes = Socket_recvT_kernel(this, buf, SOCKET_SHUTDOWN_RECV_BUF_LEN, 0, timeoutMS);
-      } while(recvRes > 0);
-   }
+   // receive until shutdown arrives
+   do
+   {
+      recvRes = Socket_recvT_kernel(this, buf, SOCKET_SHUTDOWN_RECV_BUF_LEN, 0, timeoutMS);
+   } while(recvRes > 0);
 
    if(recvRes &&
       (recvRes != -ECONNRESET) )
@@ -614,6 +522,29 @@ bool _StandardSocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS)
 
    return true;
 }
+
+
+
+/* Compatibility wrappers for sock_sendmsg / sock_recvmsg. At some point in the
+ * 4.x series, the size argument disappeared. */
+static int beegfs_recvmsg(struct socket *sock, struct msghdr *msg, size_t len, int flags)
+{
+#ifdef KERNEL_HAS_RECVMSG_SIZE
+   return sock_recvmsg(sock, msg, len, flags);
+#else
+   return sock_recvmsg(sock, msg, flags);
+#endif
+}
+static int beegfs_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
+{
+#ifdef KERNEL_HAS_RECVMSG_SIZE
+   return sock_sendmsg(sock, msg, len);
+#else
+   return sock_sendmsg(sock, msg);
+#endif
+}
+
+
 
 
 /**
@@ -627,18 +558,19 @@ ssize_t _StandardSocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags, int
 }
 
 
-#ifdef KERNEL_HAS_MSGHDR_ITER
-#define WITH_PROCESS_CONTEXT_IF_NO_ITER
-#else
-#define WITH_PROCESS_CONTEXT_IF_NO_ITER WITH_PROCESS_CONTEXT
-#endif
 
+#ifdef KERNEL_HAS_MSGHDR_ITER
+#define HAS_MSGHDR_ITER_BOOL true
+#else
+#define HAS_MSGHDR_ITER_BOOL false
+#endif
 
 
 ssize_t _StandardSocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
    fhgfs_sockaddr_in *to)
 {
    StandardSocket* thisCast = (StandardSocket*)this;
+   struct socket *sock = thisCast->sock;
 
    int sendRes;
    size_t len;
@@ -654,33 +586,35 @@ ssize_t _StandardSocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
    };
 
 #ifndef KERNEL_HAS_MSGHDR_ITER
+
    //XXX Note that if the BeeGFS_IovIter is of type ITER_KVEC, we're type punning
    //it here to get a struct iovec. Not sure if this is even supposed to work... :/
    struct iovec iov = iov_iter_iovec(beegfs_get_iovec_iov_iter(iter));
 
    msg.msg_iov       = &iov;
    msg.msg_iovlen    = 1;
+
    len = iov.iov_len;
+
 #else
-   msg.msg_iter = iter->_iov_iter;  //XXX XXX assuming that this is valid here... TODO make sure.
+   msg.msg_iter = iov_iter_from_beegfs_iov_iter(*iter);
+
    len = beegfs_iov_iter_count(iter);
+
 #endif // LINUX_VERSION_CODE
 
-   if(to)
+   if (to)
    {
       toSockAddr.sin_family = thisCast->sockDomain;
       toSockAddr.sin_addr = to->addr;
       toSockAddr.sin_port = to->port;
    }
 
-
-   WITH_PROCESS_CONTEXT_IF_NO_ITER {
-#ifndef KERNEL_HAS_SOCK_SENDMSG_NOLEN
-      sendRes = sock_sendmsg(thisCast->sock, &msg, len);
-#else
-      sendRes = sock_sendmsg(thisCast->sock, &msg);
-#endif
-   }
+   if (! HAS_MSGHDR_ITER_BOOL && beegfs_iov_iter_type(iter) == ITER_KVEC)
+      WITH_PROCESS_CONTEXT
+         sendRes = beegfs_sendmsg(sock, &msg, len);
+   else
+      sendRes = beegfs_sendmsg(sock, &msg, len);
 
    if(sendRes >= 0)
       beegfs_iov_iter_advance(iter, sendRes);
@@ -694,6 +628,7 @@ ssize_t StandardSocket_recvfrom(StandardSocket* this, BeeGFS_IovIter* iter, int 
    int recvRes;
    size_t len;
    struct sockaddr_in fromSockAddr;
+   struct socket *sock = this->sock;
 
    struct msghdr msg =
    {
@@ -713,17 +648,15 @@ ssize_t StandardSocket_recvfrom(StandardSocket* this, BeeGFS_IovIter* iter, int 
    msg.msg_iovlen    = 1;
    len = iov.iov_len;
 #else
-   msg.msg_iter = iter->_iov_iter;  //XXX XXX assuming that this is valid here... TODO make sure.
+   msg.msg_iter = iov_iter_from_beegfs_iov_iter(*iter);
    len = beegfs_iov_iter_count(iter);
 #endif // LINUX_VERSION_CODE
 
-   WITH_PROCESS_CONTEXT_IF_NO_ITER {
-#ifdef KERNEL_HAS_RECVMSG_SIZE
-      recvRes = sock_recvmsg(this->sock, &msg, len, flags);
-#else
-      recvRes = sock_recvmsg(this->sock, &msg, flags);
-#endif
-   }
+   if (! HAS_MSGHDR_ITER_BOOL && beegfs_iov_iter_type(iter) == ITER_KVEC)
+      WITH_PROCESS_CONTEXT
+         recvRes = beegfs_recvmsg(sock, &msg, len, flags);
+   else
+      recvRes = beegfs_recvmsg(sock, &msg, len, flags);
 
    if(recvRes > 0)
       beegfs_iov_iter_advance(iter, recvRes);

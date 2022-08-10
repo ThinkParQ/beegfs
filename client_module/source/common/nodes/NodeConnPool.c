@@ -32,7 +32,7 @@ void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentN
    Mutex_init(&this->mutex);
    Condition_init(&this->changeCond);
 
-   ConnectionList_init(&this->connList);
+   ConnectionList_init(&this->connList, true);
 
    ListTk_cloneNicAddressList(nicList, &this->nicList, true);
 
@@ -343,8 +343,8 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    if(likely(this->availableConns) )
    { // established connection available => grab it
       PooledSocket* pooledSock;
-
       ConnectionListIter connIter;
+
       ConnectionListIter_init(&connIter, &this->connList);
       for(; !ConnectionListIter_end(&connIter); ConnectionListIter_next(&connIter))
       {
@@ -361,6 +361,8 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       {
          PooledSocket_setAvailable(pooledSock, false);
          PooledSocket_setHasActivity(pooledSock);
+         // this invalidates the iterator but this code returns before the next iteration
+         ConnectionList_moveToTail(&this->connList, pooledSock);
 
          this->availableConns--;
          if (srcRdma)
@@ -616,8 +618,17 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
 
    Mutex_lock(&this->mutex);
 
+   if (unlikely(PooledSocket_getPool(pooledSock) != &this->connList))
+   {
+      printk_fhgfs(KERN_ERR, "%s:%d: socket %p not in pool %p\n",
+         __func__, __LINE__, pooledSock, this);
+      goto exit;
+   }
+
    this->availableConns++;
    PooledSocket_setAvailable(pooledSock, true);
+   ConnectionList_moveToHead(&this->connList, pooledSock);
+
    if (Socket_getSockType((Socket*) pooledSock) == NICADDRTYPE_RDMA)
    {
       NicAddressStats* st = IBVSocket_getNicStats(&((RDMASocket*) pooledSock)->ibvsock);
@@ -627,6 +638,7 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
 
    Condition_signal(&this->changeCond);
 
+exit:
    Mutex_unlock(&this->mutex);
 }
 
@@ -657,23 +669,13 @@ void __NodeConnPool_invalidateSpecificStreamSocket(NodeConnPool* this, Socket* s
    Logger* log = App_getLogger(this->app);
 
    bool sockValid = true;
-   ConnectionListIter connIter;
    PooledSocket* pooledSock = (PooledSocket*)sock;
    bool shutdownRes;
 
 
    Mutex_lock(&this->mutex); // L O C K
 
-   ConnectionListIter_init(&connIter, &this->connList);
-
-   for( ; !ConnectionListIter_end(&connIter); ConnectionListIter_next(&connIter) )
-   {
-      Socket* listSock = (Socket*)ConnectionListIter_value(&connIter);
-      if(listSock == sock)
-         break;
-   }
-
-   if(ConnectionListIter_end(&connIter) )
+   if (unlikely(PooledSocket_getPool(pooledSock) != &this->connList))
    { // socket not in the list
       Logger_logErrFormatted(log, logContext,
          "Tried to remove a socket that was not found in the pool: %s", Socket_getPeername(sock) );
@@ -689,7 +691,7 @@ void __NodeConnPool_invalidateSpecificStreamSocket(NodeConnPool* this, Socket* s
             st->established--;
       }
 
-      ConnectionListIter_remove(&connIter);
+      ConnectionList_remove(&this->connList, pooledSock);
       __NodeConnPool_statsRemoveNic(this, PooledSocket_getNicType(pooledSock) );
 
       Condition_signal(&this->changeCond);
@@ -733,7 +735,7 @@ unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this, bool idle
    ConnectionListIter availableIter;
 
    ConnectionList availableConnsList;
-   ConnectionList_init(&availableConnsList);
+   ConnectionList_init(&availableConnsList, false);
 
    Mutex_lock(&this->mutex); // L O C K
 
@@ -751,6 +753,8 @@ unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this, bool idle
       if(idleStreamsOnly && PooledSocket_getHasActivity(sock) )
          continue; // idle-only requested and this one was not idle
 
+      // don't worry about reordering the connList here, the socket
+      // will be removed in stage 2
       PooledSocket_setAvailable(sock, false);
       this->availableConns--;
       if (Socket_getSockType((Socket*)sock) == NICADDRTYPE_RDMA)
@@ -846,10 +850,9 @@ bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* soc
    if(sockType == NICADDRTYPE_STANDARD)
    {
       StandardSocket* stdSock = (StandardSocket*)sock;
-      int bufSize = Config_getConnRDMABufNum(cfg) * Config_getConnRDMABufSize(cfg); /* we're just
-         re-using the rdma buffer settings here. should later be changed to separate settings */
-
-      StandardSocket_setSoRcvBuf(stdSock, bufSize);
+      int bufSize = Config_getConnTCPRcvBufSize(cfg);
+      if (bufSize > 0)
+         StandardSocket_setSoRcvBuf(stdSock, bufSize);
    }
    else
    if(sockType == NICADDRTYPE_RDMA)

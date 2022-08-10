@@ -61,7 +61,7 @@ void beegfs_native_release()
 static bool is_pipe_iter(struct iov_iter* iter)
 {
 #ifdef KERNEL_HAS_ITER_PIPE
-      return iter->type & ITER_PIPE;
+      return iov_iter_type(iter) & ITER_PIPE;
 #else
       return false;
 #endif

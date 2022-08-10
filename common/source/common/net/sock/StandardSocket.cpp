@@ -702,7 +702,12 @@ int StandardSocket::getSoRcvBuf()
 void StandardSocket::setSoRcvBuf(int size)
 {
    /* note: according to socket(7) man page, the value given to setsockopt() is doubled and the
-      doubled value is returned by getsockopt() */
+      doubled value is returned by getsockopt()
+
+      update 2022-05-13: the kernel doubles the value passed to setsockopt(SO_RCVBUF) to allow
+      for bookkeeping overhead. Halving the value is probably "not correct" but it's been this
+      way since 2010 and changing it will potentially do more harm than good at this point.
+   */
 
    int halfSize = size/2;
    int origBufLen = getSoRcvBuf();

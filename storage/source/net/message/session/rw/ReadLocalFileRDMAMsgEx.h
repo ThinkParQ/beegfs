@@ -7,74 +7,106 @@
 #include <common/net/message/session/rw/ReadLocalFileRDMAMsg.h>
 #include <common/storage/StorageErrors.h>
 #include <session/SessionLocalFileStore.h>
+#include "ReadLocalFileV2MsgEx.h"
 
-class StorageTarget;
-
-class ReadLocalFileRDMAMsgEx : public ReadLocalFileRDMAMsg
+/**
+ * Implements RDMA write protocol.
+ */
+class ReadLocalFileRDMAMsgSender : public ReadLocalFileRDMAMsg
 {
    public:
-      virtual bool processIncoming(ResponseContext& ctx);
+      struct ReadState : public ReadStateBase
+      {
+         RdmaInfo* rdma;
+         uint64_t rBuf;
+         size_t rLen;
+         uint64_t rOff;
+
+         ReadState(const char* logContext, uint64_t toBeRead,
+            SessionLocalFile* sessionLocalFile) :
+            ReadStateBase(logContext, toBeRead, sessionLocalFile) {}
+
+      };
 
    private:
-      SessionLocalFileStore* sessionLocalFiles;
+      friend class ReadLocalFileMsgExBase<ReadLocalFileRDMAMsgSender, ReadState>;
 
+      static std::string logContextPref;
 
-      int64_t incrementalReadStatefulAndSendRDMA(ResponseContext& ctx,
-         SessionLocalFile* sessionLocalFile);
-
-      void checkAndStartReadAhead(SessionLocalFile* sessionLocalFile, ssize_t readAheadTriggerSize,
-         off_t currentOffset, off_t readAheadSize);
-
-      FhgfsOpsErr openFile(const StorageTarget& target, SessionLocalFile* sessionLocalFile);
-
-
-      // inliners
-
-      /**
-       * Send error code upon failure.
-       */
-      inline void sendError(ResponseContext& ctx, int64_t errorCode)
+      inline void sendLengthInfo(Socket* sock, int64_t lengthInfo)
       {
-         char buf[sizeof(uint64_t)];
-         Serializer ser(buf, sizeof(uint64_t));
-
-         LOG_DEBUG("ReadLocalFileRDMAMsgEx:sendError", Log_DEBUG, "error: " + StringTk::uint64ToHexStr((uint64_t)errorCode));
-         errorCode = HOST_TO_LE_64(errorCode);
-         ser % errorCode;
-         ctx.getSocket()->send(buf, sizeof(uint64_t), 0);
+         lengthInfo = HOST_TO_LE_64(lengthInfo);
+         sock->send(&lengthInfo, sizeof(int64_t), 0);
       }
 
       /**
-       * Write data to the remote buffer.
+       * RDMA write data to the remote buffer.
        */
-      inline ssize_t writeData(ResponseContext &ctx, char *buf, size_t bufLen, uint64_t rBuf, unsigned rKey)
+      inline ssize_t readStateSendData(Socket* sock, ReadState& rs, char* buf, bool isFinal)
       {
-         ssize_t writeRes = 0;
-         LOG_DEBUG("ReadLocalFileRDMAMsgEx:writeData", Log_DEBUG,
-            "buf: " + StringTk::uint64ToHexStr((uint64_t)buf) + "   "
-            "bufLen: " + StringTk::int64ToStr(bufLen) + "   "
-            "rbuf: " + StringTk::uint64ToHexStr(rBuf) + "   "
-            "rkey: " + StringTk::uintToHexStr(rKey));
-         if (bufLen > 0)
+         ssize_t writeRes = sock->write(buf, rs.readRes, 0, rs.rBuf + rs.rOff, rs.rdma->key);
+         LOG_DEBUG(rs.logContext, Log_DEBUG,
+            "buf: " + StringTk::uint64ToHexStr((uint64_t)buf) + "; "
+            "bufLen: " + StringTk::int64ToStr(rs.readRes) + "; "
+            "rbuf: " + StringTk::uint64ToHexStr(rs.rBuf) + "; "
+            "rkey: " + StringTk::uintToHexStr(rs.rdma->key) + "; "
+            "writeRes: " + StringTk::int64ToStr(writeRes));
+
+         if (unlikely(writeRes != rs.readRes))
          {
-            writeRes = ctx.getSocket()->write(buf, bufLen, 0, rBuf, rKey);
+            LogContext(rs.logContext).logErr("Unable to write file data to client. "
+               "FileID: " + rs.sessionLocalFile->getFileID() + "; "
+               "SysErr: " + System::getErrString());
+            writeRes = -1;
          }
+
+         if (isFinal && likely(writeRes >= 0))
+            sendLengthInfo(sock, getCount() - rs.toBeRead);
+
          return writeRes;
       }
 
-      /**
-       * Send length of data written.
-       */
-      inline void sendDone(ResponseContext &ctx, int64_t lengthInfo)
+      inline ssize_t getReadLength(ReadState& rs, ssize_t len)
       {
-         char buf[sizeof(uint64_t)];
-         Serializer ser(buf, sizeof(uint64_t));
+         return BEEGFS_MIN(len, ssize_t(rs.rLen - rs.rOff));
+      }
 
-         LOG_DEBUG("ReadLocalFileRDMAMsgEx:sendDone", Log_DEBUG, "length: " + StringTk::uint64ToHexStr((uint64_t)lengthInfo));
-         ser % lengthInfo;
-         ctx.getSocket()->send(buf, sizeof(uint64_t), 0);
+      inline bool readStateInit(ReadState& rs)
+      {
+         rs.rdma = getRdmaInfo();
+         if (unlikely(!rs.rdma->next(rs.rBuf, rs.rLen, rs.rOff)))
+         {
+            LogContext(rs.logContext).logErr("No entities in RDMA buffers.");
+            return false;
+         }
+         return true;
+      }
+
+      inline bool readStateNext(ReadState& rs)
+      {
+         rs.rOff += rs.readRes;
+         if (rs.rOff == rs.rLen)
+         {
+            if (unlikely(!rs.rdma->next(rs.rBuf, rs.rLen, rs.rOff)))
+            {
+               LogContext(rs.logContext).logErr("RDMA buffers exhausted");
+               return false;
+            }
+         }
+         return true;
+      }
+
+      inline size_t getBuffers(ResponseContext& ctx, char** dataBuf, char** sendBuf)
+      {
+         *dataBuf = ctx.getBuffer();
+         *sendBuf = *dataBuf;
+         return ctx.getBufferLength();
       }
 };
+
+typedef ReadLocalFileMsgExBase<ReadLocalFileRDMAMsgSender,
+                               ReadLocalFileRDMAMsgSender::ReadState> ReadLocalFileRDMAMsgEx;
+
 #endif /* BEEGFS_NVFS */
 
 #endif /*READLOCALFILERDMAMSGEX_H_*/

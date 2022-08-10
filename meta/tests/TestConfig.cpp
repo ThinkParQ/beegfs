@@ -98,7 +98,11 @@ TEST_F(TestConfig, defaultConfigFile)
    argv[0] = &appNameStr[0];
    argv[1] = &cfgLineStr[0];
 
-   Config config(argc, argv);
+   try {
+      Config config(argc, argv);
+   } catch (ConnAuthFileException& e) {
+      return;
+   }
 
    log.log(Log_DEBUG, "testDefaultConfigFile finished");
 }

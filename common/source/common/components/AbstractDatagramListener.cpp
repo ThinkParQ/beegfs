@@ -45,8 +45,9 @@ bool AbstractDatagramListener::initSock(unsigned short udpPort)
       udpSock = new StandardSocket(PF_INET, SOCK_DGRAM);
       udpSock->setSoBroadcast(true);
       udpSock->setSoReuseAddr(true);
-      udpSock->setSoRcvBuf(cfg->getConnRDMABufNum() * cfg->getConnRDMABufSize() ); /* note:
-         we're re-using rdma buffer settings here. should later be changed. */
+      int bufsize = cfg->getConnUDPRcvBufSize();
+      if (bufsize > 0)
+         udpSock->setSoRcvBuf(bufsize);
 
       udpSock->bind(udpPort);
 

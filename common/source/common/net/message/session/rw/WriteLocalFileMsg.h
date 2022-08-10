@@ -140,8 +140,17 @@ class WriteLocalFileMsgBase
          sock->send(data, count, 0);
       }
 
-      virtual unsigned getSupportedHeaderFeatureFlagsMask() const = 0;
+      unsigned getSupportedHeaderFeatureFlagsMask() const
+      {
+         return WRITELOCALFILEMSG_FLAG_SESSION_CHECK | WRITELOCALFILEMSG_FLAG_USE_QUOTA |
+            WRITELOCALFILEMSG_FLAG_DISABLE_IO | WRITELOCALFILEMSG_FLAG_BUDDYMIRROR |
+            WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND | WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_FORWARD;
+      }
 
+      bool isMsgValid() const
+      {
+         return true;
+      }
 };
 
 class WriteLocalFileMsg : public WriteLocalFileMsgBase, public NetMessageSerdes<WriteLocalFileMsg>
@@ -157,9 +166,7 @@ class WriteLocalFileMsg : public WriteLocalFileMsgBase, public NetMessageSerdes<
          const int64_t offset, const int64_t count) :
          WriteLocalFileMsgBase(clientNumID, fileHandleID, targetID, pathInfo, accessFlags,
             offset, count),
-         BaseType(NETMSGTYPE_WriteLocalFile)
-      {
-      }
+            BaseType(NETMSGTYPE_WriteLocalFile) {}
 
       /**
        * For deserialization only!
@@ -174,13 +181,9 @@ class WriteLocalFileMsg : public WriteLocalFileMsgBase, public NetMessageSerdes<
          WriteLocalFileMsgBase::setUserdataForQuota(userID, groupID);
       }
 
-      // getSupportedHeaderFeatureFlagsMask() must be defined in WriteLocalFileMsg
-      // for the NetMessageSerdes registration to work.
       unsigned getSupportedHeaderFeatureFlagsMask() const
       {
-         return WRITELOCALFILEMSG_FLAG_SESSION_CHECK | WRITELOCALFILEMSG_FLAG_USE_QUOTA |
-            WRITELOCALFILEMSG_FLAG_DISABLE_IO | WRITELOCALFILEMSG_FLAG_BUDDYMIRROR |
-            WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND | WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_FORWARD;
+         return WriteLocalFileMsgBase::getSupportedHeaderFeatureFlagsMask();
       }
 
 };

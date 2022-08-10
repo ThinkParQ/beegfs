@@ -198,7 +198,6 @@ const char* NIC_nicTypeToString(NicAddrType_t nicType)
 char* NIC_nicAddrToString(NicAddress* nicAddr)
 {
    char* nicAddrStr;
-   char* resultStr;
    char ipStr[NICADDRESS_IP_STR_LEN];
    const char* typeStr;
 
@@ -219,10 +218,7 @@ char* NIC_nicAddrToString(NicAddress* nicAddr)
 
    snprintf(nicAddrStr, NIC_STRING_LEN, "%s[ip addr: %s; type: %s]", nicAddr->name, ipStr, typeStr);
 
-   resultStr = StringTk_strDup(nicAddrStr); // create string with min required size
-   kfree(nicAddrStr);
-
-   return resultStr;
+   return nicAddrStr;
 }
 
 bool NIC_supportsSDP(NicAddressList* nicList)

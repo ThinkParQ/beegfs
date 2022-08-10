@@ -81,11 +81,14 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connBacklogTCP",             "64", addDashes);
    configMapRedefine("connMaxInternodeNum",        "6", addDashes);
    configMapRedefine("connFallbackExpirationSecs", "900", addDashes);
+   configMapRedefine("connTCPRcvBufSize",          "0", addDashes);
+   configMapRedefine("connUDPRcvBufSize",          "0", addDashes);
    configMapRedefine("connRDMABufSize",            "8192", addDashes);
    configMapRedefine("connRDMABufNum",             "70", addDashes);
    configMapRedefine("connRDMATypeOfService",      "0", addDashes);
    configMapRedefine("connNetFilterFile",          "", addDashes);
    configMapRedefine("connAuthFile",               "", addDashes);
+   configMapRedefine("connDisableAuthentication",  "false", addDashes);
    configMapRedefine("connTcpOnlyFilterFile",      "", addDashes);
 
    configMapRedefine("sysMgmtdHost",               "",    addDashes);
@@ -148,6 +151,10 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
       }
       else if (testConfigMapKeyMatch(iter, "connFallbackExpirationSecs", addDashes))
          connFallbackExpirationSecs = StringTk::strToUInt(iter->second);
+      else if (testConfigMapKeyMatch(iter, "connTCPRcvBufSize", addDashes))
+         connTCPRcvBufSize = StringTk::strToInt(iter->second);
+      else if (testConfigMapKeyMatch(iter, "connUDPRcvBufSize", addDashes))
+         connUDPRcvBufSize = StringTk::strToInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "connRDMABufSize", addDashes))
          connRDMABufSize = StringTk::strToUInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "connRDMABufNum", addDashes))
@@ -158,6 +165,8 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          connNetFilterFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "connAuthFile", addDashes))
          connAuthFile = iter->second;
+      else if (testConfigMapKeyMatch(iter, "connDisableAuthentication", addDashes))
+         connDisableAuthentication = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connTcpOnlyFilterFile", addDashes))
          connTcpOnlyFilterFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "sysMgmtdHost", addDashes))
@@ -236,10 +245,14 @@ void AbstractConfig::initInterfacesList(const std::string& connInterfacesFile,
  */
 void AbstractConfig::initConnAuthHash(const std::string& connAuthFile, uint64_t* outConnAuthHash)
 {
-   if(connAuthFile.empty() )
+   if(connAuthFile.empty())
    {
-      *outConnAuthHash = 0;
-      return; // no file given => no hash to be generated
+      if (connDisableAuthentication) {
+         *outConnAuthHash = 0;
+         return; // connAuthFile explicitly disabled => no hash to be generated
+      }
+      else
+         throw ConnAuthFileException("No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
    }
 
    // open file...
@@ -305,6 +318,22 @@ void AbstractConfig::initConnAuthHash(const std::string& connAuthFile, uint64_t*
    const uint64_t low  = BufferTk::hash32(&buf[len1stHalf], len2ndHalf);
 
    *outConnAuthHash = (high << 32) | low;
+}
+
+/**
+ * Sets the value of connTCPRcvBufSize and connUDPRcvBufSize according to the configuration.
+ * 0 indicates legacy behavior that uses RDMA bufsizes. Otherwise leave the values as
+ * configured.
+ */
+void AbstractConfig::initSocketBufferSizes()
+{
+   int legacy = connRDMABufSize * connRDMABufNum;
+
+   if (connTCPRcvBufSize == 0)
+      connTCPRcvBufSize = legacy;
+
+   if (connUDPRcvBufSize == 0)
+      connUDPRcvBufSize = legacy;
 }
 
 /**

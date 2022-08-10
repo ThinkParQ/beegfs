@@ -5,6 +5,7 @@
 
 #include <libgen.h>
 #include <gtest/gtest.h>
+#include <common/app/config/ConnAuthFileException.h>
 
 #define DUMMY_NOEXIST_CONFIG_FILE "/tmp/nonExistantConfigFile.fsck"
 #define DUMMY_EMPTY_CONFIG_FILE "/tmp/emptyConfigFile.fsck"

@@ -5,6 +5,7 @@
 #include <common/Common.h>
 #include <common/toolkit/MapTk.h>
 #include "InvalidConfigException.h"
+#include "ConnAuthFileException.h"
 #include "ICommonConfig.h"
 
 
@@ -41,6 +42,7 @@ class AbstractConfig : public ICommonConfig
       void initInterfacesList(const std::string& connInterfacesFile,
                               std::string& inoutConnInterfacesList);
       void initConnAuthHash(const std::string& connAuthFile, uint64_t* outConnAuthHash);
+      void initSocketBufferSizes();
 
       // inliners
 

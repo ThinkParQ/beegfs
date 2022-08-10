@@ -3,17 +3,19 @@
 #include "IBVBuffer.h"
 #include "IBVSocket.h"
 
-bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen)
+bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen,
+    enum dma_data_direction dma_dir)
 {
    unsigned count = (bufLen + IBV_FRAGMENT_SIZE - 1) / IBV_FRAGMENT_SIZE;
    unsigned i;
 
    bufLen = MIN(IBV_FRAGMENT_SIZE, bufLen);
 
+   buffer->dma_dir = dma_dir;
    buffer->buffers = kzalloc(count * sizeof(*buffer->buffers), GFP_KERNEL);
    buffer->lists = kzalloc(count * sizeof(*buffer->lists), GFP_KERNEL);
    if(!buffer->buffers || !buffer->lists)
-      goto fail_alloc;
+      goto fail;
 
    for(i = 0; i < count; i++)
    {
@@ -23,10 +25,21 @@ bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen)
       buffer->lists[i].lkey = ctx->pd->local_dma_lkey;
 #endif
       buffer->lists[i].length = bufLen;
-      buffer->buffers[i] = dma_alloc_coherent(ctx->pd->device->dma_device, bufLen,
-         &buffer->lists[i].addr, GFP_KERNEL);
-      if(!buffer->buffers[i])
-         goto fail_dma;
+      buffer->buffers[i] = kmalloc(bufLen, GFP_KERNEL);
+      if(unlikely(!buffer->buffers[i]))
+      {
+         printk_fhgfs(KERN_ERR, "Failed to allocate buffer size=%zu\n", bufLen);
+         goto fail;
+      }
+      buffer->lists[i].addr = ib_dma_map_single(ctx->pd->device, buffer->buffers[i],
+         bufLen, dma_dir);
+      if (unlikely(ib_dma_mapping_error(ctx->pd->device, buffer->lists[i].addr)))
+      {
+         buffer->lists[i].addr = 0;
+         printk_fhgfs(KERN_ERR, "Failed to dma map buffer size=%zu\n", bufLen);
+         goto fail;
+      }
+      BUG_ON(buffer->lists[i].addr == 0);
    }
 
    buffer->bufferSize = bufLen;
@@ -34,32 +47,31 @@ bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen)
    buffer->bufferCount = count;
    return true;
 
-fail_dma:
-   for(i = 0; i < count; i++)
-   {
-      if(buffer->buffers[i])
-         dma_free_coherent(ctx->pd->device->dma_device, buffer->bufferSize,
-            buffer->buffers[i], buffer->lists[i].addr);
-   }
-
-fail_alloc:
-   kfree(buffer->buffers);
-   kfree(buffer->lists);
+fail:
+   IBVBuffer_free(buffer, ctx);
    return false;
 }
 
 void IBVBuffer_free(IBVBuffer* buffer, IBVCommContext* ctx)
 {
-   unsigned i;
-
-   for(i = 0; i < buffer->bufferCount; i++)
+   if(buffer->buffers && buffer->lists)
    {
-      dma_free_coherent(ctx->pd->device->dma_device, buffer->bufferSize,
-         buffer->buffers[i], buffer->lists[i].addr);
+      unsigned i;
+      for(i = 0; i < buffer->bufferCount; i++)
+      {
+         if (buffer->lists[i].addr)
+            ib_dma_unmap_single(ctx->pd->device, buffer->lists[i].addr,
+               buffer->bufferSize, buffer->dma_dir);
+         if (buffer->buffers[i])
+            kfree(buffer->buffers[i]);
+      }
    }
 
-   kfree(buffer->buffers);
-   kfree(buffer->lists);
+   if (buffer->buffers)
+      kfree(buffer->buffers);
+
+   if (buffer->lists)
+      kfree(buffer->lists);
 }
 
 ssize_t IBVBuffer_fill(IBVBuffer* buffer, BeeGFS_IovIter* iter)

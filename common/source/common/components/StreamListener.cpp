@@ -153,9 +153,9 @@ bool StreamListener::initSocks(unsigned short listenPort, NicListCapabilities* l
    {
       tcpListenSock = new StandardSocket(PF_INET, SOCK_STREAM);
       tcpListenSock->setSoReuseAddr(true);
-      tcpListenSock->setSoRcvBuf(cfg->getConnRDMABufNum() * cfg->getConnRDMABufSize() ); /* note:
-         we're re-using rdma buffer settings here. should later be changed.
-         note 2: these buf settings will automatically be applied to accepted socks. */
+      int bufsize = cfg->getConnTCPRcvBufSize();
+      if (bufsize > 0)
+         tcpListenSock->setSoRcvBuf(bufsize);
       tcpListenSock->bind(listenPort);
       tcpListenSock->listen();
 

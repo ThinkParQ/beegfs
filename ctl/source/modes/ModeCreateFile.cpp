@@ -96,7 +96,7 @@ int ModeCreateFile::execute()
    if(iter != cfg->end() )
    {
       mode = StringTk::strOctalToUInt(iter->second);
-      mode = mode & 0777; // trim invalid flags from mode
+      mode = mode & 07777; // trim invalid flags from mode
       cfg->erase(iter);
    }
    mode |= S_IFREG; // make sure mode contains the "file" flag

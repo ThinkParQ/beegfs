@@ -243,8 +243,13 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
 
 
 #ifdef KERNEL_HAS_STATX
+#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+extern int FhgfsOps_getattr(struct user_namespace* mnt_userns, const struct path* path,
+      struct kstat* kstat, u32 request_mask, unsigned int query_flags)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
 int FhgfsOps_getattr(const struct path* path, struct kstat* kstat, u32 request_mask,
       unsigned int query_flags)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    struct vfsmount* mnt = path->mnt;
    struct dentry* dentry = path->dentry;
@@ -288,7 +293,7 @@ int FhgfsOps_getattr(struct vfsmount* mnt, struct dentry* dentry, struct kstat* 
 
    if(!retVal)
    {
-      generic_fillattr(inode, kstat);
+      os_generic_fillattr(inode, kstat);
 
       kstat->blksize = Config_getTuneInodeBlockSize(cfg);
 
@@ -460,7 +465,11 @@ int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* value, 
 }
 
 #ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_POSIX_GET_ACL_HAS_RCU
+struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rcu)
+#else // KERNEL_POSIX_GET_ACL_HAS_RCU
 struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
+#endif // KERNEL_POSIX_GET_ACL_HAS_RCU
 {
    App* app = FhgfsOps_getApp(inode->i_sb);
    struct posix_acl* res = NULL;
@@ -474,6 +483,11 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
 
    int refreshRes;
+
+#ifdef KERNEL_POSIX_GET_ACL_HAS_RCU
+   if (rcu)
+      return ERR_PTR(-ECHILD);
+#endif // KERNEL_POSIX_GET_ACL_HAS_RCU
 
    forget_all_cached_acls(inode);
 
@@ -533,8 +547,13 @@ cleanup:
 }
 #endif // KERNEL_HAS_POSIX_GET_ACL
 
-#ifdef KERNEL_HAS_SET_ACL
-int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
+#if defined(KERNEL_HAS_SET_ACL)
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* inode,
+   struct posix_acl* acl, int type)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
+extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    App* app = FhgfsOps_getApp(inode->i_sb);
    int res;
@@ -600,7 +619,7 @@ cleanup:
 
    return res;
 }
-#endif // LINUX_KERNEL_VERSION_CODE
+#endif // KERNEL_HAS_SET_ACL
 
 #ifdef KERNEL_HAS_POSIX_GET_ACL
 /**
@@ -610,7 +629,7 @@ int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry)
 {
 #ifdef KERNEL_HAS_SET_ACL
    if (iattr->ia_valid & ATTR_MODE)
-      return posix_acl_chmod(dentry->d_inode, iattr->ia_mode);
+      return os_posix_acl_chmod(dentry->d_inode, iattr->ia_mode);
    else
       return 0;
 #else
@@ -674,7 +693,12 @@ cleanup:
 /**
  * @return 0 on success, negative linux error code otherwise
  */
+#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+extern int FhgfsOps_setattr(struct user_namespace* mnt_userns, struct dentry* dentry,
+   struct iattr* iattr)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
 int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    // note: called for chmod(), chown(), utime(), truncate()
    // note: changed fields can be determined by the iattr->ia_valid flags (ATTR_...)
@@ -700,7 +724,7 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
    }
 
 #ifdef KERNEL_HAS_SETATTR_PREPARE
-   setAttrPrepRes = setattr_prepare(dentry, iattr);
+   setAttrPrepRes = os_setattr_prepare(dentry, iattr);
    if(setAttrPrepRes < 0)
       return setAttrPrepRes;
 #else
@@ -866,11 +890,14 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
 /**
  * Create directory.
  */
-#ifdef KERNEL_HAS_UMODE_T
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_mkdir(struct user_namespace* mnt_userns, struct inode* dir, struct dentry* dentry,
+   umode_t mode)
+#elif defined(KERNEL_HAS_UMODE_T)
 int FhgfsOps_mkdir(struct inode* dir, struct dentry* dentry, umode_t mode)
 #else
 int FhgfsOps_mkdir(struct inode* dir, struct dentry* dentry, int mode)
-#endif // KERNEL_HAS_UMODE_T
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -981,8 +1008,13 @@ int FhgfsOps_rmdir(struct inode* dir, struct dentry* dentry)
  * @param isExclusiveCreate true if this is an exclusive (O_EXCL) create
  */
 #if defined KERNEL_HAS_ATOMIC_OPEN
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_createIntent(struct user_namespace* mnt_userns, struct inode* dir,
+   struct dentry* dentry, umode_t createMode, bool isExclusiveCreate)
+#else // KERNEL_HAS_IDMAPPED_MOUNTS
 int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t createMode,
    bool isExclusiveCreate)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 #elif defined KERNEL_HAS_UMODE_T
 int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t createMode,
    struct nameidata* nameidata)
@@ -1504,11 +1536,14 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
 /**
  * Create special file.
  */
-#ifdef KERNEL_HAS_UMODE_T
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_mknod(struct user_namespace* mnt_userns, struct inode* dir, struct dentry* dentry,
+   umode_t mode, dev_t dev)
+#elif defined(KERNEL_HAS_UMODE_T)
 int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, umode_t mode, dev_t dev)
 #else
 int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, int mode, dev_t dev)
-#endif // KERNEL_HAS_UMODE_T
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1571,7 +1606,12 @@ outErr:
  * @param dentry dentry of the new entry that we want to create
  * @param to where the symlink points to
  */
-int FhgfsOps_symlink(struct inode* dir, struct dentry* dentry, const char* to)
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_symlink(struct user_namespace* mnt_userns, struct inode* dir,
+   struct dentry* dentry, const char* to)
+#else
+extern int FhgfsOps_symlink(struct inode* dir, struct dentry* dentry, const char* to)
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1958,8 +1998,13 @@ void FhgfsOps_put_link(struct dentry* dentry, struct nameidata* nd, void* p)
 #endif
 
 
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_rename(struct user_namespace* mnt_userns, struct inode* inodeDirFrom,
+   struct dentry* dentryFrom, struct inode* inodeDirTo, struct dentry* dentryTo
+#else
 int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    struct inode* inodeDirTo, struct dentry* dentryTo
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 #ifdef KERNEL_HAS_RENAME_FLAGS
    , unsigned flags
 #endif

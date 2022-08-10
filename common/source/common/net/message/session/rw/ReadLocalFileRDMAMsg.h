@@ -6,13 +6,13 @@
 #include <common/nodes/NumNodeID.h>
 #include <common/storage/PathInfo.h>
 #include <common/storage/RdmaInfo.h>
+#include <common/app/log/LogContext.h>
 #include <common/net/message/session/rw/ReadLocalFileV2Msg.h>
 
 
 class ReadLocalFileRDMAMsg : public ReadLocalFileV2MsgBase, public NetMessageSerdes<ReadLocalFileRDMAMsg>
 {
    public:
-
       /**
        * @param fileHandleID just a reference, so do not free it as long as you use this object!
        */
@@ -20,10 +20,7 @@ class ReadLocalFileRDMAMsg : public ReadLocalFileV2MsgBase, public NetMessageSer
          PathInfo* pathInfoPtr, unsigned accessFlags, int64_t offset, int64_t count) :
          ReadLocalFileV2MsgBase(clientNumID, fileHandleID, targetID, pathInfoPtr, accessFlags,
             offset, count),
-         BaseType(NETMSGTYPE_ReadLocalFileRDMA)
-      {
-         this->rdmaInfo.initialize();
-      }
+         BaseType(NETMSGTYPE_ReadLocalFileRDMA) {}
 
       /**
        * For deserialization only!
@@ -36,21 +33,9 @@ class ReadLocalFileRDMAMsg : public ReadLocalFileV2MsgBase, public NetMessageSer
       static void serialize(This obj, Ctx& ctx)
       {
          ReadLocalFileV2MsgBase::serialize(obj, ctx);
-         ctx % obj->rdmaInfo.nents;
-         if ((0 < obj->rdmaInfo.nents) && (obj->rdmaInfo.nents < RDMA_MAX_DMA_COUNT))
-         {
-            ctx
-               % obj->rdmaInfo.tag
-               % obj->rdmaInfo.key;
 
-            for (size_t i = 0; i < obj->rdmaInfo.nents; i++)
-            {
-                ctx
-                   % obj->rdmaInfo.dma_address[i]
-                   % obj->rdmaInfo.dma_length[i]
-                   % obj->rdmaInfo.dma_offset[i];
-            }
-         }
+         ctx
+            % obj->rdmaInfo;
       }
 
 
@@ -59,18 +44,20 @@ class ReadLocalFileRDMAMsg : public ReadLocalFileV2MsgBase, public NetMessageSer
       RdmaInfo rdmaInfo;
 
    public:
-
-      RdmaInfo* getRdmaInfo()
+      inline RdmaInfo* getRdmaInfo()
       {
          return &rdmaInfo;
       }
 
       unsigned getSupportedHeaderFeatureFlagsMask() const
       {
-         return READLOCALFILEMSG_FLAG_SESSION_CHECK | READLOCALFILEMSG_FLAG_DISABLE_IO |
-            READLOCALFILEMSG_FLAG_BUDDYMIRROR | READLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND;
+         return ReadLocalFileV2MsgBase::getSupportedHeaderFeatureFlagsMask();
       }
 
+      bool isMsgValid() const
+      {
+         return rdmaInfo.isValid();
+      }
 };
 #endif /* BEEGFS_NVFS */
 
