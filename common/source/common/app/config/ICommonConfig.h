@@ -44,11 +44,25 @@ class ICommonConfig
       uint64_t    connAuthHash; // implicitly set based on hash of connAuthFile contents
       std::string connTcpOnlyFilterFile; // for IPs that only allow plain TCP (no RDMA etc)
 
+      int         connMsgLongTimeout;
+      int         connMsgMediumTimeout;
+      int         connMsgShortTimeout; // connection (response) timeouts in ms
+                                       // note: be careful here, because servers not
+                                       // responding for >30secs under high load is nothing
+                                       // unusual, so never use connMsgShortTimeout for
+                                       // IO-related operations.
+
+
+      int         connRDMATimeoutConnect;
+      int         connRDMATimeoutFlowSend;
+      int         connRDMATimeoutPoll;
+
       std::string sysMgmtdHost;
       unsigned    sysUpdateTargetStatesSecs;
 
       int         connectionRejectionRate;
       int         connectionRejectionCount;
+
 
    public:
       // getters & setters
@@ -180,6 +194,36 @@ class ICommonConfig
       const std::string& getConnTcpOnlyFilterFile() const
       {
          return connTcpOnlyFilterFile;
+      }
+
+      int getConnMsgLongTimeout() const
+      {
+        return connMsgLongTimeout;
+      }
+
+      int getConnMsgMediumTimeout() const
+      {
+        return connMsgMediumTimeout;
+      }
+
+      int getConnMsgShortTimeout() const
+      {
+        return connMsgShortTimeout;
+      }
+
+      int getConnRDMATimeoutConnect() const
+      {
+        return connRDMATimeoutConnect;
+      }
+
+      int getConnRDMATimeoutFlowSend() const
+      {
+        return connRDMATimeoutFlowSend;
+      }
+
+      int getConnRDMATimeoutPoll() const
+      {
+        return connRDMATimeoutPoll;
       }
 
       const std::string& getSysMgmtdHost() const

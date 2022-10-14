@@ -173,6 +173,8 @@ function init_multi_mode_single_configuration()
          for line in $file; do
             if [ -z "$line" ]; then
                continue # ignore empty line
+            elif echo "$line" | grep -qs "^\s*#" ; then
+               continue # ignore shell style comments
             fi
 
             mnt=`echo $line | awk '{print $1}'`

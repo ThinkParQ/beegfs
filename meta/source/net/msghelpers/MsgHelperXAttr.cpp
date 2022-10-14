@@ -222,7 +222,9 @@ FhgfsOpsErr MsgHelperXAttr::StreamXAttrState::readNextXAttr(Socket* socket, std:
    CharVector& value)
 {
    uint32_t nameLen;
-   ssize_t nameLenRes = socket->recvExactT(&nameLen, sizeof(nameLen), 0, CONN_SHORT_TIMEOUT);
+   Config* cfg = Program::getApp()->getConfig();
+
+   ssize_t nameLenRes = socket->recvExactT(&nameLen, sizeof(nameLen), 0, cfg->getConnMsgShortTimeout());
    if (nameLenRes < 0 || size_t(nameLenRes) < sizeof(nameLen))
       return FhgfsOpsErr_COMMUNICATION;
 
@@ -236,12 +238,12 @@ FhgfsOpsErr MsgHelperXAttr::StreamXAttrState::readNextXAttr(Socket* socket, std:
       return FhgfsOpsErr_RANGE;
 
    name.resize(nameLen);
-   if (socket->recvExactT(&name[0], nameLen, 0, CONN_SHORT_TIMEOUT) != (ssize_t) name.size())
+   if (socket->recvExactT(&name[0], nameLen, 0, cfg->getConnMsgShortTimeout()) != (ssize_t) name.size())
       return FhgfsOpsErr_COMMUNICATION;
 
    uint64_t valueLen;
    ssize_t valueLenRes = socket->recvExactT(&valueLen, sizeof(valueLen), 0,
-         CONN_SHORT_TIMEOUT);
+         cfg->getConnMsgShortTimeout());
    if (valueLenRes < 0 || size_t(valueLenRes) != sizeof(valueLen))
       return FhgfsOpsErr_COMMUNICATION;
 
@@ -250,7 +252,7 @@ FhgfsOpsErr MsgHelperXAttr::StreamXAttrState::readNextXAttr(Socket* socket, std:
       return FhgfsOpsErr_RANGE;
 
    value.resize(valueLen);
-   if (socket->recvExactT(&value[0], valueLen, 0, CONN_SHORT_TIMEOUT) != ssize_t(valueLen))
+   if (socket->recvExactT(&value[0], valueLen, 0, cfg->getConnMsgShortTimeout()) != ssize_t(valueLen))
       return FhgfsOpsErr_COMMUNICATION;
 
    return FhgfsOpsErr_AGAIN;

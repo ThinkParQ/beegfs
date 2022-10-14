@@ -24,6 +24,7 @@
 #include <linux/mpage.h>
 #include <linux/backing-dev.h>
 #include <linux/pagemap.h>
+#include <linux/delay.h>
 
 
 #ifdef CONFIG_COMPAT
@@ -48,6 +49,9 @@ static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec
 static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter *from);
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to);
 #endif // LINUX_VERSION_CODE
+
+#define MMAP_RETRY_LOCK_EASY 100
+#define MMAP_RETRY_LOCK_HARD 500
 
 /**
  * Operations for files with cache type "buffered" and "none".
@@ -949,6 +953,8 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
       // coherent without locking everything all the time. if this produces inconsistent data,
       // something must have been racy anyway.
       invalidate_inode_pages2(file->f_mapping);
+      // Increment coherent read/write counter
+      atomic_inc(&fhgfsInode->coRWInProg);
    }
 
    readRes = FhgfsOpsHelper_readCached(buf, size, *offsetPointer, fhgfsInode, fileInfo, &ioInfo);
@@ -956,6 +962,8 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
 
    if(unlikely(readRes < 0) )
    { // read error (=> transform negative fhgfs error code to system error code)
+      if (app->cfg->tuneCoherentBuffers)
+         atomic_dec(&fhgfsInode->coRWInProg);
       return FhgfsOpsErr_toSysErr(-readRes);
    }
 
@@ -968,7 +976,11 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
          file, &buf[readRes], size - readRes, *offsetPointer);
 
       if(unlikely(readSparseRes < 0) )
+      {
+         if (app->cfg->tuneCoherentBuffers)
+            atomic_dec(&fhgfsInode->coRWInProg);
          return readSparseRes;
+      }
 
       *offsetPointer += readSparseRes;
       readRes += readSparseRes;
@@ -979,6 +991,10 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
    // add to /proc/<pid>/io
    task_io_account_read(readRes);
 
+   // Decrement coherent read/write counter
+   if (app->cfg->tuneCoherentBuffers)
+      atomic_dec(&fhgfsInode->coRWInProg);
+ 
    return readRes;
 }
 
@@ -1287,6 +1303,8 @@ ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
        * coherent without locking everything all the time. if this produces inconsistent data,
        * something must have been racy anyway. */
       invalidate_inode_pages2(file->f_mapping);
+      //Increment coherent rw counter
+      atomic_inc(&fhgfsInode->coRWInProg);
    }
 
    if(isLocallyLockedAppend)
@@ -1362,6 +1380,9 @@ unlockappend_and_exit:
    if(isLocallyLockedAppend)
       Fhgfsinode_appendUnlock(fhgfsInode); // U N L O C K (append)
 
+   // Decrement coherent read/write counter
+   if (app->cfg->tuneCoherentBuffers)
+      atomic_dec(&fhgfsInode->coRWInProg);
    return writeRes;
 }
 
@@ -1762,28 +1783,64 @@ int FhgfsOps_mmap(struct file* file, struct vm_area_struct* vma)
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    Logger* log = App_getLogger(app);
    const char* logContext = "FhgfsOps_mmap";
+   int locked;
+   int retry;
+   int max_retry;
 
    FhgfsIsizeHints iSizeHints;
 
    int retVal;
    struct inode* inode = file_inode(file);
+   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
 
    if(unlikely(Logger_getLogLevel(log) >= 5) )
       FhgfsOpsHelper_logOp(5, app, file_dentry(file), inode, logContext);
+
+   locked = 0;
+   retry = 0;
+
+   /*
+    * If there are reads/writes already in progress, retry for the inode cache
+    * lock till MMAP_RETRY_LOCK_EASY iterations. reads/write will anyway
+    * flush the cache. So even if mmap can not get the inode cache lock, it can
+    * proceed with the operation. If read/writes are not in progress, wait for
+    * more iteration before we get the lock. But mmap should not block forever
+    * for the cache lock to avoid the deadlock condition.
+    * If mmap has to proceed without getting lock, we will print warning message
+    * indicating cache might not be coherent.
+    */
+
+   max_retry = atomic_read(&fhgfsInode->coRWInProg) > 0 ?
+               MMAP_RETRY_LOCK_EASY : MMAP_RETRY_LOCK_HARD;
 
    if (app->cfg->tuneCoherentBuffers)
    {
       FhgfsOpsErr flushRes;
 
-      FhgfsInode_fileCacheExclusiveLock(BEEGFS_INODE(inode));
-
-      flushRes = __FhgfsOpsHelper_flushCacheUnlocked(app, BEEGFS_INODE(inode), false);
-      if (flushRes != FhgfsOpsErr_SUCCESS)
+      do
       {
-         FhgfsInode_fileCacheExclusiveUnlock(BEEGFS_INODE(inode));
-         retVal = FhgfsOpsErr_toSysErr(flushRes);
-         goto exit;
+         locked = FhgfsInode_fileCacheExclusiveTryLock(fhgfsInode);
+         if (locked)
+            break;
+
+         // Sleep and retry for the lock
+         mdelay(10);
+         retry++;
+      } while (!locked && retry < max_retry);
+
+      if (locked)
+      {
+         flushRes = __FhgfsOpsHelper_flushCacheUnlocked(app, fhgfsInode, false);
+         if (flushRes != FhgfsOpsErr_SUCCESS)
+         {
+            FhgfsInode_fileCacheExclusiveUnlock(fhgfsInode);
+            retVal = FhgfsOpsErr_toSysErr(flushRes);
+            goto exit;
+         }
       }
+      else
+         printk_fhgfs_debug(KERN_WARNING,
+                            "mmap couldn't flush the cache. Cache might not be coherent\n");
    }
 
    retVal = generic_file_mmap(file, vma);
@@ -1791,8 +1848,8 @@ int FhgfsOps_mmap(struct file* file, struct vm_area_struct* vma)
    if(!retVal)
       retVal = __FhgfsOps_doRefreshInode(app, inode, NULL, &iSizeHints, true);
 
-   if (app->cfg->tuneCoherentBuffers)
-      FhgfsInode_fileCacheExclusiveUnlock(BEEGFS_INODE(inode));
+   if (app->cfg->tuneCoherentBuffers && locked)
+      FhgfsInode_fileCacheExclusiveUnlock(fhgfsInode);
 
 exit:
    LOG_DEBUG_FORMATTED(log, 5, logContext, "result: %d", retVal);

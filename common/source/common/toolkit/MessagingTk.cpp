@@ -16,8 +16,6 @@
 // performance critical, and the overhead of a 2k allocation is small enough to ignore it.
 #define MSGBUF_SMALL_SIZE 2048
 
-DEBUG_ENV_VAR(unsigned, RECEIVE_TIMEOUT, CONN_LONG_TIMEOUT, "BEEGFS_MESSAGING_RECV_TIMEOUT_MS");
-
 bool MessagingTk::requestResponse(RequestResponseArgs* rrArgs)
 {
    FhgfsOpsErr commRes = requestResponseComm(rrArgs);
@@ -312,6 +310,11 @@ FhgfsOpsErr MessagingTk::requestResponseTarget(RequestResponseTarget* rrTarget,
 std::vector<char> MessagingTk::recvMsgBuf(Socket& socket, int minTimeout)
 try
 {
+   AbstractApp* app = PThread::getCurrentThreadApp();
+   int connMsgLongTimeout = app->getCommonConfig()->getConnMsgLongTimeout();
+
+   DEBUG_ENV_VAR(unsigned, RECEIVE_TIMEOUT, connMsgLongTimeout, "BEEGFS_MESSAGING_RECV_TIMEOUT_MS");
+
    const int recvTimeoutMS = minTimeout < 0
       ? -1
       : std::max<int>(minTimeout, RECEIVE_TIMEOUT);

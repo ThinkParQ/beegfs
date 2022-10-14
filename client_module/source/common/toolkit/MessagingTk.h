@@ -82,10 +82,11 @@ ssize_t MessagingTk_recvMsgBuf(App* app, Socket* sock, char* bufIn, size_t bufIn
    size_t numReceived = 0;
    ssize_t recvRes;
    size_t msgLength;
+   Config* cfg = App_getConfig(app);
 
    // receive at least the message header
 
-   recvRes = Socket_recvExactTEx(sock, bufIn, NETMSG_MIN_LENGTH, 0, CONN_LONG_TIMEOUT,
+   recvRes = Socket_recvExactTEx(sock, bufIn, NETMSG_MIN_LENGTH, 0, cfg->connMsgLongTimeout,
          &numReceived);
 
    if(unlikely(recvRes <= 0) )
@@ -116,7 +117,7 @@ ssize_t MessagingTk_recvMsgBuf(App* app, Socket* sock, char* bufIn, size_t bufIn
    }
 
    recvRes = Socket_recvExactTEx(sock, &bufIn[numReceived], msgLength-numReceived, 0,
-         CONN_LONG_TIMEOUT, &numReceived);
+         cfg->connMsgLongTimeout, &numReceived);
 
    if(unlikely(recvRes <= 0) )
       goto socket_exception;

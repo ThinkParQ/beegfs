@@ -78,6 +78,10 @@ unsigned long IBVSocket_poll(IBVSocket* _this, short events, bool finishPoll)
    return ~0;
 }
 
+void IBVSocket_setTimeouts(IBVSocket* _this, int connectMS,
+   int completionMS, int flowSendMS, int flowRecvMS, int pollMS)
+{
+}
 
 void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService)
 {

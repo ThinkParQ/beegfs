@@ -27,6 +27,7 @@ class RDMASocket : public PooledSocket
       virtual bool checkDelayedEvents() = 0;
 
       virtual void setBuffers(unsigned bufNum, unsigned bufSize) = 0;
+      virtual void setTimeouts(int connectMS, int flowSendMS, int pollMS) = 0;
       virtual void setTypeOfService(uint8_t typeOfService) = 0;
 
       virtual void setConnectionRejectionRate(unsigned rate) = 0;

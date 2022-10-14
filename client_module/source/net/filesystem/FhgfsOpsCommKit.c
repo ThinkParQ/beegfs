@@ -982,13 +982,15 @@ static ssize_t __commkit_readfile_receive(CommKitContext* context, ReadfileState
    ssize_t recvRes;
    Socket* socket = currentState->base.socket;
 
+   Config* cfg = App_getConfig(context->app);
+
    if(BEEGFS_SHOULD_FAIL(commkit_readfile_receive_timeout, 1) )
       recvRes = -ETIMEDOUT;
    else
    if(exact)
-      recvRes = Socket_recvExactT(socket, buffer, length, 0, CONN_LONG_TIMEOUT);
+      recvRes = Socket_recvExactT(socket, buffer, length, 0, cfg->connMsgLongTimeout);
    else
-      recvRes = Socket_recvT(socket, buffer, length, 0, CONN_LONG_TIMEOUT);
+      recvRes = Socket_recvT(socket, buffer, length, 0, cfg->connMsgLongTimeout);
 
    if(unlikely(recvRes < 0) )
    {

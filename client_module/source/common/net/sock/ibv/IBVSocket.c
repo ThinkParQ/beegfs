@@ -18,12 +18,23 @@
 #include <rdma/ib_cm.h>
 
 
-#define IBVSOCKET_CONN_TIMEOUT_MS         5000
-#define IBVSOCKET_COMPLETION_TIMEOUT_MS   300000 /* this also includes send completion wait times */
+#define IBVSOCKET_CONN_TIMEOUT_MS                  5000
+ /* this also includes send completion wait times */
+#define IBVSOCKET_COMPLETION_TIMEOUT_MS          300000
 #define IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS  180000
-#define IBVSOCKET_FLOWCONTROL_MSG_LEN                 1
 #define IBVSOCKET_FLOWCONTROL_ONRECV_TIMEOUT_MS  180000
+#define IBVSOCKET_SHUTDOWN_TIMEOUT_MS               250
+#define IBVSOCKET_POLL_TIMEOUT_MS                 10000
+#define IBVSOCKET_FLOWCONTROL_MSG_LEN                 1
 #define IBVSOCKET_STALE_RETRIES_NUM                 128
+/**
+ * IBVSOCKET_RECVT_INFINITE_TIMEOUT_MS is used by IBVSocket_recvT when timeoutMS
+ * is passed as < 0, which indicates that __IBVSocket_receiveCheck should be
+ * called until it does not timeout. Thus, the long timeout value is
+ * inconsequential for that case. There doesn't appear to be any current code
+ * that passes timeoutMS < 0 to IBVSocket_recvT.
+ */
+#define IBVSOCKET_RECVT_INFINITE_TIMEOUT_MS     1000000
 
 #define ibv_print_info(str, ...) printk_fhgfs(KERN_INFO, "%s:%d: " str, __func__, __LINE__, \
    ##__VA_ARGS__)
@@ -61,6 +72,12 @@ bool IBVSocket_init(IBVSocket* _this)
    memset(_this, 0, sizeof(*_this) );
 
    _this->connState = IBVSOCKETCONNSTATE_UNCONNECTED;
+
+   _this->timeoutCfg.connectMS = IBVSOCKET_CONN_TIMEOUT_MS;
+   _this->timeoutCfg.completionMS = IBVSOCKET_COMPLETION_TIMEOUT_MS;
+   _this->timeoutCfg.flowSendMS = IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS;
+   _this->timeoutCfg.flowRecvMS = IBVSOCKET_FLOWCONTROL_ONRECV_TIMEOUT_MS;
+   _this->timeoutCfg.pollMS = IBVSOCKET_POLL_TIMEOUT_MS;
 
    _this->typeOfService = 0;
 
@@ -160,7 +177,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       sin.sin_family = AF_INET;
       sin.sin_port = htons(port);
 
-      if(rdma_resolve_addr(_this->cm_id, NULL, (struct sockaddr*)&sin, IBVSOCKET_CONN_TIMEOUT_MS) )
+      if(rdma_resolve_addr(_this->cm_id, NULL, (struct sockaddr*)&sin, _this->timeoutCfg.connectMS) )
       {
          ibv_print_info_debug("rdma_resolve_addr failed\n");
          goto err_invalidateSock;
@@ -172,7 +189,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       if(_this->connState != IBVSOCKETCONNSTATE_ADDRESSRESOLVED)
          goto err_invalidateSock;
 
-      if(rdma_resolve_route(_this->cm_id, IBVSOCKET_CONN_TIMEOUT_MS) )
+      if(rdma_resolve_route(_this->cm_id, _this->timeoutCfg.connectMS) )
       {
          ibv_print_info_debug("rdma_resolve_route failed.\n");
          goto err_invalidateSock;
@@ -300,7 +317,7 @@ bool IBVSocket_shutdown(IBVSocket* _this)
 
    unsigned numWaitWrites = 0;
    unsigned numWaitReads = 0;
-   int timeoutMS = 250;
+   int timeoutMS = IBVSOCKET_SHUTDOWN_TIMEOUT_MS;
 
    if(_this->errState)
       return true; // true, because the conn is down anyways
@@ -391,7 +408,7 @@ err_fault:
 ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags, int timeoutMS)
 {
    int checkRes;
-   int wait = timeoutMS < 0 ? 1000*1000 : timeoutMS;
+   int wait = timeoutMS < 0 ? IBVSOCKET_RECVT_INFINITE_TIMEOUT_MS : timeoutMS;
 
    do {
       checkRes = __IBVSocket_receiveCheck(_this, wait);
@@ -425,7 +442,7 @@ ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
 
    unsigned numWaitWrites = 0;
    unsigned numWaitReads = 0;
-   int timeoutMS = IBVSOCKET_COMPLETION_TIMEOUT_MS;
+   int timeoutMS = _this->timeoutCfg.completionMS;
 
    if(unlikely(_this->errState) )
       return -1;
@@ -463,7 +480,7 @@ ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
    do
    {
       flowControlRes = __IBVSocket_flowControlOnSendWait(_this,
-         IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS);
+         _this->timeoutCfg.flowSendMS);
       if(unlikely(flowControlRes <= 0) )
          goto err_invalidateSock;
 
@@ -509,6 +526,22 @@ err_invalidateSock:
 err_fault:
    _this->errState = -1;
    return -EFAULT;
+}
+
+
+void IBVSocket_setTimeouts(IBVSocket* _this, int connectMS,
+   int completionMS, int flowSendMS, int flowRecvMS, int pollMS)
+{
+   _this->timeoutCfg.connectMS = connectMS > 0? connectMS : IBVSOCKET_CONN_TIMEOUT_MS;
+   _this->timeoutCfg.completionMS = completionMS > 0? completionMS : IBVSOCKET_COMPLETION_TIMEOUT_MS;
+   _this->timeoutCfg.flowSendMS = flowSendMS > 0? flowSendMS : IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS;
+   _this->timeoutCfg.flowRecvMS = flowRecvMS > 0? flowRecvMS : IBVSOCKET_FLOWCONTROL_ONRECV_TIMEOUT_MS;
+   _this->timeoutCfg.pollMS = pollMS > 0? pollMS : IBVSOCKET_POLL_TIMEOUT_MS;
+#ifdef BEEGFS_DEBUG
+   ibv_print_info_debug("connectMS=%d completionMS=%d flowSendMS=%d flowRecvMS=%d pollMS=%d\n",
+      _this->timeoutCfg.connectMS, _this->timeoutCfg.completionMS, _this->timeoutCfg.flowSendMS,
+      _this->timeoutCfg.flowRecvMS, _this->timeoutCfg.pollMS);
+#endif
 }
 
 
@@ -904,7 +937,7 @@ int IBVSocket_checkConnection(IBVSocket* _this)
    int postRes;
    int waitRes;
 
-   int timeoutMS = IBVSOCKET_COMPLETION_TIMEOUT_MS;
+   int timeoutMS = _this->timeoutCfg.completionMS;
    unsigned numWaitWrites = 0;
    unsigned numWaitReads = 1;
 
@@ -1028,7 +1061,7 @@ int __IBVSocket_recvWC(IBVSocket* _this, int timeoutMS, struct ib_wc* outWC)
 
    // flow control
 
-   if(unlikely(__IBVSocket_flowControlOnRecv(_this, IBVSOCKET_FLOWCONTROL_ONRECV_TIMEOUT_MS) ) )
+   if(unlikely(__IBVSocket_flowControlOnRecv(_this, _this->timeoutCfg.flowRecvMS) ) )
    {
       ibv_print_info_debug("got an error from flowControlOnRecv().\n");
       return -1;
@@ -1198,7 +1231,7 @@ int __IBVSocket_waitForRecvCompletionEvent(IBVSocket* _this, int timeoutMS, stru
       /* note: we use pollTimeoutMS to check the conn every few secs (otherwise we might
          wait for a very long time in case the other side disconnected silently) */
 
-      int pollTimeoutMS = MIN(10000, timeoutMS);
+      int pollTimeoutMS = MIN(_this->timeoutCfg.pollMS, timeoutMS);
       long pollTimeoutJiffies = TimeTk_msToJiffiesSchedulable(pollTimeoutMS);
 
       /* note: don't think about ib_peek_cq here, because it is not implemented in the drivers. */
@@ -1244,7 +1277,7 @@ int __IBVSocket_waitForSendCompletionEvent(IBVSocket* _this, int oldSendCount, i
    {
       // Note: We use pollTimeoutMS to check the conn every few secs (otherwise we might
       //    wait for a very long time in case the other side disconnected silently)
-      int pollTimeoutMS = MIN(10000, timeoutMS);
+      int pollTimeoutMS = MIN(_this->timeoutCfg.pollMS, timeoutMS);
       long pollTimeoutJiffies = TimeTk_msToJiffiesSchedulable(pollTimeoutMS);
 
       waitRes = wait_event_timeout(commContext->sendCompWaitQ,

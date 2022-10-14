@@ -31,6 +31,9 @@ typedef struct IBVCommContext IBVCommContext;
 struct IBVCommDest;
 typedef struct IBVCommDest IBVCommDest;
 
+struct IBVTimeoutConfig;
+typedef struct IBVTimeoutConfig IBVTimeoutConfig;
+
 struct IBVSocket; // forward declaration
 typedef struct IBVSocket IBVSocket;
 
@@ -62,9 +65,20 @@ extern int IBVSocket_checkConnection(IBVSocket* _this);
 extern unsigned long IBVSocket_poll(IBVSocket* _this, short events, bool finishPoll);
 
 // getters & setters
+extern void IBVSocket_setTimeouts(IBVSocket* _this, int connectMS,
+   int completionMS, int flowSendMS, int flowRecvMS, int pollMS);
 extern void IBVSocket_setTypeOfService(IBVSocket* _this, int typeOfService);
 extern void IBVSocket_setConnectionFailureStatus(IBVSocket* _this, unsigned value);
 
+
+struct IBVTimeoutConfig
+{
+   int connectMS;
+   int completionMS;
+   int flowSendMS;
+   int flowRecvMS;
+   int pollMS;
+};
 
 struct IBVCommConfig
 {
@@ -220,6 +234,7 @@ struct IBVSocket
 
    int                           typeOfService;
    unsigned                      remapConnectionFailureStatus;
+   IBVTimeoutConfig              timeoutCfg;
 };
 
 

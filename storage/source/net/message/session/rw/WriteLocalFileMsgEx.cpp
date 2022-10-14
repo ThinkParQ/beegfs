@@ -256,8 +256,6 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
    const char* logContext = "WriteChunkFileMsg (write incremental)";
    Config* cfg = Program::getApp()->getConfig();
 
-   const int timeoutMS = CONN_MEDIUM_TIMEOUT;
-
    // we can securely cast getTuneFileWriteSize to size_t below to make a comparision possible, as
    // it can technically never be negative and will therefore always fit into size_t
    const ssize_t exactStaticRecvSize = sessionLocalFile->getIsDirectIO()
@@ -299,7 +297,7 @@ int64_t WriteLocalFileMsgEx::incrementalRecvAndWriteStateful(ResponseContext& ct
          "receiving... (remaining: " + StringTk::intToStr(toBeReceived) + ")");
 
       ssize_t recvLength = BEEGFS_MIN(exactStaticRecvSize, toBeReceived);
-      ssize_t recvRes = ctx.getSocket()->recvExactT(ctx.getBuffer(), recvLength, 0, timeoutMS);
+      ssize_t recvRes = ctx.getSocket()->recvExactT(ctx.getBuffer(), recvLength, 0, cfg->getConnMsgMediumTimeout());
 
       // forward to mirror...
 
@@ -416,14 +414,13 @@ ssize_t WriteLocalFileMsgEx::doWrite(int fd, char* buf, size_t count, off_t offs
 void WriteLocalFileMsgEx::incrementalRecvPadding(ResponseContext& ctx,
    int64_t padLen, SessionLocalFile* sessionLocalFile)
 {
-   const int timeoutMS = CONN_MEDIUM_TIMEOUT;
-
+   Config* cfg = Program::getApp()->getConfig();
    uint64_t toBeReceived = padLen;
 
    while(toBeReceived)
    {
       ssize_t recvRes = ctx.getSocket()->recvT(ctx.getBuffer(),
-         BEEGFS_MIN(toBeReceived, ctx.getBufferLength()), 0, timeoutMS);
+         BEEGFS_MIN(toBeReceived, ctx.getBufferLength()), 0, cfg->getConnMsgMediumTimeout());
 
       // forward to mirror...
 

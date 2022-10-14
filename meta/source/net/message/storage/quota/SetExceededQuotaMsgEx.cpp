@@ -30,14 +30,13 @@ bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
       }
 
       // set exceeded quota info for all of its targets
-      UInt16List targetIdList;
-      storagePool->getTargets();
+      UInt16Set targetIds = storagePool->getTargets();
 
-      for (auto iter = targetIdList.begin(); iter != targetIdList.end(); iter++)
+      for (auto  targetId : targetIds)
       {
          // update exceeded quota
          ExceededQuotaStorePtr exQuotaStore =
-               Program::getApp()->getExceededQuotaStores()->get(*iter);
+               Program::getApp()->getExceededQuotaStores()->get(targetId);
          exQuotaStore->updateExceededQuota(getExceededQuotaIDs(), getQuotaDataType(),
             getExceededType());
       }

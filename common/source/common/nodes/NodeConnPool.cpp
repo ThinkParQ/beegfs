@@ -471,6 +471,8 @@ void NodeConnPool::applySocketOptionsPreConnect(RDMASocket* sock)
    auto cfg = app->getCommonConfig();
 
    sock->setBuffers(cfg->getConnRDMABufNum(), cfg->getConnRDMABufSize() );
+   sock->setTimeouts(cfg->getConnRDMATimeoutConnect(), cfg->getConnRDMATimeoutFlowSend(),
+      cfg->getConnRDMATimeoutPoll());
    sock->setTypeOfService(cfg->getConnRDMATypeOfService());
 }
 

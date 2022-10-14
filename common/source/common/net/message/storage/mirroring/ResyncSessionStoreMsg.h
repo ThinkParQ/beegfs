@@ -46,7 +46,7 @@ class ResyncSessionStoreMsg : public NetMessageSerdes<ResyncSessionStoreMsg>
          return std::pair<char*, size_t>(sessionStoreBuf, sessionStoreBufSize);
       }
 
-      FhgfsOpsErr receiveStoreBuf(Socket* socket)
+      FhgfsOpsErr receiveStoreBuf(Socket* socket, int connMsgShortTimeout)
       {
          parsed.sessionStoreBuf.reset(new (std::nothrow)char[sessionStoreBufSize]);
          if (!parsed.sessionStoreBuf)
@@ -55,7 +55,7 @@ class ResyncSessionStoreMsg : public NetMessageSerdes<ResyncSessionStoreMsg>
          sessionStoreBuf = parsed.sessionStoreBuf.get();
 
          ssize_t received = socket->recvExactT(sessionStoreBuf, sessionStoreBufSize,
-            0, CONN_SHORT_TIMEOUT);
+            0, connMsgShortTimeout);
 
          if (received < 0 || received < (ssize_t)sessionStoreBufSize)
             return FhgfsOpsErr_COMMUNICATION;

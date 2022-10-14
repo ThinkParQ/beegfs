@@ -93,6 +93,7 @@ static inline void Config_setRemapConnectionFailureStatus(Config* this, unsigned
 static inline char* Config_getConnNetFilterFile(Config* this);
 static inline unsigned Config_getConnMaxConcurrentAttempts(Config* this);
 static inline char* Config_getConnAuthFile(Config* this);
+static inline bool Config_getConnDisableAuthentication(Config* this);
 static inline uint64_t Config_getConnAuthHash(Config* this);
 static inline char* Config_getConnTcpOnlyFilterFile(Config* this);
 static inline char* Config_getTunePreferredMetaFile(Config* this);
@@ -136,6 +137,11 @@ static inline bool Config_getSysACLsEnabled(Config* this);
 static inline bool Config_getSysXAttrsImplicitlyEnabled(Config* this);
 
 static inline bool Config_getQuotaEnabled(Config* this);
+static inline int Config_getConnRDMATimeoutConnect(Config* this);
+static inline int Config_getConnRDMATimeoutCompletion(Config* this);
+static inline int Config_getConnRDMATimeoutFlowSend(Config* this);
+static inline int Config_getConnRDMATimeoutFlowRecv(Config* this);
+static inline int Config_getConnRDMATimeoutPoll(Config* this);
 
 
 enum FileCacheType
@@ -194,6 +200,20 @@ struct Config
    bool           connDisableAuthentication;
    uint64_t       connAuthHash; // implicitly set based on hash of connAuthFile contents
    char*          connTcpOnlyFilterFile; // allow only plain TCP (no RDMA etc) to these IPs
+
+   int            connMsgLongTimeout;
+   int            connMsgMediumTimeout;
+   int            connMsgShortTimeout; // connection (response) timeouts in ms
+                                       // note: be careful here, because servers not
+                                       // responding for >30secs under high load is nothing
+                                       // unusual, so never use connMsgShortTimeout for
+                                       // IO-related operations.
+
+   int            connRDMATimeoutConnect;
+   int            connRDMATimeoutCompletion;
+   int            connRDMATimeoutFlowSend;
+   int            connRDMATimeoutFlowRecv;
+   int            connRDMATimeoutPoll;
 
    char*          tunePreferredMetaFile;
    char*          tunePreferredStorageFile;
@@ -379,6 +399,11 @@ unsigned Config_getConnMaxConcurrentAttempts(Config* this)
 char* Config_getConnAuthFile(Config* this)
 {
    return this->connAuthFile;
+}
+
+bool Config_getConnDisableAuthentication(Config* this)
+{
+   return this->connDisableAuthentication;
 }
 
 uint64_t Config_getConnAuthHash(Config* this)
@@ -594,6 +619,31 @@ bool Config_getSysXAttrsImplicitlyEnabled(Config* this)
 bool Config_getQuotaEnabled(Config* this)
 {
    return this->quotaEnabled;
+}
+
+int Config_getConnRDMATimeoutConnect(Config* this)
+{
+   return this->connRDMATimeoutConnect;
+}
+
+int Config_getConnRDMATimeoutCompletion(Config* this)
+{
+   return this->connRDMATimeoutCompletion;
+}
+
+int Config_getConnRDMATimeoutFlowSend(Config* this)
+{
+   return this->connRDMATimeoutFlowSend;
+}
+
+int Config_getConnRDMATimeoutFlowRecv(Config* this)
+{
+   return this->connRDMATimeoutFlowRecv;
+}
+
+int Config_getConnRDMATimeoutPoll(Config* this)
+{
+   return this->connRDMATimeoutPoll;
 }
 
 #endif /*CONFIG_H_*/

@@ -58,6 +58,8 @@ extern bool IBVSocket_getSockValid(IBVSocket* _this);
 extern int IBVSocket_getRecvCompletionFD(IBVSocket* _this);
 extern int IBVSocket_getConnManagerFD(IBVSocket* _this);
 extern void IBVSocket_setTypeOfService(IBVSocket* _this, uint8_t typeOfService);
+extern void IBVSocket_setTimeouts(IBVSocket* _this, int connectMS, int flowSendMS,
+   int pollMS);
 
 // testing methods
 extern void IBVSocket_setConnectionRejectionRate(IBVSocket* _this, unsigned rate);

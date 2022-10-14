@@ -131,6 +131,8 @@ void __FhgfsOpsCommKitCommon_pollStateSocks(CommKitContext* context, size_t numS
 {
    int pollRes;
 
+   Config* cfg = App_getConfig(context->app);
+
    size_t numWaiters = context->numPollSocks + context->numRetryWaiters +
       context->numDone + context->numUnconnectable + context->numBufferless;
 
@@ -138,8 +140,7 @@ void __FhgfsOpsCommKitCommon_pollStateSocks(CommKitContext* context, size_t numS
       immediately => set timeout to 0 (non-blocking) */
    /* note: be very careful with timeoutMS==0, because that means we don't release the CPU,
       so we need to ensure that timeoutMS==0 is no permanent condition. */
-   int timeoutMS = (numWaiters < numStates) ? 0 : CONN_LONG_TIMEOUT;
-
+   int timeoutMS = (numWaiters < numStates) ? 0 : cfg->connMsgLongTimeout;
    BEEGFS_BUG_ON_DEBUG(numWaiters > numStates, "numWaiters > numStates should never happen");
 
    pollRes = SocketTk_poll(&context->pollState, timeoutMS);

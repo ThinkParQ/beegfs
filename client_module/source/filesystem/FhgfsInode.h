@@ -270,6 +270,7 @@ struct FhgfsInode
    int flags; // protected by inode->i_lock
    uint64_t version; // protected by entryInfoLock (which would subsume a more granular lock)
    atomic_t modified; // tracks whether the inode data has been written since its last full flush
+   atomic_t coRWInProg; //Coherent read/write in progress.
 };
 
 

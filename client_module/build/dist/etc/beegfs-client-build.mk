@@ -6,4 +6,6 @@
 # Examples:
 #OFED_INCLUDE_PATH=/usr/src/ofa_kernel/default/include
 #OFED_INCLUDE_PATH=/usr/src/openib/include
-
+ifneq ($(OFED_INCLUDE_PATH),)
+export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
+endif

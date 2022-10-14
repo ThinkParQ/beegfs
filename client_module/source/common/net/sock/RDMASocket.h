@@ -36,6 +36,8 @@ extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finish
 
 // inliners
 static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize);
+static inline void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
+   int completionMS, int flowSendMS, int flowRecvMS, int pollMS);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
 static inline void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value);
 
@@ -55,6 +57,13 @@ void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize)
 {
    this->commCfg.bufNum = bufNum;
    this->commCfg.bufSize = bufSize;
+}
+
+void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
+   int completionMS, int flowSendMS, int flowRecvMS, int pollMS)
+{
+   IBVSocket_setTimeouts(&this->ibvsock, connectMS, completionMS, flowSendMS,
+      flowRecvMS, pollMS);
 }
 
 /**

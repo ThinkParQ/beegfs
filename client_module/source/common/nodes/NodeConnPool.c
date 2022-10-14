@@ -621,6 +621,9 @@ bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* soc
       RDMASocket* rdmaSock = (RDMASocket*)sock;
       RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
          Config_getConnRDMABufSize(cfg) );
+      RDMASocket_setTimeouts(rdmaSock, Config_getConnRDMATimeoutConnect(cfg),
+         Config_getConnRDMATimeoutCompletion(cfg), Config_getConnRDMATimeoutFlowSend(cfg),
+         Config_getConnRDMATimeoutFlowRecv(cfg), Config_getConnRDMATimeoutPoll(cfg));
       RDMASocket_setTypeOfService(rdmaSock, Config_getConnRDMATypeOfService(cfg));
       RDMASocket_setConnectionFailureStatus(rdmaSock, Config_getRemapConnectionFailureStatus(cfg));
    }

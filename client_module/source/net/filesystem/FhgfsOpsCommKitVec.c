@@ -180,9 +180,11 @@ void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
    bool isSocketException = false;
    bool needCleanup = false;
 
+   Config* cfg = App_getConfig(commHelper->app);
+
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__, "enter");
 
-   recvRes = Socket_recvExactT(comm->sock, &dataLenBuf, sizeof(int64_t), 0, CONN_LONG_TIMEOUT);
+   recvRes = Socket_recvExactT(comm->sock, &dataLenBuf, sizeof(int64_t), 0, cfg->connMsgLongTimeout);
 
    if(unlikely(recvRes <= 0) )
    { // error
@@ -265,6 +267,8 @@ void __FhgfsOpsCommKitVec_readfileStageRECVDATA(CommKitVecHelper* commHelper,
    size_t pageLen;   // length of a page
    ssize_t recvRes;
 
+   Config* cfg = App_getConfig(commHelper->app);
+
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__, "enter");
 
    do
@@ -300,7 +304,7 @@ void __FhgfsOpsCommKitVec_readfileStageRECVDATA(CommKitVecHelper* commHelper,
       requestLength = MIN(pageLen, comm->read.serverSize - receiveSum);
 
       // receive available dataPart
-      recvRes = Socket_recvExactT(comm->sock, pageDataPtr, requestLength, 0, CONN_LONG_TIMEOUT);
+      recvRes = Socket_recvExactT(comm->sock, pageDataPtr, requestLength, 0, cfg->connMsgLongTimeout);
 
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__,
          "requested: %lld; received: %lld",

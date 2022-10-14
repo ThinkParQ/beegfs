@@ -89,6 +89,13 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connDisableAuthentication",  "false", addDashes);
    configMapRedefine("connTcpOnlyFilterFile",      "", addDashes);
 
+   /* connMessagingTimeouts: default to zero, indicating that constants
+    * specified in Common.h are used.
+    */
+   configMapRedefine("connMessagingTimeouts",      "0,0,0", addDashes);
+   // connRDMATimeouts: zero values are interpreted as the defaults specified in IBVSocket.cpp
+   configMapRedefine("connRDMATimeouts",           "0,0,0", addDashes);
+
    configMapRedefine("sysMgmtdHost",               "",    addDashes);
    configMapRedefine("sysUpdateTargetStatesSecs",  "0", addDashes);
 }
@@ -163,6 +170,51 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          connDisableAuthentication = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connTcpOnlyFilterFile", addDashes))
          connTcpOnlyFilterFile = iter->second;
+      else if (testConfigMapKeyMatch(iter, "connMessagingTimeouts", addDashes))
+      {
+         size_t cfgValCount = 3; // count value in config file in order of long, medium and short
+         std::list<std::string> split;
+         StringList::iterator timeoutIter;
+
+         StringTk::explode(iter->second, ',', &split);
+
+         if (split.size() == cfgValCount)
+         {
+            timeoutIter = split.begin();
+            connMsgLongTimeout = StringTk::strToInt(*timeoutIter) > 0 ?
+                  StringTk::strToInt(*timeoutIter) : CONN_LONG_TIMEOUT;
+            timeoutIter++;
+
+            connMsgMediumTimeout = StringTk::strToInt(*timeoutIter) > 0 ?
+                  StringTk::strToInt(*timeoutIter) : CONN_MEDIUM_TIMEOUT;
+            timeoutIter++;
+
+            connMsgShortTimeout = StringTk::strToInt(*timeoutIter) > 0 ?
+                  StringTk::strToInt(*timeoutIter) : CONN_SHORT_TIMEOUT;
+         }
+         else
+            throw InvalidConfigException("The config argument '" + iter->first + "' is invalid");
+      }
+      else if (testConfigMapKeyMatch(iter, "connRDMATimeouts", addDashes))
+      {
+         const int cfgValCount = 3;
+         std::list<std::string> split;
+
+         StringTk::explode(iter->second, ',', &split);
+
+         if (split.size() == cfgValCount)
+         {
+            StringList::iterator timeoutIter = split.begin();
+            connRDMATimeoutConnect = StringTk::strToInt(*timeoutIter++);
+            connRDMATimeoutFlowSend = StringTk::strToInt(*timeoutIter++);
+            connRDMATimeoutPoll = StringTk::strToInt(*timeoutIter);
+         }
+         else
+         {
+            throw InvalidConfigException("The config argument '" + iter->first +
+               "' is invalid");
+         }
+      }
       else if (testConfigMapKeyMatch(iter, "sysMgmtdHost", addDashes))
          sysMgmtdHost = iter->second;
       else if (testConfigMapKeyMatch(iter, "sysUpdateTargetStatesSecs", addDashes))

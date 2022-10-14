@@ -39,16 +39,14 @@
 #include <boost/smart_ptr/make_unique.hpp>
 #include <memory>
 
-
 /**
- * connection (response) timeouts in ms
- * note: be careful here, because servers not responding for >30secs during RAID cache flush is
- * nothing unusual, so never use CONN_SHORT_TIMEOUT for IO-related operations.
+ * NOTE: These timeouts can now be overridden by the connMessagingTimeouts
+ * option in the configuration file. If that option is unset or set to <=0, we
+ * still default to these constants.
  */
 #define CONN_LONG_TIMEOUT     600000
 #define CONN_MEDIUM_TIMEOUT    90000
 #define CONN_SHORT_TIMEOUT     30000
-
 
 typedef std::map<std::string, std::string> StringMap;
 typedef StringMap::iterator StringMapIter;
