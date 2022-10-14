@@ -7,7 +7,10 @@
 
 bool ResyncSessionStoreMsgEx::processIncoming(ResponseContext& ctx)
 {
-   FhgfsOpsErr receiveRes = receiveStoreBuf(ctx.getSocket());
+   App* app = Program::getApp();
+   Config* config = app->getConfig();
+
+   FhgfsOpsErr receiveRes = receiveStoreBuf(ctx.getSocket(), config->getConnMsgShortTimeout());
 
    if (receiveRes == FhgfsOpsErr_OUTOFMEM)
    {

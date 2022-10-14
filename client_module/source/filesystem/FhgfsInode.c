@@ -73,6 +73,7 @@ void FhgfsInode_allocInit(FhgfsInode* fhgfsInode)
    fhgfsInode->flags = 0;
    fhgfsInode->version = 0;
    atomic_set(&fhgfsInode->modified, 0);
+   atomic_set(&fhgfsInode->coRWInProg, 0);
 }
 
 /**

@@ -426,8 +426,8 @@ int ModeGetQuotaInfo::checkConfig(StringMap* cfg)
    }
 
 
-   // print UID/GID with zero values when a list or a single UID/GID is given
-   if(!this->cfg.cfgUseRange && !this->cfg.cfgUseAll)
+   // print UID/GID with zero values when a single UID/GID is given
+   if(!this->cfg.cfgUseRange && !this->cfg.cfgUseAll && !this->cfg.cfgUseList)
    {
       this->cfg.cfgPrintUnused = true;
    }

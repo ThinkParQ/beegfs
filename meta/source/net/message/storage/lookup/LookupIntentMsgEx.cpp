@@ -12,42 +12,75 @@
 #include <session/EntryLock.h>
 #include <session/SessionStore.h>
 #include <storage/DentryStoreData.h>
+#include <common/storage/StoragePool.h>
 #include "LookupIntentMsgEx.h"
 
 
 std::tuple<FileIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(EntryLockStore& store)
 {
    ParentNameLock dentryLock;
-   FileIDLock dirLock;
-   FileIDLock fileLock;
+   FileIDLock entryIDLockForDir;
+   FileIDLock entryIDLockForFile;
+   enum DirEntryType entryType = getEntryInfo()->getEntryType();
+   bool inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
 
    if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE)
    {
-      dirLock = {&store, getParentInfo()->getEntryID(), true};
+      entryIDLockForDir = {&store, getParentInfo()->getEntryID(), true};
       dentryLock = {&store, getParentInfo()->getEntryID(), getEntryName()};
-      fileLock = {&store, entryID, true};
-   }
-   else if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_OPEN)
-   {
-      dirLock = {&store, getParentInfo()->getEntryID(), false};
-      fileLock = {&store, entryID, true};
+      entryIDLockForFile = {&store, entryID, true};
    }
    else
    {
-      //For all the other flags, take parent lock if parenEntryID is not
-      //empty and fileID lock.
       //XXX Note: If you are addding new flag for lookupintent, make sure to
       //check if shared lock for parent dir and file is sufficient.
       //Otherwise add another else if condition.
-      const std::string& parentEntryID = getParentInfo()->getEntryID();
-      if (!parentEntryID.empty())
+      // For other lookup flag, we don't have entryID yet. So rather than
+      // taking lock on the emptry EntryID(which can serialize lookup on all
+      // files even if from different parent directory), lookup the entryID
+      // while holding parent lock. And take the lock on the actual entryID.
+      entryIDLockForDir = {&store, getParentInfo()->getEntryID(), false};
+
+      lookupRes = lookup(getParentInfo()->getEntryID(), getEntryName(), isMirrored(),
+            &diskEntryInfo, &inodeData, inodeDataOutdated);
+      if (lookupRes == FhgfsOpsErr_SUCCESS)
       {
-         dirLock = {&store, getParentInfo()->getEntryID(), false};
+         entryID = diskEntryInfo.getEntryID();
+         entryType = diskEntryInfo.getEntryType();
       }
-      fileLock = {&store, entryID, false};
+
+      // for revalidate entryInfo is valid, so use the info from it
+      if (entryID.empty() && (getIntentFlags() & LOOKUPINTENTMSG_FLAG_REVALIDATE))
+      {
+         entryID =  getEntryInfo()->getEntryID();
+         entryType =  getEntryInfo()->getEntryType();
+      }
+
+      if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_OPEN)
+      {
+         entryIDLockForFile = {&store, entryID, true};
+      }
+      else
+      {
+         if (DirEntryType_ISDIR(entryType) &&
+               (entryID < getParentInfo()->getEntryID()))
+         {
+            // Release parent lock because child lock needs to be taken first.
+            entryIDLockForDir = {};
+
+            // Take the lock in reverse order
+            entryIDLockForFile = {&store, entryID, false};
+            entryIDLockForDir = {&store, getParentInfo()->getEntryID(), false};
+         }
+         else
+         {
+            entryIDLockForFile = {&store, entryID, false};
+         }
+      }
    }
 
-   return std::make_tuple(std::move(dirLock), std::move(dentryLock), std::move(fileLock));
+   return std::make_tuple(std::move(entryIDLockForDir), std::move(dentryLock),
+                          std::move(entryIDLockForDir));
 }
 
 bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)
@@ -56,6 +89,8 @@ bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)
 
    const std::string& parentEntryID = getParentInfo()->getEntryID();
    const std::string& entryName = getEntryName();
+
+   lookupRes = FhgfsOpsErr_INTERNAL;
 
    LOG_DBG(GENERAL, DEBUG, "", parentEntryID, entryName, getParentInfo()->getIsBuddyMirrored());
 
@@ -81,8 +116,6 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
 
    int createFlag = getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE;
    FhgfsOpsErr createRes = FhgfsOpsErr_INTERNAL;
-   FhgfsOpsErr lookupRes = FhgfsOpsErr_INTERNAL;
-   EntryInfo diskEntryInfo;
    bool inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
 
    // Note: Actually we should first do a lookup. However, a successful create also implies a
@@ -110,6 +143,9 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
             else
                response.addResponseCreate(FhgfsOpsErr_SUCCESS);
             break;
+         case FhgfsOpsErr_DQUOT:
+            response.addResponseCreate(FhgfsOpsErr_DQUOT);
+            break;
 
          default:
             response.addResponseCreate(FhgfsOpsErr_INTERNAL);
@@ -123,9 +159,18 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
    {
       LOG_DBG(GENERAL, SPAM, "Lookup");
 
-      lookupRes = lookup(getParentInfo()->getEntryID(), getEntryName(), isMirrored(),
-            &diskEntryInfo, &inodeData, inodeDataOutdated);
+      // Lookup will happen for secondary node or create failed or lookup
+      // failed earlier.
+      if (isSecondary || (createRes == FhgfsOpsErr_EXISTS) ||
+          lookupRes != FhgfsOpsErr_SUCCESS)
+      {
+         // lock is not taken on secondary, so we need to perform lookup()
+         // for secondary here.
+          lookupRes = lookup(getParentInfo()->getEntryID(), getEntryName(), isMirrored(),
+                 &diskEntryInfo, &inodeData, inodeDataOutdated);
 
+      }
+      // Lookup was already done in lock() function after taking lock on parent.
       response.setLookupResult(lookupRes);
       response.setEntryInfo(diskEntryInfo);
 
@@ -237,18 +282,18 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
       return FhgfsOpsErr_INTERNAL;
    }
 
-   FhgfsOpsErr lookupRes = metaStore->getEntryData(parentDir, entryName, outEntryInfo,
+   FhgfsOpsErr lookupRes1 = metaStore->getEntryData(parentDir, entryName, outEntryInfo,
       outInodeStoreData);
 
-   if (lookupRes == FhgfsOpsErr_DYNAMICATTRIBSOUTDATED)
+   if (lookupRes1 == FhgfsOpsErr_DYNAMICATTRIBSOUTDATED)
    {
-      lookupRes = FhgfsOpsErr_SUCCESS;
+      lookupRes1 = FhgfsOpsErr_SUCCESS;
       outInodeDataOutdated = true;
    }
 
    metaStore->releaseDir(parentEntryID);
 
-   return lookupRes;
+   return lookupRes1;
 }
 
 /**
@@ -273,6 +318,12 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
    MkFileDetails mkDetails(entryName, getUserID(), getGroupID(), getMode(), getUmask(),
          TimeAbs().getTimeval()->tv_sec);
    StripePattern* pattern = nullptr;
+   FhgfsOpsErr res;
+
+   DirInode* dir = Program::getApp()->getMetaStore()->referenceDir(
+         parentInfo->getEntryID(), parentInfo->getIsBuddyMirrored(), true);
+   if (!dir)
+      return FhgfsOpsErr_PATHNOTEXISTS;
 
    if (isSecondary)
    {
@@ -280,15 +331,51 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
       mkDetails.createTime = fileTimestamps.creationTimeSecs;
       pattern = getNewStripePattern()->clone();
    }
-   else if (!entryID.empty())
-      mkDetails.setNewEntryID(entryID.c_str());
+   else
+   {
+      if (!entryID.empty())
+         mkDetails.setNewEntryID(entryID.c_str());
 
-   DirInode* dir = Program::getApp()->getMetaStore()->referenceDir(
-         parentInfo->getEntryID(), parentInfo->getIsBuddyMirrored(), true);
-   if (!dir)
-      return FhgfsOpsErr_PATHNOTEXISTS;
+      pattern = dir->createFileStripePattern(&getPreferredTargets(), 0, 0, StoragePoolId(0));
+   }
 
-   FhgfsOpsErr res = MsgHelperMkFile::mkFile(*dir, &mkDetails, &getPreferredTargets(), 0, 0,
+   if (isMsgHeaderFeatureFlagSet(LOOKUPINTENTMSG_FLAG_USE_QUOTA) &&
+         Program::getApp()->getConfig()->getQuotaEnableEnforcement())
+   {
+      const char* logContext = "Quota Enforcement for create";
+      StoragePoolPtr storagePool =
+         Program::getApp()->getStoragePoolStore()->getPool(pattern->getStoragePoolId());
+
+      if (!storagePool)
+      {
+         LOG(QUOTA, WARNING, "Requested storage pool doesn't exist on metadata server.",
+                      ("StoragePoolId", pattern->getStoragePoolId()));
+
+         res = FhgfsOpsErr_UNKNOWNPOOL;
+         goto releasedir_and_return;
+      }
+
+      UInt16Set targetIds = storagePool->getTargets();
+      for (auto targetId : targetIds)
+      {
+         ExceededQuotaStorePtr exceededQuotaStore = Program::getApp()->getExceededQuotaStores()->get(targetId);
+         if (exceededQuotaStore && exceededQuotaStore->someQuotaExceeded())
+         {
+            QuotaExceededErrorType quotaExceeded = exceededQuotaStore->isQuotaExceeded(mkDetails.userID, mkDetails.groupID);
+            if (quotaExceeded != QuotaExceededErrorType_NOT_EXCEEDED)
+            {
+               LogContext(logContext).log(Log_NOTICE,
+                  QuotaData::QuotaExceededErrorTypeToString(quotaExceeded) + " "
+                  "UID: " + StringTk::uintToStr(mkDetails.userID) + "; "
+                  "GID: " + StringTk::uintToStr(mkDetails.groupID));
+               res = FhgfsOpsErr_DQUOT;
+               goto releasedir_and_return;
+            }
+         }
+      }
+   }
+
+   res = MsgHelperMkFile::mkFile(*dir, &mkDetails, &getPreferredTargets(), 0, 0,
       pattern, outEntryInfo, outInodeData);
 
    if (res == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
@@ -308,6 +395,7 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
                   outEntryInfo->getParentEntryID());
    }
 
+releasedir_and_return:
    Program::getApp()->getMetaStore()->releaseDir(dir->getID());
 
    return res;

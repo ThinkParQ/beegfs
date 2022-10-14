@@ -59,11 +59,12 @@ int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
    status = iov_iter_get_pages(&iter_copy._iov_iter, &page, PAGE_SIZE, 1, &page_offset);
    if (unlikely(status <= 0))
    {
-#ifdef BEEGFS_DEBUG
-      printk_fhgfs(KERN_WARNING, "%s: can't retrieve page from iov_iter, status=%d\n",
-         __func__, status);
-#endif
-      return status == 0? -EIO : status;
+      // 0 means the iter is empty, so just indicate that it's not an NVFS call.
+      // Otherwise, indicate an error condition.if (unlikely(status <= 0))
+      if (status < 0)
+         printk_fhgfs(KERN_WARNING, "%s: can't retrieve page from iov_iter, status=%d\n",
+            __func__, status);
+      return status == 0? false : status;
    }
 
    // At this point, the request did come in through nvidia_fs.

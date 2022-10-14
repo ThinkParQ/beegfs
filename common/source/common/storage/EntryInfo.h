@@ -45,16 +45,6 @@ class EntryInfo
             featureFlags(featureFlags)
       { }
 
-      EntryInfo(const EntryInfo& entryInfo) :
-           ownerNodeID(entryInfo.ownerNodeID),
-           parentEntryID(entryInfo.parentEntryID),
-           entryID(entryInfo.entryID),
-           fileName(entryInfo.fileName),
-           entryType(entryInfo.entryType),
-           featureFlags(entryInfo.featureFlags)
-      {
-      }
-
       virtual ~EntryInfo()
       {
       }

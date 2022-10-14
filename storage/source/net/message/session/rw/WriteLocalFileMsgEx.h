@@ -196,8 +196,10 @@ class WriteLocalFileMsgSender : public WriteLocalFileMsg
 
       inline ssize_t writeStateRecvData(ResponseContext& ctx, WriteState& ws)
       {
+         AbstractApp* app = PThread::getCurrentThreadApp();
+         int connMsgMediumTimeout = app->getCommonConfig()->getConnMsgMediumTimeout();
          ws.recvLength = BEEGFS_MIN(ws.exactStaticRecvSize, ws.toBeReceived);
-         return ctx.getSocket()->recvExactT(ctx.getBuffer(), ws.recvLength, 0, CONN_MEDIUM_TIMEOUT);
+         return ctx.getSocket()->recvExactT(ctx.getBuffer(), ws.recvLength, 0, connMsgMediumTimeout);
       }
 
       inline size_t writeStateNext(WriteState& ws, ssize_t writeRes)

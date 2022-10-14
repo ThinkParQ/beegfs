@@ -39,7 +39,7 @@ std::unique_ptr<MirroredMessageResponseState> MkDirMsgEx::executeLocally(Respons
             ("newDirName", getNewDirName()),
             ("error", result->getResult()));
 
-   return std::move(result);
+   return result;
 }
 
 std::tuple<HashDirLock, FileIDLock, ParentNameLock> MkDirMsgEx::lock(EntryLockStore& store)

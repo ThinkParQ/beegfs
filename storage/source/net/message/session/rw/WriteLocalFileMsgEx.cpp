@@ -268,8 +268,9 @@ cleanup:
 
 ssize_t WriteLocalFileMsgSender::recvPadding(ResponseContext& ctx, int64_t toBeReceived)
 {
+   Config* cfg = Program::getApp()->getConfig();
    return ctx.getSocket()->recvT(ctx.getBuffer(),
-         BEEGFS_MIN(toBeReceived, ctx.getBufferLength()), 0, CONN_MEDIUM_TIMEOUT);
+         BEEGFS_MIN(toBeReceived, ctx.getBufferLength()), 0, cfg->getConnMsgMediumTimeout());
 }
 
 #ifdef BEEGFS_NVFS

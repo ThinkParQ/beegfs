@@ -32,6 +32,7 @@ obj-m	+= ${TARGET}.o
 
 SOURCES := \
    fault-inject/fault-inject.c \
+   os/iov_iter.c \
    os/atomic64.c \
    os/OsCompat.c \
    os/OsDeps.c \

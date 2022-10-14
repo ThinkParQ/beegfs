@@ -96,7 +96,20 @@ static inline ssize_t Socket_recvT(Socket* this, BeeGFS_IovIter *iter,
       ssize_t nread = this->ops->recvT(this, &copy, flags, timeoutMS);
 
       if (nread >= 0)
+      {
+         // TODO: currently some parts of the project expect that we advance
+         // the iov_iter.  But as it turns out, advancing here does not mesh
+         // well with how iov_iter is supposed to be used.  A problem can be
+         // observed when advancing an iov_iter of type ITER_PIPE. This will
+         // result in mutation of external state (struct pipe_inode_info). IOW
+         // we can't just make a copy of any iov_iter and advance that in
+         // isolation.
+         //
+         // That means, the code should be changed such that we advance only in
+         // the outermost layers of the beegfs client module.
+
          beegfs_iov_iter_advance(iter, nread);
+      }
 
       return nread;
    }

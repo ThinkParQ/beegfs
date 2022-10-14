@@ -6,6 +6,9 @@
 # Examples:
 #OFED_INCLUDE_PATH=/usr/src/ofa_kernel/default/include
 #OFED_INCLUDE_PATH=/usr/src/openib/include
+ifneq ($(OFED_INCLUDE_PATH),)
+export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
+endif
 # If building nvidia-fs support, specify path to nvfs.h
 #NVFS_H_PATH=/usr/src/mlnx-ofed-kernel-5.4/drivers/nvme/host
 

@@ -58,17 +58,6 @@ void beegfs_native_release()
 
 
 
-static bool is_pipe_iter(struct iov_iter* iter)
-{
-#ifdef KERNEL_HAS_ITER_PIPE
-      return iov_iter_type(iter) & ITER_PIPE;
-#else
-      return false;
-#endif
-}
-
-
-
 /*
  * PVRs and ARDs use the Private and Checked bits of pages to determine which is attached to a
  * page. Once we support only kernels that have the Private2 bit, we should use Private2 instead
@@ -615,7 +604,7 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
    if(filp->f_flags & O_APPEND)
       return beegfs_append_iter(iocb, from);
 
-   if (!is_pipe_iter(from)
+   if (!iov_iter_is_pipe(from)
          && (from->count >= Config_getTuneFileCacheBufSize(App_getConfig(app))
                || BEEGFS_SHOULD_FAIL(write_force_cache_bypass, 1)))
    {
@@ -714,68 +703,71 @@ static ssize_t beegfs_aio_write(struct kiocb* iocb, const struct iovec* iov,
 
 
 #ifdef KERNEL_HAS_AIO_WRITE_BUF
-static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* from)
+static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* to)
 {
-   struct iovec iov = iov_iter_iovec(from);
+   struct iovec iov = iov_iter_iovec(to);
 
    return generic_file_aio_read(iocb, iov.iov_base, iov.iov_len, iocb->ki_pos);
 }
 #elif !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* from)
+static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* to)
 {
-   return generic_file_aio_read(iocb, from->iov, from->nr_segs, iocb->ki_pos);
+   return generic_file_aio_read(iocb, to->iov, to->nr_segs, iocb->ki_pos);
 }
 #else
-static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* from)
+static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* to)
 {
-   return generic_file_read_iter(iocb, from);
+   return generic_file_read_iter(iocb, to);
 }
 #endif
 
-static ssize_t beegfs_read_iter(struct kiocb* iocb, struct iov_iter* to)
+
+/* like with write_iter, this is basically the O_DIRECT generic_file_read_iter. */
+static ssize_t beegfs_direct_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
    struct file* filp = iocb->ki_filp;
-   size_t size = to->count;
 
+   struct address_space* mapping = filp->f_mapping;
+   struct inode* inode = mapping->host;
+   size_t count = to->count;
+   loff_t size;
+   ssize_t result;
+
+   if(!count)
+      return 0; /* skip atime */
+
+   size = i_size_read(inode);
+   result = beegfs_release_range(filp, iocb->ki_pos, iocb->ki_pos + count - 1);
+   if(!result)
+   {
+      struct iov_iter data = *to;
+      result = __beegfs_direct_IO(READ, iocb, &data, iocb->ki_pos);
+   }
+
+   if(result > 0)
+      iocb->ki_pos += result;
+
+   if(result < 0 || to->count == result || iocb->ki_pos + result >= size)
+      file_accessed(filp);
+
+   return result;
+}
+
+static ssize_t beegfs_read_iter(struct kiocb* iocb, struct iov_iter* to)
+{
+   size_t size = to->count;
+   struct file* filp = iocb->ki_filp;
    App* app = FhgfsOps_getApp(file_dentry(filp)->d_sb);
 
    FhgfsOpsHelper_logOpDebug(app, file_dentry(filp), file_inode(filp), __func__,
       "(offset: %lld; size: %zu)", iocb->ki_pos, size);
-   IGNORE_UNUSED_VARIABLE(app);
    IGNORE_UNUSED_VARIABLE(size);
 
-   if (!is_pipe_iter(to)
-         && (to->count >= Config_getTuneFileCacheBufSize(App_getConfig(app))
-               || BEEGFS_SHOULD_FAIL(read_force_cache_bypass, 1)))
-   {
-      /* like with write_iter, this is basically the O_DIRECT generic_file_read_iter. */
-      struct address_space* mapping = filp->f_mapping;
-      struct inode* inode = mapping->host;
-      size_t count = to->count;
-      loff_t size;
-      ssize_t result;
-
-      if(!count)
-         return 0; /* skip atime */
-
-      size = i_size_read(inode);
-      result = beegfs_release_range(filp, iocb->ki_pos, iocb->ki_pos + count - 1);
-      if(!result)
-      {
-         struct iov_iter data = *to;
-         result = __beegfs_direct_IO(READ, iocb, &data, iocb->ki_pos);
-      }
-
-      if(result > 0)
-         iocb->ki_pos += result;
-
-      if(result < 0 || to->count == result || iocb->ki_pos + result >= size)
-         file_accessed(filp);
-
-      return result;
-   }
-
-   return beegfs_file_read_iter(iocb, to);
+   if (to->count >= Config_getTuneFileCacheBufSize(App_getConfig(app))
+               || BEEGFS_SHOULD_FAIL(read_force_cache_bypass, 1))
+      return beegfs_direct_read_iter(iocb, to);
+   else
+      return beegfs_file_read_iter(iocb, to);
 }
 
 #ifndef KERNEL_HAS_WRITE_ITER
@@ -2102,13 +2094,6 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
    RemotingIOInfo ioInfo;
 
    FsFileInfo_getIOInfo(__FhgfsOps_getFileInfo(filp), BEEGFS_INODE(inode), &ioInfo);
-
-   if(!iter_is_iovec(iter) )
-   {
-      printk(KERN_ERR "unexpected direct_IO rw %d\n", rw);
-      WARN_ON(1);
-      return -EINVAL;
-   }
 
    {
       ssize_t result;

@@ -115,6 +115,13 @@ struct IBVIncompleteSend
    unsigned             numAvailable;
 };
 
+struct IBVTimeoutConfig
+{
+   int                  connectMS;
+   int                  flowSendMS;
+   int                  pollMS;
+};
+
 struct IBVCommContext
 {
    struct ibv_context*        context;
@@ -186,6 +193,8 @@ struct IBVSocket
 
    unsigned                      connectionRejectionRate;
    unsigned                      connectionRejectionCount;
+
+   IBVTimeoutConfig              timeoutCfg;
 };
 
 

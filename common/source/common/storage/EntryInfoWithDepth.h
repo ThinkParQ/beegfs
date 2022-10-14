@@ -20,12 +20,6 @@ class EntryInfoWithDepth : public EntryInfo
       {
       }
 
-      // copy constructor
-      EntryInfoWithDepth(const EntryInfoWithDepth& entryInfo) : EntryInfo(entryInfo),
-         entryDepth(entryInfo.entryDepth)
-      {
-      }
-
       EntryInfoWithDepth(const EntryInfo& entryInfo) : EntryInfo(entryInfo),
          entryDepth(0)
       {

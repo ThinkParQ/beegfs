@@ -226,6 +226,13 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connDisableAuthentication",        "false");
    _Config_configMapRedefine(this, "connTcpOnlyFilterFile",            "");
 
+   /* connMessagingTimeouts: default to zero, indicating that constants
+    * specified in Common.h are used.
+    */
+   _Config_configMapRedefine(this, "connMessagingTimeouts",            "0,0,0");
+   // connRDMATimeouts: zero values are interpreted as the defaults specified in IBVSocket.c
+   _Config_configMapRedefine(this, "connRDMATimeouts",                 "0,0,0,0,0");
+
    _Config_configMapRedefine(this, "tunePreferredMetaFile",            "");
    _Config_configMapRedefine(this, "tunePreferredStorageFile",         "");
    _Config_configMapRedefine(this, "tuneFileCacheType",                FILECACHETYPE_BUFFERED_STR);
@@ -416,6 +423,75 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       {
          SAFE_KFREE(this->connTcpOnlyFilterFile);
          this->connTcpOnlyFilterFile = StringTk_strDup(valueStr);
+      }
+      else
+      if(!strcmp(keyStr, "connMessagingTimeouts"))
+      {
+         int cfgValCount = 3; // count value in config file in order of long, medium and short
+
+         StrCpyList connMsgTimeoutList;
+         StrCpyListIter iter;
+
+         StrCpyList_init(&connMsgTimeoutList);
+         StringTk_explode(valueStr, ',', &connMsgTimeoutList);
+
+         StrCpyListIter_init(&iter, &connMsgTimeoutList);
+
+         if (StrCpyList_length(&connMsgTimeoutList) == cfgValCount)
+         {
+            this->connMsgLongTimeout = StringTk_strToInt(StrCpyListIter_value(&iter)) > 0 ?
+                  StringTk_strToInt(StrCpyListIter_value(&iter)) : CONN_LONG_TIMEOUT;
+            StrCpyListIter_next(&iter);
+
+            this->connMsgMediumTimeout = StringTk_strToInt(StrCpyListIter_value(&iter)) > 0 ?
+                  StringTk_strToInt(StrCpyListIter_value(&iter)) : CONN_MEDIUM_TIMEOUT;
+            StrCpyListIter_next(&iter);
+
+            this->connMsgShortTimeout = StringTk_strToInt(StrCpyListIter_value(&iter)) > 0 ?
+                  StringTk_strToInt(StrCpyListIter_value(&iter)) : CONN_SHORT_TIMEOUT;
+         }
+         else
+         {
+            StrCpyList_uninit(&connMsgTimeoutList);
+            goto bad_config_elem;
+         }
+         StrCpyList_uninit(&connMsgTimeoutList);
+      }
+      else
+      if(!strcmp(keyStr, "connRDMATimeouts"))
+      {
+         StrCpyList connRDMATimeoutList;
+         int* cfgVals[] = {
+            &this->connRDMATimeoutConnect,
+            &this->connRDMATimeoutCompletion,
+            &this->connRDMATimeoutFlowSend,
+            &this->connRDMATimeoutFlowRecv,
+            &this->connRDMATimeoutPoll
+         };
+         bool badVals = false;
+
+         StrCpyList_init(&connRDMATimeoutList);
+         StringTk_explode(valueStr, ',', &connRDMATimeoutList);
+
+         if (StrCpyList_length(&connRDMATimeoutList) == sizeof(cfgVals) / sizeof(int*))
+         {
+            StrCpyListIter iter;
+            int idx;
+
+            StrCpyListIter_init(&iter, &connRDMATimeoutList);
+            for (idx = 0; !StrCpyListIter_end(&iter); ++idx, StrCpyListIter_next(&iter))
+            {
+               *cfgVals[idx] = StringTk_strToInt(StrCpyListIter_value(&iter));
+            }
+         }
+         else
+         {
+            badVals = true;
+         }
+
+         StrCpyList_uninit(&connRDMATimeoutList);
+         if (badVals)
+            goto bad_config_elem;
       }
       else
       IGNORE_CONFIG_VALUE("debugFindOtherNodes")

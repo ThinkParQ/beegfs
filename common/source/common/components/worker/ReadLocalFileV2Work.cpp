@@ -36,6 +36,9 @@ int64_t ReadLocalFileV2Work::communicate(Node& node, char* bufIn, unsigned bufIn
    NodeConnPool* connPool = node.getConnPool();
    NumNodeID localNodeNumID = readInfo->localNodeNumID;
 
+   AbstractApp* app = PThread::getCurrentThreadApp();
+   int connMsgLongTimeout = app->getCommonConfig()->getConnMsgLongTimeout();
+
    int64_t retVal = -FhgfsOpsErr_COMMUNICATION;
    int64_t numReceivedFileBytes = 0;
    Socket* sock = NULL;
@@ -62,7 +65,7 @@ int64_t ReadLocalFileV2Work::communicate(Node& node, char* bufIn, unsigned bufIn
       {
          int64_t lengthInfo; // length info in fhgfs host byte order
 
-         sock->recvExactT(&lengthInfo, sizeof(lengthInfo), 0, CONN_LONG_TIMEOUT);
+         sock->recvExactT(&lengthInfo, sizeof(lengthInfo), 0, connMsgLongTimeout);
          lengthInfo = LE_TO_HOST_64(lengthInfo);
 
          if(lengthInfo <= 0)
@@ -95,7 +98,7 @@ int64_t ReadLocalFileV2Work::communicate(Node& node, char* bufIn, unsigned bufIn
          // positive result => node is going to send some file data
 
          // receive announced dataPart
-         sock->recvExactT(&(this->buf)[numReceivedFileBytes], lengthInfo, 0, CONN_LONG_TIMEOUT);
+         sock->recvExactT(&(this->buf)[numReceivedFileBytes], lengthInfo, 0, connMsgLongTimeout);
 
          numReceivedFileBytes += lengthInfo;
 

@@ -18,6 +18,11 @@ ifeq ($(KRELEASE),)
 KRELEASE := $(shell uname -r)
 endif
 
+ifneq ($(OFED_INCLUDE_PATH),)
+BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
+export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
+endif
+
 # The following section deals with the auto-detection of the kernel
 # build directory (KDIR)
 
@@ -119,10 +124,6 @@ $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
 	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
 endif
 
-ifneq ($(OFED_INCLUDE_PATH),)
-BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
-endif
-
 # OFED API version
 ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
@@ -152,12 +153,6 @@ ifeq ($(KSRCDIR_PRUNED_HEAD),)
 	the kernel module development packages are installed for the current kernel\
 	version. (RHEL: kernel-devel; SLES: linux-kernel-headers, kernel-source;\
 	Debian: linux-headers))
-endif
-
-ifneq ($(OFED_INCLUDE_PATH),)
-	if [ -f $(OFED_INCLUDE_PATH)/../Module.symvers ]; then \
-		cp $(OFED_INCLUDE_PATH)/../Module.symvers ../source ; \
-	fi
 endif
 
 	@echo "Building beegfs client module"

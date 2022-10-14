@@ -58,6 +58,8 @@ bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* loc
       try
       {
          rdmaListenSock = RDMASocket::create().release();
+         rdmaListenSock->setTimeouts(cfg->getConnRDMATimeoutConnect(),
+            cfg->getConnRDMATimeoutFlowSend(), cfg->getConnRDMATimeoutPoll());
          rdmaListenSock->bind(listenPort);
          rdmaListenSock->listen();
 
@@ -292,6 +294,9 @@ void ConnAcceptor::onIncomingRDMAConnection(RDMASocket* sock)
             log.log(Log_DEBUG, "Ignoring an internal event on the listening RDMA socket");
             continue;
          }
+
+         acceptedSock->setTimeouts(cfg->getConnRDMATimeoutConnect(),
+            cfg->getConnRDMATimeoutFlowSend(), cfg->getConnRDMATimeoutPoll());
 
          // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
          log.log(Log_DEBUG, std::string("Accepted new RDMA connection from " +

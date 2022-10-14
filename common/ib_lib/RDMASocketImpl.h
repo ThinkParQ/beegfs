@@ -56,6 +56,11 @@ class RDMASocketImpl : public RDMASocket
          commCfg.bufSize = bufSize;
       }
 
+      virtual void setTimeouts(int connectMS, int flowSendMS, int pollMS)
+      {
+         IBVSocket_setTimeouts(ibvsock, connectMS, flowSendMS, pollMS);
+      }
+
       /**
        * Note: Only has an effect for unconnected sockets.
        */

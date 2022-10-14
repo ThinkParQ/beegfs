@@ -23,6 +23,11 @@ endif
 
 $(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
 
+ifneq ($(OFED_INCLUDE_PATH),)
+BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
+export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
+endif
+
 # The following section deals with the auto-detection of the kernel
 # build directory (KDIR)
 
@@ -75,6 +80,16 @@ KSRCDIR_PRUNED := $(foreach dir, $(KSRCDIR), $(test_dir) )
 # We use the first valid entry of the pruned KSRCDIR list
 KSRCDIR_PRUNED_HEAD := $(firstword $(KSRCDIR_PRUNED) )
 
+# OFED
+-include /etc/beegfs/beegfs-client-build.mk
+ifneq ($(OFED_INCLUDE_PATH),)
+
+BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
+
+module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h
+$(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
+	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
+endif
 
 # Include kernel feature auto-detectors
 include KernelFeatureDetection.mk
@@ -123,21 +138,6 @@ ifeq ($(BEEGFS_DEBUG_RDMA),1)
 BEEGFS_CFLAGS += -DBEEGFS_DEBUG_RDMA
 endif
 
-# OFED
--include /etc/beegfs/beegfs-client-build.mk
-ifneq ($(OFED_INCLUDE_PATH),)
-
-BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
-
-module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h
-$(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
-	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
-endif
-
-ifneq ($(OFED_INCLUDE_PATH),)
-BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
-endif
-
 # OFED API version
 ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
@@ -175,12 +175,6 @@ module: $(TARGET_ALL_DEPS)
 		"version. (RHEL: kernel-devel; SLES: kernel-source; Debian: linux-headers)"; \
 		false; \
 	fi >&2
-
-ifneq ($(OFED_INCLUDE_PATH),)
-	if [ -f $(OFED_INCLUDE_PATH)/../Module.symvers ]; then \
-		cp $(OFED_INCLUDE_PATH)/../Module.symvers ../source ; \
-	fi
-endif
 
 	$(MAKE) -C $(KDIR_PRUNED_HEAD) "M=$(BEEGFS_BUILDDIR)/../source" \
 	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)"  modules

@@ -192,8 +192,8 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
    FhgfsOpsErr resolveErr;
    NodeConnPool* connPool;
 #ifdef BEEGFS_NVFS
-    FileOpState* currentState = container_of(info, struct FileOpState, base);
-    BeeGFS_IovIter* data = NULL;
+   FileOpState* currentState = container_of(info, struct FileOpState, base);
+   BeeGFS_IovIter* data = NULL;
 #endif
    DevicePriorityContext devPrioCtx =
    {
@@ -207,10 +207,13 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
       // one conn already (this is important to avoid a deadlock between racing commkit processes)
 
 #ifdef BEEGFS_NVFS
-   if (context->ioInfo)
+   // only set data if this is a storage call, NVFS ops are available and the
+   // iov is an ITER_IOVEC.
+   if (context->ioInfo && context->ioInfo->nvfs)
    {
       struct FileOpVecState* vs = container_of(currentState, struct FileOpVecState, base);
-      data = &vs->data;
+      if (beegfs_iov_iter_is_iovec(&vs->data))
+         data = &vs->data;
    }
 #endif
    info->socket = NULL;
@@ -287,10 +290,7 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
    // perform first test for GPUD
    context->gpudRc = 0;
 
-   // nvfs is false if I/O did not come in through
-   // nvidia_fs (e.g. POSIX I/O)
-   // ioInfo is NULL if this is not a storage call
-   if (context->ioInfo && data && context->ioInfo->nvfs)
+   if (data)
       context->gpudRc = RdmaInfo_detectNVFSRequest(&devPrioCtx, data);
 #endif
 
@@ -1073,17 +1073,19 @@ static ssize_t __commkit_readfile_receive(CommKitContext* context, FileOpState* 
    ssize_t recvRes;
    Socket* socket = currentState->base.socket;
 
+   Config* cfg = App_getConfig(context->app);
+
    if(BEEGFS_SHOULD_FAIL(commkit_readfile_receive_timeout, 1) )
       recvRes = -ETIMEDOUT;
    else
 
    if(exact)
    {
-      recvRes = Socket_recvExactT(socket, iter, length, 0, CONN_LONG_TIMEOUT);
+      recvRes = Socket_recvExactT(socket, iter, length, 0, cfg->connMsgLongTimeout);
    }
    else
    {
-      recvRes = Socket_recvT(socket, iter, length, 0, CONN_LONG_TIMEOUT);
+      recvRes = Socket_recvT(socket, iter, length, 0, cfg->connMsgLongTimeout);
    }
 
    if(unlikely(recvRes < 0) )

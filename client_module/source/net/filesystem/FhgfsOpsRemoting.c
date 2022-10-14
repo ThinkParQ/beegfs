@@ -70,7 +70,6 @@
 #include "FhgfsOpsCommKit.h"
 #include "FhgfsOpsCommKitVec.h"
 
-
 static inline const char* __FhgfsOpsRemoting_rwTypeToString(enum Fhgfs_RWType);
 
 static bool __FhgfsOpsRemoting_writefileVerify(App* app, RemotingIOInfo* ioInfo,
@@ -1597,8 +1596,9 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
 {
    App* app = ioInfo->app;
 
-   ssize_t retVal = toBeRead; //???
-   BeeGFS_IovIter iterCopy = *iter;
+   ssize_t retVal = 0;
+   ssize_t errnum = 0;
+   BeeGFS_ReadSink readsink = {0};
    loff_t currentOffset = offset;
 
    StripePattern* pattern = ioInfo->pattern;
@@ -1607,24 +1607,32 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
    unsigned numStripeNodes = UInt16Vec_length(targetIDs);
    const char* fileHandleID = ioInfo->fileHandleID;
    int maxUsedTargetIndex = AtomicInt_read(ioInfo->maxUsedTargetIndex);
-
-   ssize_t usableReadSize = 0; // the amount of usable data that was received from the nodes
+   size_t stripeSetSize = (size_t) chunkSize * numStripeNodes;
+   size_t maxReadSize = min_t(size_t, stripeSetSize, toBeRead);
 
    __FhgfsOpsRemoting_logDebugIOCall(__func__, beegfs_iov_iter_count(iter), offset, ioInfo, NULL);
 
 #ifdef BEEGFS_NVFS
    ioInfo->nvfs = RdmaInfo_acquireNVFS();
 #endif
-   while(toBeRead)
+   while(toBeRead && !errnum)
    {
       unsigned currentTargetIndex = pattern->getStripeTargetIndex(pattern, currentOffset);
-      unsigned numWorks = 0; // number of work items that we added to the queue
       LIST_HEAD(stateList);
       struct FileOpVecState* state;
+      ssize_t bytesReadThisRound = 0;
+      BeeGFS_IovIter stripeSetIter;
+
+      beegfs_readsink_reserve(&readsink, &iter->_iov_iter, maxReadSize);
+      stripeSetIter = readsink.sanitized_iter;
 
       // stripeset-loop: loop over one stripe set (using dynamically determined stripe node
       // indices).
-      while(toBeRead && (numWorks < numStripeNodes) )
+
+      for(unsigned numWorks = 0;
+          (numWorks < numStripeNodes
+           && toBeRead && beegfs_iov_iter_count(&stripeSetIter));
+          ++ numWorks)
       {
          size_t currentChunkSize =
             StripePattern_getChunkEnd(pattern, currentOffset) - currentOffset + 1;
@@ -1639,7 +1647,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
 
          maxUsedTargetIndex = MAX(maxUsedTargetIndex, (int)currentTargetIndex);
 
-         chunkIter = iterCopy;
+         chunkIter = stripeSetIter;
          beegfs_iov_iter_truncate(&chunkIter, currentChunkSize);
 
          // prepare the state information
@@ -1666,15 +1674,17 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
          // prepare for next loop
          currentOffset += currentReadSize;
          toBeRead -= currentReadSize;
-         numWorks++;
-         if (!beegfs_is_pipe_iter(iter))
-            beegfs_iov_iter_advance(&iterCopy, beegfs_iov_iter_count(&chunkIter));
 
          currentTargetIndex = (currentTargetIndex + 1) % numStripeNodes;
+
+         beegfs_iov_iter_advance(&stripeSetIter, beegfs_iov_iter_count(&chunkIter));
       }
 
       if(list_empty(&stateList) )
-         return -FhgfsOpsErr_OUTOFMEM;
+      {
+         errnum = -FhgfsOpsErr_OUTOFMEM;
+         break;
+      }
 
       // communicate with the nodes
       FhgfsOpsCommKit_readfileV2bCommunicate(app, ioInfo, &stateList, readfile_nextIter, NULL);
@@ -1684,7 +1694,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
       {
          if(state->base.base.nodeResult == state->base.expectedNodeResult)
          {
-            usableReadSize += state->base.base.nodeResult;
+            bytesReadThisRound += state->base.base.nodeResult;
             continue;
          }
 
@@ -1692,7 +1702,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
 
          if(state->base.base.nodeResult >= 0)
          { // we have an end of file here (but some data might have been read)
-            retVal = usableReadSize + state->base.base.nodeResult;
+            bytesReadThisRound += state->base.base.nodeResult;
          }
          else
          { // error occurred
@@ -1710,7 +1720,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
                   "Error storage targetID: %hu; Msg: %s; FileHandle: %s",
                   state->base.base.targetID, FhgfsOpsErr_toErrString(nodeError), fileHandleID);
 
-            retVal = state->base.base.nodeResult;
+            errnum = state->base.base.nodeResult;
          }
 
          toBeRead = 0; /* abort the read here due to incomplete result/error */
@@ -1725,12 +1735,17 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
          list_del(&state->base.base.targetInfoList);
          kfree(state);
       }
+
+      beegfs_readsink_release(&readsink);
+
+      retVal += bytesReadThisRound;
+      beegfs_iov_iter_advance(iter, bytesReadThisRound);
+
    } // end of while(toBeRead)
 
    AtomicInt_max(ioInfo->maxUsedTargetIndex, maxUsedTargetIndex);
 
-   if (retVal > 0)
-      beegfs_iov_iter_advance(iter, retVal);
+   beegfs_readsink_release(&readsink); // Make sure it's released even if we broke early from the loop
 
 #ifdef BEEGFS_NVFS
    if (ioInfo->nvfs)
@@ -1739,7 +1754,8 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
       ioInfo->nvfs = false;
    }
 #endif
-   return retVal;
+
+   return retVal ? retVal : errnum;
 }
 
 

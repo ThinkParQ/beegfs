@@ -44,7 +44,11 @@ std::tuple<HashDirLock, FileIDLock, FileIDLock, ParentNameLock> RmDirMsgEx::lock
       hashLock = {&store, MetaStorageTk::getMetaInodeHash(delEntryInfo.getEntryID())};
 
    // lock directories in deadlock-avoidance order, see MirroredMessage::lock()
-   if (delEntryInfo.getEntryID() < getParentInfo()->getEntryID())
+   if (delEntryInfo.getEntryID().empty())
+   {
+      parentDirLock = {&store, getParentInfo()->getEntryID(), true};
+   }
+   else if (delEntryInfo.getEntryID() < getParentInfo()->getEntryID())
    {
       delDirLock = {&store, delEntryInfo.getEntryID(), true};
       parentDirLock = {&store, getParentInfo()->getEntryID(), true};

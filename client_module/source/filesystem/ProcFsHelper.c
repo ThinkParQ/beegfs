@@ -40,6 +40,7 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "connRDMAInterfacesFile",
    "connNetFilterFile",
    "connAuthFile",
+   "connDisableAuthentication",
    "connTcpOnlyFilterFile",
    "connFallbackExpirationSecs",
    "connRDMABufSize",
@@ -107,6 +108,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connRDMAInterfacesFile = %s\n", Config_getConnRDMAInterfacesFile(cfg) );
    seq_printf(file, "connNetFilterFile = %s\n", Config_getConnNetFilterFile(cfg) );
    seq_printf(file, "connAuthFile = %s\n", Config_getConnAuthFile(cfg) );
+   seq_printf(file, "connDisableAuthentication = %s\n",
+      Config_getConnDisableAuthentication(cfg) ? "true" : "false");
    seq_printf(file, "connTcpOnlyFilterFile = %s\n", Config_getConnTcpOnlyFilterFile(cfg) );
    seq_printf(file, "connFallbackExpirationSecs = %u\n",
       Config_getConnFallbackExpirationSecs(cfg) );

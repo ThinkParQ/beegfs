@@ -146,11 +146,6 @@ $(call define_if_matches, KERNEL_HAS_CONST_XATTR_HANDLER, \
 $(call define_if_matches, KERNEL_HAS_DENTRY_XATTR_HANDLER, \
    "int (\*set).struct dentry \*dentry", xattr.h)
 
-# iov_iter_truncate was new to 3.16, but was backported in distro kernels
-# Note: we need to check that in multiple files, because it is declared in uio.h in vanilla kernels, but at least RHEL backports put it in fs.h
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_TRUNCATE, "static inline void iov_iter_truncate(struct iov_iter \*i, size_t count)", fs.h)
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_TRUNCATE, "static inline void iov_iter_truncate(struct iov_iter \*i, u64 count)", uio.h)
-
 # address_space.assoc_mapping went away in vanilla 3.8, but SLES11 backports that change
 $(call define_if_matches, KERNEL_HAS_ADDRSPACE_ASSOC_MAPPING, -F "assoc_mapping", fs.h)
 
@@ -221,8 +216,8 @@ $(call define_if_matches, KERNEL_HAS_ITER_KVEC, "ITER_KVEC", uio.h)
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_TYPE, "iov_iter_type", uio.h)
 $(call define_if_matches, KERNEL_HAS_ITER_BVEC, "ITER_BVEC", uio.h)
 $(call define_if_matches, KERNEL_HAS_ITER_PIPE, "ITER_PIPE", uio.h)
+$(call define_if_matches, KERNEL_HAS_IOV_ITER_IS_PIPE, "iov_iter_is_pipe", uio.h)
 $(call define_if_matches, KERNEL_HAS_ITER_IS_IOVEC, "iter_is_iovec", uio.h)
-$(call define_if_matches, KERNEL_HAS_IOV_ITER_IN_FS, "struct iov_iter {", fs.h)
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_IOVEC, "iov_iter_iovec", uio.h)
 $(call define_if_matches, KERNEL_HAS_GET_SB_NODEV, "get_sb_nodev", fs.h)
 $(call define_if_matches, KERNEL_HAS_GENERIC_FILE_LLSEEK_UNLOCKED, "generic_file_llseek_unlocked", \

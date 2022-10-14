@@ -1176,7 +1176,7 @@ boost::optional<std::map<uint16_t, std::unique_ptr<StorageTarget>>> App::preregi
       }
    }
 
-   return std::move(targets);
+   return targets;
 }
 
 /**
