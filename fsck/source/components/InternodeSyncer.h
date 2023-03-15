@@ -27,6 +27,8 @@ class InternodeSyncer : public PThread
       LogContext log;
       Mutex forceNodesAndTargetStatesUpdateMutex;
       bool forceNodesAndTargetStatesUpdate;
+      Mutex forceCheckNetworkMutex;
+      bool forceCheckNetwork;  // true to force check of network interfaces
 
       TargetMap originalTargetMap;
       MirrorBuddyGroupMap originalMirrorBuddyGroupMap;
@@ -39,12 +41,32 @@ class InternodeSyncer : public PThread
       void handleTargetMappingChanges();
       void handleBuddyGroupChanges();
 
+      bool getAndResetForceCheckNetwork()
+      {
+         const std::lock_guard<Mutex> lock(forceCheckNetworkMutex);
+
+         bool retVal = this->forceCheckNetwork;
+
+         this->forceCheckNetwork = false;
+
+         return retVal;
+      }
+
+      bool checkNetwork();
+
       Condition serversDownloadedCondition;
       Mutex serversDownloadedMutex;
       bool serversDownloaded;
 
    public:
       void waitForServers();
+
+      void setForceCheckNetwork()
+      {
+         const std::lock_guard<Mutex> lock(forceCheckNetworkMutex);
+
+         this->forceCheckNetwork = true;
+      }
 
    private:
       static void printSyncNodesResults(NodeType nodeType, NumNodeIDList* addedNodes,

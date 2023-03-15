@@ -111,7 +111,7 @@ void FhgfsOpsHelper_logOpMsg(int level, App* app, struct dentry* dentry, struct 
       NoAllocBufferStore_addBuf(bufStore, pathStoreBuf);
 }
 
-ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, BeeGFS_IovIter *iter,
+ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, struct iov_iter *iter,
       size_t count, RemotingIOInfo* ioInfo, loff_t offsetFromEnd, loff_t* outNewOffset)
 {
    App* app = ioInfo->app;
@@ -145,7 +145,7 @@ ssize_t FhgfsOpsHelper_appendfileVecOffset(FhgfsInode* fhgfsInode, BeeGFS_IovIte
    fhgfsStat.size += offsetFromEnd;
 
    (void) count; // count currently not used, writefileVec looks at iter->count
-   BUG_ON(count != beegfs_iov_iter_count(iter));
+   BUG_ON(count != iov_iter_count(iter));
    writeRes = FhgfsOpsRemoting_writefileVec(iter, fhgfsStat.size, ioInfo, false);
 
    if(writeRes >= 0)
@@ -172,14 +172,8 @@ unlock_and_exit:
 ssize_t FhgfsOpsHelper_appendfile_kernel(FhgfsInode* fhgfsInode, const char *buf, size_t size,
    RemotingIOInfo* ioInfo, loff_t* outNewOffset)
 {
-   struct kvec kvec = {
-      .iov_len = size,
-      .iov_base = (void*) buf
-   };
-   BeeGFS_IovIter iter;
-   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &kvec, 1, size);
-
-   return FhgfsOpsHelper_appendfileVecOffset(fhgfsInode, &iter, size, ioInfo, 0, outNewOffset);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buf, size, WRITE);
+   return FhgfsOpsHelper_appendfileVecOffset(fhgfsInode, iter, size, ioInfo, 0, outNewOffset);
 }
 
 /**
@@ -189,7 +183,7 @@ ssize_t FhgfsOpsHelper_appendfile_kernel(FhgfsInode* fhgfsInode, const char *buf
  * @param offset offset in file, -1 for append
  */
 static ssize_t FhgfsOpsHelper_writefileEx(FhgfsInode* fhgfsInode,
-      BeeGFS_IovIter *iter, size_t size, loff_t offset, RemotingIOInfo* ioInfo)
+      struct iov_iter *iter, size_t size, loff_t offset, RemotingIOInfo* ioInfo)
 {
    if(offset == -1)
       return FhgfsOpsHelper_appendfileVecOffset(fhgfsInode, iter, size, ioInfo, 0, &offset);
@@ -313,7 +307,7 @@ FhgfsOpsErr FhgfsOpsHelper_flushCacheNoWait(App* app, FhgfsInode* fhgfsInode,
  * @param offset offset in file, -1 for append
  * @return number of bytes written or negative fhgfs error code
  */
-ssize_t FhgfsOpsHelper_writeCached(BeeGFS_IovIter *iter, size_t size,
+ssize_t FhgfsOpsHelper_writeCached(struct iov_iter *iter, size_t size,
    loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -409,7 +403,7 @@ ssize_t FhgfsOpsHelper_writeCached(BeeGFS_IovIter *iter, size_t size,
 
    FsFileInfo_incCacheHits(fileInfo);
 
-   userBufCopyRes = beegfs_copy_from_iter(&(cacheBuffer->buf)[cacheBuffer->bufUsageLen], size, iter);
+   userBufCopyRes = copy_from_iter(&(cacheBuffer->buf)[cacheBuffer->bufUsageLen], size, iter);
    if(unlikely(userBufCopyRes != size))
    { // copy failed
       Logger* log = App_getLogger(app);
@@ -454,7 +448,7 @@ unlock_and_exit:
  *
  * @return number of bytes read or negative fhgfs error code
  */
-ssize_t FhgfsOpsHelper_readCached(BeeGFS_IovIter *iter, size_t size, loff_t offset,
+ssize_t FhgfsOpsHelper_readCached(struct iov_iter *iter, size_t size, loff_t offset,
    FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -603,7 +597,7 @@ exclusive_lock_path:
       (cacheBuffer->fileOffset + cacheCopyOffset);
 
    {
-      size_t numCopied = beegfs_copy_to_iter(&(cacheBuffer->buf)[cacheCopyOffset], cacheCopySize, iter);
+      size_t numCopied = copy_to_iter(&(cacheBuffer->buf)[cacheCopyOffset], cacheCopySize, iter);
       if (unlikely(numCopied != cacheCopySize))
       { // copy failed
          Logger* log = App_getLogger(app);
@@ -660,7 +654,7 @@ unlock_and_exit:
  * @param offset offset in file, -1 for append
  * @return number of bytes written or negative fhgfs error code
  */
-ssize_t __FhgfsOpsHelper_writeCacheFlushed(BeeGFS_IovIter *iter,
+ssize_t __FhgfsOpsHelper_writeCacheFlushed(struct iov_iter *iter,
    size_t size, loff_t offset, FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -715,7 +709,7 @@ ssize_t __FhgfsOpsHelper_writeCacheFlushed(BeeGFS_IovIter *iter,
    cacheBuffer->bufType = FileBufferType_WRITE; // (needed here for _discardCache() below)
 
    // init cache entry fields and copy data to cacheBuf
-   userBufCopyRes = beegfs_copy_from_iter(cacheBuffer->buf, size, iter);
+   userBufCopyRes = copy_from_iter(cacheBuffer->buf, size, iter);
    if(unlikely(userBufCopyRes != size))
    { // copy failed
       Logger* log = App_getLogger(app);
@@ -744,7 +738,7 @@ ssize_t __FhgfsOpsHelper_writeCacheFlushed(BeeGFS_IovIter *iter,
  *
  * @return number of bytes read or negative fhgfs error code
  */
-ssize_t __FhgfsOpsHelper_readCacheFlushed(BeeGFS_IovIter *iter, size_t size, loff_t offset,
+ssize_t __FhgfsOpsHelper_readCacheFlushed(struct iov_iter *iter, size_t size, loff_t offset,
    FhgfsInode* fhgfsInode, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    App* app = ioInfo->app;
@@ -809,7 +803,7 @@ ssize_t __FhgfsOpsHelper_readCacheFlushed(BeeGFS_IovIter *iter, size_t size, lof
 
    // init cache entry fields and copy data from cache buffer to client iter
    {
-      size_t numCopied = beegfs_copy_to_iter(cacheBuffer->buf, numIterCopy, iter);
+      size_t numCopied = copy_to_iter(cacheBuffer->buf, numIterCopy, iter);
 
       if (unlikely(numCopied != numIterCopy))
       { // copy failed
@@ -906,7 +900,7 @@ FhgfsOpsErr FhgfsOpsHelper_releaseAppendLock(FhgfsInode* inode, RemotingIOInfo* 
  * Note: Intended for sparse file reading.
  * Note: There is also a similar version for kernel buffers.
  */
-FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, BeeGFS_IovIter *iter, size_t size,
+FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, struct iov_iter *iter, size_t size,
    loff_t offset, FsFileInfo* fileInfo, RemotingIOInfo* ioInfo)
 {
    StripePattern* pattern = ioInfo->pattern;
@@ -927,7 +921,7 @@ FhgfsOpsErr FhgfsOpsHelper_readOrClearUser(App* app, BeeGFS_IovIter *iter, size_
          long clearVal;
          ssize_t nclear = currentReadSize - currentReadRes;
 
-         clearVal = beegfs_iov_iter_zero(nclear, iter);
+         clearVal = iov_iter_zero(nclear, iter);
          if (clearVal != nclear)
             return FhgfsOpsErr_ADDRESSFAULT;
       }
@@ -1102,7 +1096,7 @@ err_exit:
  * @return number of read bytes or negative linux error code
  */
 ssize_t FhgfsOpsHelper_readStateless(App* app, const EntryInfo* entryInfo,
-   BeeGFS_IovIter *iter, size_t size, loff_t offset)
+   struct iov_iter *iter, size_t size, loff_t offset)
 {
    int retVal = -EREMOTEIO;
 
@@ -1234,7 +1228,7 @@ static ssize_t FhgfsOpsHelper_writeStatelessInode(FhgfsInode* fhgfsInode, const 
  * @return number of written bytes or negative linux error code
  */
 ssize_t FhgfsOpsHelper_writeStateless(App* app, const EntryInfo* entryInfo,
-   BeeGFS_IovIter *iter, size_t size, loff_t offset, unsigned uid, unsigned gid)
+   struct iov_iter *iter, size_t size, loff_t offset, unsigned uid, unsigned gid)
 {
    int retVal = -EREMOTEIO;
 

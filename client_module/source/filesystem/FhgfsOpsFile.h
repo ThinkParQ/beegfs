@@ -113,7 +113,7 @@ extern int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
 #endif // KERNEL_HAS_DIRECT_IO_ITER
 
 extern int FhgfsOps_releaseCancelLocks(struct inode* inode, struct file* file);
-extern ssize_t __FhgfsOps_readSparse(struct file* file, BeeGFS_IovIter *iter, size_t size,
+extern ssize_t __FhgfsOps_readSparse(struct file* file, struct iov_iter *iter, size_t size,
    loff_t offset);
 
 

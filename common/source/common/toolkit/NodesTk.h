@@ -35,7 +35,9 @@ class NodesTk
 
       static void moveNodesFromListToStore(std::vector<NodeHandle>& nodes,
          AbstractNodeStore* nodeStore);
-      static void applyLocalNicCapsToList(Node& localNode, const std::vector<NodeHandle>& nodes);
+      static void applyLocalNicListToList(Node& localNode, const std::vector<NodeHandle>& nodes);
+      static void applyLocalNicListToList(const NicAddressList& localNicList,
+         const NicListCapabilities& localNicCaps, const std::vector<NodeHandle>& nodes);
 
       static unsigned getRetryDelayMS(int elapsedMS);
 

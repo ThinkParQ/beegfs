@@ -21,7 +21,7 @@ typedef enum Fhgfs_RWType Fhgfs_RWType;
 struct FileOpVecState {
    FileOpState base;
 
-   BeeGFS_IovIter data;
+   struct iov_iter data;
 };
 
 union RWFileVecState {
@@ -73,66 +73,40 @@ extern FhgfsOpsErr FhgfsOpsRemoting_flockRangeEx(const EntryInfo* entryInfo, RWL
    App* app, const char* fileHandleID, int ownerPID, int lockTypeFlags, uint64_t start, uint64_t end,
    bool allowRetries);
 
-extern ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
+extern ssize_t FhgfsOpsRemoting_writefileVec(struct iov_iter* iter, loff_t offset,
    RemotingIOInfo* ioInfo, bool serializeWrites);
 
 static inline ssize_t FhgfsOpsRemoting_writefile(const char __user *buf, size_t size, loff_t offset,
    RemotingIOInfo* ioInfo)
 {
-   struct iovec iov = {
-      .iov_base = (char __user *) buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-
-   BEEGFS_IOV_ITER_INIT(&iter, WRITE, &iov, 1, size);
-
-   return FhgfsOpsRemoting_writefileVec(&iter, offset, ioInfo, false);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, WRITE);
+   return FhgfsOpsRemoting_writefileVec(iter, offset, ioInfo, false);
 }
 
 static inline ssize_t FhgfsOpsRemoting_writefile_kernel(const char *buf, size_t size, loff_t offset,
    RemotingIOInfo* ioInfo)
 {
-   struct kvec kvec = {
-      .iov_base = (char *) buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-
-   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &kvec, 1, size);
-
-   return FhgfsOpsRemoting_writefileVec(&iter, offset, ioInfo, false);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buf, size, WRITE);
+   return FhgfsOpsRemoting_writefileVec(iter, offset, ioInfo, false);
 }
 
 extern ssize_t FhgfsOpsRemoting_rwChunkPageVec(FhgfsChunkPageVec *pageVec, RemotingIOInfo* ioInfo,
    Fhgfs_RWType rwType);
-extern ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter *iter, size_t size, loff_t offset,
+extern ssize_t FhgfsOpsRemoting_readfileVec(struct iov_iter *iter, size_t size, loff_t offset,
    RemotingIOInfo* ioInfo, FhgfsInode* fhgfsInode);
 
 static inline ssize_t FhgfsOpsRemoting_readfile_user(char __user *buf, size_t size, loff_t offset,
    RemotingIOInfo* ioInfo, FhgfsInode* fhgfsInode)
 {
-   struct iovec iov = {
-      .iov_base = (void __user *) buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-   BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, size);
-
-   return FhgfsOpsRemoting_readfileVec(&iter, size, offset, ioInfo, fhgfsInode);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, READ);
+   return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
 }
 
 static inline ssize_t FhgfsOpsRemoting_readfile_kernel(char *buf, size_t size, loff_t offset,
    RemotingIOInfo* ioInfo, FhgfsInode* fhgfsInode)
 {
-   struct kvec kvec = {
-      .iov_base = (void *) buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-   BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, size);
-
-   return FhgfsOpsRemoting_readfileVec(&iter, size, offset, ioInfo, fhgfsInode);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buf, size, READ);
+   return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
 }
 
 extern FhgfsOpsErr FhgfsOpsRemoting_rename(App* app, const char* oldName, unsigned oldLen,

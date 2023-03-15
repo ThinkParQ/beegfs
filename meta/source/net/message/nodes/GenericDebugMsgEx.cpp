@@ -456,7 +456,7 @@ std::string GenericDebugMsgEx::processOpDumpDentry(std::istringstream& commandSt
    StringList parameterList;
    StringTk::explode(commandStream.str(), ' ', &parameterList);
 
-   if ( parameterList.size() != 3 )
+   if ( parameterList.size() < 3 || parameterList.size() > 4 )
       return "Invalid or missing parameters; Parameter format: parentDirID entryName "
          "[isBuddyMirrored]";
 
@@ -465,10 +465,10 @@ std::string GenericDebugMsgEx::processOpDumpDentry(std::istringstream& commandSt
    std::string parentDirID = *iter;
    iter++;
    std::string entryName = *iter;
+   iter++;
    bool isBuddyMirrored = false;
    if (iter != parameterList.end())
    {
-      iter++;
       isBuddyMirrored = StringTk::strToBool(*iter);
    }
 
@@ -504,7 +504,7 @@ std::string GenericDebugMsgEx::processOpWriteDirDentry(std::istringstream& comma
    StringList parameterList;
    StringTk::explode(commandStream.str(), ' ', &parameterList);
 
-   if ( parameterList.size() != 4 )
+   if ( parameterList.size() < 4 || parameterList.size() > 5 )
       return "Invalid or missing parameters; Parameter format: parentDirID entryName ownerNodeID "
          "[isBuddyMirrored]";
 
@@ -516,10 +516,10 @@ std::string GenericDebugMsgEx::processOpWriteDirDentry(std::istringstream& comma
    iter++;
    NumNodeID ownerNodeID(StringTk::strToUInt(*iter) );
 
+   iter++;
    bool isBuddyMirrored = false;
    if (iter!=parameterList.end())
    {
-      iter++;
       isBuddyMirrored = StringTk::strToBool(*iter);
    }
 
@@ -665,7 +665,7 @@ std::string GenericDebugMsgEx::processOpDumpInlinedInode(std::istringstream& com
    StringList parameterList;
    StringTk::explode(commandStream.str(), ' ', &parameterList);
 
-   if ( parameterList.size() != 3 )
+   if ( parameterList.size() < 3 || parameterList.size() > 4 )
       return "Invalid or missing parameters; Parameter format: parentDirID entryName "
          "[isBuddyMirrored]";
 
@@ -674,10 +674,10 @@ std::string GenericDebugMsgEx::processOpDumpInlinedInode(std::istringstream& com
    std::string parentEntryID = *iter;
    iter++;
    std::string entryName = *iter;
+   iter++;
    bool isBuddyMirrored = false;
    if (iter != parameterList.end())
    {
-      iter++;
       isBuddyMirrored = StringTk::strToBool(*iter);
    }
 

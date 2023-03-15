@@ -40,8 +40,8 @@ struct SocketOps
    bool (*shutdown)(Socket* this);
    bool (*shutdownAndRecvDisconnect)(Socket* this, int timeoutMS);
 
-   ssize_t (*sendto)(Socket* this, BeeGFS_IovIter* iter, int flags, fhgfs_sockaddr_in *to);
-   ssize_t (*recvT)(Socket* this, BeeGFS_IovIter* iter, int flags, int timeoutMS);
+   ssize_t (*sendto)(Socket* this, struct iov_iter* iter, int flags, fhgfs_sockaddr_in *to);
+   ssize_t (*recvT)(Socket* this, struct iov_iter* iter, int flags, int timeoutMS);
 };
 
 struct Socket
@@ -85,12 +85,12 @@ static inline void Socket_virtualDestruct(Socket* this)
    kfree(this);
 }
 
-static inline ssize_t Socket_recvT(Socket* this, BeeGFS_IovIter *iter,
+static inline ssize_t Socket_recvT(Socket* this, struct iov_iter *iter,
       size_t length, int flags, int timeoutMS)
 {
    // TODO: implementation function should accept length as well.
-   BeeGFS_IovIter copy = *iter;
-   beegfs_iov_iter_truncate(&copy, length);
+   struct iov_iter copy = *iter;
+   iov_iter_truncate(&copy, length);
 
    {
       ssize_t nread = this->ops->recvT(this, &copy, flags, timeoutMS);
@@ -108,7 +108,7 @@ static inline ssize_t Socket_recvT(Socket* this, BeeGFS_IovIter *iter,
          // That means, the code should be changed such that we advance only in
          // the outermost layers of the beegfs client module.
 
-         beegfs_iov_iter_advance(iter, nread);
+         iov_iter_advance(iter, nread);
       }
 
       return nread;
@@ -118,14 +118,8 @@ static inline ssize_t Socket_recvT(Socket* this, BeeGFS_IovIter *iter,
 static inline ssize_t Socket_recvT_kernel(Socket* this, void *buffer,
       size_t length, int flags, int timeoutMS)
 {
-      struct kvec kvec = {
-         .iov_base = buffer,
-         .iov_len = length,
-      };
-      BeeGFS_IovIter iter;
-      BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, length);
-
-      return this->ops->recvT(this, &iter, flags, timeoutMS);
+      struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buffer, length, READ);
+      return this->ops->recvT(this, iter, flags, timeoutMS);
 }
 
 /**
@@ -138,7 +132,7 @@ static inline ssize_t Socket_recvT_kernel(Socket* this, void *buffer,
  * initially.
  * @return -ETIMEDOUT on timeout.
  */
-static inline ssize_t Socket_recvExactTEx(Socket* this, BeeGFS_IovIter *iter, size_t len, int flags, int timeoutMS,
+static inline ssize_t Socket_recvExactTEx(Socket* this, struct iov_iter *iter, size_t len, int flags, int timeoutMS,
    size_t* outNumReceivedBeforeError)
 {
    ssize_t missingLen = len;
@@ -162,14 +156,8 @@ static inline ssize_t Socket_recvExactTEx(Socket* this, BeeGFS_IovIter *iter, si
 static inline ssize_t Socket_recvExactTEx_kernel(Socket* this, void *buf, size_t len, int flags, int timeoutMS,
    size_t* outNumReceivedBeforeError)
 {
-      struct kvec kvec = {
-         .iov_base = buf,
-         .iov_len = len,
-      };
-      BeeGFS_IovIter iter;
-      BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, len);
-
-      return Socket_recvExactTEx(this, &iter, len, flags, timeoutMS, outNumReceivedBeforeError);
+      struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buf, len, READ);
+      return Socket_recvExactTEx(this, iter, len, flags, timeoutMS, outNumReceivedBeforeError);
 }
 
 /**
@@ -177,7 +165,7 @@ static inline ssize_t Socket_recvExactTEx_kernel(Socket* this, void *buf, size_t
  *
  * @return -ETIMEDOUT on timeout.
  */
-static inline ssize_t Socket_recvExactT(Socket* this, BeeGFS_IovIter *iter, size_t len, int flags, int timeoutMS)
+static inline ssize_t Socket_recvExactT(Socket* this, struct iov_iter *iter, size_t len, int flags, int timeoutMS)
 {
    size_t numReceivedBeforeError;
 
@@ -195,12 +183,8 @@ static inline ssize_t Socket_recvExactT_kernel(Socket* this, void *buf, size_t l
 static inline ssize_t Socket_sendto_kernel(Socket *this, const void *buf, size_t len, int flags,
    fhgfs_sockaddr_in *to)
 {
-   struct kvec kvec = { (void *) buf, len };
-   BeeGFS_IovIter iter;
-
-   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &kvec, 1, len);
-
-   return this->ops->sendto(this, &iter, flags, to);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buf, len, WRITE);
+   return this->ops->sendto(this, iter, flags, to);
 }
 
 static inline ssize_t Socket_send_kernel(Socket *this, const void *buf, size_t len, int flags)

@@ -193,7 +193,7 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
    NodeConnPool* connPool;
 #ifdef BEEGFS_NVFS
    FileOpState* currentState = container_of(info, struct FileOpState, base);
-   BeeGFS_IovIter* data = NULL;
+   struct iov_iter* data = NULL;
 #endif
    DevicePriorityContext devPrioCtx =
    {
@@ -1068,7 +1068,7 @@ static void __commkit_readfile_printSocketDetails(CommKitContext* context,
 }
 
 static ssize_t __commkit_readfile_receive(CommKitContext* context, FileOpState* currentState,
-   BeeGFS_IovIter *iter, size_t length, bool exact)
+   struct iov_iter *iter, size_t length, bool exact)
 {
    ssize_t recvRes;
    Socket* socket = currentState->base.socket;
@@ -1110,7 +1110,7 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, FileOpSta
       .iov_base = dataLenBuf,
       .iov_len = size,
    };
-   BeeGFS_IovIter iter;
+   struct iov_iter iter;
    BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, size);
 
    recvRes = __commkit_readfile_receive(context, currentState, &iter, size, true);
@@ -1156,7 +1156,7 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, FileOpSta
 static int __commkit_readfile_recvdata(CommKitContext* context, struct CommKitTargetInfo* info)
 {
    FileOpState* currentState = container_of(info, FileOpState, base);
-   BeeGFS_IovIter *iter = &currentState->data;
+   struct iov_iter *iter = &currentState->data;
    size_t missingLength = currentState->toBeTransmitted - currentState->transmitted;
    ssize_t recvRes;
 
@@ -1182,10 +1182,10 @@ static int __commkit_readfile_recvdata(CommKitContext* context, struct CommKitTa
    if(!currentState->receiveFileData)
       return __commkit_readfile_recvdata_prefix(context, currentState);
 
-   if(beegfs_iov_iter_count(iter) == 0)
+   if(iov_iter_count(iter) == 0)
    {
       ((struct ReadfileIterOps*) context->private)->nextIter(context, currentState);
-      BUG_ON(beegfs_iov_iter_count(iter) == 0);
+      BUG_ON(iov_iter_count(iter) == 0);
    }
 
    // receive available dataPart
@@ -1330,8 +1330,8 @@ static int __commkit_writefile_sendData(CommKitContext* context,
 {
    FileOpState* currentState = container_of(info, FileOpState, base);
    ssize_t sendRes = 0;
-   BeeGFS_IovIter* data = &currentState->data;
-   size_t partLen = beegfs_iov_iter_count(data);
+   struct iov_iter* data = &currentState->data;
+   size_t partLen = iov_iter_count(data);
 
 #ifdef BEEGFS_NVFS
    //
@@ -1345,10 +1345,10 @@ static int __commkit_writefile_sendData(CommKitContext* context,
    if(currentState->toBeTransmitted == 0)
       return 0;
 
-   if(beegfs_iov_iter_count(data) == 0)
+   if(iov_iter_count(data) == 0)
    {
       ((struct WritefileIterOps*) context->private)->nextIter(context, currentState);
-      BUG_ON(beegfs_iov_iter_count(data) == 0);
+      BUG_ON(iov_iter_count(data) == 0);
    }
 
    if(BEEGFS_SHOULD_FAIL(commkit_writefile_senddata_timeout, 1) )
@@ -1357,7 +1357,7 @@ static int __commkit_writefile_sendData(CommKitContext* context,
       goto sendsDone;
    }
 
-   while(beegfs_iov_iter_count(data))
+   while(iov_iter_count(data))
    {
       sendRes = info->socket->ops->sendto(info->socket, data, MSG_DONTWAIT, NULL);
       if (sendRes < 0)
@@ -1376,7 +1376,7 @@ sendsDone:
          Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
             "SocketError. ErrCode: %zd", sendRes);
          Logger_logFormatted(context->log, Log_SPAM, context->ops->logContext,
-            "partLen/missing: %zd/%zd", partLen, beegfs_iov_iter_count(data));
+            "partLen/missing: %zd/%zd", partLen, iov_iter_count(data));
       }
 
       return sendRes;

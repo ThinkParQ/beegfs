@@ -41,6 +41,18 @@ NodeConnPool::NodeConnPool(Node& parentNode, unsigned short streamPort, const Ni
    memset(&localNicCaps, 0, sizeof(localNicCaps) );
    memset(&stats, 0, sizeof(stats) );
    memset(&errState, 0, sizeof(errState) );
+
+   filterNicList(this->nicList);
+}
+
+void NodeConnPool::setLocalNicList(const NicAddressList& localNicList,
+   const NicListCapabilities& localNicCaps)
+{
+   std::unique_lock<Mutex> mutexLock(mutex);
+   this->localNicList = localNicList;
+   this->localNicCaps = localNicCaps;
+   mutexLock.unlock();
+   invalidateAllAvailableStreams(false, true);
 }
 
 NodeConnPool::~NodeConnPool()
@@ -62,6 +74,19 @@ NodeConnPool::~NodeConnPool()
    nicList.clear();
 }
 
+void NodeConnPool::filterNicList(NicAddressList& nicList)
+{
+   for (NicAddressListIter nicIter = nicList.begin(); nicIter != nicList.end(); )
+   {
+      if(!app->getNetFilter()->isAllowed(nicIter->ipAddr.s_addr) )
+      {
+         nicIter = nicList.erase(nicIter);
+         continue;
+      }
+
+      nicIter++;
+   }
+}
 
 /**
  * Note: Will block if no stream socket is immediately available.
@@ -86,10 +111,9 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
    PooledSocket* sock = NULL;
    unsigned short port;
 
-   std::string contextStr = "NodeConn (acquire stream)";
-   LogContext log(contextStr);
+   LogContext log("NodeConn (acquire stream)");
 
-   std::unique_lock<Mutex> mutexLock(mutex);
+   std::unique_lock<Mutex> mutexLock(mutex); // L O C K
 
    if(!availableConns && (establishedConns == maxConns) )
    { // wait for a conn to become available (or disconnected)
@@ -102,7 +126,6 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
       while(!availableConns && (establishedConns == maxConns) )
          changeCond.wait(&mutex);
    }
-
 
    if(likely(availableConns) )
    {
@@ -130,6 +153,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
 
    port = this->streamPort;
    NicAddressList nicListCopy = this->nicList;
+   NicListCapabilities localNicCapsCopy = this->localNicCaps;
 
    establishedConns++;
 
@@ -145,15 +169,12 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
       RDMASocket* newRDMASock = NULL; // (to find out whether we need to set the
          // socketOptions without runtime type info)
 
-      if(!app->getNetFilter()->isAllowed(iter->ipAddr.s_addr) )
-         continue;
+      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
+         Socket::endpointAddrToString(&iter->ipAddr, port);
 
       if( (iter->nicType != NICADDRTYPE_STANDARD) &&
          app->getTcpOnlyFilter()->isContained(iter->ipAddr.s_addr) )
          continue;
-
-      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
-         Socket::endpointAddrToString(&iter->ipAddr, port);
 
       try
       {
@@ -161,7 +182,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
          {
             case NICADDRTYPE_RDMA:
             { // RDMA
-               if(!localNicCaps.supportsRDMA)
+               if(!localNicCapsCopy.supportsRDMA)
                   continue;
 
                log.log(Log_DEBUG, "Establishing new RDMA connection to: " + endpointStr);
@@ -170,7 +191,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
             } break;
             case NICADDRTYPE_SDP:
             { // SDP
-               if(!localNicCaps.supportsSDP)
+               if(!localNicCapsCopy.supportsSDP)
                   continue;
 
                log.log(Log_DEBUG, "Establishing new SDP connection to: " + endpointStr);
@@ -293,10 +314,11 @@ void NodeConnPool::releaseStreamSocket(Socket* sock)
 {
    PooledSocket* pooledSock = (PooledSocket*)sock;
 
-   // test whether this socket has expired
-
-   if(unlikely(pooledSock->getHasExpired(fallbackExpirationSecs) ) )
-   { // this socket just expired => invalidate it
+   if(unlikely(pooledSock->getHasExpired(fallbackExpirationSecs) ) ||
+      unlikely(pooledSock->isCloseOnRelease() ) )
+   {
+      // this socket just expired or is set to be closed => invalidate it.
+      // note: changeCond is signaled by this call
       invalidateSpecificStreamSocket(sock);
       return;
    }
@@ -319,14 +341,13 @@ void NodeConnPool::invalidateStreamSocket(Socket* sock)
    //    availabe anyways. (we don't want to acquire a mutex here that would block the whole pool
    //    while we're just waiting for the sock-close response messages)
 
-   invalidateAllAvailableStreams(false);
+   invalidateAllAvailableStreams(false, false);
    invalidateSpecificStreamSocket(sock);
 }
 
 void NodeConnPool::invalidateSpecificStreamSocket(Socket* sock)
 {
-   std::string contextStr = std::string("NodeConn (invalidate stream)");
-   LogContext log(contextStr);
+   LogContext log("NodeConn (invalidate stream)");
 
    bool sockValid = true;
 
@@ -379,9 +400,10 @@ void NodeConnPool::invalidateSpecificStreamSocket(Socket* sock)
  *
  * @param idleStreamsOnly invalidate only conns that are marked as idle (ie don't have the activity
  * flag set).
+ * @param closeOnRelease if true, set every PooledSocket's closeOnRelease flag.
  * @return number of invalidated streams
  */
-unsigned NodeConnPool::invalidateAllAvailableStreams(bool idleStreamsOnly)
+unsigned NodeConnPool::invalidateAllAvailableStreams(bool idleStreamsOnly, bool closeOnRelease)
 {
    /* note: we have TWO STAGES here, because we don't want to hold the mutex and block everything
       while we're waiting for the conns to be dropped. */
@@ -404,6 +426,9 @@ unsigned NodeConnPool::invalidateAllAvailableStreams(bool idleStreamsOnly)
       for(ConnListIter iter = connList.begin(); iter != connList.end(); iter++)
       {
          PooledSocket* sock = *iter;
+
+         if (closeOnRelease )
+            sock->setCloseOnRelease(true);
 
          if(!sock->isAvailable() )
             continue;
@@ -440,7 +465,7 @@ unsigned NodeConnPool::disconnectAndResetIdleStreams()
 {
    unsigned numInvalidated;
 
-   numInvalidated = invalidateAllAvailableStreams(true);
+   numInvalidated = invalidateAllAvailableStreams(true, false);
 
    resetStreamsIdleFlag();
 
@@ -540,25 +565,37 @@ void NodeConnPool::makeChannelIndirect(Socket* sock)
  * @param streamPort value 0 will be ignored
  * @param nicList will be copied
  */
-void NodeConnPool::updateInterfaces(unsigned short streamPort, NicAddressList& nicList)
+bool NodeConnPool::updateInterfaces(unsigned short streamPort, const NicAddressList& nicList)
 {
-   bool portHasChanged = false; // we only check port, because nicList check would be too
-      // inefficient and not worth the effort
-
+   bool hasChanged = false;
    {
       const std::lock_guard<Mutex> lock(mutex);
 
       if(streamPort && (streamPort != this->streamPort) )
       {
+         LOG(GENERAL, NOTICE, "Node port has changed", ("node", parentNode.getNodeIDWithTypeStr()));
          this->streamPort = streamPort;
-         portHasChanged = true;
+         hasChanged = true;
       }
 
-      this->nicList = nicList;
+      NicAddressList filtNicList = nicList;
+      filterNicList(filtNicList);
+
+      if (!(this->nicList == filtNicList))
+      {
+         LOG(GENERAL, NOTICE, "Node interfaces have changed", ("node", parentNode.getNodeIDWithTypeStr()));
+         hasChanged = true;
+         this->nicList = filtNicList;
+      }
    }
 
-   if(unlikely(portHasChanged) )
-      invalidateAllAvailableStreams(false);
+   if(unlikely(hasChanged) )
+   {
+      // closeOnRelease is true, all of these sockets need to be invalidated ASAP
+      invalidateAllAvailableStreams(false, true);
+   }
+
+   return hasChanged;
 }
 
 /**

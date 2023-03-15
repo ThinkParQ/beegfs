@@ -3,7 +3,7 @@
 
 #include <common/Common.h>
 #include <common/toolkit/Time.h>
-#ifdef BEEGFS_NVFS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
 #include <rdma/ib_verbs.h>
 #endif
 
@@ -12,11 +12,8 @@ typedef struct NicAddressStats NicAddressStats;
 
 static inline void NicAddressStats_init(NicAddressStats* this, NicAddress* nic);
 static inline void NicAddressStats_uninit(NicAddressStats* this);
-static inline int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o
-#ifdef BEEGFS_NVFS
-   , int numa
-#endif
-   );
+static inline int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o,
+   int numa);
 static inline void NicAddressStats_updateUsed(NicAddressStats* this);
 static inline void NicAddressStats_updateLastError(NicAddressStats* this);
 static inline bool NicAddressStats_lastErrorExpired(NicAddressStats* this, Time* now,
@@ -50,15 +47,12 @@ void NicAddressStats_uninit(NicAddressStats* this)
  *
  * Return value is < 0 if this has higher priority, > 0 if o has higher priority.
  */
-int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o
-#ifdef BEEGFS_NVFS
-   , int numa
-#endif
-   )
+int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o,
+   int numa)
 {
    int rc;
 
-#ifdef BEEGFS_NVFS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
    // device on the same numa node as current thread has higher priority
    if (likely(this->nic.ibdev && o->nic.ibdev))
    {
@@ -72,7 +66,8 @@ int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o
             return 1;
       }
    }
-#endif // BEEGFS_NVFS
+#endif
+
    // device with more available connections has higher priority
    rc = o->available - this->available;
    if (rc != 0)
@@ -102,7 +97,7 @@ bool NicAddressStats_lastErrorExpired(NicAddressStats* this, Time* now, int expi
 
 bool NicAddressStats_usable(NicAddressStats* this, int maxConns)
 {
-#ifdef BEEGFS_NVFS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
    if (unlikely(!this->nic.ibdev))
       return false;
 #endif

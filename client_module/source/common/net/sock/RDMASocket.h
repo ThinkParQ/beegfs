@@ -29,9 +29,9 @@ extern bool _RDMASocket_listen(Socket* this);
 extern bool _RDMASocket_shutdown(Socket* this);
 extern bool _RDMASocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS);
 
-extern ssize_t _RDMASocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags,
+extern ssize_t _RDMASocket_recvT(Socket* this, struct iov_iter* iter, int flags,
    int timeoutMS);
-extern ssize_t _RDMASocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
+extern ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags,
    fhgfs_sockaddr_in *to);
 
 extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finishPoll);

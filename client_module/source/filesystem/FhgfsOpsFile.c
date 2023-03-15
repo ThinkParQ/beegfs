@@ -911,7 +911,7 @@ int FhgfsOps_lock(struct file* file, int cmd, struct file_lock* fileLock)
 }
 
 
-static ssize_t read_common(struct file *file, BeeGFS_IovIter *iter, size_t size, loff_t *offsetPointer)
+static ssize_t read_common(struct file *file, struct iov_iter *iter, size_t size, loff_t *offsetPointer)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
 
@@ -986,13 +986,8 @@ static ssize_t read_common(struct file *file, BeeGFS_IovIter *iter, size_t size,
 
 ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *offsetPointer)
 {
-   struct iovec iov = {
-      .iov_base = buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-   BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, size);
-   return read_common(file, &iter, size, offsetPointer);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, READ);
+   return read_common(file, iter, size, offsetPointer);
 }
 
 /**
@@ -1003,7 +998,7 @@ ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *
  *
  * @return negative Linux error code on error, read bytes otherwise
  */
-ssize_t __FhgfsOps_readSparse(struct file* file, BeeGFS_IovIter *iter, size_t size, loff_t offset)
+ssize_t __FhgfsOps_readSparse(struct file* file, struct iov_iter *iter, size_t size, loff_t offset)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
 
@@ -1143,15 +1138,11 @@ static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec
 #else // LINUX_VERSION_CODE
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
-   size_t result;
-   BeeGFS_IovIter beegfs_iter = beegfs_iov_iter_from_iov_iter(*to);
-   result = read_common(iocb->ki_filp, &beegfs_iter, beegfs_iov_iter_count(&beegfs_iter), &iocb->ki_pos);
-   *to = iov_iter_from_beegfs_iov_iter(beegfs_iter);
-   return result;
+   return read_common(iocb->ki_filp, to, iov_iter_count(to), &iocb->ki_pos);
 }
 #endif // LINUX_VERSION_CODE
 
-static ssize_t write_common(struct file *file, BeeGFS_IovIter *from, size_t size, loff_t *offsetPointer)
+static ssize_t write_common(struct file *file, struct iov_iter *from, size_t size, loff_t *offsetPointer)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    Config* cfg = App_getConfig(app);
@@ -1275,13 +1266,8 @@ unlockappend_and_exit:
 ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
    loff_t* offsetPointer)
 {
-   struct iovec iov = {
-      .iov_base = (void *) buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-   BEEGFS_IOV_ITER_INIT(&iter, WRITE, &iov, 1, size);
-   return write_common(file, &iter, size, offsetPointer);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, WRITE);
+   return write_common(file, iter, size, offsetPointer);
 }
 
 #if defined(KERNEL_HAS_AIO_WRITE_BUF)
@@ -1438,9 +1424,7 @@ static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iove
 #else // LINUX_VERSION_CODE
 static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
-   BeeGFS_IovIter beegfs_iter = beegfs_iov_iter_from_iov_iter(*from);
-   return write_common(iocb->ki_filp, &beegfs_iter, iov_iter_count(from), &iocb->ki_pos);
-   *from = iov_iter_from_beegfs_iov_iter(beegfs_iter);
+   return write_common(iocb->ki_filp, from, iov_iter_count(from), &iocb->ki_pos);
 }
 #endif // LINUX_VERSION_CODE
 
@@ -1836,7 +1820,7 @@ int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
 
 ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
 {
-   BeeGFS_IovIter bgfsIter = beegfs_iov_iter_from_iov_iter(*iter);
+   struct iov_iter bgfsIter = *iter;  // Was a wrapper copy. Now is just a defensive copy. Still needed?
    struct file* file = iocb->ki_filp;
    FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(file);
    struct dentry* dentry = file_dentry(file);
@@ -1863,12 +1847,12 @@ ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *
    }
    else if(rw == READ)
    { // read
-      remotingRes = FhgfsOpsRemoting_readfileVec(&bgfsIter, beegfs_iov_iter_count(&bgfsIter), pos, &ioInfo, fhgfsInode);
+      remotingRes = FhgfsOpsRemoting_readfileVec(&bgfsIter, iov_iter_count(&bgfsIter), pos, &ioInfo, fhgfsInode);
 
-      if( (remotingRes >= 0 && beegfs_iov_iter_count(&bgfsIter))
+      if( (remotingRes >= 0 && iov_iter_count(&bgfsIter))
             && ( i_size_read(inode) > (pos + remotingRes) ) )
       { // sparse file compatibility mode
-         ssize_t readSparseRes = __FhgfsOps_readSparse(file, &bgfsIter, beegfs_iov_iter_count(&bgfsIter), pos + remotingRes);
+         ssize_t readSparseRes = __FhgfsOps_readSparse(file, &bgfsIter, iov_iter_count(&bgfsIter), pos + remotingRes);
 
          if(unlikely(readSparseRes < 0) )
             remotingRes = readSparseRes;
@@ -1885,7 +1869,7 @@ ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *
    }
 
    //Write back wrapped iter.
-   *iter = iov_iter_from_beegfs_iov_iter(bgfsIter);
+   *iter = bgfsIter;
 
    if(unlikely(remotingRes < 0) )
    { // error occurred
@@ -1942,10 +1926,9 @@ ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, struct iov_iter *iter, lof
 ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, const struct iovec *iov, loff_t pos,
    unsigned long nr_segs)
 {
-   // This is a very roundabout way to initialize an iov_iter here, because there isn't a stable way in Linux across versions.
-   BeeGFS_IovIter bgfsIter;
-   BEEGFS_IOV_ITER_INIT(&bgfsIter, rw, iov, 1, iov->iov_len);
-   return __FhgfsOps_directIO_common(rw, iocb, &bgfsIter._iov_iter, pos);
+   struct iov_iter iter;
+   BEEGFS_IOV_ITER_INIT(&iter, rw, iov, 1, iov->iov_len);
+   return __FhgfsOps_directIO_common(rw, iocb, &iter, pos);
 }
 
 #endif // KERNEL_HAS_DIRECT_IO_ITER

@@ -3,3 +3,7 @@
 
 username =
 password =
+
+# used by influxdb V2 only
+organization =
+token =

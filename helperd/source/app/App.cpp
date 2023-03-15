@@ -289,6 +289,17 @@ void App::handleComponentException(std::exception& e)
    stopComponents();
 }
 
+/**
+ * Handles a network interface failure.
+ */
+void App::handleNetworkInterfaceFailure(const std::string& devname)
+{
+   // Nothing to do. This App has no internodeSyncer that would rescan the
+   // netdevs.
+   LOG(GENERAL, ERR, "Network interface failure.",
+      ("Device", devname));
+}
+
 
 void App::joinComponents()
 {
@@ -380,33 +391,9 @@ void App::logInfos()
 
    log->log(Log_CRITICAL, "Client log messages will be prefixed with an asterisk (*) symbol.");
 
-
    // list usable network interfaces
-   std::string nicListStr;
-   std::string extendedNicListStr;
-   for(NicAddressListIter nicIter = localNicList.begin(); nicIter != localNicList.end(); nicIter++)
-   {
-      std::string nicTypeStr;
-
-      if(nicIter->nicType == NICADDRTYPE_RDMA)
-         nicTypeStr = "RDMA";
-      else
-      if(nicIter->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
-      else
-      if(nicIter->nicType == NICADDRTYPE_STANDARD)
-         nicTypeStr = "TCP";
-      else
-         nicTypeStr = "Unknown";
-
-      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
-
-      extendedNicListStr += "\n+ ";
-      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&(*nicIter) ) + " ";
-   }
-
-   this->log->log(3, std::string("Usable NICs: ") + nicListStr);
-   this->log->log(4, std::string("Extended list of usable NICs: ") + extendedNicListStr);
+   NicAddressList nicList = getLocalNicList();
+   logUsableNICs(log, nicList);
 
 }
 

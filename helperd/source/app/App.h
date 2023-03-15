@@ -41,6 +41,8 @@ class App : public AbstractApp
 
       virtual void stopComponents() override;
       virtual void handleComponentException(std::exception& e) override;
+      virtual void handleNetworkInterfaceFailure(const std::string& devname) override;
+
 
    private:
       int appResult;
@@ -55,7 +57,6 @@ class App : public AbstractApp
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
-      NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       std::shared_ptr<Node> localNode;
 
       MultiWorkQueue* workQueue;

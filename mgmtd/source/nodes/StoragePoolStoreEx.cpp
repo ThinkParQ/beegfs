@@ -1,3 +1,4 @@
+#include <common/toolkit/TempFileTk.h>
 #include "StoragePoolStoreEx.h"
 
 #include <storage/StoragePoolEx.h>
@@ -205,66 +206,35 @@ cleanup_and_exit:
  */
 bool StoragePoolStoreEx::saveToFile()
 {
+   LogContext log("StoragePoolStoreEx (save)");
+
    RWLockGuard lock(rwlock, SafeRWLock_READ);
 
    if (storePath.empty())
       return false;
 
-   // create/trunc file
-   const int openFlags = O_CREAT | O_TRUNC | O_WRONLY;
+   Serializer lengthSerializer;
+   serialize(lengthSerializer);
+   const unsigned bufLen = lengthSerializer.size();
 
-   int fd = open(storePath.c_str(), openFlags, 0660);
-   if (fd == -1)
-   { // error
-      LOG(STORAGEPOOLS, ERR, "Could not open storage pool mappings file.", storePath, sysErr);
+   // do the actual serialization
+   boost::scoped_array<char> buf(new char[bufLen]);
 
+   Serializer ser(buf.get(), bufLen);
+   serialize(ser);
+   if (!ser.good())
+   {
+      LOG(STORAGEPOOLS, ERR, "Could not serialize storage pool mappings file.", storePath);
       return false;
    }
 
-   // file open -> write contents
-   bool retVal = true;
-
-   try
+   if (TempFileTk::storeTmpAndMove(storePath.c_str(), buf.get(), bufLen) == FhgfsOpsErr_SUCCESS)
    {
-      // determine buffer length
-      Serializer lengthSerializer;
-      serialize(lengthSerializer);
-      const unsigned bufLen = lengthSerializer.size();
-
-      // do the actual serialization
-      boost::scoped_array<char> buf(new char[bufLen]);
-
-      Serializer ser(buf.get(), bufLen);
-      serialize(ser);
-
-      if (!ser.good())
-      {
-         LOG(STORAGEPOOLS, ERR, "Could not serialize storage pool mappings file.", storePath);
-         retVal = false;
-
-         goto cleanup_and_exit;
-      }
-
-      const ssize_t writeRes = write(fd, buf.get(), bufLen);
-      if ( (writeRes == -1) || (static_cast<size_t>(writeRes) != bufLen))
-      {
-         LOG(STORAGEPOOLS, ERR, "Could not store storage pool mappings file.", storePath, sysErr);
-         retVal = false;
-
-         goto cleanup_and_exit;
-      }
+      LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Nodes file stored: " + storePath);
+      return true;
    }
-   catch (const std::bad_alloc& e)
-   {
-      LOG(STORAGEPOOLS, ERR, "Could not allocate memory for storage pool mappings file.",
-          storePath);
-      retVal = false;
-   }
-
-cleanup_and_exit:
-   close (fd);
-
-   return retVal;
+   else
+      return false;
 }
 
 

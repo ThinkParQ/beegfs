@@ -378,6 +378,7 @@ bool AbstractDatagramListener::isDGramFromSelf(struct sockaddr_in* fromAddr)
    if(fromAddr->sin_port != udpPortNetByteOrder)
       return false;
 
+   const std::lock_guard<Mutex> lock(localNicListMutex);
    for(NicAddressListIter iter = localNicList.begin(); iter != localNicList.end(); iter++)
    {
       if(iter->ipAddr.s_addr == fromAddr->sin_addr.s_addr)

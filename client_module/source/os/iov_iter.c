@@ -6,9 +6,8 @@
 
 static void beegfs_readsink_reserve_no_pipe(BeeGFS_ReadSink *rs, struct iov_iter *iter, size_t size)
 {
-      struct iov_iter si = *iter;
-      iov_iter_truncate(&si, size);
-      rs->sanitized_iter = beegfs_iov_iter_from_iov_iter(si);
+      rs->sanitized_iter = *iter;
+      iov_iter_truncate(&rs->sanitized_iter, size);
 }
 
 static size_t compute_max_pagecount(size_t size)

@@ -74,7 +74,7 @@ void _RDMASocket_uninit(Socket* this)
 
 bool RDMASocket_rdmaDevicesExist(void)
 {
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
    return true;
 #else
    return false;
@@ -177,7 +177,7 @@ bool _RDMASocket_shutdownAndRecvDisconnect(Socket* this, int timeoutMS)
 /**
  * @return -ETIMEDOUT on timeout
  */
-ssize_t _RDMASocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags, int timeoutMS)
+ssize_t _RDMASocket_recvT(Socket* this, struct iov_iter* iter, int flags, int timeoutMS)
 {
    RDMASocket* thisCast = (RDMASocket*)this;
 
@@ -193,7 +193,7 @@ ssize_t _RDMASocket_recvT(Socket* this, BeeGFS_IovIter* iter, int flags, int tim
  *
  * @param flags ignored
  */
-ssize_t _RDMASocket_sendto(Socket* this, BeeGFS_IovIter* iter, int flags,
+ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags,
    fhgfs_sockaddr_in *to)
 {
    RDMASocket* thisCast = (RDMASocket*)this;

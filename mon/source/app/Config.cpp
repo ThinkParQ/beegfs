@@ -29,6 +29,10 @@ Config::Config(int argc, char** argv): AbstractConfig(argc, argv)
             dbAuthPassword = e.second;
          } else if (e.first == "username") {
             dbAuthUsername = e.second;
+         } else if (e.first == "organization") {
+            dbAuthOrg = e.second;
+         } else if (e.first == "token") {
+            dbAuthToken = e.second;
          } else {
             throw InvalidConfigException("The InfluxDB authentication file may only contain "
                   "the options username and password");
@@ -61,6 +65,8 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("dbMaxPointsPerRequest",      "5000");
    configMapRedefine("dbSetRetentionPolicy",       "true");
    configMapRedefine("dbRetentionDuration",        "1d");
+
+   configMapRedefine("dbBucket",                   "");
 
    configMapRedefine("cassandraMaxInsertsPerBatch","25");
    configMapRedefine("cassandraTTLSecs", "86400");
@@ -116,6 +122,8 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       {
          if (iter->second == "influxdb")
             dbType = DbTypes::INFLUXDB;
+         else if (iter->second == "influxdb2")
+            dbType = DbTypes::INFLUXDB2;
          else if (iter->second == "cassandra")
             dbType = DbTypes::CASSANDRA;
          else
@@ -144,6 +152,10 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       else
       if (iter->first == std::string("dbRetentionDuration"))
          influxdbRetentionDuration = iter->second;
+      else
+      // those are used by influxdb2
+      if (iter->first == std::string("dbBucket"))
+         dbBucket = iter->second;
       else
 
       if (iter->first == std::string("cassandraMaxInsertsPerBatch"))

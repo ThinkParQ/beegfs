@@ -58,6 +58,7 @@ class AbstractDatagramListener : public PThread
       NetFilter* netFilter;
       AcknowledgmentStore* ackStore;
       NicAddressList localNicList;
+      Mutex localNicListMutex;
 
       StandardSocket* udpSock;
       unsigned short udpPortNetByteOrder;
@@ -112,6 +113,12 @@ class AbstractDatagramListener : public PThread
       unsigned short getUDPPort()
       {
          return ntohs(udpPortNetByteOrder);
+      }
+
+      void setLocalNicList(NicAddressList& nicList)
+      {
+         const std::lock_guard<Mutex> lock(localNicListMutex);
+         localNicList = nicList;
       }
 };
 

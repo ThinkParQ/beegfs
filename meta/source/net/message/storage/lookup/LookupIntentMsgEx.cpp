@@ -80,7 +80,7 @@ std::tuple<FileIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(Entry
    }
 
    return std::make_tuple(std::move(entryIDLockForDir), std::move(dentryLock),
-                          std::move(entryIDLockForDir));
+                          std::move(entryIDLockForFile));
 }
 
 bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)

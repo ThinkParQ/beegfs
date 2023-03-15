@@ -48,6 +48,8 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "connCommRetrySecs",
    "connNumCommRetries",
    "connUnmountRetries",
+   "connMessagingTimeouts",
+   "connRDMATimeouts",
    "tunePreferredMetaFile",
    "tunePreferredStorageFile",
    "tuneFileCacheType",
@@ -118,6 +120,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connCommRetrySecs = %u\n", Config_getConnCommRetrySecs(cfg) );
    seq_printf(file, "connNumCommRetries = %u\n", Config_getConnNumCommRetries(cfg) );
    seq_printf(file, "connUnmountRetries = %d\n", (int)Config_getConnUnmountRetries(cfg) );
+   seq_printf(file, "connMessagingTimeouts = %s\n", Config_getConnMessagingTimeouts(cfg) );
+   seq_printf(file, "connRDMATimeouts = %s\n", Config_getConnRDMATimeouts(cfg) );
    seq_printf(file, "tunePreferredMetaFile = %s\n", Config_getTunePreferredMetaFile(cfg) );
    seq_printf(file, "tunePreferredStorageFile = %s\n", Config_getTunePreferredStorageFile(cfg) );
    seq_printf(file, "tuneFileCacheType = %s\n",

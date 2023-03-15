@@ -24,10 +24,11 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    NicListCapabilities localNicCaps;
 
    NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-   node->getConnPool()->setLocalNicCaps(&localNicCaps);
+   node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
    
    std::string nodeIDWithTypeStr = node->getNodeIDWithTypeStr();
 
+   log.log(Log_DEBUG, std::string("Heartbeat node: ") + nodeIDWithTypeStr);
 
    // add/update node in store
 
@@ -53,7 +54,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       } break;
    }
 
-   isNodeNew = nodes->addOrUpdateNode(std::move(node));
+   isNodeNew = (nodes->addOrUpdateNode(std::move(node)) == NodeStoreResult::Added);
    if(isNodeNew)
    { // log info about new server
       bool supportsSDP = NetworkInterfaceCard::supportsSDP(&nicList);

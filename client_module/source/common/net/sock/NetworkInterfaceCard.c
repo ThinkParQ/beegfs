@@ -93,10 +93,9 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
    struct in_device* in_dev;
    struct in_ifaddr *ifa;
 
-#ifdef BEEGFS_NVFS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
    outAddr->ibdev = NULL;
 #endif
-
    // name
    strcpy(outAddr->name, dev->name);
 
@@ -305,10 +304,9 @@ void __NIC_filterInterfacesForRDMA(NicAddressList* nicList, NicAddressList* outL
 
          *nicAddrCopy = *nicAddr;
 
-#ifdef BEEGFS_NVFS
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
          nicAddrCopy->ibdev = rdmaSock.ibvsock.cm_id->device;
 #endif
-
          nicAddrCopy->nicType = NICADDRTYPE_RDMA;
 
          NicAddressList_append(outList, nicAddrCopy);

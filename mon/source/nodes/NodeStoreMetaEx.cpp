@@ -7,12 +7,12 @@ NodeStoreMetaEx::NodeStoreMetaEx() :
       NodeStoreServers(NODETYPE_Meta, false)
 {}
 
-bool NodeStoreMetaEx::addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
+NodeStoreResult NodeStoreMetaEx::addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
       NumNodeID* outNodeNumID)
 {
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
    if (!receivedNode->getNumID())
-      return false;
+      return NodeStoreResult::Error;
 
    std::shared_ptr<MetaNodeEx> newNode;
    auto storedNode =

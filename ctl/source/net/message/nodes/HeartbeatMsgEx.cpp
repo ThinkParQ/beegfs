@@ -24,7 +24,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    NicListCapabilities localNicCaps;
 
    NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-   node->getConnPool()->setLocalNicCaps(&localNicCaps);
+   node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
 
    std::string nodeIDWithTypeStr = node->getNodeIDWithTypeStr();
 
@@ -46,7 +46,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    // add/update node in store
 
-   isNodeNew = nodes->addOrUpdateNode(std::move(node));
+   isNodeNew = (nodes->addOrUpdateNode(std::move(node)) == NodeStoreResult::Added);
    if(isNodeNew)
       processNewNode(nodeIDWithTypeStr, getNodeType(), &nicList, ctx.peerName() );
 

@@ -10,20 +10,25 @@
 #include <common/toolkit/LockFD.h>
 #include <common/Common.h>
 
+#include <mutex>
 
 class StreamListenerV2; // forward declaration
-
+class LogContext;
+class AbstractNodeStore;
 
 class AbstractApp : public PThread
 {
    public:
       virtual void stopComponents() = 0;
       virtual void handleComponentException(std::exception& e) = 0;
+      virtual void handleNetworkInterfaceFailure(const std::string& devname) = 0;
 
       LockFD createAndLockPIDFile(const std::string& pidFile);
       void updateLockedPIDFile(LockFD& pidFileFD);
 
       void waitForComponentTermination(PThread* component);
+
+      void logUsableNICs(LogContext* log, NicAddressList& nicList);
 
       static void handleOutOfMemFromNew();
 
@@ -31,6 +36,7 @@ class AbstractApp : public PThread
       virtual const NetFilter* getNetFilter() const = 0;
       virtual const NetFilter* getTcpOnlyFilter() const = 0;
       virtual const AbstractNetMessageFactory* getNetMessageFactory() const = 0;
+
 
       static bool didRunTimeInit;
 
@@ -43,7 +49,16 @@ class AbstractApp : public PThread
          return NULL;
       }
 
+      NicAddressList getLocalNicList()
+      {
+         const std::lock_guard<Mutex> lock(localNicListMutex);
+         return localNicList;
+      }
+
    protected:
+      NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
+      Mutex localNicListMutex;
+
       AbstractApp() : PThread("Main", this)
       {
          if (!didRunTimeInit)
@@ -60,11 +75,14 @@ class AbstractApp : public PThread
          basicDestructions();
       }
 
+      void updateLocalNicListInNodes(LogContext* log, NicAddressList& nicList,
+         std::vector<AbstractNodeStore*>& nodeStores);
+
+
    private:
       static bool basicInitializations();
       bool basicDestructions();
       static bool performBasicInitialRunTimeChecks();
-
 
       // inliners
 
@@ -87,6 +105,7 @@ class AbstractApp : public PThread
 
          return true;
       }
+
 };
 
 #endif /*ABSTRACTAPP_H_*/

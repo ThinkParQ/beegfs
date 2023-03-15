@@ -2,10 +2,10 @@
 #include <common/components/worker/DummyWork.h>
 #include <common/components/worker/IncSyncedCounterWork.h>
 #include <common/components/ComponentInitException.h>
-#include <common/net/sock/RDMASocket.h>
 #include <common/nodes/LocalNode.h>
 #include <common/nodes/DynamicPoolLimits.h>
 #include <common/toolkit/StorageTk.h>
+#include <common/toolkit/NodesTk.h>
 #include <common/toolkit/SynchronizedCounter.h>
 #include <program/Program.h>
 #include <toolkit/StorageTkEx.h>
@@ -166,28 +166,9 @@ void App::runNormal()
 
    logInfos();
 
-
-   // prepare ibverbs for forking
-   RDMASocket::rdmaForkInitOnce();
-
    // detach process
    if(cfg->getRunDaemonized() )
       daemonize();
-
-   // find RDMA interfaces (based on TCP/IP interfaces)
-
-   // note: we do this here, because when we first create an RDMASocket (and this is done in this
-   // check), the process opens the verbs device. Recent OFED versions have a check if the
-   // credentials of the opening process match those of the calling process (not only the values
-   // are compared, but the pointer is checked for equality). Thus, the first open needs to happen
-   // after the fork, because we need to access the device in the child process.
-   if(cfg->getConnUseRDMA() && RDMASocket::rdmaDevicesExist() )
-   {
-      bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
-
-      if (foundRdmaInterfaces)
-         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
-   }
 
    // start component threads
 
@@ -289,6 +270,13 @@ void App::initDataObjects(int argc, char** argv)
    this->netMessageFactory = new NetMessageFactory();
 }
 
+void App::findAllowedInterfaces(NicAddressList& outList) const
+{
+   // discover local NICs and filter them
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, outList);
+   outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
+}
+
 void App::initLocalNodeInfo()
 {
    unsigned portUDP = cfg->getConnMgmtdPortUDP();
@@ -302,12 +290,9 @@ void App::initLocalNodeInfo()
       StringTk::explodeEx(interfacesList, ',', true, &allowedInterfaces);
    }
 
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
-
+   findAllowedInterfaces(localNicList);
    if (localNicList.empty())
       throw InvalidConfigException("Couldn't find any usable NIC");
-
-   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    // try to load localNodeID from file and fall back to auto-generated ID otherwise
 
@@ -333,9 +318,10 @@ void App::initLocalNodeInfo()
    localNodeNumID = 1;
 
    // create the local node
+   NicAddressList nicList = getLocalNicList();
 
    localNode = std::make_shared<LocalNode>(NODETYPE_Mgmt, localNodeID, NumNodeID(localNodeNumID),
-         portUDP, portTCP, localNicList);
+         portUDP, portTCP, nicList);
 }
 
 /**
@@ -587,8 +573,9 @@ void App::initComponents()
 {
    log->log(Log_DEBUG, "Initializing components...");
 
+   NicAddressList nicList = getLocalNicList();
    this->dgramListener = new DatagramListener(
-      netFilter, localNicList, ackStore, cfg->getConnMgmtdPortUDP() );
+      netFilter, nicList, ackStore, cfg->getConnMgmtdPortUDP());
    this->heartbeatMgr = new HeartbeatManager(dgramListener);
 
    // attach heartbeat manager to storagePoolStore to enable sending of modifications
@@ -669,6 +656,18 @@ void App::stopComponents()
       required e.g. to let App::waitForMgmtNode() know that it should cancel */
 }
 
+void App::updateLocalNicList(NicAddressList& localNicList)
+{
+   std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes, clientNodes});
+   updateLocalNicListInNodes(log, localNicList, allNodes);
+   localNode->updateInterfaces(0, 0, localNicList);
+   dgramListener->setLocalNicList(localNicList);
+   // Updating StreamListener localNicList is not required. That is only
+   // required for apps that create RDMA and SDP listeners.
+   // Note that StreamListener::updateLocalNicList() does not exist. See
+   // ConnAcceptor::updateLocalNicNicList().
+}
+
 /**
  * Handles expections that lead to the termination of a component.
  * Initiates an application shutdown.
@@ -688,6 +687,16 @@ void App::handleComponentException(std::exception& e)
    log.log(2, "Shutting down...");
 
    shuttingDown.set(App_SHUTDOWN_IMMEDIATE);
+}
+
+/**
+ * Called when a network device failure has been detected.
+ */
+void App::handleNetworkInterfaceFailure(const std::string& devname)
+{
+   LOG(GENERAL, ERR, "Network interface failure.",
+      ("Device", devname));
+   internodeSyncer->setForceCheckNetwork();
 }
 
 
@@ -781,31 +790,8 @@ void App::logInfos()
    log->log(Log_WARNING, "LocalNode: " + localNode->getNodeIDWithTypeStr() );
 
    // list usable network interfaces
-   std::string nicListStr;
-   std::string extendedNicListStr;
-   for(NicAddressListIter nicIter = localNicList.begin(); nicIter != localNicList.end(); nicIter++)
-   {
-      std::string nicTypeStr;
-
-      if(nicIter->nicType == NICADDRTYPE_RDMA)
-         nicTypeStr = "RDMA";
-      else
-      if(nicIter->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
-      else
-      if(nicIter->nicType == NICADDRTYPE_STANDARD)
-         nicTypeStr = "TCP";
-      else
-         nicTypeStr = "Unknown";
-
-      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
-
-      extendedNicListStr += "\n+ ";
-      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&(*nicIter) ) + " ";
-   }
-
-   this->log->log(Log_WARNING, std::string("Usable NICs: ") + nicListStr);
-   this->log->log(Log_DEBUG, std::string("Extended list of usable NICs: ") + extendedNicListStr);
+   NicAddressList nicList = getLocalNicList();
+   logUsableNICs(log, nicList);
 
    // print net filters
    if(netFilter->getNumFilterEntries() )

@@ -12,6 +12,8 @@ bool HeartbeatRequestMsgEx::processIncoming(ResponseContext& ctx)
    NumNodeID localNodeNumID = localNode.getNumID();
    NicAddressList nicList(localNode.getNicList() );
 
+   LOG(GENERAL, DEBUG, std::string("Heartbeat request incoming: ") + StringTk::uintToHexStr(ctx.getSocket()->getPeerIP()));
+
    HeartbeatMsg hbMsg(localNode.getID(), localNodeNumID, NODETYPE_Mgmt, &nicList);
    hbMsg.setPorts(cfg->getConnMgmtdPortUDP(), cfg->getConnMgmtdPortTCP() );
 

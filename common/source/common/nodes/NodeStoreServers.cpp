@@ -29,7 +29,7 @@ NodeStoreServers::NodeStoreServers(NodeType storeType, bool channelsDirectDefaul
  * Just forwards to the other addOrUpdateNodeEx method (to provide compatibility with the
  * corresponding virtual AbstractNodeStore::addOrUpdateNode() method).
  */
-bool NodeStoreServers::addOrUpdateNode(NodeHandle node)
+NodeStoreResult NodeStoreServers::addOrUpdateNode(NodeHandle node)
 {
    return addOrUpdateNodeEx(std::move(node), NULL);
 }
@@ -38,7 +38,7 @@ bool NodeStoreServers::addOrUpdateNode(NodeHandle node)
  * Locking wrapper for addOrUpdateNodeUnlocked().
  * See addOrUpdateNodeUnlocked() for description.
  */
-bool NodeStoreServers::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID)
+NodeStoreResult NodeStoreServers::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID)
 {
    std::lock_guard<Mutex> lock(mutex);
    return addOrUpdateNodeUnlocked(std::move(node), outNodeNumID);
@@ -55,7 +55,7 @@ bool NodeStoreServers::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
  * @return true if the node was not in the active group yet and has been added to the active
  * group (i.e. new node), false otherwise
  */
-bool NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNodeNumID)
+NodeStoreResult NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNodeNumID)
 {
    NumNodeID nodeNumID = node->getNumID();
    std::string nodeID(node->getID());
@@ -65,7 +65,7 @@ bool NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNo
    if(localNode && (nodeNumID == localNode->getNumID() ) )
    { // we don't allow to update local node this way (would lead to problems during sync etc.)
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
-      return false;
+      return NodeStoreResult::Error;
    }
 
    // check if numID is given. if not, we must generate an id - only mgmt may do that, which it
@@ -78,7 +78,7 @@ bool NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNo
          SAFE_ASSIGN(outNodeNumID, NumNodeID());
          LOG(GENERAL, ERR, "Should never happen: Rejecting nodeNumID==0.",
                node->getNodeIDWithTypeStr());
-         return false;
+         return NodeStoreResult::Error;
       }
 
       nodeNumID = newID;
@@ -92,7 +92,7 @@ bool NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNo
       initially 0, because generateNodeNumID() might have found that the node already had a numID
       and just didn't know about it (e.g. when it sent a registration retry message). */
 
-   bool nodeWasInserted = false; // true if node was inserted as new node into active store
+   NodeStoreResult result = NodeStoreResult::Unchanged;
 
    auto iter = activeNodes.find(nodeNumID);
 
@@ -112,7 +112,10 @@ bool NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNo
       else
       { // update node
          active.updateLastHeartbeatT();
-         active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList);
+         if (active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList))
+         {
+            result = NodeStoreResult::Updated;
+         }
       }
 
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
@@ -146,11 +149,11 @@ bool NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNo
 
          SAFE_ASSIGN(outNodeNumID, nodeNumID);
 
-         nodeWasInserted = true;
+         result = NodeStoreResult::Added;
       }
    }
 
-   return nodeWasInserted;
+   return result;
 }
 
 /**
@@ -395,10 +398,11 @@ void NodeStoreServers::syncNodes(const std::vector<NodeHandle>& masterList,
 
    // set supported nic capabilities for added nodes
    NicListCapabilities localNicCaps;
+   NicAddressList localNicList;
 
    if(appLocalNode)
    {
-      NicAddressList localNicList(appLocalNode->getNicList() );
+      localNicList = appLocalNode->getNicList();
       NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
    }
 
@@ -408,7 +412,7 @@ void NodeStoreServers::syncNodes(const std::vector<NodeHandle>& masterList,
       auto& node = *iter;
 
       if(appLocalNode)
-         node->getConnPool()->setLocalNicCaps(&localNicCaps);
+         node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
 
       addOrUpdateNodeEx(node, NULL);
    }

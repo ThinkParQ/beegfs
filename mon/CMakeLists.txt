@@ -51,7 +51,7 @@ add_library(
 
 target_include_directories(
 	mon PRIVATE
-	../thirdparty/datastax
+	../thirdparty/source/datastax
 )
 
 target_link_libraries(

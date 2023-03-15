@@ -1,7 +1,6 @@
 #ifndef OPENTK_IBVSOCKET_H_
 #define OPENTK_IBVSOCKET_H_
 
-#include <common/net/sock/ibv/IBVBuffer.h>
 #include <common/Common.h>
 
 #include <linux/in.h>
@@ -58,9 +57,9 @@ extern bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr* ipAddr,
 extern bool IBVSocket_listen(IBVSocket* _this);
 extern bool IBVSocket_shutdown(IBVSocket* _this);
 
-extern ssize_t IBVSocket_recvT(IBVSocket* _this, BeeGFS_IovIter* iter, int flags,
+extern ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags,
    int timeoutMS);
-extern ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags);
+extern ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags);
 
 extern int IBVSocket_checkConnection(IBVSocket* _this);
 
@@ -93,7 +92,7 @@ struct IBVCommConfig
 };
 
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
 
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
@@ -131,7 +130,7 @@ extern int __IBVSocket_waitForSendCompletionEvent(IBVSocket* _this, int oldSendC
 extern int __IBVSocket_waitForTotalSendCompletion(IBVSocket* _this,
    unsigned* numSendElements, unsigned* numWriteElements, unsigned* numReadElements, int timeoutMS);
 
-extern ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, BeeGFS_IovIter* iter);
+extern ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, struct iov_iter* iter);
 
 extern int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event);
 extern void __IBVSocket_cqSendEventHandler(struct ib_event* event, void* data);

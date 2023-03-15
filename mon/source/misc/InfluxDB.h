@@ -7,6 +7,13 @@
 #include <nodes/StorageNodeEx.h>
 #include <misc/CurlWrapper.h>
 #include <misc/TSDatabase.h>
+#include <app/Config.h>
+
+enum InfluxDBVersion
+{
+   INFLUXDB,
+   INFLUXDB2,
+};
 
 class App;
 
@@ -26,6 +33,11 @@ class InfluxDB : public TSDatabase
          bool curlCheckSSLCertificates;
          std::string username;
          std::string password;
+         std::string bucket;
+         std::string organization;
+         std::string token;
+         InfluxDBVersion dbVersion;
+
       };
 
       InfluxDB(Config cfg);

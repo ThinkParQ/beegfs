@@ -225,13 +225,7 @@ void App::runNormal()
    // credentials of the opening process match those of the calling process (not only the values
    // are compared, but the pointer is checked for equality). Thus, the first open needs to happen
    // after the fork, because we need to access the device in the child process.
-   if(cfg->getConnUseRDMA() && RDMASocket::rdmaDevicesExist() )
-   {
-      bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
-
-      if (foundRdmaInterfaces)
-         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
-   }
+   findAllowedRDMAInterfaces(localNicList);
 
    // wait for management node heartbeat (required for localNodeNumID and target pre-registration)
    bool mgmtWaitRes = waitForMgmtNode();
@@ -366,6 +360,29 @@ void App::initDataObjects()
    this->chunkLockStore = new ChunkLockStore();
 }
 
+void App::findAllowedRDMAInterfaces(NicAddressList& outList) const
+{
+   Config* cfg = this->getConfig();
+
+   if(cfg->getConnUseRDMA() && RDMASocket::rdmaDevicesExist() )
+   {
+      bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(outList);
+      if (foundRdmaInterfaces)
+         outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
+   }
+}
+
+void App::findAllowedInterfaces(NicAddressList& outList) const
+{
+   // discover local NICs and filter them
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, outList);
+
+   if(outList.empty() )
+      throw InvalidConfigException("Couldn't find any usable NIC");
+
+   outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
+}
+
 /**
  * Init basic networking data structures.
  *
@@ -381,6 +398,8 @@ void App::initBasicNetwork()
    this->netFilter = new NetFilter(cfg->getConnNetFilterFile() );
    this->tcpOnlyFilter = new NetFilter(cfg->getConnTcpOnlyFilterFile() );
 
+   Config* cfg = this->getConfig();
+
    // prepare filter for interfaces
    std::string interfacesList = cfg->getConnInterfacesList();
    if(!interfacesList.empty() )
@@ -389,13 +408,7 @@ void App::initBasicNetwork()
       StringTk::explodeEx(interfacesList, ',', true, &allowedInterfaces);
    }
 
-   // discover local NICs and filter them
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
-
-   if(localNicList.empty() )
-      throw InvalidConfigException("Couldn't find any usable NIC");
-
-   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
+   findAllowedInterfaces(localNicList);
 
    // prepare factory for incoming messages
    this->netMessageFactory = new NetMessageFactory();
@@ -444,10 +457,11 @@ void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
 {
    unsigned portUDP = cfg->getConnStoragePortUDP();
    unsigned portTCP = cfg->getConnStoragePortTCP();
+   NicAddressList nicList = getLocalNicList();
 
    // create localNode object
    this->localNode = std::make_shared<LocalNode>(NODETYPE_Storage, localNodeID, localNodeNumID,
-         portUDP, portTCP, localNicList);
+      portUDP, portTCP, nicList);
 
    // attach to storageNodes store
    storageNodes->setLocalNode(this->localNode);
@@ -556,9 +570,9 @@ void App::initPostTargetRegistration()
 void App::initComponents()
 {
    this->log->log(Log_DEBUG, "Initializing components...");
-
+   NicAddressList nicList = getLocalNicList();
    this->dgramListener = new DatagramListener(
-      netFilter, localNicList, ackStore, cfg->getConnStoragePortUDP() );
+      netFilter, nicList, ackStore, cfg->getConnStoragePortUDP());
    if(cfg->getTuneListenerPrioShift() )
       dgramListener->setPriorityShift(cfg->getTuneListenerPrioShift() );
 
@@ -566,7 +580,7 @@ void App::initComponents()
 
    unsigned short listenPort = cfg->getConnStoragePortTCP();
 
-   this->connAcceptor = new ConnAcceptor(this, localNicList, listenPort);
+   this->connAcceptor = new ConnAcceptor(this, nicList, listenPort);
 
    this->statsCollector = new StorageStatsCollector(STATSCOLLECTOR_COLLECT_INTERVAL_MS,
       STATSCOLLECTOR_HISTORY_LENGTH);
@@ -646,6 +660,15 @@ void App::stopComponents()
       required e.g. to let App::waitForMgmtNode() know that it should cancel */
 }
 
+void App::updateLocalNicList(NicAddressList& localNicList)
+{
+   std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes});
+   updateLocalNicListInNodes(log, localNicList, allNodes);
+   localNode->updateInterfaces(0, 0, localNicList);
+   dgramListener->setLocalNicList(localNicList);
+   connAcceptor->updateLocalNicList(localNicList);
+}
+
 /**
  * Handles expections that lead to the termination of a component.
  * Initiates an application shutdown.
@@ -667,6 +690,15 @@ void App::handleComponentException(std::exception& e)
    stopComponents();
 }
 
+/**
+ * Called when a network device failure has been detected.
+ */
+void App::handleNetworkInterfaceFailure(const std::string& devname)
+{
+   LOG(GENERAL, ERR, "Network interface failure.",
+      ("Device", devname));
+   internodeSyncer->setForceCheckNetwork();
+}
 
 void App::joinComponents()
 {
@@ -855,31 +887,8 @@ void App::logInfos()
    log->log(Log_WARNING, "LocalNode: " + localNode->getNodeIDWithTypeStr() );
 
    // list usable network interfaces
-   std::string nicListStr;
-   std::string extendedNicListStr;
-   for(NicAddressListIter nicIter = localNicList.begin(); nicIter != localNicList.end(); nicIter++)
-   {
-      std::string nicTypeStr;
-
-      if(nicIter->nicType == NICADDRTYPE_RDMA)
-         nicTypeStr = "RDMA";
-      else
-      if(nicIter->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
-      else
-      if(nicIter->nicType == NICADDRTYPE_STANDARD)
-         nicTypeStr = "TCP";
-      else
-         nicTypeStr = "Unknown";
-
-      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
-
-      extendedNicListStr += "\n+ ";
-      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&(*nicIter) ) + " ";
-   }
-
-   log->log(Log_WARNING, std::string("Usable NICs: ") + nicListStr);
-   log->log(Log_DEBUG, std::string("Extended list of usable NICs: ") + extendedNicListStr);
+   NicAddressList nicList = getLocalNicList();
+   logUsableNICs(log, nicList);
 
    // print net filters
    if(netFilter->getNumFilterEntries() )
@@ -1010,8 +1019,9 @@ bool App::waitForMgmtNode()
    unsigned udpListenPort = cfg->getConnStoragePortUDP();
    unsigned udpMgmtdPort = cfg->getConnMgmtdPortUDP();
    std::string mgmtdHost = cfg->getSysMgmtdHost();
+   NicAddressList nicList = getLocalNicList();
 
-   RegistrationDatagramListener regDGramLis(netFilter, localNicList, ackStore, udpListenPort);
+   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort);
 
    regDGramLis.start();
 
@@ -1047,7 +1057,8 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
       return false;
    }
 
-   RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Storage, &localNicList,
+   NicAddressList nicList = getLocalNicList();
+   RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Storage, &nicList,
       cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
 
    Time startTime;
@@ -1263,10 +1274,11 @@ bool App::registerAndDownloadMgmtInfo()
 
    unsigned udpListenPort = cfg->getConnStoragePortUDP();
    bool allSuccessful = false;
+   NicAddressList nicList = getLocalNicList();
 
    // start temporary registration datagram listener
 
-   RegistrationDatagramListener regDGramLis(netFilter, localNicList, ackStore, udpListenPort);
+   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort);
 
    regDGramLis.start();
 

@@ -1315,17 +1315,17 @@ static void writefile_nextIter(CommKitContext* context, FileOpState* state)
  *
  * @return number of bytes written or negative fhgfs error code
  */
-ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
+ssize_t FhgfsOpsRemoting_writefileVec(struct iov_iter* iter, loff_t offset,
    RemotingIOInfo* ioInfo, bool serializeWrites)
 {
    App* app = ioInfo->app;
 
    bool verifyRes;
    ssize_t verifyValue;
-   ssize_t retVal = beegfs_iov_iter_count(iter);
-   size_t toBeWritten = beegfs_iov_iter_count(iter);
+   ssize_t retVal = iov_iter_count(iter);
+   size_t toBeWritten = iov_iter_count(iter);
    loff_t currentOffset = offset;
-   BeeGFS_IovIter iterCopy = *iter;
+   struct iov_iter iterCopy = *iter;
 
    StripePattern* pattern = ioInfo->pattern;
    unsigned chunkSize = StripePattern_getChunkSize(pattern);
@@ -1333,7 +1333,7 @@ ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
    unsigned numStripeTargets = UInt16Vec_length(targetIDs);
    int maxUsedTargetIndex = AtomicInt_read(ioInfo->maxUsedTargetIndex);
 
-   __FhgfsOpsRemoting_logDebugIOCall(__func__, beegfs_iov_iter_count(iter), offset, ioInfo, NULL);
+   __FhgfsOpsRemoting_logDebugIOCall(__func__, iov_iter_count(iter), offset, ioInfo, NULL);
 
 #ifdef BEEGFS_NVFS
    ioInfo->nvfs = RdmaInfo_acquireNVFS();
@@ -1354,7 +1354,7 @@ ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
             StripePattern_getChunkEnd(pattern, currentOffset) - currentOffset + 1;
          loff_t currentNodeLocalOffset = __FhgfsOpsRemoting_getChunkOffset(
             currentOffset, chunkSize, numStripeTargets, currentTargetIndex);
-         BeeGFS_IovIter chunkIter;
+         struct iov_iter chunkIter;
 
          struct FileOpVecState* state = mempool_alloc(writefileStatePool,
             list_empty(&statesList) ? GFP_NOFS : GFP_NOWAIT);
@@ -1365,13 +1365,13 @@ ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
          maxUsedTargetIndex = MAX(maxUsedTargetIndex, (int)currentTargetIndex);
 
          chunkIter = iterCopy;
-         beegfs_iov_iter_truncate(&chunkIter, currentChunkSize);
+         iov_iter_truncate(&chunkIter, currentChunkSize);
 
          // prepare the state information
          FhgfsOpsCommKit_initFileOpState(
             &state->base,
             currentNodeLocalOffset,
-            beegfs_iov_iter_count(&chunkIter),
+            iov_iter_count(&chunkIter),
             UInt16Vec_at(targetIDs, currentTargetIndex) );
 
          state->base.firstWriteDoneForTarget =
@@ -1387,12 +1387,12 @@ ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
 
          // prepare for next loop
          {
-            size_t count = beegfs_iov_iter_count(&chunkIter);
+            size_t count = iov_iter_count(&chunkIter);
             currentOffset += count; 
             toBeWritten -= count;
             expectedWritten += count;
             numWorks++;
-            beegfs_iov_iter_advance(&iterCopy, count);
+            iov_iter_advance(&iterCopy, count);
             currentTargetIndex = (currentTargetIndex + 1) % numStripeTargets;
          }
 
@@ -1425,7 +1425,7 @@ ssize_t FhgfsOpsRemoting_writefileVec(BeeGFS_IovIter* iter, loff_t offset,
 
    AtomicInt_max(ioInfo->maxUsedTargetIndex, maxUsedTargetIndex);
    if (retVal > 0)
-      beegfs_iov_iter_advance(iter, retVal);
+      iov_iter_advance(iter, retVal);
 
 #ifdef BEEGFS_NVFS
    if (ioInfo->nvfs)
@@ -1573,15 +1573,8 @@ out:
 ssize_t FhgfsOpsRemoting_readfile(char __user *buf, size_t size, loff_t offset,
    RemotingIOInfo* ioInfo, FhgfsInode* fhgfsInode)
 {
-   struct iovec iov = {
-      .iov_base = (char*) buf,
-      .iov_len = size,
-   };
-   BeeGFS_IovIter iter;
-
-   BEEGFS_IOV_ITER_INIT(&iter, READ, &iov, 1, size);
-
-   return FhgfsOpsRemoting_readfileVec(&iter, size, offset, ioInfo, fhgfsInode);
+   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, READ);
+   return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
 }
 
 static void readfile_nextIter(CommKitContext* context, FileOpState* state)
@@ -1591,7 +1584,7 @@ static void readfile_nextIter(CommKitContext* context, FileOpState* state)
    state->data = vecState->data;
 }
 
-ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff_t offset,
+ssize_t FhgfsOpsRemoting_readfileVec(struct iov_iter* iter, size_t toBeRead, loff_t offset,
    RemotingIOInfo* ioInfo, FhgfsInode* fhgfsInode)
 {
    App* app = ioInfo->app;
@@ -1610,7 +1603,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
    size_t stripeSetSize = (size_t) chunkSize * numStripeNodes;
    size_t maxReadSize = min_t(size_t, stripeSetSize, toBeRead);
 
-   __FhgfsOpsRemoting_logDebugIOCall(__func__, beegfs_iov_iter_count(iter), offset, ioInfo, NULL);
+   __FhgfsOpsRemoting_logDebugIOCall(__func__, iov_iter_count(iter), offset, ioInfo, NULL);
 
 #ifdef BEEGFS_NVFS
    ioInfo->nvfs = RdmaInfo_acquireNVFS();
@@ -1621,9 +1614,9 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
       LIST_HEAD(stateList);
       struct FileOpVecState* state;
       ssize_t bytesReadThisRound = 0;
-      BeeGFS_IovIter stripeSetIter;
+      struct iov_iter stripeSetIter;
 
-      beegfs_readsink_reserve(&readsink, &iter->_iov_iter, maxReadSize);
+      beegfs_readsink_reserve(&readsink, iter, maxReadSize);
       stripeSetIter = readsink.sanitized_iter;
 
       // stripeset-loop: loop over one stripe set (using dynamically determined stripe node
@@ -1631,7 +1624,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
 
       for(unsigned numWorks = 0;
           (numWorks < numStripeNodes
-           && toBeRead && beegfs_iov_iter_count(&stripeSetIter));
+           && toBeRead && iov_iter_count(&stripeSetIter));
           ++ numWorks)
       {
          size_t currentChunkSize =
@@ -1639,7 +1632,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
          size_t currentReadSize = MIN(currentChunkSize, toBeRead);
          loff_t currentNodeLocalOffset = __FhgfsOpsRemoting_getChunkOffset(
             currentOffset, chunkSize, numStripeNodes, currentTargetIndex);
-         BeeGFS_IovIter chunkIter;
+         struct iov_iter chunkIter;
 
          state = kmalloc(sizeof(*state), list_empty(&stateList) ? GFP_NOFS : GFP_NOWAIT);
          if (!state)
@@ -1648,13 +1641,13 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
          maxUsedTargetIndex = MAX(maxUsedTargetIndex, (int)currentTargetIndex);
 
          chunkIter = stripeSetIter;
-         beegfs_iov_iter_truncate(&chunkIter, currentChunkSize);
+         iov_iter_truncate(&chunkIter, currentChunkSize);
 
          // prepare the state information
          FhgfsOpsCommKit_initFileOpState(
             &state->base,
             currentNodeLocalOffset,
-            beegfs_iov_iter_count(&chunkIter),
+            iov_iter_count(&chunkIter),
             UInt16Vec_at(targetIDs, currentTargetIndex) );
 
          state->base.firstWriteDoneForTarget =
@@ -1677,7 +1670,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
 
          currentTargetIndex = (currentTargetIndex + 1) % numStripeNodes;
 
-         beegfs_iov_iter_advance(&stripeSetIter, beegfs_iov_iter_count(&chunkIter));
+         iov_iter_advance(&stripeSetIter, iov_iter_count(&chunkIter));
       }
 
       if(list_empty(&stateList) )
@@ -1739,7 +1732,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(BeeGFS_IovIter* iter, size_t toBeRead, loff
       beegfs_readsink_release(&readsink);
 
       retVal += bytesReadThisRound;
-      beegfs_iov_iter_advance(iter, bytesReadThisRound);
+      iov_iter_advance(iter, bytesReadThisRound);
 
    } // end of while(toBeRead)
 

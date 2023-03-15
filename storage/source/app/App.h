@@ -66,7 +66,9 @@ class App : public AbstractApp
 
       virtual void stopComponents() override;
       virtual void handleComponentException(std::exception& e) override;
+      virtual void handleNetworkInterfaceFailure(const std::string& devname) override;
 
+      void handleNetworkInterfacesChanged(NicAddressList nicList);
 
    private:
       int appResult;
@@ -82,7 +84,6 @@ class App : public AbstractApp
 
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
-      NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       std::shared_ptr<Node> localNode;
 
       NodeStoreServers* mgmtNodes;
@@ -231,10 +232,7 @@ class App : public AbstractApp
          return cfg;
       }
 
-      NicAddressList getLocalNicList() const
-      {
-         return localNicList;
-      }
+      void updateLocalNicList(NicAddressList& localNicList);
 
       Node& getLocalNode() const
       {
@@ -419,5 +417,10 @@ class App : public AbstractApp
 
          return false;
       }
+
+      void findAllowedInterfaces(NicAddressList& outList) const;
+      void findAllowedRDMAInterfaces(NicAddressList& outList) const;
+
+
 };
 #endif /*APP_H_*/

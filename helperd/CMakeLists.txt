@@ -25,6 +25,7 @@ target_link_libraries(
 	helperd
 	beegfs-common
 	pthread
+	dl
 )
 	
 add_executable(

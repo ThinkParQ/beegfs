@@ -284,6 +284,19 @@ cp -a event_listener/source/beegfs-event-listener.cpp \
    ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/source/
 
 ##########
+########## eventlistener extra files
+##########
+# copying event-listener config file
+cp -a event_listener/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs
+
+install -D event_listener/build/dist/etc/init.d/beegfs-eventlistener.init \
+   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-eventlistener
+
+#install systemd unit description
+install -D -m644 event_listener/build/dist/usr/lib/systemd/system/beegfs-eventlistener.service \
+	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-eventlistener.service
+
+##########
 ########## client
 ##########
 
@@ -565,12 +578,6 @@ This package contains the BeeGFS mon dashboards to display monitoring data in Gr
 
 The default dashboard setup requires both Grafana, and InfluxDB.
 
-%post mon-grafana
-%post_package beegfs-mon-grafana
-
-%preun mon-grafana
-%preun_package beegfs-mon-grafana
-
 %files mon-grafana
 %defattr(-,root,root)
 /opt/beegfs/scripts/grafana/
@@ -597,10 +604,12 @@ This package contains BeeGFS utilities.
 /usr/bin/beegfs-df
 /usr/bin/beegfs-fsck
 /usr/bin/beegfs-net
+/usr/lib/systemd/system/beegfs-eventlistener.service
+%config(noreplace) /etc/beegfs/beegfs-eventlistener.conf
+/etc/init.d/beegfs-eventlistener
 /etc/bash_completion.d/beegfs-ctl
 /sbin/fsck.beegfs
 /opt/beegfs/sbin/beegfs-event-listener
-
 
 
 %package utils-devel

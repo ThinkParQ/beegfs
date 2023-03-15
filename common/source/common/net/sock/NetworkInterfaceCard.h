@@ -43,6 +43,12 @@ struct NicAddress
       des % serdes::as<char>(obj->nicType);
       des.skip(3); // PADDING
    }
+
+   bool operator==(const NicAddress& o) const
+   {
+      return ipAddr.s_addr == o.ipAddr.s_addr && nicType == o.nicType
+         && !strncmp(name, o.name, sizeof(name));
+   }
 };
 
 template<>
@@ -58,6 +64,18 @@ typedef struct NicListCapabilities
 typedef std::list<NicAddress> NicAddressList;
 typedef NicAddressList::iterator NicAddressListIter;
 
+// used for debugging
+static inline std::string NicAddressList_str(const NicAddressList& nicList)
+{
+   std::string r;
+   char buf[64];
+   for (NicAddressList::const_iterator it = nicList.begin(); it != nicList.end(); ++it)
+   {
+      snprintf(buf, sizeof(buf), "name=%s type=%d addr=%x, ", it->name, it->nicType, it->ipAddr.s_addr);
+      r += std::string(buf);
+   }
+   return r;
+}
 
 class NetworkInterfaceCard
 {
@@ -92,9 +110,9 @@ class NetworkInterfaceCard
       struct NicAddrComp {
          // the comparison implemented here is a model of Compare only if preferences contains
          // all possible names ever encountered or is unset.
-         StringList* preferences = nullptr;
+         const StringList* preferences = nullptr;
 
-         explicit NicAddrComp(StringList* preferences = nullptr): preferences(preferences) {}
+         explicit NicAddrComp(const StringList* preferences = nullptr): preferences(preferences) {}
 
          bool operator()(const NicAddress& lhs, const NicAddress& rhs) const
          {

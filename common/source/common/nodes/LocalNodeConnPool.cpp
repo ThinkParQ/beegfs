@@ -220,3 +220,17 @@ void LocalNodeConnPool::invalidateStreamSocket(Socket* sock)
    delete(worker);
 
 }
+
+bool LocalNodeConnPool::updateInterfaces(unsigned short streamPort, const NicAddressList& nicList)
+{
+   const std::lock_guard<Mutex> lock(nicListMutex);
+   // ignore streamPort
+   bool changed = false;
+   if (this->nicList.size() != nicList.size() ||
+      !std::equal(this->nicList.begin(), this->nicList.end(), nicList.begin()))
+   {
+      changed = true;
+      this->nicList = nicList;
+   }
+   return changed;
+}

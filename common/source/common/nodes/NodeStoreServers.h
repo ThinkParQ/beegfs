@@ -17,8 +17,8 @@ class NodeStoreServers : public AbstractNodeStore
    public:
       NodeStoreServers(NodeType storeType, bool channelsDirectDefault);
 
-      virtual bool addOrUpdateNode(NodeHandle node) override;
-      virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) override;
+      virtual NodeStoreResult addOrUpdateNode(NodeHandle node) override;
+      virtual NodeStoreResult addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) override;
       virtual bool deleteNode(NumNodeID id);
 
       NodeHandle referenceNode(NumNodeID id) const;
@@ -57,8 +57,7 @@ class NodeStoreServers : public AbstractNodeStore
       TargetMapper* targetMapper; // optional for auto remove (may be NULL)
       TargetStateStore* stateStore; // optional for auto remove (may be NULL)
 
-
-      bool addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNodeNumID);
+      NodeStoreResult addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNodeNumID);
 
       virtual NumNodeID generateID(Node& node) const
       {

@@ -105,6 +105,56 @@ void HbMgrNotificationNodeRemoved::processNotification()
    }
 }
 
+void HbMgrNotificationRefreshNode::processNotification()
+{
+   App* app = Program::getApp();
+
+   NodeHandle handle;
+
+   if(nodeType == NODETYPE_Client)
+      return;
+   else
+      handle = app->getServerStoreFromType(nodeType)->referenceNode(nodeNumID);
+
+   if (!handle)
+      return;
+
+   LOG_DBG(GENERAL, SPAM, "Propagating changed node information.", handle->getNodeIDWithTypeStr());
+
+   auto& node = *handle;
+
+   DatagramListener* dgramLis = app->getDatagramListener();
+   NodeStoreClients* clients = app->getClientNodes();
+   NodeStoreServers* metaNodes = app->getMetaNodes();
+   NodeStoreServers* storageNodes = app->getStorageNodes();
+
+   NumNodeID nodeNumID = node.getNumID();
+   NicAddressList nicList(node.getNicList() );
+
+
+   if(nodeType == NODETYPE_Meta)
+   {
+      NumNodeID rootNodeID = app->getMetaRoot().getID();
+
+      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList);
+      hbMsg.setRootNumID(rootNodeID);
+      hbMsg.setPorts(node.getPortUDP(), node.getPortTCP() );
+
+      dgramLis->sendToNodesUDPwithAck(clients, &hbMsg);
+      dgramLis->sendToNodesUDPwithAck(metaNodes, &hbMsg);
+   }
+   else
+   if(nodeType == NODETYPE_Storage)
+   {
+      HeartbeatMsg hbMsg(node.getID(), nodeNumID, nodeType, &nicList);
+      hbMsg.setPorts(node.getPortUDP(), node.getPortTCP() );
+
+      dgramLis->sendToNodesUDPwithAck(storageNodes, &hbMsg);
+      dgramLis->sendToNodesUDPwithAck(clients, &hbMsg);
+      dgramLis->sendToNodesUDPwithAck(metaNodes, &hbMsg);
+   }
+}
+
 void HbMgrNotificationTargetAdded::processNotification()
 {
    LOG_DEBUG(__func__, Log_SPAM,

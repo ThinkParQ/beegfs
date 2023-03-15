@@ -30,6 +30,7 @@ class HeartbeatManager : public PThread
       bool initRootNode(NumNodeID rootIDHint, bool rootIsBuddyMirrored);
       void notifyAsyncAddedNode(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType);
       void notifyAsyncRemovedNode(NumNodeID nodeNumID, NodeType nodeType);
+      void notifyAsyncRefreshNode(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType);
       void notifyAsyncAddedTarget(uint16_t targetID, NumNodeID nodeID, StoragePoolId storagePoolId);
       void notifyAsyncAddedMirrorBuddyGroup(NodeType nodeType, uint16_t buddyGroupID,
          uint16_t primaryTargetID, uint16_t secondaryTargetID);
@@ -37,6 +38,7 @@ class HeartbeatManager : public PThread
       void notifyAsyncRefreshTargetStates();
       void notifyAsyncPublishCapacities();
       void notifyAsyncRefreshStoragePools();
+      bool notifyNodes();
       void saveNodeStores();
 
    protected:

@@ -5,6 +5,7 @@
 
 bool HeartbeatRequestMsgEx::processIncoming(ResponseContext& ctx)
 {
+   LogContext log("Heartbeat request incoming");
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
 
@@ -16,6 +17,8 @@ bool HeartbeatRequestMsgEx::processIncoming(ResponseContext& ctx)
    hbMsg.setPorts(cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
 
    ctx.sendResponse(hbMsg);
+
+   log.log(Log_DEBUG, std::string("Heartbeat req ip:") + StringTk::uintToHexStr(ctx.getSocket()->getPeerIP()));
 
    app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), StorageOpCounter_HEARTBEAT,
       getMsgHeaderUserID() );

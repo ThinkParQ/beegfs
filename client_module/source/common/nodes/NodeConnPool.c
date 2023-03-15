@@ -159,10 +159,10 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
    NicAddressStats* min = NULL;
    NicAddressStatsListIter statsIter;
    bool skipped;
+   int numa = cpu_to_node(current->cpu);
 #ifdef BEEGFS_NVFS
    int minNvfsPrio = INT_MAX;
    int nvfsPrio;
-   int numa = cpu_to_node(current->cpu);
 #endif
 
    if (NicAddressStatsList_length(&this->rdmaNicStatsList) < 1)
@@ -178,7 +178,7 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
       else
       {
 #ifndef BEEGFS_NVFS
-         if (min == NULL || NicAddressStats_comparePriority(min, cur))
+         if (min == NULL || NicAddressStats_comparePriority(min, cur, numa) > 0)
             min = cur;
 #else
          if (ctx->gpuIndex < 0)
@@ -329,15 +329,37 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       }
    }
 
-   if (this->rdmaNicCount > 0 && devPrioCtx)
+   if (this->rdmaNicCount > 0)
    {
-      devPrioCtx->maxConns = this->maxConns / this->rdmaNicCount;
-      NodeConnPool_updateRdmaNicStatsRetry(this);
-      srcRdma = NodeConnPool_rdmaNicPriority(this, devPrioCtx);
-#ifdef BEEGFS_DEBUG
-      Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
-         "Preferred IP addr is 0x%x", srcRdma == NULL? 0 : srcRdma->nic.ipAddr.s_addr);
+      DevicePriorityContext* dpc = devPrioCtx;
+      // metaDevPrioCtx is hacky. When the node is meta and the client is doing
+      // multi-rail for RDMA this structure is used for the call to
+      // NodeConnPool_rdmaNicPriority(). This allows use of multiple RDMA
+      // interfaces to communicate with meta. When the node is  storage, devPrioCtx
+      // will be used if not null. In that devPrioCtx has been initialized with
+      // information from NVFS detection that happens before the stream is
+      // acquired.
+      DevicePriorityContext metaDevPrioCtx =
+         {
+            .maxConns = 0,
+#ifdef BEEGFS_NVFS
+            .gpuIndex = -1,
 #endif
+         };
+
+      if (!dpc && Node_getNodeType(this->parentNode) == NODETYPE_Meta)
+         dpc = &metaDevPrioCtx;
+
+      if (dpc)
+      {
+         dpc->maxConns = this->maxConns / this->rdmaNicCount;
+         NodeConnPool_updateRdmaNicStatsRetry(this);
+         srcRdma = NodeConnPool_rdmaNicPriority(this, dpc);
+#ifdef BEEGFS_DEBUG
+         Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
+            "Preferred IP addr is 0x%x", srcRdma == NULL? 0 : srcRdma->nic.ipAddr.s_addr);
+#endif
+      }
    }
 
    if(likely(this->availableConns) )
@@ -377,6 +399,7 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    // no conn available, but maxConns not reached yet => establish a new conn
 
    port = this->streamPort;
+
    nodeType = Node_getNodeType(this->parentNode);
    if (!this->enableTCPFallback && (nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage))
       includeTcp = false;
@@ -655,7 +678,7 @@ void NodeConnPool_invalidateStreamSocket(NodeConnPool* this, Socket* sock)
       while we're just waiting for the sock-close response messages) */
 
 
-   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false);
+   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false, false);
 
    Logger_logTopFormatted(log, LogTopic_CONN, 4, logContext,
       "Invalidated %u pooled connections. (1 more invalidation pending...)", numInvalidated);
@@ -723,9 +746,11 @@ void __NodeConnPool_invalidateSpecificStreamSocket(NodeConnPool* this, Socket* s
  *
  * @param idleStreamsOnly invalidate only conns that are marked as idle (ie don't have the activity
  * flag set).
+ * @param closeOnRelease if true set every PooledSocket's closeOnRelease flag
  * @return number of invalidated streams
  */
-unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this, bool idleStreamsOnly)
+unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this, bool idleStreamsOnly,
+   bool closeOnRelease)
 {
    /* note: we have TWO STAGES here, because we don't want to hold the mutex and block everything
       while we're waiting for the conns to be dropped. */
@@ -746,6 +771,9 @@ unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this, bool idle
    for( ; !ConnectionListIter_end(&connIter); ConnectionListIter_next(&connIter) )
    {
       PooledSocket* sock = ConnectionListIter_value(&connIter);
+
+      if(closeOnRelease)
+         sock->closeOnRelease = true;
 
       if(!PooledSocket_isAvailable(sock) )
          continue; // this one is currently in use
@@ -795,7 +823,7 @@ unsigned NodeConnPool_disconnectAvailableStreams(NodeConnPool* this)
 {
    unsigned numInvalidated;
 
-   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false);
+   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false, false);
 
    return numInvalidated;
 }
@@ -810,7 +838,7 @@ unsigned NodeConnPool_disconnectAndResetIdleStreams(NodeConnPool* this)
 {
    unsigned numInvalidated;
 
-   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, true);
+   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, true, false);
 
    __NodeConnPool_resetStreamsIdleFlag(this);
 
@@ -1106,27 +1134,27 @@ bool NodeConnPool_updateInterfaces(NodeConnPool* this, unsigned short streamPort
 {
    Logger* log = App_getLogger(this->app);
    const char* logContext = "NodeConn (update stream port)";
-
-   bool portHasChanged = false; // retVal
+   bool hasChanged = false; // retVal
 
    Mutex_lock(&this->mutex); // L O C K
 
    if(streamPort && (streamPort != this->streamPort) )
    {
       this->streamPort = streamPort;
-      portHasChanged = true;
+      hasChanged = true;
+      Logger_logFormatted(log, Log_NOTICE, logContext,
+         "Node %s port has changed", Node_getID(this->parentNode));
    }
 
+   if (!NicAddressList_equals(&this->nicList, nicList))
    { // update nicList (if allocation of new list fails, we just keep the old list)
       NicAddressList newNicList;
-      NodeType nodeType;
-      bool includeTcp = true;
 
-      nodeType = Node_getNodeType(this->parentNode);
-      if (!this->enableTCPFallback && (nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage))
-         includeTcp = false;
+      hasChanged = true;
+      Logger_logFormatted(log, Log_NOTICE, logContext,
+         "Node %s interfaces have changed", Node_getID(this->parentNode));
 
-      ListTk_cloneNicAddressList(nicList, &newNicList, includeTcp);
+      ListTk_cloneNicAddressList(nicList, &newNicList, true);
       ListTk_kfreeNicAddressListElems(&this->nicList);
       NicAddressList_uninit(&this->nicList);
 
@@ -1135,17 +1163,18 @@ bool NodeConnPool_updateInterfaces(NodeConnPool* this, unsigned short streamPort
 
    Mutex_unlock(&this->mutex); // U N L O C K
 
-   if(portHasChanged)
+   if (unlikely(hasChanged))
    {
-      unsigned numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false);
+      // closeOnRelease is true, all of these sockets need to be invalidated ASAP
+      unsigned numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false, true);
       if(numInvalidated)
       {
          Logger_logFormatted(log, Log_DEBUG, logContext,
-            "Invalidated %u pooled connections (due to port change)", numInvalidated);
+            "Invalidated %u pooled connections (due to port/interface change)", numInvalidated);
       }
    }
 
-   return portHasChanged;
+   return hasChanged;
 }
 
 void __NodeConnPool_setCompleteFail(NodeConnPool* this)

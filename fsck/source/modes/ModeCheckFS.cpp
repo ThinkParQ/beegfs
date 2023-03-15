@@ -1069,7 +1069,7 @@ void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry,
 
       // create mirrored inodes iff the dentry was mirrored. if a contdir with the same id exists,
       // a previous check will have created an inode for it, leaving this dentry not dangling.
-      MsgHelperRepair::createDefDirInodes(fsckEntry.getSaveNodeID(), fsckEntry.getIsBuddyMirrored(),
+      MsgHelperRepair::createDefDirInodes(fsckEntry.getInodeOwnerNodeID(), fsckEntry.getIsBuddyMirrored(),
             {std::make_tuple(fsckEntry.getID(), fsckEntry.getIsBuddyMirrored())}, &createdInodes,
             secondariesSetBad);
 

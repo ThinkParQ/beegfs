@@ -81,6 +81,7 @@ void InternodeSyncer::syncLoop()
    const unsigned updateIDTimeMS = 60 * 1000; // 1 min
    const unsigned downloadNodesIntervalMS = 300000; // 5 min
    const unsigned updateStoragePoolsMS = downloadNodesIntervalMS;
+   const unsigned checkNetworkIntervalMS = 60*1000; // 1 minute
 
    Time lastCapacityUpdateT;
    Time lastMetaCacheSweepT;
@@ -90,6 +91,8 @@ void InternodeSyncer::syncLoop()
    Time lastDownloadNodesT;
    Time lastStoragePoolsUpdateT;
    Time lastCapacityPublishedT;
+   Time lastCheckNetworkT;
+   bool doRegisterLocalNode = false;
 
    unsigned currentCacheSweepMS = metaCacheSweepNormalMS; // (adapted inside the loop below)
 
@@ -105,6 +108,18 @@ void InternodeSyncer::syncLoop()
             || (lastCapacityPublishedT.elapsedMS() > updateTargetStatesMS);
       const bool doStoragePoolsUpdate = forceStoragePoolsUpdate.exchange(false)
             || (lastStoragePoolsUpdateT.elapsedMS() > updateStoragePoolsMS);
+      const bool doCheckNetwork = forceCheckNetwork.exchange(false)
+            || (lastCheckNetworkT.elapsedMS() > checkNetworkIntervalMS);
+
+      if (doCheckNetwork)
+      {
+         if (checkNetwork())
+            doRegisterLocalNode = true;
+         lastCheckNetworkT.setToNow();
+      }
+
+      if (doRegisterLocalNode)
+         doRegisterLocalNode = !registerNode(app->getDatagramListener());
 
       // download & sync nodes
       if (lastDownloadNodesT.elapsedMS() > downloadNodesIntervalMS)
@@ -182,6 +197,27 @@ void InternodeSyncer::syncLoop()
          lastCapacityPublishedT.setToNow();
       }
    }
+}
+
+/**
+ * Inspect the available and allowed network interfaces for any changes.
+ */
+bool InternodeSyncer::checkNetwork()
+{
+   App* app = Program::getApp();
+   NicAddressList newLocalNicList;
+   bool res = false;
+
+   app->findAllowedInterfaces(newLocalNicList);
+   app->findAllowedRDMAInterfaces(newLocalNicList);
+   if (!std::equal(newLocalNicList.begin(), newLocalNicList.end(), app->getLocalNicList().begin()))
+   {
+      log.log(Log_NOTICE, "checkNetwork: local interfaces have changed");
+      app->updateLocalNicList(newLocalNicList);
+      res = true;
+   }
+
+   return res;
 }
 
 bool InternodeSyncer::updateMetaCapacityPools()
@@ -1169,7 +1205,14 @@ bool InternodeSyncer::downloadAllExceededQuotaLists(const StoragePoolPtr storage
       // update exceeded store for every target in the pool
       for (auto iter = targets.begin(); iter != targets.end(); iter++)
       {
-         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(*iter);
+         uint16_t targetId = *iter;
+         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(targetId);
+         if (!exceededQuotaStore)
+         {
+            LOG(STORAGEPOOLS, ERR, "Could not access exceeded quota store in file size quota for users.", targetId);
+            retVal = false;
+            break;
+         }
          exceededQuotaStore->updateExceededQuota(&tmpExceededUIDsSize, QuotaDataType_USER,
             QuotaLimitType_SIZE);
       }
@@ -1220,7 +1263,14 @@ bool InternodeSyncer::downloadAllExceededQuotaLists(const StoragePoolPtr storage
    {
       for (auto iter = targets.begin(); iter != targets.end(); iter++)
       {
-         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(*iter);
+         uint16_t targetId = *iter;
+         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(targetId);
+         if (!exceededQuotaStore)
+         {
+            LOG(STORAGEPOOLS, ERR, "Could not access exceeded quota store in file size quota for groups.", targetId);
+            retVal = false;
+            break;
+         }
          exceededQuotaStore->updateExceededQuota(&tmpExceededGIDsSize, QuotaDataType_GROUP,
             QuotaLimitType_SIZE);
       }
@@ -1236,7 +1286,14 @@ bool InternodeSyncer::downloadAllExceededQuotaLists(const StoragePoolPtr storage
    {
       for (auto iter = targets.begin(); iter != targets.end(); iter++)
       {
-         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(*iter);
+         uint16_t targetId = *iter;
+         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(targetId);
+         if (!exceededQuotaStore)
+         {
+            LOG(STORAGEPOOLS, ERR, "Could not access exceeded quota store in file number quota for users.", targetId);
+            retVal = false;
+            break;
+         }
          exceededQuotaStore->updateExceededQuota(&tmpExceededUIDsInode, QuotaDataType_USER,
             QuotaLimitType_INODE);
       }
@@ -1252,7 +1309,14 @@ bool InternodeSyncer::downloadAllExceededQuotaLists(const StoragePoolPtr storage
    {
       for (auto iter = targets.begin(); iter != targets.end(); iter++)
       {
-         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(*iter);
+         uint16_t targetId = *iter;
+         ExceededQuotaStorePtr exceededQuotaStore = app->getExceededQuotaStores()->get(targetId);
+         if (!exceededQuotaStore)
+         {
+            LOG(STORAGEPOOLS, ERR, "Could not access exceeded quota store in file number quota for groups.", targetId);
+            retVal = false;
+            break;
+         }
          exceededQuotaStore->updateExceededQuota(&tmpExceededGIDsInode, QuotaDataType_GROUP,
             QuotaLimitType_INODE);
       }

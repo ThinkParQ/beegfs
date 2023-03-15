@@ -27,6 +27,7 @@ class ConnAcceptor : public PThread
    private:
       AbstractApp*      app;
       LogContext        log;
+      unsigned short    listenPort;
 
       StandardSocket*   tcpListenSock;
       StandardSocket*   sdpListenSock;
@@ -34,7 +35,14 @@ class ConnAcceptor : public PThread
 
       int               epollFD;
 
-      bool initSocks(unsigned short listenPort, NicListCapabilities* localNicCaps);
+      NicListCapabilities  localNicCaps;
+      bool                 localNicCapsUpdated;
+      Mutex                localNicCapsMutex;
+
+      bool initSocks();
+      bool startRDMASocket(NicListCapabilities* localNicCaps);
+      bool startSDPSocket(NicListCapabilities* localNicCaps);
+      void handleNewLocalNicCaps();
 
       virtual void run();
       void listenLoop();
@@ -44,8 +52,8 @@ class ConnAcceptor : public PThread
 
       void applySocketOptions(StandardSocket* sock);
 
-
    public:
+      void updateLocalNicList(NicAddressList& nicList);
       // getters & setters
 
 };

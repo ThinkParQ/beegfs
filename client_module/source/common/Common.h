@@ -13,11 +13,16 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+
+#ifdef KERNEL_HAS_LINUX_STDARG_H
+#include <linux/stdarg.h>
+#else
 #include <stdarg.h>
+#endif
+
 #include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/cred.h>
-//#include <linux/compiler.h>
 #include <asm/div64.h>
 
 #ifdef KERNEL_HAS_SCHED_SIG_H
@@ -247,6 +252,13 @@ static inline struct timespec current_fs_time(struct super_block *sb)
 
 #ifndef swap
    #define swap(a, b) do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
+#endif
+
+#undef BEEGFS_RDMA
+#ifndef BEEGFS_NO_RDMA
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#define BEEGFS_RDMA 1
+#endif
 #endif
 
 static inline unsigned FhgfsCommon_getCurrentUserID(void);

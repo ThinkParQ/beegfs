@@ -1,3 +1,4 @@
+
 # This is the BeeGFS client makefile.
 # It creates the client kernel module (beegfs.ko).
 #
@@ -10,6 +11,7 @@ TARGET ?= beegfs
 
 export TARGET
 export OFED_INCLUDE_PATH
+export BEEGFS_NO_RDMA
 
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
@@ -19,6 +21,10 @@ endif
 
 ifeq ($(KRELEASE),)
 KRELEASE := $(shell uname -r)
+endif
+
+ifdef BEEGFS_NO_RDMA
+BEEGFS_CFLAGS += -DBEEGFS_NO_RDMA
 endif
 
 $(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
@@ -106,8 +112,13 @@ BEEGFS_CFLAGS  :=  $(BUILD_ARCH) $(KERNEL_FEATURE_DETECTION) \
 	-Wextra -Wno-sign-compare -Wno-empty-body -Wno-unused-parameter -Wno-missing-field-initializers \
 	-DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
 
-# Sorry but I'm hereby requesting that we can make use of "for loop initial declarations"
-BEEGFS_CFLAGS += -std=gnu99
+# Update 2022-12: BeeGFS module source code had already switched to -std=gnu99,
+# but now the kernel has caught up with us - kernel moved from gnu89 to
+# gnu11.
+# So we're switching from gnu99 to gnu11, to not break the build with the newer
+# kernels. We still need to specify this flag because that would break the
+# client module build with older kernels, where gnu89 is the default.
+BEEGFS_CFLAGS += -std=gnu11
 
 ifeq ($(shell echo | gcc -Wtype-limits -E - >/dev/null 2>&1 && echo 1),1)
    BEEGFS_CFLAGS += -Wno-type-limits
@@ -124,18 +135,19 @@ else
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_DEBUG)
 endif
 
-
 # NVFS
-ifneq ($(NVFS_H_PATH),)
-module: $(NVFS_H_PATH)/nvfs.h
-$(NVFS_H_PATH)/nvfs.h:
-	$(error NVFS_H_PATH not valid: $(NVFS_H_PATH))
+ifneq ($(NVFS_INCLUDE_PATH),)
+$(NVFS_INCLUDE_PATH)/nvfs-dma.h:
+	$(error NVFS_INCLUDE_PATH missing nvfs-dma.h: $(NVFS_INCLUDE_PATH))
+$(NVFS_INCLUDE_PATH)/config-host.h:
+	$(error NVFS_INCLUDE_PATH missing config-host.h: $(NVFS_INCLUDE_PATH))
+$(NVIDIA_INCLUDE_PATH)/nv-p2p.h:
+	$(error NVIDIA_INCLUDE_PATH missing nv-p2p.h: $(NVIDIA_INCLUDE_PATH))
+module: $(NVFS_INCLUDE_PATH)/nvfs-dma.h  $(NVFS_INCLUDE_PATH)/config-host.h \
+	$(NVIDIA_INCLUDE_PATH)/nv-p2p.h
 
 BEEGFS_CFLAGS += -DBEEGFS_NVFS
-BEEGFS_CFLAGS += -I$(NVFS_H_PATH)
-endif
-ifeq ($(BEEGFS_DEBUG_RDMA),1)
-BEEGFS_CFLAGS += -DBEEGFS_DEBUG_RDMA
+BEEGFS_CFLAGS += -I$(NVFS_INCLUDE_PATH)  -I$(NVIDIA_INCLUDE_PATH)
 endif
 
 # OFED API version
@@ -264,9 +276,11 @@ help:
 	@echo '     compatibility. (If not defined, OFED 1.2.5 or higher API will be used.)'
 	@echo ''
 	@echo 'NVIDIA GPUDirect Storage (GDS) arguments (optional):'
-	@echo '  NVFS_H_PATH=<path>:'
-	@echo '    Path to directory that contains nvfs.h. If not defined, GDS support is'
+	@echo '  NVFS_INCLUDE_PATH=<path>:'
+	@echo '    Path to directory that contains nvfs-dma.h. If not defined, GDS support is'
 	@echo '    disabled.'
+	@echo '  NVIDIA_INCLUDE_PATH=<path>:'
+	@echo '    Path to NVIDIA driver source. Required when NVFS_INCLUDE_PATH is specifed.'
 	@echo ''
 	@echo 'Targets:'
 	@echo '   all (default)     - build only'

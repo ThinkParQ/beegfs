@@ -1,6 +1,6 @@
 #include "IBVSocket.h"
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
 
 #ifdef KERNEL_HAS_SCSI_FC_COMPAT
 #include <scsi/fc_compat.h> // some kernels (e.g. rhel 5.9) forgot this in their rdma headers
@@ -8,6 +8,7 @@
 
 
 #include <common/toolkit/TimeTk.h>
+#include <common/toolkit/Time.h>
 
 #include <linux/in.h>
 #include <linux/sched.h>
@@ -155,6 +156,8 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    struct sockaddr_in sin;
    struct sockaddr_in src;
    struct sockaddr_in* srcp;
+   long connTimeoutJiffies = TimeTk_msToJiffiesSchedulable(IBVSOCKET_CONN_TIMEOUT_MS);
+   Time connElapsed;
 
    /* note: rejected as stale means remote side still had an old open connection associated with
          our current cm_id. what most likely happened is that the client was reset (i.e. no clean
@@ -162,6 +165,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
          => only possible solution seems to be retrying with another cm_id. */
    int numStaleRetriesLeft = IBVSOCKET_STALE_RETRIES_NUM;
 
+   Time_setToNow(&connElapsed);
    for( ; ; ) // stale retry loop
    {
       // set type of service for this connection
@@ -226,8 +230,10 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       }
 
       // wait for async event
-      wait_event_interruptible(_this->eventWaitQ,
-         _this->connState != IBVSOCKETCONNSTATE_ROUTERESOLVED);
+      // Note: rdma_connect() can take a very long time (>5m) if the peer's HCA has gone down.
+      wait_event_interruptible_timeout(_this->eventWaitQ,
+         _this->connState != IBVSOCKETCONNSTATE_ROUTERESOLVED,
+         connTimeoutJiffies);
 
       // test point for failed connections
       if((_this->connState != IBVSOCKETCONNSTATE_ESTABLISHED) &&
@@ -264,14 +270,18 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       }
 
       if(_this->connState != IBVSOCKETCONNSTATE_ESTABLISHED)
+      {
+         ibv_print_info_debug("Failed after %d stale connection retries, elapsed = %u\n",
+            IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft, Time_elapsedMS(&connElapsed));
          goto err_invalidateSock;
+      }
 
       // connected
 
       if(numStaleRetriesLeft != IBVSOCKET_STALE_RETRIES_NUM)
       {
-         ibv_print_info_debug("Succeeded after %d stale connection retries\n",
-            IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft);
+         ibv_print_info_debug("Succeeded after %d stale connection retries, elapsed = %u\n",
+            IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft, Time_elapsedMS(&connElapsed));
       }
 
       return true;
@@ -362,7 +372,7 @@ bool IBVSocket_shutdown(IBVSocket* _this)
  * Continues an incomplete former recv() by returning immediately available data from the
  * corresponding buffer.
  */
-ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, BeeGFS_IovIter* iter)
+ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, struct iov_iter* iter)
 {
    IBVCommContext* commContext = _this->commContext;
    struct IBVIncompleteRecv* recv = &commContext->incompleteRecv;
@@ -374,14 +384,14 @@ ssize_t __IBVSocket_recvContinueIncomplete(IBVSocket* _this, BeeGFS_IovIter* ite
    if(unlikely(_this->errState) )
       return -1;
 
-   while(beegfs_iov_iter_count(iter) > 0 && recv->totalSize != recv->completedOffset)
+   while(iov_iter_count(iter) > 0 && recv->totalSize != recv->completedOffset)
    {
       unsigned page = recv->completedOffset / buffer->bufferSize;
       unsigned offset = recv->completedOffset % buffer->bufferSize;
-      unsigned fragment = MIN(MIN(beegfs_iov_iter_count(iter), buffer->bufferSize - offset),
+      unsigned fragment = MIN(MIN(iov_iter_count(iter), buffer->bufferSize - offset),
          recv->totalSize - recv->completedOffset);
 
-      copyRes = beegfs_copy_to_iter(buffer->buffers[page] + offset, fragment, iter);
+      copyRes = copy_to_iter(buffer->buffers[page] + offset, fragment, iter);
       if(copyRes != fragment)
       {
          copyRes = 0;
@@ -421,7 +431,7 @@ err_fault:
 /**
  * @return number of received bytes on success, -ETIMEDOUT on timeout, -ECOMM on error
  */
-ssize_t IBVSocket_recvT(IBVSocket* _this, BeeGFS_IovIter* iter, int flags, int timeoutMS)
+ssize_t IBVSocket_recvT(IBVSocket* _this, struct iov_iter* iter, int flags, int timeoutMS)
 {
    int checkRes;
    int wait = timeoutMS < 0 ? IBVSOCKET_RECVT_INFINITE_TIMEOUT_MS : timeoutMS;
@@ -445,12 +455,12 @@ ssize_t IBVSocket_recvT(IBVSocket* _this, BeeGFS_IovIter* iter, int flags, int t
  * @return number of bytes sent or negative error code (-EAGAIN in case of MSG_DONTWAIT if no data
  * could be sent without blocking)
  */
-ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags)
+ssize_t IBVSocket_send(IBVSocket* _this, struct iov_iter* iter, int flags)
 {
    IBVCommContext* commContext = _this->commContext;
    int flowControlRes;
    size_t currentBufIndex;
-   BeeGFS_IovIter source = *iter;
+   struct iov_iter source = *iter;
    int postRes;
    size_t postedLen = 0;
    ssize_t currentPostLen;
@@ -488,7 +498,7 @@ ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags)
          commContext->numSendBufsLeft);
       bufLenLeft = bufNumLeft * commContext->commCfg.bufSize;
 
-      beegfs_iov_iter_truncate(&source, bufLenLeft);
+      iov_iter_truncate(&source, bufLenLeft);
    }
 
    // send data cut in buf-sized pieces...
@@ -530,9 +540,9 @@ ssize_t IBVSocket_send(IBVSocket* _this, BeeGFS_IovIter* iter, int flags)
       }
 
       postedLen += currentPostLen;
-   } while(beegfs_iov_iter_count(&source));
+   } while(iov_iter_count(&source));
 
-   beegfs_iov_iter_advance(iter, postedLen);
+   iov_iter_advance(iter, postedLen);
    return (ssize_t)postedLen;
 
 err_invalidateSock:

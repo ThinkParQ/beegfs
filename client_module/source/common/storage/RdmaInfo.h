@@ -52,26 +52,26 @@ static inline void RdmaInfo_serialize(SerializeCtx* ctx, RdmaInfo *rdmap)
 bool RdmaInfo_acquireNVFS(void);
 void RdmaInfo_releaseNVFS(void);
 int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
-   const BeeGFS_IovIter *iter);
+   const struct iov_iter *iter);
 static inline int RdmaInfo_nvfsDevicePriority(struct ib_device* dev,
    int gpuIndex);
 
-RdmaInfo* RdmaInfo_mapRead(const BeeGFS_IovIter *iter, Socket *socket);
-RdmaInfo* RdmaInfo_mapWrite(const BeeGFS_IovIter *iter, Socket *socket);
+RdmaInfo* RdmaInfo_mapRead(const struct iov_iter *iter, Socket *socket);
+RdmaInfo* RdmaInfo_mapWrite(const struct iov_iter *iter, Socket *socket);
 void RdmaInfo_unmapRead(RdmaInfo *rdmap);
 void RdmaInfo_unmapWrite(RdmaInfo *rdmap);
 
 #ifdef BEEGFS_DEBUG_RDMA
-static inline void RdmaInfo_dumpIovIter(const BeeGFS_IovIter *iter)
+static inline void RdmaInfo_dumpIovIter(const struct iov_iter *iter)
 {
    int             i = 0;
-   BeeGFS_IovIter  iter_copy = *iter;
+   struct iov_iter  iter_copy = *iter;
 
-   printk(KERN_ALERT "IOV_ITER : count=%ld", beegfs_iov_iter_count(&iter_copy));
-   while (beegfs_iov_iter_count(&iter_copy) > 0)
+   printk(KERN_ALERT "IOV_ITER : count=%ld", iov_iter_count(&iter_copy));
+   while (iov_iter_count(&iter_copy) > 0)
    {
-      struct iovec iovec = iov_iter_iovec(&iter_copy._iov_iter);
-      beegfs_iov_iter_advance(&iter_copy, iovec.iov_len);
+      struct iovec iovec = iov_iter_iovec(&iter_copy);
+      iov_iter_advance(&iter_copy, iovec.iov_len);
       printk(KERN_INFO "      %3d: %px %ld", i, iovec.iov_base, iovec.iov_len);
    }
 }

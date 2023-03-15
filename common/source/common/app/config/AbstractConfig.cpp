@@ -204,20 +204,27 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
       else if (testConfigMapKeyMatch(iter, "connRDMATimeouts", addDashes))
       {
          const size_t cfgValCount = 3;
+         const size_t cfgUtilValCount = 5;
          std::list<std::string> split;
 
          StringTk::explode(iter->second, ',', &split);
-
-         if (split.size() == cfgValCount)
+         // YUCK. beegfs-ctl and beegfs-fsck use beegfs-client.conf. That file defines
+         // connRDMATimeouts as 5 comma-separated values, but user space only has 3
+         // values. The utils are supposed to ignore the configuration. cfgUtilValCount
+         // is a hack to prevent the configuration from causing a runtime error.
+         if (split.size() != cfgUtilValCount)
          {
-            StringList::iterator timeoutIter = split.begin();
-            connRDMATimeoutConnect = StringTk::strToInt(*timeoutIter++);
-            connRDMATimeoutFlowSend = StringTk::strToInt(*timeoutIter++);
-            connRDMATimeoutPoll = StringTk::strToInt(*timeoutIter);
-         }
-         else
-         {
-            throw InvalidConfigException("The config argument '" + iter->first + "' is invalid");
+            if (split.size() == cfgValCount)
+            {
+               StringList::iterator timeoutIter = split.begin();
+               connRDMATimeoutConnect = StringTk::strToInt(*timeoutIter++);
+               connRDMATimeoutFlowSend = StringTk::strToInt(*timeoutIter++);
+               connRDMATimeoutPoll = StringTk::strToInt(*timeoutIter);
+            }
+            else
+            {
+               throw InvalidConfigException("The config argument '" + iter->first + "' is invalid");
+            }
          }
       }
       else if (testConfigMapKeyMatch(iter, "sysMgmtdHost", addDashes))

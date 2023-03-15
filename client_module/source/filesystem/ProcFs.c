@@ -660,7 +660,7 @@ struct proc_dir_entry* __ProcFs_mkDir(const char* name, void* data)
    struct proc_dir_entry* procDir;
 
 
-   #ifdef KERNEL_HAS_PDE_DATA
+   #if defined(KERNEL_HAS_PDE_DATA) || defined(KERNEL_HAS_NEW_PDE_DATA)
 
       procDir = proc_mkdir_data(name, 0, NULL, data);
 
@@ -691,6 +691,10 @@ void* __ProcFs_getProcDirEntryDataField(const struct inode* procInode)
 
       return PDE_DATA(procInode);
 
+   #elif defined(KERNEL_HAS_NEW_PDE_DATA)
+
+      return pde_data(procInode);
+
    #else
 
       struct proc_dir_entry* procEntry = PDE(procInode);
@@ -710,7 +714,7 @@ void* __ProcFs_getProcParentDirEntryDataField(const struct inode* procInode)
    /* newer kernels do no longer export struct proc_dir_entry, so the ->parent and ->data fields are
       only accessible through special kernel methods. */
 
-   #ifdef KERNEL_HAS_PDE_DATA
+   #if defined(KERNEL_HAS_PDE_DATA) || defined(KERNEL_HAS_NEW_PDE_DATA)
 
       return proc_get_parent_data(procInode);
 

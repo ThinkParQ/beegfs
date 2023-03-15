@@ -29,7 +29,7 @@ class CurlWrapper
       unsigned short sendGetRequest(const std::string& url,
             const ParameterMap& parameters);
       unsigned short sendPostRequest(const std::string& url, const char* data,
-            const ParameterMap& parameters);
+            const ParameterMap& parameters, const std::vector<std::string>& headers);
 
       static size_t writeCallback(char *ptr, size_t size, size_t nmemb, void *userdata);
 

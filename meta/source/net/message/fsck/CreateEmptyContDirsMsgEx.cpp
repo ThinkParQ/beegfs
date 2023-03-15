@@ -31,6 +31,18 @@ bool CreateEmptyContDirsMsgEx::processIncoming(ResponseContext& ctx)
          continue;
       }
 
+      // create the dirEntryID directory, which allows access to inlined inodes via dirID access
+      std::string contentsDirIDStr = MetaStorageTk::getMetaDirEntryIDPath(contentsDirStr);
+
+      int mkDirIDRes = mkdir(contentsDirIDStr.c_str(), 0755);
+
+      if ( mkDirIDRes != 0 )
+      { // error
+         LOG(GENERAL, ERR, "Unable to create dirEntryID directory.", contentsDirIDStr, sysErr);
+         failedIDs.push_back(dirID);
+         continue;
+      }
+
       FileIDLock lock;
 
       if (isBuddyMirrored)

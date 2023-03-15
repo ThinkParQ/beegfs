@@ -294,3 +294,5 @@ $(call define_if_matches, KERNEL_ACCESS_OK_WANTS_TYPE, "define access_ok(type, a
    $(KSRCDIR_PRUNED_HEAD)/include/asm-generic/uaccess.h)
 
 $(call define_if_matches, KERNEL_SPIN_RELEASE_HAS_3_ARGUMENTS, "\#define spin_release(l, n, i)", lockdep.h)
+
+$(call define_if_matches, KERNEL_HAS_NEW_PDE_DATA, "pde_data", proc_fs.h)

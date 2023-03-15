@@ -37,6 +37,12 @@ bool SetExceededQuotaMsgEx::processIncoming(ResponseContext& ctx)
          // update exceeded quota
          ExceededQuotaStorePtr exQuotaStore =
                Program::getApp()->getExceededQuotaStores()->get(targetId);
+         if (!exQuotaStore)
+         {
+            LOG(QUOTA, ERR, "Could not access exceeded quota store.", targetId);
+            errorCode = FhgfsOpsErr_UNKNOWNTARGET;
+            goto send_response;
+         }
          exQuotaStore->updateExceededQuota(getExceededQuotaIDs(), getQuotaDataType(),
             getExceededType());
       }

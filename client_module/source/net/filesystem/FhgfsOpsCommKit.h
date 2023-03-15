@@ -97,7 +97,7 @@ struct FileOpState
    // data for all modes
 
    // (assigned by the state-creator)
-   BeeGFS_IovIter data;
+   struct iov_iter data;
    loff_t offset; // target-node local offset
 
    bool firstWriteDoneForTarget; /* true if a chunk was previously written to this target in

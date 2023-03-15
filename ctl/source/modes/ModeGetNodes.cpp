@@ -125,7 +125,7 @@ int ModeGetNodes::execute()
          const NumNodeID& rootNodeID = data.first;
          const std::vector<std::shared_ptr<Node>>& nodes = data.second;
 
-         NodesTk::applyLocalNicCapsToList(app->getLocalNode(), nodes);
+         NodesTk::applyLocalNicListToList(app->getLocalNode(), nodes);
 
          std::set<NumNodeID> unreachableNodes;
 

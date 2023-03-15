@@ -86,7 +86,7 @@ bool RegisterNodeMsgEx::processIncoming(ResponseContext& ctx)
 
    // add node to store (or update it)
 
-   isNodeNew = nodeStore->addOrUpdateNodeEx(std::move(node), &newNodeNumID);
+   isNodeNew = (nodeStore->addOrUpdateNodeEx(std::move(node), &newNodeNumID) == NodeStoreResult::Added);
 
    if(!newNodeNumID)
    { // unable to add node to store
@@ -168,7 +168,7 @@ std::shared_ptr<Node> RegisterNodeMsgEx::constructNode(NodeType nodeType, std::s
    NicListCapabilities localNicCaps;
 
    NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-   node->getConnPool()->setLocalNicCaps(&localNicCaps);
+   node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
 
    return node;
 }

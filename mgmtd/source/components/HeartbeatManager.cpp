@@ -87,7 +87,7 @@ void HeartbeatManager::requestLoop()
    } // end of while loop
 }
 
-void HeartbeatManager::mgmtInit()
+bool HeartbeatManager::notifyNodes()
 {
    log.log(Log_NOTICE, "Notifying stored nodes...");
 
@@ -108,6 +108,13 @@ void HeartbeatManager::mgmtInit()
    dgramLis->sendToNodesUDP(metaNodes, &hbMsg, numRetries, timeoutMS);
    dgramLis->sendToNodesUDP(clients, &hbMsg, numRetries, timeoutMS);
 
+   // assume success?
+   return true;
+}
+
+void HeartbeatManager::mgmtInit()
+{
+   notifyNodes();
    log.log(Log_NOTICE, "Init complete.");
 }
 
@@ -188,6 +195,15 @@ void HeartbeatManager::notifyAsyncRemovedNode(NumNodeID nodeNumID,
    NodeType nodeType)
 {
    HbMgrNotification* notification = new HbMgrNotificationNodeRemoved(nodeNumID, nodeType);
+
+   const std::lock_guard<Mutex> lock (notificationListMutex);
+   notificationList.push_back(notification);
+}
+
+void HeartbeatManager::notifyAsyncRefreshNode(std::string nodeID, NumNodeID nodeNumID,
+   NodeType nodeType)
+{
+   HbMgrNotification* notification = new HbMgrNotificationRefreshNode(nodeID, nodeNumID, nodeType);
 
    const std::lock_guard<Mutex> lock (notificationListMutex);
    notificationList.push_back(notification);

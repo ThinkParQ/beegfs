@@ -1,7 +1,8 @@
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+
 
 #include "IBVBuffer.h"
 #include "IBVSocket.h"
+#ifdef BEEGFS_RDMA
 
 bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen,
     enum dma_data_direction dma_dir)
@@ -74,16 +75,16 @@ void IBVBuffer_free(IBVBuffer* buffer, IBVCommContext* ctx)
       kfree(buffer->lists);
 }
 
-ssize_t IBVBuffer_fill(IBVBuffer* buffer, BeeGFS_IovIter* iter)
+ssize_t IBVBuffer_fill(IBVBuffer* buffer, struct iov_iter* iter)
 {
    ssize_t total = 0;
    unsigned i;
 
-   for(i = 0; i < buffer->bufferCount && beegfs_iov_iter_count(iter) > 0; i++)
+   for(i = 0; i < buffer->bufferCount && iov_iter_count(iter) > 0; i++)
    {
-      size_t fragment = MIN(MIN(beegfs_iov_iter_count(iter), buffer->bufferSize), 0xFFFFFFFF);
+      size_t fragment = MIN(MIN(iov_iter_count(iter), buffer->bufferSize), 0xFFFFFFFF);
 
-      if(beegfs_copy_from_iter(buffer->buffers[i], fragment, iter) != fragment)
+      if(copy_from_iter(buffer->buffers[i], fragment, iter) != fragment)
          return -EFAULT;
 
       buffer->lists[i].length = fragment;

@@ -19,7 +19,8 @@ enum HbMgrNotificationType {
    HbMgrNotificationType_REFRESHTARGETSTATES,
    HbMgrNotificationType_BUDDYGROUPADDED,
    HbMgrNotificationType_PUBLISHCAPACITIES,
-   HbMgrNotificationType_REFRESHSTORAGEPOOLS
+   HbMgrNotificationType_REFRESHSTORAGEPOOLS,
+   HbMgrNotificationType_REFRESHNODE
 };
 
 
@@ -161,6 +162,23 @@ class HbMgrNotificationRefreshStoragePools: public HbMgrNotification
          HbMgrNotification(HbMgrNotificationType_REFRESHSTORAGEPOOLS) {}
 
       void processNotification();
+};
+
+class HbMgrNotificationRefreshNode : public HbMgrNotification
+{
+   public:
+      HbMgrNotificationRefreshNode(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType) :
+         HbMgrNotification(HbMgrNotificationType_REFRESHNODE),
+         nodeID(nodeID), nodeNumID(nodeNumID), nodeType(nodeType)
+      {}
+
+      void processNotification();
+
+
+   private:
+      std::string nodeID;
+      NumNodeID nodeNumID;
+      NodeType nodeType;
 };
 
 #endif /* HBMGRNOTIFICATION_H_ */

@@ -14,6 +14,8 @@ enum {
    Opt_tunePreferredMetaFile,
    Opt_tunePreferredStorageFile,
 
+   Opt_connInterfacesList,
+
    /* Mount options that take integer arguments */
    Opt_logLevel,
    Opt_connPortShift,
@@ -33,6 +35,8 @@ static match_table_t fhgfs_mount_option_tokens =
    { Opt_sysMgmtdHost, "sysMgmtdHost=%s" },
    { Opt_tunePreferredMetaFile, "tunePreferredMetaFile=%s" },
    { Opt_tunePreferredStorageFile, "tunePreferredStorageFile=%s" },
+
+   { Opt_connInterfacesList, "connInterfacesList=%s" },
 
    /* Mount options that take integer arguments */
    { Opt_logLevel, "logLevel=%d" },
@@ -106,6 +110,13 @@ bool MountConfig_parseFromRawOptions(MountConfig* this, char* mountOptions)
             SAFE_KFREE(this->tunePreferredStorageFile);
 
             this->tunePreferredStorageFile = match_strdup(args); // (string kalloc'ed => needs kfree later)
+         } break;
+
+         case Opt_connInterfacesList:
+         {
+            SAFE_KFREE(this->connInterfacesList);
+            this->connInterfacesList = match_strdup(args);
+
          } break;
 
          /* Mount options that take INTEGER arguments */
@@ -183,6 +194,9 @@ void MountConfig_showOptions(MountConfig* this, struct seq_file* sf)
 
    if (this->tunePreferredStorageFile)
       seq_printf(sf, ",tunePreferredStorageFile=%s", this->tunePreferredStorageFile);
+
+   if (this->connInterfacesList)
+      seq_printf(sf, ",connInterfacesList=%s", this->connInterfacesList);
 
    if (this->logLevelDefined)
       seq_printf(sf, ",logLevel=%d", this->logLevel);

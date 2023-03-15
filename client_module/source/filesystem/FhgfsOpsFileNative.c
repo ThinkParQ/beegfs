@@ -620,7 +620,7 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
       loff_t pos = iocb->ki_pos;
       struct inode* inode = file_inode(filp);
 
-      mutex_lock(&inode->i_mutex);
+      os_inode_lock(inode);
       do {
          result = os_generic_write_checks(filp, &pos, &size, S_ISBLK(inode->i_mode) );
          if(result)
@@ -660,7 +660,7 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
          result = generic_file_direct_write(iocb, from, pos);
 #endif
       } while(0);
-      mutex_unlock(&inode->i_mutex);
+      os_inode_unlock(inode);
 #endif
 
       return result;
@@ -674,7 +674,7 @@ static ssize_t beegfs_aio_write_iov(struct kiocb* iocb, const struct iovec* iov,
    unsigned long nr_segs, loff_t pos)
 {
    size_t count = iov_length(iov, nr_segs);
-   BeeGFS_IovIter iter;
+   struct iov_iter iter;
 
    BEEGFS_IOV_ITER_INIT(&iter, WRITE, iov, nr_segs, count);
 
@@ -775,7 +775,7 @@ static ssize_t beegfs_aio_read_iov(struct kiocb* iocb, const struct iovec* iov,
    unsigned long nr_segs, loff_t pos)
 {
    size_t count = iov_length(iov, nr_segs);
-   BeeGFS_IovIter iter;
+   struct iov_iter iter;
 
    BEEGFS_IOV_ITER_INIT(&iter, READ, iov, nr_segs, count);
 
@@ -1030,7 +1030,7 @@ static void* __writepages_pool_alloc(gfp_t mask, void* pool_data)
    return state;
 
 fail_kvecs:
-   kfree(state->kvecs);
+   kfree(state->pages);
 fail_pages:
    kfree(state);
 fail_state:
@@ -1101,18 +1101,11 @@ static int beegfs_allocate_ard(struct beegfs_writepages_state* state)
    if(!Config_getTuneUseGlobalAppendLocks(App_getConfig(app) ) )
    {
       char zero = 0;
-      size_t size = 1;
-      ssize_t appendRes;
+      size_t size = sizeof zero;
+      struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(&zero, size, WRITE);
 
-      struct kvec reserve = {
-         .iov_base = &zero,
-         .iov_len = size,
-      };
-      BeeGFS_IovIter iter;
-      BEEGFS_IOV_ITER_KVEC(&iter, WRITE, &reserve, 1, size);
-
-      appendRes = FhgfsOpsHelper_appendfileVecOffset(BEEGFS_INODE(mapping->host), &iter, size,
-         &state->context->ioInfo, ard->size - 1, &ard->fileOffset);
+      ssize_t appendRes = FhgfsOpsHelper_appendfileVecOffset(BEEGFS_INODE(mapping->host), iter, size,
+            &state->context->ioInfo, ard->size - size, &ard->fileOffset);
 
       if (appendRes >= 0)
          ard->fileOffset -= ard->size;
@@ -1229,7 +1222,7 @@ static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* off
 static int beegfs_writepages_work(struct beegfs_writepages_state* state)
 {
    App* app;
-   BeeGFS_IovIter iter;
+   struct iov_iter iter;
    unsigned i;
    int result = 0;
    ssize_t written;
@@ -1691,7 +1684,7 @@ static void beegfs_readpages_work(struct work_struct* w)
    struct beegfs_readpages_state* state = container_of(w, struct beegfs_readpages_state, work);
 
    App* app;
-   BeeGFS_IovIter iter;
+   struct iov_iter iter;
    ssize_t readRes;
    unsigned validPages = 0;
    int err = 0;
@@ -1715,7 +1708,7 @@ static void beegfs_readpages_work(struct work_struct* w)
    BEEGFS_IOV_ITER_KVEC(&iter, READ, state->kvecs, state->nr_pages,
       state->nr_pages * PAGE_SIZE);
 
-   readRes = FhgfsOpsRemoting_readfileVec(&iter, beegfs_iov_iter_count(&iter), page_offset(state->pages[0]),
+   readRes = FhgfsOpsRemoting_readfileVec(&iter, iov_iter_count(&iter), page_offset(state->pages[0]),
       &state->context->ioInfo, BEEGFS_INODE(state->pages[0]->mapping->host) );
    if(readRes < 0)
       err = FhgfsOpsErr_toSysErr(-readRes);
@@ -2022,7 +2015,7 @@ static void beegfs_invalidate_page(struct page* page, unsigned begin, unsigned e
 }
 #endif
 
-static ssize_t beegfs_dIO_read(struct kiocb* iocb, BeeGFS_IovIter* iter, loff_t offset,
+static ssize_t beegfs_dIO_read(struct kiocb* iocb, struct iov_iter* iter, loff_t offset,
    RemotingIOInfo* ioInfo)
 {
    struct file* filp = iocb->ki_filp;
@@ -2037,16 +2030,16 @@ static ssize_t beegfs_dIO_read(struct kiocb* iocb, BeeGFS_IovIter* iter, loff_t 
       offset, beegfs_iov_iter_nr_segs(iter));
    IGNORE_UNUSED_VARIABLE(app);
 
-   result = FhgfsOpsRemoting_readfileVec(iter, beegfs_iov_iter_count(iter), offset, ioInfo, BEEGFS_INODE(inode));
+   result = FhgfsOpsRemoting_readfileVec(iter, iov_iter_count(iter), offset, ioInfo, BEEGFS_INODE(inode));
 
    if(result < 0)
       return FhgfsOpsErr_toSysErr(-result);
 
    offset += result;
 
-   if(beegfs_iov_iter_count(iter) > 0)
+   if(iov_iter_count(iter) > 0)
    {
-      ssize_t readRes = __FhgfsOps_readSparse(filp, iter, beegfs_iov_iter_count(iter), offset + result);
+      ssize_t readRes = __FhgfsOps_readSparse(filp, iter, iov_iter_count(iter), offset + result);
 
       result += readRes;
    }
@@ -2059,7 +2052,7 @@ static ssize_t beegfs_dIO_read(struct kiocb* iocb, BeeGFS_IovIter* iter, loff_t 
    return result;
 }
 
-static ssize_t beegfs_dIO_write(struct kiocb* iocb, BeeGFS_IovIter* iter, loff_t offset,
+static ssize_t beegfs_dIO_write(struct kiocb* iocb, struct iov_iter* iter, loff_t offset,
    RemotingIOInfo* ioInfo)
 {
    struct file* filp = iocb->ki_filp;
@@ -2097,16 +2090,15 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
 
    {
       ssize_t result;
-      BeeGFS_IovIter beegfs_iter = beegfs_iov_iter_from_iov_iter(*iter);
 
       switch(rw)
       {
          case READ:
-            result = beegfs_dIO_read(iocb, &beegfs_iter, offset, &ioInfo);
+            result = beegfs_dIO_read(iocb, iter, offset, &ioInfo);
             break;
 
          case WRITE:
-            result = beegfs_dIO_write(iocb, &beegfs_iter, offset, &ioInfo);
+            result = beegfs_dIO_write(iocb, iter, offset, &ioInfo);
             break;
 
          default:
@@ -2114,7 +2106,6 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
             return -EINVAL;
       }
 
-      *iter = iov_iter_from_beegfs_iov_iter(beegfs_iter);
       return result;
    }
 }
@@ -2138,7 +2129,7 @@ static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* ite
 static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* iov, loff_t pos,
       unsigned long nr_segs)
 {
-   BeeGFS_IovIter iter;
+   struct iov_iter iter;
 
    BEEGFS_IOV_ITER_INIT(&iter, rw & RW_MASK, iov, nr_segs, iov_length(iov, nr_segs) );
 

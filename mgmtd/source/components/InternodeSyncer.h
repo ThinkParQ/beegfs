@@ -26,6 +26,9 @@ class InternodeSyncer : public PThread
 
       Mutex forcePoolsUpdateMutex;
       bool forcePoolsUpdate; // true to force update of capacity pools
+      Mutex forceCheckNetworkMutex;
+      bool forceCheckNetwork;  // true to force check of network interfaces
+
       const unsigned targetOfflineTimeoutMS;
 
       RWLock targetCapacityReportMapLock;
@@ -71,6 +74,7 @@ class InternodeSyncer : public PThread
 
       void clearStaleCapacityReports(const NodeType nodeType);
 
+      bool checkNetwork();
 
    public:
       // getters & setters
@@ -82,6 +86,13 @@ class InternodeSyncer : public PThread
          this->forcePoolsUpdate = true;
       }
 
+      void setForceCheckNetwork()
+      {
+         const std::lock_guard<Mutex> lock(forceCheckNetworkMutex);
+
+         this->forceCheckNetwork = true;
+      }
+
       // inliners
 
       bool getAndResetForcePoolsUpdate()
@@ -91,6 +102,17 @@ class InternodeSyncer : public PThread
          bool retVal = this->forcePoolsUpdate;
 
          this->forcePoolsUpdate = false;
+
+         return retVal;
+      }
+
+      bool getAndResetForceCheckNetwork()
+      {
+         const std::lock_guard<Mutex> lock(forceCheckNetworkMutex);
+
+         bool retVal = this->forceCheckNetwork;
+
+         this->forceCheckNetwork = false;
 
          return retVal;
       }

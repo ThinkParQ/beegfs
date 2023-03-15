@@ -7,6 +7,7 @@ TARGET ?= beegfs
 
 export TARGET
 export OFED_INCLUDE_PATH
+export BEEGFS_NO_RDMA
 
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
@@ -16,6 +17,10 @@ endif
 
 ifeq ($(KRELEASE),)
 KRELEASE := $(shell uname -r)
+endif
+
+ifdef BEEGFS_NO_RDMA
+BEEGFS_CFLAGS += -DBEEGFS_NO_RDMA
 endif
 
 ifneq ($(OFED_INCLUDE_PATH),)
@@ -102,26 +107,36 @@ ifneq ($(BEEGFS_VERSION),)
 BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"'
 endif
 
+# OFED
+ifneq ($(OFED_INCLUDE_PATH),)
+BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
+
+NVFS_HEADERS=
 # NVFS
-ifneq ($(NVFS_H_PATH),)
-module: $(NVFS_H_PATH)/nvfs.h
-$(NVFS_H_PATH)/nvfs.h:
-	$(error NVFS_H_PATH not valid: $(NVFS_H_PATH))
+ifneq ($(NVFS_INCLUDE_PATH),)
+
+NVFS_HEADERS=$(NVFS_INCLUDE_PATH)/nvfs-dma.h \
+	$(NVFS_INCLUDE_PATH)/config-host.h \
+	$(NVIDIA_INCLUDE_PATH)/nv-p2p.h
 
 BEEGFS_CFLAGS += -DBEEGFS_NVFS
-BEEGFS_CFLAGS += -I$(NVFS_H_PATH)
+BEEGFS_CFLAGS += -I$(NVFS_INCLUDE_PATH)  -I$(NVIDIA_INCLUDE_PATH)
 endif
 ifeq ($(BEEGFS_DEBUG_RDMA),1)
 BEEGFS_CFLAGS += -DBEEGFS_DEBUG_RDMA
 endif
 
-# OFED
-ifneq ($(OFED_INCLUDE_PATH),)
-BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
-
-module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h
+module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h $(NVFS_HEADERS)
 $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
 	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
+ifneq ($(NVFS_INCLUDE_PATH),)
+$(NVFS_INCLUDE_PATH)/nvfs-dma.h:
+	$(error NVFS_INCLUDE_PATH missing nvfs-dma.h: $(NVFS_INCLUDE_PATH))
+$(NVFS_INCLUDE_PATH)/config-host.h:
+	$(error NVFS_INCLUDE_PATH missing config-host.h: $(NVFS_INCLUDE_PATH))
+$(NVIDIA_INCLUDE_PATH)/nv-p2p.h:
+	$(error NVIDIA_INCLUDE_PATH missing nv-p2p.h: $(NVIDIA_INCLUDE_PATH))
+endif
 endif
 
 # OFED API version
@@ -211,6 +226,8 @@ help:
 	@echo '    (If not defined, OFED 1.2.5 or higher API will be used.)'
 	@echo ' '
 	@echo 'NVIDIA GPUDirect Storage (GDS) arguments (optional):'
-	@echo '  NVFS_H_PATH=<path>:'
+	@echo '  NVFS_INCLUDE_PATH=<path>:'
 	@echo '    Path to directory that contains nvfs.h. If not defined, GDS support is'
 	@echo '    disabled.'
+	@echo '  NVIDIA_INCLUDE_PATH=<path>:'
+	@echo '    Path to NVIDIA driver source. Required when NVFS_INCLUDE_PATH is specifed.'

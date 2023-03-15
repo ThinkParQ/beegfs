@@ -47,16 +47,16 @@ void RdmaInfo_releaseNVFS(void)
 }
 
 int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
-   const BeeGFS_IovIter *iter)
+   const struct iov_iter *iter)
 {
    struct page     *page = NULL;
-   BeeGFS_IovIter   iter_copy = *iter;
+   struct iov_iter   iter_copy = *iter;
    size_t           page_offset = 0;
    int              status = 0;
    bool             is_gpu = false;
 
    // Test the first page of the request to determine the memory type.
-   status = iov_iter_get_pages(&iter_copy._iov_iter, &page, PAGE_SIZE, 1, &page_offset);
+   status = iov_iter_get_pages(&iter_copy, &page, PAGE_SIZE, 1, &page_offset);
    if (unlikely(status <= 0))
    {
       // 0 means the iter is empty, so just indicate that it's not an NVFS call.
@@ -112,13 +112,13 @@ static inline void RdmaInfo_putPages(struct scatterlist *sglist, int count)
  * @sglist: The array of scatter/gather entries (needs to be big enough for all pages)
  * @returns number of sg entries set up for the iov_iter
  */
-static int RdmaInfo_iovToSglist(const BeeGFS_IovIter *iter,
+static int RdmaInfo_iovToSglist(const struct iov_iter *iter,
    struct scatterlist *sglist)
 {
    struct page        **pages = NULL;
    struct scatterlist  *sg = NULL;
    struct scatterlist  *sg_prev = NULL;
-   BeeGFS_IovIter       iter_copy = *iter;
+   struct iov_iter       iter_copy = *iter;
    int                  sg_count = 0;
    size_t               page_length = 0;
    size_t               page_offset = 0;
@@ -127,9 +127,9 @@ static int RdmaInfo_iovToSglist(const BeeGFS_IovIter *iter,
    unsigned             i = 0;
    unsigned             npages = 0;
 
-   while (beegfs_iov_iter_count(&iter_copy) > 0)
+   while (iov_iter_count(&iter_copy) > 0)
    {
-      result = iov_iter_get_pages_alloc(&iter_copy._iov_iter, &pages, iter_copy._iov_iter.count, &page_offset);
+      result = iov_iter_get_pages_alloc(&iter_copy, &pages, iov_iter_count(&iter_copy), &page_offset);
       if (result < 0)
       {
          printk_fhgfs(KERN_ERR, "RdmaInfo_iovToSglist: no memory pages\n");
@@ -152,7 +152,7 @@ static int RdmaInfo_iovToSglist(const BeeGFS_IovIter *iter,
       }
 
       kvfree(pages);
-      beegfs_iov_iter_advance(&iter_copy, result);
+      iov_iter_advance(&iter_copy, result);
    }
 
    if (sg_prev)
@@ -227,7 +227,7 @@ static int RdmaInfo_coalesceSglist(struct scatterlist *sglist,
  * @dma_dir: read (DMA_FROM_DEVICE) or write (DMA_TO_DEVICE)
  * @returns RdmaInfo struct
  */
-static RdmaInfo * RdmaInfo_map(const BeeGFS_IovIter *iter, Socket *socket,
+static RdmaInfo * RdmaInfo_map(const struct iov_iter *iter, Socket *socket,
    enum dma_data_direction dma_dir)
 {
    RdmaInfo           *rdmap = NULL;
@@ -244,7 +244,7 @@ static RdmaInfo * RdmaInfo_map(const BeeGFS_IovIter *iter, Socket *socket,
    if (Socket_getSockType(socket) != NICADDRTYPE_RDMA)
       return ERR_PTR(-EINVAL);
 
-   npages = 1 + iov_iter_npages(&iter->_iov_iter, INT_MAX);
+   npages = 1 + iov_iter_npages(iter, INT_MAX);
 
    //
    // Allocate the scatterlist.
@@ -341,12 +341,12 @@ error_return:
    return (status == 0) ? NULL : ERR_PTR(status);
 }
 
-RdmaInfo* RdmaInfo_mapRead(const BeeGFS_IovIter *iter, Socket *socket)
+RdmaInfo* RdmaInfo_mapRead(const struct iov_iter *iter, Socket *socket)
 {
    return RdmaInfo_map(iter, socket, DMA_FROM_DEVICE);
 }
 
-RdmaInfo* RdmaInfo_mapWrite(const BeeGFS_IovIter *iter, Socket *socket)
+RdmaInfo* RdmaInfo_mapWrite(const struct iov_iter *iter, Socket *socket)
 {
    return RdmaInfo_map(iter, socket, DMA_TO_DEVICE);
 }

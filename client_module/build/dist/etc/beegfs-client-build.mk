@@ -9,6 +9,14 @@
 ifneq ($(OFED_INCLUDE_PATH),)
 export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
 endif
-# If building nvidia-fs support, specify path to nvfs.h
-#NVFS_H_PATH=/usr/src/mlnx-ofed-kernel-5.4/drivers/nvme/host
-
+# To disable RDMA support, define BEEGFS_NO_RDMA
+#BEEGFS_NO_RDMA=1
+# If building nvidia-fs support, specify path to nvfs-dma.h.
+# This directory must also have config-host.h, which is created
+# by the nvidia-fs configure script.
+# Example:
+#NVFS_INCLUDE_PATH=/usr/src/nvidia-fs-2.13.5
+# If building nvidia-fs support, specify path to NVIDIA driver
+# source.
+# Example:
+#NVIDIA_INCLUDE_PATH=/usr/src/nvidia-520.61.05/nvidia

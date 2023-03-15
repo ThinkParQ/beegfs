@@ -31,6 +31,9 @@
 #error iov_iter_iovec() is a required feature
 #endif
 
+#ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
+#error We require kernels that have a "direction" parameter to iov_iter_init().
+#endif
 
 
 #ifndef KERNEL_HAS_IOV_ITER_TYPE
@@ -53,131 +56,55 @@ static inline bool iov_iter_is_pipe(struct iov_iter* iter)
 #endif
 
 
-// TODO: we can consider removing this wrapper. By now, only the struct
-// iov_iter member is left.
-typedef struct
+static inline int beegfs_iov_iter_is_iovec(const struct iov_iter *iter)
 {
-   struct iov_iter _iov_iter;
-} BeeGFS_IovIter;
-
-static inline int beegfs_iov_iter_is_iovec(const BeeGFS_IovIter *iter)
-{
-   return iov_iter_type(&iter->_iov_iter) == ITER_IOVEC;
-}
-
-// by now, we can assume that we have ITER_IOVEC and ITER_KVEC available
-// TODO: we can get rid of more compat code because of this assumption
-static inline int beegfs_iov_iter_type(BeeGFS_IovIter *iter)
-{
-   return iov_iter_type(&iter->_iov_iter);
+   return iov_iter_type(iter) == ITER_IOVEC;
 }
 
 // TODO: Now that ITER_KVEC is required across all kernels, is this function still needed?
-static inline struct iov_iter *beegfs_get_iovec_iov_iter(BeeGFS_IovIter *iter)
+static inline struct iov_iter *beegfs_get_iovec_iov_iter(struct iov_iter *iter)
 {
    BUG_ON(!beegfs_iov_iter_is_iovec(iter));
-   return &iter->_iov_iter;
+   return iter;
 }
 
-static inline struct iov_iter iov_iter_from_beegfs_iov_iter(BeeGFS_IovIter i)
+static inline unsigned long beegfs_iov_iter_nr_segs(const struct iov_iter *iter)
 {
-   return i._iov_iter;
+   return iter->nr_segs;
 }
 
-static inline BeeGFS_IovIter beegfs_iov_iter_from_iov_iter(struct iov_iter i)
+static inline void beegfs_iov_iter_clear(struct iov_iter *iter)
 {
-
-   BeeGFS_IovIter result = { ._iov_iter = i };
-   return result;
+   iter->count = 0;
 }
 
-static inline size_t beegfs_iov_iter_count(const BeeGFS_IovIter *iter)
-{
-   // Not all versions of iov_iter_count() take a const pointer...
-   return iov_iter_count(&((BeeGFS_IovIter *) iter)->_iov_iter);
-}
-
-static inline unsigned long beegfs_iov_iter_nr_segs(const BeeGFS_IovIter *iter)
-{
-   return iter->_iov_iter.nr_segs;
-}
-
-static inline void beegfs_iov_iter_clear(BeeGFS_IovIter *iter)
-{
-   iter->_iov_iter.count = 0;
-}
-
-static inline size_t beegfs_copy_to_iter(const void *addr, size_t bytes, BeeGFS_IovIter *i)
-{
-   return copy_to_iter(addr, bytes, &i->_iov_iter);
-}
-
-static inline size_t beegfs_copy_from_iter(void *addr, size_t bytes, BeeGFS_IovIter *i)
-{
-   return copy_from_iter(addr, bytes, &i->_iov_iter);
-}
-
-static inline size_t beegfs_iov_iter_zero(size_t bytes, BeeGFS_IovIter *iter)
-{
-   return iov_iter_zero(bytes, &iter->_iov_iter);
-}
-
-static inline void beegfs_iov_iter_truncate(BeeGFS_IovIter *iter, u64 count)
-{
-   iov_iter_truncate(&iter->_iov_iter, count);
-}
-
-static inline void beegfs_iov_iter_advance(BeeGFS_IovIter *iter, size_t bytes)
-{
-   iov_iter_advance(&iter->_iov_iter, bytes);
-}
-
-static inline bool beegfs_is_pipe_iter(BeeGFS_IovIter * iter)
+static inline bool beegfs_is_pipe_iter(struct iov_iter * iter)
 {
 #ifdef KERNEL_HAS_ITER_PIPE
-   return iov_iter_type(&iter->_iov_iter) == ITER_PIPE;
+   return iov_iter_type(iter) == ITER_PIPE;
 #else
    return false;
 #endif
 }
 
-static inline void BEEGFS_IOV_ITER_INIT(BeeGFS_IovIter *iter, int direction,
-   const struct iovec* iov, unsigned long nr_segs, size_t count)
-{
+#define BEEGFS_IOV_ITER_INIT iov_iter_init
 
-#ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
-#error We require kernels that have a "direction" parameter to iov_iter_init().
-#endif
-
-   iov_iter_init(&iter->_iov_iter, direction, iov, nr_segs, count);
-}
-
-static inline void BEEGFS_IOV_ITER_KVEC(BeeGFS_IovIter *iter, int direction,
+static inline void BEEGFS_IOV_ITER_KVEC(struct iov_iter *iter, int direction,
    const struct kvec* kvec, unsigned long nr_segs, size_t count)
 {
-#ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
-#error We require kernels that have a "direction" parameter to iov_iter_init().
-#endif
-
 #ifndef KERNEL_HAS_IOV_ITER_KVEC_NO_TYPE_FLAG_IN_DIRECTION
    direction |= ITER_KVEC;
 #endif
-
-   iov_iter_kvec(&iter->_iov_iter, direction, kvec, nr_segs, count);
+   iov_iter_kvec(iter, direction, kvec, nr_segs, count);
 }
 
-static inline void BEEGFS_IOV_ITER_BVEC(BeeGFS_IovIter *iter, int direction,
+static inline void BEEGFS_IOV_ITER_BVEC(struct iov_iter *iter, int direction,
    const struct bio_vec* bvec, unsigned long nr_segs, size_t count)
 {
-#ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
-#error We require kernels that have a "direction" parameter to iov_iter_init().
-#endif
-
 #ifndef KERNEL_HAS_IOV_ITER_KVEC_NO_TYPE_FLAG_IN_DIRECTION
    direction |= ITER_BVEC;
 #endif
-
-   iov_iter_bvec(&iter->_iov_iter, direction, bvec, nr_segs, count);
+   iov_iter_bvec(iter, direction, bvec, nr_segs, count);
 }
 
 
@@ -206,7 +133,7 @@ static inline void BEEGFS_IOV_ITER_BVEC(BeeGFS_IovIter *iter, int direction,
 
       Note that this can fail in low memory situations. The size of the view
       that was successfully allocated can be queried by calling
-      beegfs_iov_iter_count() on the sanitized_iter field.
+      iov_iter_count() on the sanitized_iter field.
 
       2) The sanitized_iter field should be used to read data. The field can be
       used destructively. In particular it is safe to call iov_iter_advance()
@@ -230,8 +157,49 @@ struct _BeeGFS_ReadSink {
    struct bio_vec *bvecs;  // 0..npages
 
    // output value
-   BeeGFS_IovIter sanitized_iter;
+   struct iov_iter sanitized_iter;
 };
 
 void beegfs_readsink_reserve(BeeGFS_ReadSink *rs, struct iov_iter *iter, size_t size);
 void beegfs_readsink_release(BeeGFS_ReadSink *rs);
+
+
+
+
+/*
+ We have lots of code locations where we need to read or write memory using a
+ pointer + length pair, but need to use an iov_iter based API. This always
+ leads to boilerplate where struct iovec and struct iov_iter values have to be
+ declared on the stack. The following hack is meant to reduce that boilerplate.
+ */
+#define STACK_ALLOC_BEEGFS_ITER_IOV(ptr, size, direction) \
+   ___BEEGFS_IOV_ITER_INIT(&(struct iov_iter){0}, &(struct iovec){0}, (ptr), (size), (direction))
+
+#define STACK_ALLOC_BEEGFS_ITER_KVEC(ptr, size, direction) \
+   ___BEEGFS_IOV_ITER_KVEC(&(struct iov_iter){0}, &(struct kvec){0}, (ptr), (size), (direction))
+
+static inline struct iov_iter *___BEEGFS_IOV_ITER_INIT(
+      struct iov_iter *iter, struct iovec *iovec,
+      const char __user *ptr, size_t size, int direction)
+{
+   unsigned nr_segs = 1;
+   *iovec = (struct iovec) {
+      .iov_base = (char __user *) ptr,
+      .iov_len = size,
+   };
+   BEEGFS_IOV_ITER_INIT(iter, direction, iovec, nr_segs, size);
+   return iter;
+}
+
+static inline struct iov_iter *___BEEGFS_IOV_ITER_KVEC(
+      struct iov_iter *iter, struct kvec* kvec,
+      const char *ptr, size_t size, int direction)
+{
+   unsigned nr_segs = 1;
+   *kvec = (struct kvec) {
+      .iov_base = (char *) ptr,
+      .iov_len = size,
+   };
+   BEEGFS_IOV_ITER_KVEC(iter, direction, kvec, nr_segs, size);
+   return iter;
+}

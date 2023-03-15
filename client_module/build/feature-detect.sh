@@ -158,6 +158,10 @@ check_header \
    linux/sched/signal.h \
    KERNEL_HAS_SCHED_SIG_H
 
+check_header \
+   linux/stdarg.h \
+   KERNEL_HAS_LINUX_STDARG_H
+
 # cryptohash does not include linux/types.h, so the type comparison fails
 check_function \
    half_md4_transform "__u32 (__u32[4], __u32 const in[8])" \

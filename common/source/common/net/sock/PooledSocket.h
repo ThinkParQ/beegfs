@@ -18,11 +18,13 @@ class PooledSocket : public Socket
       PooledSocket() : expireTimeStart(true)
       {
          this->available = false;
+         this->closeOnRelease = false;
       }
 
 
    private:
       bool available; // == !acquired
+      bool closeOnRelease; // if true, close this socket when it is released
       Time expireTimeStart; // 0 means "doesn't expire", otherwise time when conn was established
 
 
@@ -65,6 +67,16 @@ class PooledSocket : public Socket
       bool getHasExpirationTimer()
       {
          return !expireTimeStart.getIsZero();
+      }
+
+      bool isCloseOnRelease()
+      {
+         return closeOnRelease;
+      }
+
+      void setCloseOnRelease(bool v)
+      {
+         closeOnRelease = v;
       }
 };
 

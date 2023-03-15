@@ -36,11 +36,8 @@ void __DatagramListener_listenLoop(DatagramListener* this)
       NetMessage* msg;
       ssize_t recvRes;
 
-      struct kvec kvec = { this->recvBuf, DGRAMMGR_RECVBUF_SIZE };
-      BeeGFS_IovIter iter;
-      BEEGFS_IOV_ITER_KVEC(&iter, READ, &kvec, 1, kvec.iov_len);
-
-      recvRes = StandardSocket_recvfromT(this->udpSock, &iter, 0, &fromAddr, recvTimeoutMS);
+      struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(this->recvBuf, DGRAMMGR_RECVBUF_SIZE, READ);
+      recvRes = StandardSocket_recvfromT(this->udpSock, iter, 0, &fromAddr, recvTimeoutMS);
 
       if(recvRes == -ETIMEDOUT)
       { // timeout: nothing to worry about, just idle
