@@ -136,20 +136,30 @@ void App::initDataObjects()
 
       tsdb = boost::make_unique<Cassandra>(std::move(cassandraConfig));
    }
-   else // Config::DbTypes::INFLUXDB
+   else // Config::DbTypes::INFLUXDB OR Config::DbTypes::INFLUXDB2
    {
       InfluxDB::Config influxdbConfig;
       influxdbConfig.host = cfg->getDbHostName();
       influxdbConfig.port = cfg->getDbHostPort();
-      influxdbConfig.database = cfg->getDbDatabase();
       influxdbConfig.maxPointsPerRequest = cfg->getInfluxdbMaxPointsPerRequest();
-      influxdbConfig.setRetentionPolicy = cfg->getInfluxDbSetRetentionPolicy();
-      influxdbConfig.retentionDuration = cfg->getInfluxDbRetentionDuration();
       influxdbConfig.httpTimeout = cfg->getHttpTimeout();
       influxdbConfig.curlCheckSSLCertificates = cfg->getCurlCheckSSLCertificates();
-      influxdbConfig.username = cfg->getDbAuthUsername();
-      influxdbConfig.password = cfg->getDbAuthPassword();
-
+      if (cfg->getDbType() == Config::DbTypes::INFLUXDB2)
+      {
+         influxdbConfig.bucket = cfg->getDbBucket();
+         influxdbConfig.organization = cfg->getDbAuthOrg();
+         influxdbConfig.token = cfg->getDbAuthToken();
+         influxdbConfig.dbVersion = INFLUXDB2;
+      }
+      else
+      {
+         influxdbConfig.database = cfg->getDbDatabase();
+         influxdbConfig.setRetentionPolicy = cfg->getInfluxDbSetRetentionPolicy();
+         influxdbConfig.retentionDuration = cfg->getInfluxDbRetentionDuration();
+         influxdbConfig.username = cfg->getDbAuthUsername();
+         influxdbConfig.password = cfg->getDbAuthPassword();
+         influxdbConfig.dbVersion = INFLUXDB;
+       }
       tsdb = boost::make_unique<InfluxDB>(std::move(influxdbConfig));
    }
 }
@@ -256,31 +266,9 @@ void App::logInfos()
    LOG(GENERAL, DEBUG, "--DEBUG VERSION--");
 #endif
 
-   std::string nicListStr;
-   std::string extendedNicListStr;
-   for (auto nicIter = localNicList.begin(); nicIter != localNicList.end(); nicIter++)
-   {
-      std::string nicTypeStr;
-
-      if (nicIter->nicType == NICADDRTYPE_RDMA)
-         nicTypeStr = "RDMA";
-      else
-      if (nicIter->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
-      else
-      if (nicIter->nicType == NICADDRTYPE_STANDARD)
-         nicTypeStr = "TCP";
-      else
-         nicTypeStr = "Unknown";
-
-      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
-
-      extendedNicListStr += "\n+ ";
-      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&*nicIter) + " ";
-   }
-
-   LOG(GENERAL, WARNING, std::string("Usable NICs: ") + nicListStr);
-   LOG(GENERAL, DEBUG, std::string("Extended List of usable NICs: ") + extendedNicListStr);
+   // list usable network interfaces
+   NicAddressList nicList = getLocalNicList();
+   logUsableNICs(NULL, nicList);
 
    // print net filters
    if (netFilter->getNumFilterEntries() )
@@ -318,4 +306,12 @@ void App::handleComponentException(std::exception& e)
 
    LOG(GENERAL, WARNING, "Shutting down...");
    stopComponents();
+}
+
+void App::handleNetworkInterfaceFailure(const std::string& devname)
+{
+   // Nothing to do. This App has no internodeSyncer that would rescan the
+   // netdevs.
+   LOG(GENERAL, ERR, "Network interface failure.",
+      ("Device", devname));
 }

@@ -1,6 +1,6 @@
 #include "IBVSocket.h"
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
 
 #ifdef KERNEL_HAS_SCSI_FC_COMPAT
 #include <scsi/fc_compat.h> // some kernels (e.g. rhel 5.9) forgot this in their rdma headers
@@ -8,6 +8,7 @@
 
 
 #include <common/toolkit/TimeTk.h>
+#include <common/toolkit/Time.h>
 
 #include <linux/in.h>
 #include <linux/sched.h>
@@ -148,6 +149,8 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    IBVCommConfig* commCfg)
 {
    struct sockaddr_in sin;
+   long connTimeoutJiffies = TimeTk_msToJiffiesSchedulable(IBVSOCKET_CONN_TIMEOUT_MS);
+   Time connElapsed;
 
    /* note: rejected as stale means remote side still had an old open connection associated with
          our current cm_id. what most likely happened is that the client was reset (i.e. no clean
@@ -155,6 +158,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
          => only possible solution seems to be retrying with another cm_id. */
    int numStaleRetriesLeft = IBVSOCKET_STALE_RETRIES_NUM;
 
+   Time_setToNow(&connElapsed);
 
    for( ; ; ) // stale retry loop
    {
@@ -210,8 +214,10 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       }
 
       // wait for async event
-      wait_event_interruptible(_this->eventWaitQ,
-         _this->connState != IBVSOCKETCONNSTATE_ROUTERESOLVED);
+      // Note: rdma_connect() can take a very long time (>5m) if the peer's HCA has gone down.
+      wait_event_interruptible_timeout(_this->eventWaitQ,
+         _this->connState != IBVSOCKETCONNSTATE_ROUTERESOLVED,
+         connTimeoutJiffies);
 
       // test point for failed connections
       if((_this->connState != IBVSOCKETCONNSTATE_ESTABLISHED) &&
@@ -248,14 +254,18 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       }
 
       if(_this->connState != IBVSOCKETCONNSTATE_ESTABLISHED)
+      {
+         ibv_print_info_debug("Failed after %d stale connection retries, elapsed = %u\n",
+            IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft, Time_elapsedMS(&connElapsed));
          goto err_invalidateSock;
+      }
 
       // connected
 
       if(numStaleRetriesLeft != IBVSOCKET_STALE_RETRIES_NUM)
       {
-         ibv_print_info_debug("Succeeded after %d stale connection retries\n",
-            IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft);
+         ibv_print_info_debug("Succeeded after %d stale connection retries, elapsed = %u\n",
+            IBVSOCKET_STALE_RETRIES_NUM - numStaleRetriesLeft, Time_elapsedMS(&connElapsed));
       }
 
       return true;

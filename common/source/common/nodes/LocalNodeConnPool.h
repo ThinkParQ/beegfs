@@ -30,6 +30,7 @@ class LocalNodeConnPool : public NodeConnPool
 
    private:
       NicAddressList nicList;
+      Mutex nicListMutex;
       UnixConnWorkerList connWorkerList;
 
       unsigned availableConns; // available established conns
@@ -46,12 +47,13 @@ class LocalNodeConnPool : public NodeConnPool
 
       NicAddressList getNicList()
       {
-         // Note: Not synced (like in normal NodeConnPool) because the nicList will never
-         //    change in the local connpool impl.
-
+         // lock nicListMutex instead of mutex. acquireStreamSocketEx may lock
+         // mutex for "long" periods
+         const std::lock_guard<Mutex> lock(nicListMutex);
          return nicList;
       }
 
+      bool updateInterfaces(unsigned short streamPort, const NicAddressList& nicList);
 
 };
 

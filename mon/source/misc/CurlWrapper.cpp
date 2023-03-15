@@ -73,7 +73,7 @@ unsigned short CurlWrapper::sendGetRequest(const std::string& url, const Paramet
 }
 
 unsigned short CurlWrapper::sendPostRequest(const std::string& url, const char* data,
-      const ParameterMap& parameters)
+      const ParameterMap& parameters, const std::vector<std::string>& headers)
 {
    std::string parameterStr = makeParameterStr(parameters);
 
@@ -81,6 +81,14 @@ unsigned short CurlWrapper::sendPostRequest(const std::string& url, const char* 
       throw CurlException(errorBuffer);
 
    if (curl_easy_setopt(curlHandle.get(), CURLOPT_POSTFIELDS, data) != CURLE_OK)
+      throw CurlException(errorBuffer);
+
+   struct curl_slist* headerList = nullptr;
+   for (const auto& header : headers) {
+      headerList = curl_slist_append(headerList, header.c_str());
+   }
+
+   if (curl_easy_setopt(curlHandle.get(), CURLOPT_HTTPHEADER, headerList) != CURLE_OK)
       throw CurlException(errorBuffer);
 
    // replace with curl_multi_perform?

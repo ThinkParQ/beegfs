@@ -252,12 +252,7 @@ void App::runNormal()
    // credentials of the opening process match those of the calling process (not only the values
    // are compared, but the pointer is checked for equality). Thus, the first open needs to happen
    // after the fork, because we need to access the device in the child process.
-   if(cfg->getConnUseRDMA() && RDMASocket::rdmaDevicesExist() )
-   {
-      bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(localNicList);
-      if (foundRdmaInterfaces)
-         localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
-   }
+   findAllowedRDMAInterfaces(localNicList);
 
    // Find MgmtNode
    bool mgmtWaitRes = waitForMgmtNode();
@@ -423,6 +418,25 @@ void App::initDataObjects()
    this->isRootBuddyMirrored = false;
 }
 
+void App::findAllowedRDMAInterfaces(NicAddressList& outList) const
+{
+   Config* cfg = this->getConfig();
+
+   if(cfg->getConnUseRDMA() && RDMASocket::rdmaDevicesExist() )
+   {
+      bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(outList);
+      if (foundRdmaInterfaces)
+         outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
+   }
+}
+
+void App::findAllowedInterfaces(NicAddressList& outList) const
+{
+   // discover local NICs and filter them
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, outList);
+   outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
+}
+
 /**
  * Init basic networking data structures.
  *
@@ -446,13 +460,10 @@ void App::initBasicNetwork()
       StringTk::explodeEx(interfacesList, ',', true, &allowedInterfaces);
    }
 
-   // discover local NICs and filter them
-   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, localNicList);
+   findAllowedInterfaces(localNicList);
 
    if(localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
-
-   localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 
    // prepare factory for incoming messages
    this->netMessageFactory = new NetMessageFactory();
@@ -499,10 +510,11 @@ void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
 {
    unsigned portUDP = cfg->getConnMetaPortUDP();
    unsigned portTCP = cfg->getConnMetaPortTCP();
+   NicAddressList nicList = getLocalNicList();
 
    // create localNode object
    localNode = std::make_shared<LocalNode>(NODETYPE_Meta, localNodeID, localNodeNumID, portUDP,
-         portTCP, localNicList);
+         portTCP, nicList);
 
    // attach to metaNodes store
    metaNodes->setLocalNode(this->localNode);
@@ -823,8 +835,9 @@ void App::initComponents(TargetConsistencyState initialConsistencyState)
 {
    this->log->log(Log_DEBUG, "Initializing components...");
 
+   NicAddressList nicList = getLocalNicList();
    this->dgramListener = new DatagramListener(
-      netFilter, localNicList, ackStore, cfg->getConnMetaPortUDP() );
+      netFilter, nicList, ackStore, cfg->getConnMetaPortUDP());
    if(cfg->getTuneListenerPrioShift() )
       dgramListener->setPriorityShift(cfg->getTuneListenerPrioShift() );
 
@@ -832,7 +845,7 @@ void App::initComponents(TargetConsistencyState initialConsistencyState)
 
    unsigned short listenPort = cfg->getConnMetaPortTCP();
 
-   this->connAcceptor = new ConnAcceptor(this, localNicList, listenPort);
+   this->connAcceptor = new ConnAcceptor(this, nicList, listenPort);
 
    this->statsCollector = new StatsCollector(workQueue, STATSCOLLECTOR_COLLECT_INTERVAL_MS,
       STATSCOLLECTOR_HISTORY_LENGTH);
@@ -956,6 +969,24 @@ void App::handleComponentException(std::exception& e)
    stopComponents();
 }
 
+/**
+ * Called when a network device failure has been detected.
+ */
+void App::handleNetworkInterfaceFailure(const std::string& devname)
+{
+   LOG(GENERAL, ERR, "Network interface failure.",
+      ("Device", devname));
+   internodeSyncer->setForceCheckNetwork();
+}
+
+void App::updateLocalNicList(NicAddressList& localNicList)
+{
+   std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes, clientNodes});
+   updateLocalNicListInNodes(log, localNicList, allNodes);
+   localNode->updateInterfaces(0, 0, localNicList);
+   dgramListener->setLocalNicList(localNicList);
+   connAcceptor->updateLocalNicList(localNicList);
+}
 
 void App::joinComponents()
 {
@@ -1178,30 +1209,8 @@ void App::logInfos()
    log->log(Log_WARNING, "LocalNode: " + localNode->getNodeIDWithTypeStr() );
 
    // list usable network interfaces
-   NicAddressList nicList(localNode->getNicList() );
-
-   std::string nicListStr;
-   std::string extendedNicListStr;
-   for (NicAddressListIter nicIter = nicList.begin(); nicIter != nicList.end(); nicIter++)
-   {
-      std::string nicTypeStr;
-
-      if (nicIter->nicType == NICADDRTYPE_RDMA)
-         nicTypeStr = "RDMA";
-      else if (nicIter->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
-      else if (nicIter->nicType == NICADDRTYPE_STANDARD)
-         nicTypeStr = "TCP";
-      else
-         nicTypeStr = "Unknown";
-
-      nicListStr += " " + std::string(nicIter->name) + "(" + nicTypeStr + ")";
-
-      extendedNicListStr += "\n+ " + NetworkInterfaceCard::nicAddrToString(&(*nicIter) );
-   }
-
-   log->log(Log_WARNING, std::string("Usable NICs:") + nicListStr);
-   log->log(Log_DEBUG, std::string("Extended list of usable NICs:") + extendedNicListStr);
+   NicAddressList nicList = getLocalNicList();
+   logUsableNICs(log, nicList);
 
    // print net filters
    if(netFilter->getNumFilterEntries() )
@@ -1323,9 +1332,9 @@ bool App::waitForMgmtNode()
    unsigned udpListenPort = cfg->getConnMetaPortUDP();
    unsigned udpMgmtdPort = cfg->getConnMgmtdPortUDP();
    std::string mgmtdHost = cfg->getSysMgmtdHost();
+   NicAddressList nicList = getLocalNicList();
 
-   RegistrationDatagramListener regDGramLis(netFilter, localNicList, ackStore, udpListenPort);
-
+   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort);
    regDGramLis.start();
 
    log->log(Log_CRITICAL, "Waiting for beegfs-mgmtd@" +
@@ -1360,8 +1369,9 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
    }
 
    NumNodeID rootNodeID = metaRoot.getID();
+   NicAddressList nicList = getLocalNicList();
 
-   RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Meta, &localNicList,
+   RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Meta, &nicList,
       cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
    msg.setRootNumID(rootNodeID);
 
@@ -1434,9 +1444,10 @@ bool App::downloadMgmtInfo(TargetConsistencyState& outInitialConsistencyState)
    int retrySleepTimeMS = 10000; // 10sec
    unsigned udpListenPort = cfg->getConnMetaPortUDP();
    bool allSuccessful = false;
+   NicAddressList nicList = getLocalNicList();
 
    // start temporary registration datagram listener
-   RegistrationDatagramListener regDGramLis(netFilter, localNicList, ackStore, udpListenPort);
+   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort);
    regDGramLis.start();
 
    // loop until we're registered and everything is downloaded (or until we got interrupted)

@@ -12,6 +12,7 @@ class Config : public AbstractConfig
       enum DbTypes
       {
          INFLUXDB,
+         INFLUXDB2,
          CASSANDRA
       };
 
@@ -27,6 +28,7 @@ class Config : public AbstractConfig
       std::string dbHostName;
       unsigned dbHostPort;
       std::string dbDatabase;
+      std::string dbBucket;
       std::string dbAuthFile;
       unsigned influxdbMaxPointsPerRequest;
       bool influxdbSetRetentionPolicy;
@@ -42,6 +44,8 @@ class Config : public AbstractConfig
 
       std::string dbAuthUsername;
       std::string dbAuthPassword;
+      std::string dbAuthOrg;
+      std::string dbAuthToken;
 
       virtual void loadDefaults(bool addDashes) override;
       virtual void applyConfigMap(bool enableException, bool addDashes) override;
@@ -78,6 +82,11 @@ class Config : public AbstractConfig
       const std::string& getDbHostName() const
       {
          return dbHostName;
+      }
+
+      const std::string& getDbBucket() const
+      {
+         return dbBucket;
       }
 
       unsigned getDbHostPort() const
@@ -148,6 +157,16 @@ class Config : public AbstractConfig
       const std::string& getDbAuthPassword() const
       {
          return dbAuthPassword;
+      }
+
+      const std::string& getDbAuthOrg() const
+      {
+         return dbAuthOrg;
+      }
+
+      const std::string& getDbAuthToken() const
+      {
+         return dbAuthToken;
       }
 
       bool getCurlCheckSSLCertificates() const

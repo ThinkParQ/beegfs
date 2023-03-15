@@ -3,5 +3,8 @@
   "type":"influxdb",
   "url":"%DATASOURCE_URL%",
   "access":"proxy",
-  "database":"%DATABASE_NAME%"
+  "user":"%DATABASE_USER%",
+  "database":"%DATABASE_NAME%",
+  "secureJsonData":{
+  "password":"%PASSWORD%"}
 }

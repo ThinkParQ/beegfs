@@ -1,10 +1,7 @@
+#include <common/toolkit/TempFileTk.h>
 #include "MapTk.h"
 
 #include <fstream>
-
-
-#define MAPTK_SAVE_TMPEXTENSION  ".tmp" /* extension for temporary files */
-
 
 /**
  * Splits a line into param and value (divided by the '='-char) and adds it to
@@ -54,42 +51,29 @@ void MapTk::loadStringMapFromFile(const char* filename, StringMap* outMap)
  */
 void MapTk::saveStringMapToFile(const char* filename, StringMap* map)
 {
-   std::string tmpFilename = std::string(filename) + MAPTK_SAVE_TMPEXTENSION;
+   std::stringstream out;
 
-   std::string line;
-
-   std::ofstream file(tmpFilename.c_str(),
-      std::ios_base::out | std::ios_base::in | std::ios_base::trunc);
-
-   if(!file.is_open() || file.fail() )
-      throw InvalidConfigException(
-         std::string("Failed to open map file for writing: ") + tmpFilename);
-
-   for(StringMapCIter iter = map->begin(); (iter != map->end() ) && !file.fail(); iter++)
+   for(StringMapCIter iter = map->begin(); (iter != map->end() ) && !out.fail(); iter++)
    {
       if(!iter->first.empty() && (iter->first[0] != STORAGETK_FILE_COMMENT_CHAR) )
-         file << iter->first << "=" << iter->second << std::endl;
+         out << iter->first << "=" << iter->second << std::endl;
       else
-         file << iter->first << std::endl; // only "iter->first" for comment or empty lines
+         out << iter->first << std::endl; // only "iter->first" for comment or empty lines
    }
 
-   if(file.fail() )
+   if(out.fail() )
    {
-      file.close();
-
       throw InvalidConfigException(
-         std::string("Failed to save data to map file: ") + tmpFilename);
+         std::string("Failed to build data buffer for ") + filename);
    }
 
-   file.close();
+   size_t outLen = out.str().length();
 
-   // rename tmp file to actual name
-
-   int renameRes = rename(tmpFilename.c_str(), filename);
-   if(renameRes == -1)
-      throw InvalidConfigException("Failed to rename tmp map file: " +
-         tmpFilename + " -> " + std::string(filename) + "; "
-         "SysErr: " + System::getErrString() );
+   if(TempFileTk::storeTmpAndMove(filename, out.str().c_str(), outLen) != FhgfsOpsErr_SUCCESS)
+   {
+      throw InvalidConfigException(
+         std::string("Unable to write data to file ") + filename);
+   }
 }
 
 void MapTk::copyUInt64VectorMap(std::map<uint64_t, UInt64Vector*> &inMap,

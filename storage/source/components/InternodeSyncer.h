@@ -45,13 +45,17 @@ class InternodeSyncer : public PThread
       Mutex forceTargetStatesUpdateMutex;
       Mutex forcePublishCapacitiesMutex;
       Mutex forceStoragePoolsUpdateMutex;
+      Mutex forceCheckNetworkMutex;
       bool forceTargetStatesUpdate; // true to force update of target states
       bool forcePublishCapacities; // true to force publishing target capacities
       bool forceStoragePoolsUpdate; // true to force update of storage pools
+      bool forceCheckNetwork; // true to force update of network interfaces
 
       virtual void run();
       void syncLoop();
 
+      // returns true if the local interfaces have changed
+      bool checkNetwork();
       void dropIdleConns();
       unsigned dropIdleConnsByStore(NodeStoreServers* nodes);
 
@@ -87,6 +91,12 @@ class InternodeSyncer : public PThread
          forceStoragePoolsUpdate = true;
       }
 
+      void setForceCheckNetwork()
+      {
+         std::lock_guard<Mutex> lock(forceCheckNetworkMutex);
+         forceCheckNetwork = true;
+      }
+
    private:
       // inliners
       bool getAndResetForceTargetStatesUpdate()
@@ -117,6 +127,16 @@ class InternodeSyncer : public PThread
 
          bool retVal = forceStoragePoolsUpdate;
          forceStoragePoolsUpdate = false;
+
+         return retVal;
+      }
+
+      bool getAndResetForceCheckNetwork()
+      {
+         std::lock_guard<Mutex> lock(forceCheckNetworkMutex);
+
+         bool retVal = forceCheckNetwork;
+         forceCheckNetwork = false;
 
          return retVal;
       }

@@ -5,6 +5,13 @@
 #include <common/nodes/Node.h>
 #include <common/toolkit/ObjectReferencer.h>
 
+enum class NodeStoreResult
+{
+   Unchanged,
+   Added,
+   Updated,
+   Error
+};
 
 class AbstractNodeStore
 {
@@ -12,8 +19,9 @@ class AbstractNodeStore
       typedef std::map<NumNodeID, std::shared_ptr<Node>> NodeMap;
 
    public:
-      virtual bool addOrUpdateNode(NodeHandle node) = 0;
-      virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) = 0;
+
+      virtual NodeStoreResult addOrUpdateNode(NodeHandle node) = 0;
+      virtual NodeStoreResult addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) = 0;
 
       virtual NodeHandle referenceFirstNode() const = 0;
 

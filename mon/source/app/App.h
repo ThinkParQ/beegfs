@@ -38,6 +38,8 @@ class App : public AbstractApp
       virtual void run() override;
       virtual void stopComponents() override;
       virtual void handleComponentException(std::exception& e) override;
+      virtual void handleNetworkInterfaceFailure(const std::string& devname) override;
+
 
    private:
       int appResult;
@@ -51,7 +53,6 @@ class App : public AbstractApp
       std::unique_ptr<NetFilter> netFilter;
       std::unique_ptr<NetFilter> tcpOnlyFilter;
       std::unique_ptr<NetMessageFactory> netMessageFactory;
-      NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       NicListCapabilities localNicCaps;
       std::shared_ptr<Node> localNode;
       std::unique_ptr<TSDatabase> tsdb;

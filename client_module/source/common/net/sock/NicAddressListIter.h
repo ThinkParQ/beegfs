@@ -1,7 +1,6 @@
 #ifndef NICADDRESSLISTITER_H_
 #define NICADDRESSLISTITER_H_
 
-#include <common/toolkit/list/PointerListIter.h>
 #include <common/Common.h>
 #include "NicAddressList.h"
 

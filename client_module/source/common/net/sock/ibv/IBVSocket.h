@@ -1,7 +1,6 @@
 #ifndef OPENTK_IBVSOCKET_H_
 #define OPENTK_IBVSOCKET_H_
 
-#include <common/net/sock/ibv/IBVBuffer.h>
 #include <common/Common.h>
 
 #include <linux/in.h>
@@ -87,7 +86,7 @@ struct IBVCommConfig
 };
 
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
 
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>

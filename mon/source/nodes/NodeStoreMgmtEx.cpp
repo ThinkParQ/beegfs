@@ -4,14 +4,14 @@ NodeStoreMgmtEx::NodeStoreMgmtEx() :
       NodeStoreServers(NODETYPE_Mgmt, false)
 {}
 
-bool NodeStoreMgmtEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* outNodeNumID)
+NodeStoreResult NodeStoreMgmtEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* outNodeNumID)
 {
    std::string nodeID(node->getID());
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
    if (!node->getNumID())
-      return false;
+      return NodeStoreResult::Error;
 
    const std::lock_guard<Mutex> lock(mutex);
 

@@ -24,13 +24,13 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    NicListCapabilities localNicCaps;
 
    NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-   node->getConnPool()->setLocalNicCaps(&localNicCaps);
+   node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
 
    std::string nodeIDWithTypeStr = node->getNodeIDWithTypeStr();
 
+   log.log(Log_DEBUG, std::string("Heartbeat node: ") + nodeIDWithTypeStr);
 
    // add/update node in store
-
    AbstractNodeStore* nodes = app->getAbstractNodeStoreFromType(getNodeType() );
    if(!nodes)
    {
@@ -40,7 +40,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
       goto ack_resp;
    }
 
-   isNodeNew = nodes->addOrUpdateNode(std::move(node));
+   isNodeNew = (nodes->addOrUpdateNode(std::move(node)) == NodeStoreResult::Added);
    if( (isNodeNew) && (getNodeType() != NODETYPE_Client) )
    { // log info about new server
       bool supportsSDP = NetworkInterfaceCard::supportsSDP(&nicList);

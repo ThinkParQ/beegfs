@@ -3,8 +3,12 @@
 #include <sys/epoll.h>
 
 #include <common/app/log/Logger.h>
+#include <common/app/AbstractApp.h>
+#include <common/threading/PThread.h>
 
 #define IBVSOCKET_CONN_TIMEOUT_MS                  3000
+// IBVSOCKET_CONN_TIMEOUT_POLL_MS must be < 1000
+#define IBVSOCKET_CONN_TIMEOUT_POLL_MS              500
 #define IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS  180000
 #define IBVSOCKET_POLL_TIMEOUT_MS                  7500
 #define IBVSOCKET_LISTEN_BACKLOG                    128
@@ -189,6 +193,10 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    struct rdma_conn_param conn_param;
    bool parseCommDestRes;
    bool epollInitRes;
+   int rc;
+   int connTimeoutRemaining = IBVSOCKET_CONN_TIMEOUT_MS;
+   int oldChannelFlags;
+   int setOldFlagsRes;
 
 
    // resolve IP address...
@@ -275,7 +283,67 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       goto err_invalidateSock;
    }
 
-   if(rdma_get_cm_event(_this->cm_channel, &event))
+   oldChannelFlags = fcntl(IBVSocket_getConnManagerFD(_this), F_GETFL);
+
+   rc = fcntl(IBVSocket_getConnManagerFD(_this), F_SETFL, oldChannelFlags | O_NONBLOCK);
+   if(rc < 0)
+   {
+      LOG(SOCKLIB, WARNING, "Set conn manager channel non-blocking failed.", sysErr);
+      goto err_invalidateSock;
+   }
+
+   // rdma_connect() can take a very long time (>5m) to timeout if the peer's HCA is down.
+   // Change the channel to non-blocking and use a custom timeout mechanism.
+   rc = -1;
+   while (connTimeoutRemaining > 0)
+   {
+      // (non-blocking) check for new events
+      rc = rdma_get_cm_event(_this->cm_channel, &event);
+
+      if (rc)
+      {
+         if (errno != ETIMEDOUT && errno != EAGAIN)
+         {
+            LOG(SOCKLIB, WARNING, "rdma_get_cm_event failed", ("errno", errno));
+            break;
+         }
+      }
+      else
+      {
+         // we got an event
+         break;
+      }
+
+      connTimeoutRemaining -= IBVSOCKET_CONN_TIMEOUT_POLL_MS;
+      if (connTimeoutRemaining > 0)
+      {
+         struct timespec ts = {
+            .tv_sec = 0,
+            .tv_nsec = (IBVSOCKET_CONN_TIMEOUT_POLL_MS * 1000 * 1000)
+         };
+
+         if (::nanosleep(&ts, NULL) != 0)
+         {
+            LOG(SOCKLIB, DEBUG, "rdma_connect: sleep interrupted");
+            break;
+         }
+      }
+      else
+         LOG(SOCKLIB, DEBUG, "rdma_connect: timed out");
+   }
+
+   // change channel mode back to blocking
+   setOldFlagsRes = fcntl(IBVSocket_getConnManagerFD(_this), F_SETFL, oldChannelFlags);
+   if(setOldFlagsRes < 0)
+   {
+      LOG(SOCKLIB, WARNING, "Set conn manager channel blocking failed.", sysErr);
+      if (rc == 0)
+         goto err_ack_and_invalidateSock;
+      else
+         goto err_invalidateSock;
+   }
+
+   if (rc != 0)
       goto err_invalidateSock;
 
    if(event->event != RDMA_CM_EVENT_ESTABLISHED)
@@ -502,6 +570,8 @@ IBVSocket_AcceptRes IBVSocket_accept(IBVSocket* _this, IBVSocket** outAcceptedSo
             goto ignore;
 
 
+         // Note that this code returns ACCEPTRES_IGNORE
+         LOG(SOCKLIB, DEBUG, "Connection request on RDMASocket");
          child_cm_id->context = acceptedSock;
          acceptedSock = NULL; // would otherwise be destroyed at 'ignore'
 
@@ -569,28 +639,36 @@ IBVSocket_AcceptRes IBVSocket_accept(IBVSocket* _this, IBVSocket** outAcceptedSo
 
       case RDMA_CM_EVENT_UNREACHABLE:
       {
-         LOG(SOCKLIB, WARNING, "Connect error event while waiting for 'established'.");
-      }
-      // FALLTHROUGH
+         LOG(SOCKLIB, WARNING, "Remote unreachable event while waiting for 'established'.");
+         acceptedSock = (IBVSocket*)event->id->context; // will be destroyed at 'ignore'
+      } break;
+
       case RDMA_CM_EVENT_CONNECT_ERROR:
       {
+         LOG(SOCKLIB, WARNING, "Connect error event while waiting for 'established'.");
          acceptedSock = (IBVSocket*)event->id->context; // will be destroyed at 'ignore'
+      } break;
 
+      case RDMA_CM_EVENT_TIMEWAIT_EXIT:
+      { // log only with enabled debug code
+         LOG(SOCKLIB, DEBUG, "Ignoring conn manager event RDMA_CM_EVENT_TIMEWAIT_EXIT.");
+      } break;
+
+      case RDMA_CM_EVENT_DEVICE_REMOVAL:
+      {
+         AbstractApp* app = PThread::getCurrentThreadApp();
+         const char* devname = "unknown";
+         if (event->id && event->id->verbs)
+            devname = ibv_get_device_name(event->id->verbs->device);
+         LOG(SOCKLIB, ERR, "Device removed", ("device", devname));
+         app->handleNetworkInterfaceFailure(std::string(devname));
       } break;
 
       default:
       { // ignore other events
-
-         if (event->event == RDMA_CM_EVENT_TIMEWAIT_EXIT)
-         { // log only with enabled debug code
-            LOG(SOCKLIB, DEBUG, "Ignoring conn manager event RDMA_CM_EVENT_TIMEWAIT_EXIT.");
-         }
-         else
-         { // always log
-            LOG(SOCKLIB, WARNING, "Ignoring conn manager event.",
-               ("event", rdma_event_str(event->event)));
-         }
-
+         // always log
+         LOG(SOCKLIB, WARNING, "Ignoring conn manager event.",
+            ("event", rdma_event_str(event->event)));
       } break;
    }
 
@@ -872,7 +950,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    if (unlikely(commCfg->bufSize < IBVSOCKET_MIN_BUF_SIZE) ) // sanity check
    {
       LOG(SOCKLIB, WARNING, "bufSize too small!",
-         ("got", commCfg->bufNum), ("minimum", IBVSOCKET_MIN_BUF_SIZE));
+         ("got", commCfg->bufSize), ("minimum", IBVSOCKET_MIN_BUF_SIZE));
       goto err_cleanup;
    }
 
@@ -1612,6 +1690,7 @@ int __IBVSocket_waitForRecvCompletionEvent(IBVSocket* _this, int timeoutMS, stru
             return -1;
          }
 
+         // Note: this code doesn't encounter RDMA_CM_EVENT_DEVICE_REMOVAL
          if(event->event == RDMA_CM_EVENT_DISCONNECTED)
          {
             LOG(SOCKLIB, DEBUG, "Disconnect event received.");

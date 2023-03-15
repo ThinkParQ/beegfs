@@ -1,13 +1,13 @@
 #ifndef IBVBuffer_h_aMQFNfzrjbEHDOcv216fi
 #define IBVBuffer_h_aMQFNfzrjbEHDOcv216fi
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#include <common/Common.h>
+#ifdef BEEGFS_RDMA
 
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
 #include <rdma/ib_cm.h>
 
-#include <common/Common.h>
 #include <os/iov_iter.h>
 
 #ifndef BEEGFS_IBVERBS_FRAGMENT_PAGES

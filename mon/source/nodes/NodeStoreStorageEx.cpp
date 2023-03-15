@@ -7,12 +7,12 @@ NodeStoreStorageEx::NodeStoreStorageEx() :
    NodeStoreServers(NODETYPE_Storage, false)
 {}
 
-bool NodeStoreStorageEx::addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
+NodeStoreResult NodeStoreStorageEx::addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
       NumNodeID* outNodeNumID)
 {
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)
    if (!receivedNode->getNumID())
-      return false;
+      return NodeStoreResult::Error;
 
    std::shared_ptr<StorageNodeEx> newNode;
    auto storedNode =

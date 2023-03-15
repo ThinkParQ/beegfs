@@ -230,6 +230,7 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    size_t pathBufsSize;
    size_t numMsgBufs;
    size_t msgBufsSize;
+   char* interfacesList;
 
 
    AtomicInt_init(&this->lockAckAtomicCounter, 0);
@@ -273,21 +274,28 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
 
    this->helperd = ExternalHelperd_construct(this, this->cfg);
 
-   // load allowed interface file
-   interfacesFilename = Config_getConnInterfacesFile(this->cfg);
-   if(strlen(interfacesFilename) &&
-      !Config_loadStringListFile(interfacesFilename, &this->allowedInterfaces) )
+   // load allowed interface list
+   interfacesList = Config_getConnInterfacesList(this->cfg);
+   if (StringTk_hasLength(interfacesList) )
+      StringTk_explode(interfacesList, ',', &this->allowedInterfaces);
+   else
    {
-      // if loading of file failed, we need to set LogType Syslog as fallback here, because
-      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
-      // but that's initialized later.
-      // Of course, using printk could be another option here, but the code calling this function
-      // proceeds with some more log messages, that should be logged to log file if possible, but
-      // need to be redirected to syslog in this case here as well
-      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
-      Logger_logErrFormatted(this->logger, logContext,
-         "Unable to load configured interfaces file: %s", interfacesFilename);
-      return false;
+      // load allowed interface file
+      interfacesFilename = Config_getConnInterfacesFile(this->cfg);
+      if(strlen(interfacesFilename) &&
+         !Config_loadStringListFile(interfacesFilename, &this->allowedInterfaces) )
+      {
+         // if loading of file failed, we need to set LogType Syslog as fallback here, because
+         // helperd can't be used for error logging. helperd would need a valid NicList to connect,
+         // but that's initialized later.
+         // Of course, using printk could be another option here, but the code calling this function
+         // proceeds with some more log messages, that should be logged to log file if possible, but
+         // need to be redirected to syslog in this case here as well
+         Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
+         Logger_logErrFormatted(this->logger, logContext,
+            "Unable to load configured interfaces file: %s", interfacesFilename);
+         return false;
+      }
    }
 
    // load preferred nodes files

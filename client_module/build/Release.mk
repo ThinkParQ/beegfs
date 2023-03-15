@@ -7,6 +7,7 @@ TARGET ?= beegfs
 
 export TARGET
 export OFED_INCLUDE_PATH
+export BEEGFS_NO_RDMA
 
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
@@ -16,6 +17,10 @@ endif
 
 ifeq ($(KRELEASE),)
 KRELEASE := $(shell uname -r)
+endif
+
+ifdef BEEGFS_NO_RDMA
+BEEGFS_CFLAGS += -DBEEGFS_NO_RDMA
 endif
 
 ifneq ($(OFED_INCLUDE_PATH),)

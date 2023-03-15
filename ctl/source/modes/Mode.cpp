@@ -64,7 +64,7 @@ void Mode::initializeCommonObjects()
             &rootIsBuddyMirrored))
          throw ComponentInitException("Metadata nodes download failed");
 
-      NodesTk::applyLocalNicCapsToList(app->getLocalNode(), metaNodesList);
+      NodesTk::applyLocalNicListToList(app->getLocalNode(), metaNodesList);
       NodesTk::moveNodesFromListToStore(metaNodesList, metaNodes);
       app->getMetaRoot().setIfDefault(rootNodeID, rootIsBuddyMirrored);
    }
@@ -75,7 +75,7 @@ void Mode::initializeCommonObjects()
       if(!NodesTk::downloadNodes(*mgmtNode, NODETYPE_Storage, storageNodesList, false, NULL))
          throw ComponentInitException("Storage nodes download failed");
 
-      NodesTk::applyLocalNicCapsToList(app->getLocalNode(), storageNodesList);
+      NodesTk::applyLocalNicListToList(app->getLocalNode(), storageNodesList);
       NodesTk::moveNodesFromListToStore(storageNodesList, storageNodes);
    }
 
@@ -85,7 +85,7 @@ void Mode::initializeCommonObjects()
       if(!NodesTk::downloadNodes(*mgmtNode, NODETYPE_Client, clientNodesList, false, NULL))
          throw ComponentInitException("Clients download failed");
 
-      NodesTk::applyLocalNicCapsToList(app->getLocalNode(), clientNodesList);
+      NodesTk::applyLocalNicListToList(app->getLocalNode(), clientNodesList);
       NodesTk::moveNodesFromListToStore(clientNodesList, clientNodes);
    }
 

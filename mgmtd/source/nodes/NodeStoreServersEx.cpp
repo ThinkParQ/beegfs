@@ -1,10 +1,9 @@
 #include <common/toolkit/serialization/Serialization.h>
+#include <common/toolkit/TempFileTk.h>
 #include <program/Program.h>
 #include "NodeStoreServersEx.h"
 
 #include <mutex>
-
-#define NODESTOREEX_TMPFILE_EXT  ".tmp" /* temporary extension for saved files until we rename */
 
  /*
   * maximum ID for server nodes, 0 is reserved.
@@ -96,76 +95,28 @@ bool NodeStoreServersEx::saveToFile(const RootInfo* root)
 
    LogContext log("NodeStoreServersEx (save)");
 
-   bool retVal = false;
-
    boost::scoped_array<char> buf;
    ssize_t bufLen;
-   ssize_t writeRes;
-   int renameRes;
 
    if(!this->storePath.length() )
       return false;
 
-   std::string storePathTmp(storePath + NODESTOREEX_TMPFILE_EXT);
-
    const std::lock_guard<Mutex> lock(storeMutex);
 
-   // create/trunc file
-   int openFlags = O_CREAT|O_TRUNC|O_WRONLY;
-
-   int fd = open(storePathTmp.c_str(), openFlags, 0666);
-   if(fd == -1)
-   { // error
-      log.logErr("Unable to create nodes file: " + storePathTmp + ". " +
-         "SysErr: " + System::getErrString() );
-
-      return false;
-   }
-
-   // file created => store data
    bufLen = saveToBuf(buf, root);
    if (!buf)
    {
-      log.logErr("Unable to store nodes file: " + storePathTmp + ".");
-      goto err_closefile;
+      log.logErr("Unable to create buffer to store " + storePath + ".");
+      return false;
    }
 
-   writeRes = write(fd, buf.get(), bufLen);
-
-   if(writeRes != bufLen)
+   if (TempFileTk::storeTmpAndMove(storePath, buf.get(), bufLen) == FhgfsOpsErr_SUCCESS)
    {
-      log.logErr("Unable to store nodes file: " + storePathTmp + ". " +
-         "SysErr: " + System::getErrString() );
-
-      goto err_closefile;
+      LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Nodes file stored: " + storePath);
+      return true;
    }
-
-   close(fd);
-
-   renameRes = rename(storePathTmp.c_str(), storePath.c_str() );
-   if(renameRes == -1)
-   {
-      log.logErr("Unable to rename nodes file: " + storePathTmp + ". " +
-         "SysErr: " + System::getErrString() );
-
-      goto err_unlink;
-   }
-
-   retVal = true;
-
-   LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Nodes file stored: " + storePath);
-
-   return retVal;
-
-
-   // error compensation
-err_closefile:
-   close(fd);
-
-err_unlink:
-   unlink(storePathTmp.c_str() );
-
-   return retVal;
+   else
+      return false;
 }
 
 /**
@@ -272,14 +223,14 @@ bool NodeStoreServersEx::loadFromBuf(const char* buf, unsigned bufLen, RootInfo*
       NicListCapabilities localNicCaps;
 
       NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-      node->getConnPool()->setLocalNicCaps(&localNicCaps);
+      node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
 
       // actually add the node to the store...
 
       /* note: using NodeStoreServersEx::addOrUpdate() here would deadlock (because it would try to
          acquire the storeMutex), so we explicitly call the parent class method. */
 
-      bool nodeAdded = NodeStoreServers::addOrUpdateNodeEx(std::move(node), NULL);
+      bool nodeAdded = (NodeStoreServers::addOrUpdateNodeEx(std::move(node), NULL) == NodeStoreResult::Added);
 
       LOG_DEBUG_CONTEXT(log, Log_DEBUG, "Added new node from buffer: " + nodeID);
       IGNORE_UNUSED_VARIABLE(nodeAdded);

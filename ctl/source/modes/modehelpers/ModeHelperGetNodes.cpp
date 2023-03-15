@@ -183,7 +183,7 @@ void ModeHelperGetNodes::connTest(NodeType nodeType, const std::vector<NodeHandl
       NicListCapabilities tmpRdmaNicCaps = localNicCaps;
       tmpRdmaNicCaps.supportsSDP = false;
 
-      connPool->setLocalNicCaps(&tmpRdmaNicCaps);
+      connPool->setLocalNicList(localNicList, tmpRdmaNicCaps);
 
       for(i=0; i < numConns; i++)
       {
@@ -234,7 +234,7 @@ void ModeHelperGetNodes::connTest(NodeType nodeType, const std::vector<NodeHandl
    tmpTcpNicCaps.supportsRDMA = false;
    tmpTcpNicCaps.supportsSDP = false;
 
-   connPool->setLocalNicCaps(&tmpTcpNicCaps);
+   connPool->setLocalNicList(localNicList, tmpTcpNicCaps);
 
    memset(socks, 0, numConns * sizeof(Socket*) );
 
@@ -279,7 +279,7 @@ void ModeHelperGetNodes::connTest(NodeType nodeType, const std::vector<NodeHandl
    // cleanup
    free(socks);
    connPool->setMaxConns(app->getConfig()->getConnMaxInternodeNum() );
-   connPool->setLocalNicCaps(&origNicCaps);
+   connPool->setLocalNicList(localNicList, origNicCaps);
 
    std::cout << std::endl;
 }

@@ -92,11 +92,11 @@ Time Node::getLastHeartbeatTUnlocked()
  * @param portTCP value 0 if undefined
  * @param nicList will be copied
  */
-void Node::updateInterfaces(unsigned short portUDP, unsigned short portTCP, NicAddressList& nicList)
+bool Node::updateInterfaces(unsigned short portUDP, unsigned short portTCP, NicAddressList& nicList)
 {
    const std::lock_guard<Mutex> lock(mutex);
 
-   updateInterfacesUnlocked(portUDP, portTCP, nicList);
+   return updateInterfacesUnlocked(portUDP, portTCP, nicList);
 }
 
 /**
@@ -104,12 +104,12 @@ void Node::updateInterfaces(unsigned short portUDP, unsigned short portTCP, NicA
  * @param portTCP value 0 if undefined
  * @param nicList will be copied
  */
-void Node::updateInterfacesUnlocked(unsigned short portUDP, unsigned short portTCP,
+bool Node::updateInterfacesUnlocked(unsigned short portUDP, unsigned short portTCP,
    NicAddressList& nicList)
 {
    this->portUDP = portUDP ? portUDP : this->portUDP;
 
-   this->connPool->updateInterfaces(portTCP, nicList);
+   return this->connPool->updateInterfaces(portTCP, nicList);
 }
 
 /**

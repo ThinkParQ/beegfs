@@ -9,3 +9,5 @@
 ifneq ($(OFED_INCLUDE_PATH),)
 export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
 endif
+# To disable RDMA support, define BEEGFS_NO_RDMA
+#BEEGFS_NO_RDMA=1

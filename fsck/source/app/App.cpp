@@ -20,7 +20,6 @@ App::App(int argc, char** argv)
    this->netFilter = NULL;
    this->tcpOnlyFilter = NULL;
    this->log = NULL;
-   this->allowedInterfaces = NULL;
    this->mgmtNodes = NULL;
    this->metaNodes = NULL;
    this->storageNodes = NULL;
@@ -46,7 +45,6 @@ App::~App()
    workersDelete();
 
    SAFE_DELETE(this->dgramListener);
-   SAFE_DELETE(this->allowedInterfaces);
    SAFE_DELETE(this->netMessageFactory);
    SAFE_DELETE(this->ackStore);
    SAFE_DELETE(this->workQueue);
@@ -215,10 +213,9 @@ void App::initDataObjects(int argc, char** argv)
 
    this->log = new LogContext("App");
 
-   this->allowedInterfaces = new StringList();
    std::string interfacesFilename = this->cfg->getConnInterfacesFile();
    if ( interfacesFilename.length() )
-      Config::loadStringListFile(interfacesFilename.c_str(), *this->allowedInterfaces);
+      Config::loadStringListFile(interfacesFilename.c_str(), this->allowedInterfaces);
 
    RDMASocket::rdmaForkInitOnce();
 
@@ -241,16 +238,33 @@ void App::initDataObjects(int argc, char** argv)
    this->netMessageFactory = new NetMessageFactory();
 }
 
+void App::findAllowedRDMAInterfaces(NicAddressList& outList) const
+{
+   Config* cfg = this->getConfig();
+
+   if(cfg->getConnUseRDMA() && RDMASocket::rdmaDevicesExist() )
+   {
+      bool foundRdmaInterfaces = NetworkInterfaceCard::checkAndAddRdmaCapability(outList);
+      if (foundRdmaInterfaces)
+         outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces}); // re-sort the niclist
+   }
+}
+
+void App::findAllowedInterfaces(NicAddressList& outList) const
+{
+   // discover local NICs and filter them
+   NetworkInterfaceCard::findAllInterfaces(allowedInterfaces, outList);
+   outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
+}
+
 void App::initLocalNodeInfo()
 {
-   bool useRDMA = this->cfg->getConnUseRDMA();
 
-   NetworkInterfaceCard::findAll(this->allowedInterfaces, useRDMA, &(this->localNicList));
+   findAllowedInterfaces(localNicList);
+   findAllowedRDMAInterfaces(localNicList);
 
    if ( this->localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
-
-   this->localNicList.sort(NetworkInterfaceCard::NicAddrComp{allowedInterfaces});
 
    std::string nodeID = System::getHostname();
 
@@ -266,6 +280,7 @@ void App::initComponents()
    unsigned short udpListenPort = 0;
 
    this->dgramListener = new DatagramListener(netFilter, localNicList, ackStore, udpListenPort);
+
    // update the local node info with udp port
    this->localNode->updateInterfaces(dgramListener->getUDPPort(), 0, this->localNicList);
 
@@ -399,32 +414,7 @@ void App::logInfos()
 
    // list usable network interfaces
    NicAddressList nicList(localNode->getNicList());
-
-   std::string nicListStr;
-   std::string extendedNicListStr;
-   for ( NicAddressListIter nicIter = nicList.begin(); nicIter != nicList.end(); nicIter++ )
-   {
-      std::string nicTypeStr;
-
-      if ( nicIter->nicType == NICADDRTYPE_RDMA )
-         nicTypeStr = "RDMA";
-      else
-      if ( nicIter->nicType == NICADDRTYPE_SDP )
-         nicTypeStr = "SDP";
-      else
-      if ( nicIter->nicType == NICADDRTYPE_STANDARD )
-         nicTypeStr = "TCP";
-      else
-         nicTypeStr = "Unknown";
-
-      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
-
-      extendedNicListStr += "\n+ ";
-      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&(*nicIter)) + " ";
-   }
-
-   this->log->log(3, std::string("Usable NICs: ") + nicListStr);
-   this->log->log(4, std::string("Extended List of usable NICs: ") + extendedNicListStr);
+   logUsableNICs(log, nicList);
 
    // print net filters
    if ( netFilter->getNumFilterEntries() )
@@ -475,6 +465,14 @@ bool App::waitForMgmtNode()
    return gotMgmtd;
 }
 
+void App::updateLocalNicList(NicAddressList& localNicList)
+{
+   std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes});
+   updateLocalNicListInNodes(log, localNicList, allNodes);
+   localNode->updateInterfaces(0, 0, localNicList);
+   dgramListener->setLocalNicList(localNicList);
+}
+
 /*
  * Handles expections that lead to the termination of a component.
  * Initiates an application shutdown.
@@ -496,6 +494,13 @@ void App::handleComponentException(std::exception& e)
 
    shallAbort.set(1);
    stopComponents();
+}
+
+void App::handleNetworkInterfaceFailure(const std::string& devname)
+{
+   LOG(GENERAL, ERR, "Network interface failure.",
+      ("Device", devname));
+   internodeSyncer->setForceCheckNetwork();
 }
 
 void App::registerSignalHandler()

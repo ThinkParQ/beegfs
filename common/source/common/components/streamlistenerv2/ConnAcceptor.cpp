@@ -14,9 +14,11 @@ ConnAcceptor::ConnAcceptor(AbstractApp* app, NicAddressList& localNicList,
    unsigned short listenPort)
     : PThread("ConnAccept"),
       app(app),
-      log("ConnAccept")
+      log("ConnAccept"),
+      listenPort(listenPort),
+      localNicCapsUpdated(false)
 {
-   NicListCapabilities localNicCaps;
+
    NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
 
    int epollCreateSize = 10; // size "10" is just a hint (and is actually ignored since Linux 2.6.8)
@@ -28,7 +30,7 @@ ConnAcceptor::ConnAcceptor(AbstractApp* app, NicAddressList& localNicList,
          System::getErrString() );
    }
 
-   if(!initSocks(listenPort, &localNicCaps) )
+   if(!initSocks() )
       throw ComponentInitException("Unable to initialize socket");
 }
 
@@ -42,17 +44,9 @@ ConnAcceptor::~ConnAcceptor()
    SAFE_DELETE(rdmaListenSock);
 }
 
-bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* localNicCaps)
+bool ConnAcceptor::startRDMASocket(NicListCapabilities* localNicCaps)
 {
    auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
-
-   rdmaListenSock = NULL;
-   sdpListenSock = NULL;
-   tcpListenSock = NULL;
-
-
-   // RDMA
-
    if(localNicCaps->supportsRDMA)
    { // RDMA usage is enabled
       try
@@ -79,12 +73,15 @@ bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* loc
       catch(SocketException& e)
       {
          log.logErr(std::string("RDMA socket: ") + e.what() );
+         SAFE_DELETE(rdmaListenSock);
          return false;
       }
    }
+   return true;
+}
 
-   // SDP
-
+bool ConnAcceptor::startSDPSocket(NicListCapabilities* localNicCaps)
+{
    if(localNicCaps->supportsSDP)
    { // SDP usage is enabled
       try
@@ -110,12 +107,30 @@ bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* loc
       catch(SocketException& e)
       {
          log.logErr(std::string("SDP socket: ") + e.what() );
+         SAFE_DELETE(sdpListenSock);
          return false;
       }
    }
+   return true;
+}
+
+bool ConnAcceptor::initSocks()
+{
+   auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
+
+   rdmaListenSock = NULL;
+   sdpListenSock = NULL;
+   tcpListenSock = NULL;
+
+   // RDMA
+   if (!startRDMASocket(&localNicCaps))
+      return false;
+
+   // SDP
+   if (!startSDPSocket(&localNicCaps))
+      return false;
 
    // TCP
-
    try
    {
       tcpListenSock = new StandardSocket(PF_INET, SOCK_STREAM);
@@ -142,13 +157,22 @@ bool ConnAcceptor::initSocks(unsigned short listenPort, NicListCapabilities* loc
    catch(SocketException& e)
    {
       log.logErr(std::string("TCP socket: ") + e.what() );
+      SAFE_DELETE(tcpListenSock);
       return false;
    }
-
 
    return true;
 }
 
+void ConnAcceptor::updateLocalNicList(NicAddressList& localNicList)
+{
+   // we don't store the localNicList, just use it to update localNicCaps
+   NicListCapabilities localNicCaps;
+   NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
+   const std::lock_guard<Mutex> lock(localNicCapsMutex);
+   this->localNicCaps = localNicCaps;
+   localNicCapsUpdated = true;
+}
 
 void ConnAcceptor::run()
 {
@@ -166,6 +190,59 @@ void ConnAcceptor::run()
    }
 }
 
+void ConnAcceptor::handleNewLocalNicCaps()
+{
+   NicListCapabilities localNicCaps;
+   bool localNicCapsUpdated;
+   {
+      const std::lock_guard<Mutex> lock(localNicCapsMutex);
+      localNicCapsUpdated = this->localNicCapsUpdated;
+      if (localNicCapsUpdated)
+      {
+         localNicCaps = this->localNicCaps;
+         this->localNicCapsUpdated = false;
+      }
+   }
+
+   if (localNicCapsUpdated)
+   {
+      if (localNicCaps.supportsRDMA)
+      {
+         if (!rdmaListenSock)
+            startRDMASocket(&localNicCaps);
+      }
+      else if (rdmaListenSock)
+      {
+         log.log(Log_NOTICE, std::string("Shutdown RDMA listen sock..."));
+
+         if(epoll_ctl(epollFD, EPOLL_CTL_DEL, rdmaListenSock->getFD(), NULL) == -1)
+            log.logErr(std::string("Unable to remove RDMA listen sock from epoll set: ") +
+               System::getErrString() );
+         SAFE_DELETE(rdmaListenSock);
+
+         log.log(Log_NOTICE, std::string("Shutdown RDMA listen sock complete"));
+      }
+
+      if (localNicCaps.supportsSDP)
+      {
+         if (!sdpListenSock)
+            startSDPSocket(&localNicCaps);
+      }
+      else if (sdpListenSock)
+      {
+         log.log(Log_NOTICE, std::string("Shutdown SDP listen sock..."));
+
+         if(epoll_ctl(epollFD, EPOLL_CTL_DEL, sdpListenSock->getFD(), NULL) == -1)
+            log.logErr(std::string("Unable to remove SDP listen sock from epoll set: ") +
+               System::getErrString() );
+         SAFE_DELETE(sdpListenSock);
+
+         log.log(Log_NOTICE, std::string("Shutdown SDP listen sock complete"));
+      }
+
+   }
+}
+
 void ConnAcceptor::listenLoop()
 {
    const int epollTimeoutMS = 3000;
@@ -174,14 +251,20 @@ void ConnAcceptor::listenLoop()
 
    // (just to have these values on the stack...)
    const int epollFD = this->epollFD;
-   RDMASocket* rdmaListenSock = this->rdmaListenSock;
-   StandardSocket* sdpListenSock = this->sdpListenSock;
-   StandardSocket* tcpListenSock = this->tcpListenSock;
+   RDMASocket* rdmaListenSock;
+   StandardSocket* sdpListenSock;
+   StandardSocket* tcpListenSock;
 
    // wait for incoming events and handle them...
 
    while(!getSelfTerminate() )
    {
+
+      handleNewLocalNicCaps();
+      rdmaListenSock = this->rdmaListenSock;
+      sdpListenSock = this->sdpListenSock;
+      tcpListenSock = this->tcpListenSock;
+
       //log.log(Log_DEBUG, std::string("Before poll(). pollArrayLen: ") +
       //   StringTk::uintToStr(pollArrayLen) );
 

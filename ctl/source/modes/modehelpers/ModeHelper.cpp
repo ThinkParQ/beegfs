@@ -431,6 +431,24 @@ bool ModeHelper::getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
       }
 
       outOwnerHandle = metaNodes.referenceNode(getNodeID(outEntryInfo));
+      if (!outOwnerHandle)
+      {
+         // This is usually an indication that the ctl was called with a
+         // configuration file that doesn't match the filesystem it is trying to
+         // get the info for and will lead to a segmentation violation further
+         // along when this pointer is dereferenced. So we print a hint and
+         // return an error.
+         std::cerr << "The metadata node that owns the directory" << std::endl;
+         std::cerr << "  " << path.str() << std::endl;
+         std::cerr << "could not be determined." << std::endl;
+         std::cerr << std::endl;
+
+         std::cerr << "Please make sure to supply the correct client configuration file (\"--cfgFile=\")" << std::endl;
+         std::cerr << "for the mount point the directory is on or to use the \"--mount=\" option." << std::endl;
+         std::cerr << "By default, beegfs-ctl uses /etc/beegfs/beegfs-client.conf to determine which" << std::endl;
+         std::cerr << "filesystem to connect to. See \"beegfs-ctl --help\" for more information." << std::endl;
+         return false;
+      }
    }
    else
    {

@@ -85,10 +85,14 @@ void InternodeSyncer::syncLoop()
    const unsigned idleDisconnectIntervalMS = 70*60*1000; /* 70 minutes (must be less than half the
       streamlis idle disconnect interval to avoid cases where streamlis disconnects first) */
 
+   const unsigned checkNetworkIntervalMS = 60*1000; // 1 minute
+
    Time lastStatesUpdateT;
    Time lastCapacityPoolsUpdateT;
    Time lastTargetMappingsSaveT;
    Time lastIdleDisconnectT;
+   Time lastCheckNetworkT;
+   bool doUpdatePeers = false;
 
    while(!waitForSelfTerminateOrder(sleepIntervalMS))
    {
@@ -103,6 +107,19 @@ void InternodeSyncer::syncLoop()
          askForCapacities = false;
       }
 
+
+      bool checkNetworkForced = getAndResetForceCheckNetwork();
+
+      if( checkNetworkForced ||
+         (lastCheckNetworkT.elapsedMS() > checkNetworkIntervalMS))
+      {
+         if (checkNetwork())
+            doUpdatePeers = true;
+         lastCheckNetworkT.setToNow();
+      }
+
+      if (doUpdatePeers)
+         doUpdatePeers = !app->getHeartbeatMgr()->notifyNodes();
 
       bool poolsUpdateForced = getAndResetForcePoolsUpdate();
 
@@ -154,6 +171,27 @@ void InternodeSyncer::syncLoop()
          lastIdleDisconnectT.setToNow();
       }
    }
+}
+
+
+/**
+ * Inspect the available and allowed network interfaces for any changes.
+ */
+bool InternodeSyncer::checkNetwork()
+{
+   App* app = Program::getApp();
+   NicAddressList newLocalNicList;
+   bool res = false;
+
+   app->findAllowedInterfaces(newLocalNicList);
+   if (!std::equal(newLocalNicList.begin(), newLocalNicList.end(), app->getLocalNicList().begin()))
+   {
+      log.log(Log_NOTICE, "checkNetwork: local interfaces have changed");
+      app->updateLocalNicList(newLocalNicList);
+      res = true;
+   }
+
+   return res;
 }
 
 void InternodeSyncer::updateMetaCapacityPools(bool updateForced)

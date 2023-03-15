@@ -265,7 +265,9 @@ bool NetworkInterfaceCard::fillNicAddress(int sock, NicAddrType nicType, struct 
    if(ifr->ifr_flags & IFF_LOOPBACK)
       return false; // loopback interface => skip
 
-
+   // skip interfaces that are not currently usable
+   if(!(ifr->ifr_flags & IFF_RUNNING))
+      return false;
 
    // hardware type and address
    if(ioctl(sock, SIOCGIFHWADDR, ifr) )
@@ -376,8 +378,4 @@ void NetworkInterfaceCard::supportedCapabilities(NicAddressList* nicList,
    outCapabilities->supportsSDP = supportsSDP(nicList);
    outCapabilities->supportsRDMA = supportsRDMA(nicList);
 }
-
-
-
-
 

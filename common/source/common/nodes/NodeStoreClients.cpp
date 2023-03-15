@@ -19,7 +19,7 @@ NodeStoreClients::NodeStoreClients():
  * Just forwards to the other addOrUpdateNodeEx method (to provide compatibility with the
  * corresponding virtual AbstractNodeStore::addOrUpdateNode() method).
  */
-bool NodeStoreClients::addOrUpdateNode(NodeHandle node)
+NodeStoreResult NodeStoreClients::addOrUpdateNode(NodeHandle node)
 {
    return addOrUpdateNodeEx(std::move(node), NULL);
 }
@@ -30,7 +30,7 @@ bool NodeStoreClients::addOrUpdateNode(NodeHandle node)
  * it)
  * @return true if the node was not in the active group yet, false otherwise
  */
-bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID)
+NodeStoreResult NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID)
 {
    NumNodeID nodeNumID = node->getNumID();
    std::string nodeID = node->getID();
@@ -43,7 +43,7 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
    {
       auto newID = generateID(*node);
       if (!newID)
-         return false;
+         return NodeStoreResult::Error;
 
       nodeNumID = newID;
       node->setNumID(nodeNumID);
@@ -52,8 +52,8 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
    // is node in any of the stores already?
 
    const auto activeIter = activeNodes.find(nodeNumID);
-   const bool nodeWasActive = activeIter != activeNodes.end();
-   if (nodeWasActive)
+   NodeStoreResult result = NodeStoreResult::Unchanged;
+   if (activeIter != activeNodes.end())
    { // node was in the store already => update it
       Node& active = *activeIter->second;
       NicAddressList nicList(node->getNicList());
@@ -69,7 +69,8 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
       else
       {
          active.updateLastHeartbeatT();
-         active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList);
+         if (active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList))
+            result = NodeStoreResult::Updated;
       }
 
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
@@ -83,9 +84,11 @@ bool NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumI
       newNodeCond.broadcast();
 
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
+
+      result = NodeStoreResult::Added;
    }
 
-   return !nodeWasActive;
+   return result;
 }
 
 

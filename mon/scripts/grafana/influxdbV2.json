@@ -1,0 +1,12 @@
+{
+  "name":"%DATASOURCE_NAME%",
+  "type":"influxdb",
+  "url":"%DATASOURCE_URL%",
+  "access":"proxy",
+  "jsonData":{ 
+  "organization":"%ORG_NAME%",
+  "defaultBucket":"%BUCKET_NAME%",
+  "version":"Flux"},
+  "secureJsonData":{
+  "token":"%TOKEN%"}
+}

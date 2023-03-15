@@ -64,6 +64,7 @@ void InternodeSyncer::syncLoop()
 
    const unsigned sweepNormalMS = 5*1000; // 5sec
    const unsigned sweepStressedMS = 2*1000; // 2sec
+   const unsigned checkNetworkIntervalMS = 60*1000; // 1 minute
    const unsigned idleDisconnectIntervalMS = 70*60*1000; /* 70 minutes (must be less than half the
       streamlis idle disconnect interval to avoid cases where streamlis disconnects first) */
    const unsigned downloadNodesIntervalMS = 600000; // 10min
@@ -79,11 +80,13 @@ void InternodeSyncer::syncLoop()
    const unsigned updateCapacitiesMS = updateTargetStatesMS * 4;
 
    Time lastCacheSweepT;
+   Time lastCheckNetworkT;
    Time lastIdleDisconnectT;
    Time lastDownloadNodesT;
    Time lastTargetStatesUpdateT;
    Time lastStoragePoolsUpdateT;
    Time lastCapacityUpdateT;
+   bool doRegisterLocalNode = false;
 
    unsigned currentCacheSweepMS = sweepNormalMS; // (adapted inside the loop below)
 
@@ -92,7 +95,7 @@ void InternodeSyncer::syncLoop()
       bool targetStatesUpdateForced = getAndResetForceTargetStatesUpdate();
       bool publishCapacitiesForced = getAndResetForcePublishCapacities();
       bool storagePoolsUpdateForced = getAndResetForceStoragePoolsUpdate();
-
+      bool checkNetworkForced = getAndResetForceCheckNetwork();
 
       if(lastCacheSweepT.elapsedMS() > currentCacheSweepMS)
       {
@@ -101,6 +104,17 @@ void InternodeSyncer::syncLoop()
 
          lastCacheSweepT.setToNow();
       }
+
+      if (checkNetworkForced ||
+         (lastCheckNetworkT.elapsedMS() > checkNetworkIntervalMS))
+      {
+         if (checkNetwork())
+            doRegisterLocalNode = true;
+         lastCheckNetworkT.setToNow();
+      }
+
+      if (doRegisterLocalNode)
+         doRegisterLocalNode = !registerNode(app->getDatagramListener());
 
       if(lastIdleDisconnectT.elapsedMS() > idleDisconnectIntervalMS)
       {
@@ -140,6 +154,27 @@ void InternodeSyncer::syncLoop()
          lastCapacityUpdateT.setToNow();
       }
    }
+}
+
+/**
+ * Inspect the available and allowed network interfaces for any changes.
+ */
+bool InternodeSyncer::checkNetwork()
+{
+   App* app = Program::getApp();
+   NicAddressList newLocalNicList;
+   bool res = false;
+
+   app->findAllowedInterfaces(newLocalNicList);
+   app->findAllowedRDMAInterfaces(newLocalNicList);
+   if (!std::equal(newLocalNicList.begin(), newLocalNicList.end(), app->getLocalNicList().begin()))
+   {
+      log.log(Log_NOTICE, "checkNetwork: local interfaces have changed");
+      app->updateLocalNicList(newLocalNicList);
+      res = true;
+   }
+
+   return res;
 }
 
 /**

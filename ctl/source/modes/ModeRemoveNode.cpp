@@ -194,7 +194,11 @@ int ModeRemoveNode::removeUnreachableNodes(NodeType nodeType)
 
    App* app = Program::getApp();
 
-   NodeStore* nodeStore = app->getServerStoreFromType(nodeType);
+   AbstractNodeStore* nodeStore;
+   if (nodeType == NODETYPE_Client)
+      nodeStore = app->getClientNodes();
+   else
+      nodeStore = app->getServerStoreFromType(nodeType);
 
    std::set<NumNodeID> unreachableNodeIDs;
 

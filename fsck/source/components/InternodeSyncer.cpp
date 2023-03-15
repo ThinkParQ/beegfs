@@ -104,8 +104,10 @@ void InternodeSyncer::syncLoop()
 {
    const int sleepIntervalMS = 3*1000; // 3sec
    const unsigned downloadNodesAndStatesIntervalMS = 30000; // 30 sec
+   const unsigned checkNetworkIntervalMS = 60*1000; // 1 minute
 
    Time lastDownloadNodesAndStatesT;
+   Time lastCheckNetworkT;
 
    while(!waitForSelfTerminateOrder(sleepIntervalMS) )
    {
@@ -160,6 +162,16 @@ void InternodeSyncer::syncLoop()
 
          lastDownloadNodesAndStatesT.setToNow();
       }
+
+      bool checkNetworkForced = getAndResetForceCheckNetwork();
+
+      if( checkNetworkForced ||
+         (lastCheckNetworkT.elapsedMS() > checkNetworkIntervalMS))
+      {
+         checkNetwork();
+         lastCheckNetworkT.setToNow();
+      }
+
    }
 }
 
@@ -455,4 +467,25 @@ void InternodeSyncer::waitForServers()
    std::lock_guard<Mutex> lock(serversDownloadedMutex);
    while (!serversDownloaded)
       serversDownloadedCondition.wait(&serversDownloadedMutex);
+}
+
+/**
+ * Inspect the available and allowed network interfaces for any changes.
+ */
+bool InternodeSyncer::checkNetwork()
+{
+   App* app = Program::getApp();
+   NicAddressList newLocalNicList;
+   bool res = false;
+
+   app->findAllowedInterfaces(newLocalNicList);
+   app->findAllowedRDMAInterfaces(newLocalNicList);
+   if (!std::equal(newLocalNicList.begin(), newLocalNicList.end(), app->getLocalNicList().begin()))
+   {
+      log.log(Log_NOTICE, "checkNetwork: local interfaces have changed");
+      app->updateLocalNicList(newLocalNicList);
+      res = true;
+   }
+
+   return res;
 }

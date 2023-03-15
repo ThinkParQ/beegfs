@@ -15,11 +15,13 @@ InfluxDB::InfluxDB(Config cfg) :
    config(std::move(cfg))
 {
    curlWrapper = boost::make_unique<CurlWrapper>(config.httpTimeout, config.curlCheckSSLCertificates);
+   if  (config.dbVersion == INFLUXDB)
+   {
+      if (!config.username.empty())
+         curlWrapper->enableHttpAuth(config.username, config.password);
 
-   if (!config.username.empty())
-      curlWrapper->enableHttpAuth(config.username, config.password);
-
-   setupDatabase();
+      setupDatabase();
+   }
 }
 
 void InfluxDB::setupDatabase() const
@@ -235,15 +237,26 @@ void InfluxDB::sendWrite(const std::string& data) const
 {
    unsigned short responseCode = 0;
    CurlWrapper::ParameterMap params;
-   params["db"] = config.database;
+   std::string url;
+   std::vector<std::string> headers;
+   if (config.dbVersion == INFLUXDB)
+   {
+      params["db"] = config.database;
+      url = config.host + ":" + StringTk::intToStr(config.port) + "/write";
+   }
+   else
+   {
+      params["org"] = config.organization;
+      params["bucket"] = config.bucket;
+      url = config.host + ":" + StringTk::intToStr(config.port) + "/api/v2/write";
+      headers.push_back("Authorization: Token " + config.token);
+   }
 
    const std::lock_guard<Mutex> mutexLock(curlMutex);
 
    try
    {
-      responseCode = curlWrapper->sendPostRequest(config.host + ":"
-         + StringTk::intToStr(config.port)
-         + "/write", data.c_str(), params);
+      responseCode = curlWrapper->sendPostRequest(url, data.c_str(), params, headers);
    }
    catch (const CurlException& e)
    {
@@ -271,7 +284,7 @@ void InfluxDB::sendQuery(const std::string& data) const
    {
       responseCode = curlWrapper->sendPostRequest(config.host + ":"
             + StringTk::intToStr(config.port)
-            + "/query", "", params);
+            + "/query", "", params, {});
    }
    catch (const CurlException& e)
    {

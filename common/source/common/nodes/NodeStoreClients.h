@@ -14,8 +14,8 @@ class NodeStoreClients : public AbstractNodeStore
    public:
       NodeStoreClients();
 
-      virtual bool addOrUpdateNode(NodeHandle node) override;
-      virtual bool addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) override;
+      virtual NodeStoreResult addOrUpdateNode(NodeHandle node) override;
+      virtual NodeStoreResult addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID) override;
       virtual bool deleteNode(NumNodeID nodeNumID);
 
       NodeHandle referenceNode(NumNodeID numNodeID) const;

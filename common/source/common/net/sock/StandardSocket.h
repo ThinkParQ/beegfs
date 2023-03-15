@@ -2,6 +2,7 @@
 #define STANDARDSOCKET_H_
 
 #include <common/Common.h>
+#include <common/toolkit/RandomReentrant.h>
 #include "PooledSocket.h"
 
 class StandardSocket : public PooledSocket
@@ -56,7 +57,7 @@ class StandardSocket : public PooledSocket
 
    private:
       int epollFD; // only valid for connected sockets, not valid (-1) for listening sockets
-
+      RandomReentrant rand;
 
    public:
       // getters & setters

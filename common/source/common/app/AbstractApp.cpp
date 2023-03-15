@@ -1,4 +1,5 @@
 #include <common/toolkit/StorageTk.h>
+#include <common/toolkit/NodesTk.h>
 #include "AbstractApp.h"
 
 bool AbstractApp::didRunTimeInit = false;
@@ -122,3 +123,62 @@ bool AbstractApp::basicDestructions()
    bool condAttrRes = Condition::destroyStaticCondAttr();
    return condAttrRes;
 }
+
+void AbstractApp::logUsableNICs(LogContext* log, NicAddressList& nicList)
+{
+   // list usable network interfaces
+   std::string nicListStr;
+   std::string extendedNicListStr;
+
+   for(NicAddressListIter nicIter = nicList.begin(); nicIter != nicList.end(); nicIter++)
+   {
+      std::string nicTypeStr;
+
+      if (nicIter->nicType == NICADDRTYPE_RDMA)
+         nicTypeStr = "RDMA";
+      else if (nicIter->nicType == NICADDRTYPE_SDP)
+         nicTypeStr = "SDP";
+      else if (nicIter->nicType == NICADDRTYPE_STANDARD)
+         nicTypeStr = "TCP";
+      else
+         nicTypeStr = "Unknown";
+
+      nicListStr += std::string(nicIter->name) + "(" + nicTypeStr + ")" + " ";
+
+      extendedNicListStr += "\n+ ";
+      extendedNicListStr += NetworkInterfaceCard::nicAddrToString(&(*nicIter) ) + " ";
+   }
+
+   nicListStr = std::string("Usable NICs: ") + nicListStr;
+   extendedNicListStr = std::string("Extended list of usable NICs: ") + extendedNicListStr;
+
+   if (log)
+   {
+      log->log(Log_WARNING, nicListStr);
+      log->log(Log_DEBUG, extendedNicListStr);
+   }
+   else
+   {
+      LOG(GENERAL, WARNING, nicListStr);
+      LOG(GENERAL, DEBUG, extendedNicListStr);
+   }
+}
+
+void AbstractApp::updateLocalNicListInNodes(LogContext* log, NicAddressList& localNicList,
+   std::vector<AbstractNodeStore*>& nodeStores)
+{
+   std::unique_lock<Mutex> lock(localNicListMutex);
+   this->localNicList = localNicList;
+   lock.unlock();
+
+   logUsableNICs(log, localNicList);
+   NicListCapabilities localNicCaps;
+   NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
+
+   for (auto& l : nodeStores)
+   {
+      NodesTk::applyLocalNicListToList(localNicList, localNicCaps,
+         l->referenceAllNodes());
+   }
+}
+

@@ -43,7 +43,7 @@ class Node
 
       void updateLastHeartbeatT();
       Time getLastHeartbeatT();
-      void updateInterfaces(unsigned short portUDP, unsigned short portTCP,
+      bool updateInterfaces(unsigned short portUDP, unsigned short portTCP,
          NicAddressList& nicList);
 
       std::string getTypedNodeID() const;
@@ -64,7 +64,7 @@ class Node
 
       void updateLastHeartbeatTUnlocked();
       Time getLastHeartbeatTUnlocked();
-      void updateInterfacesUnlocked(unsigned short portUDP, unsigned short portTCP,
+      bool updateInterfacesUnlocked(unsigned short portUDP, unsigned short portTCP,
          NicAddressList& nicList);
 
       // getters & setters

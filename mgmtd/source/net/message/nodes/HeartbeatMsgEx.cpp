@@ -23,8 +23,10 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
    NicAddressList& nicList = getNicList();
 
-   // check for empty nodeID; (sanity check, should never fail)
+   LOG(GENERAL, DEBUG, "Heartbeat node", ("nodeType", nodeType),
+      ("nodeId", nodeID));
 
+   // check for empty nodeID; (sanity check, should never fail)
    if(unlikely(nodeID.empty() ) )
    {
       LOG(GENERAL, WARNING, "Rejecting heartbeat of node with empty long ID.",
@@ -32,6 +34,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       return false;
    }
+
 
    if(nodeType == NODETYPE_Client)
    { // this is a client heartbeat
@@ -52,7 +55,7 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       // add node to store (or update it)
 
-      isNodeNew = clients->addOrUpdateNode(std::move(node));
+      isNodeNew = (clients->addOrUpdateNode(std::move(node)) == NodeStoreResult::Added);
    }
    else
    { // this is a server heartbeat
@@ -112,7 +115,10 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
 
       NumNodeID confirmationNodeNumID;
 
-      isNodeNew = servers->addOrUpdateNodeEx(std::move(node), &confirmationNodeNumID);
+      NodeStoreResult nodeStoreRes = servers->addOrUpdateNodeEx(std::move(node), &confirmationNodeNumID);
+      isNodeNew = (nodeStoreRes == NodeStoreResult::Added);
+      if (nodeStoreRes == NodeStoreResult::Updated)
+         heartbeatMgr->notifyAsyncRefreshNode(nodeID, getNodeNumID(), nodeType);
 
       if(confirmationNodeNumID != getNodeNumID() )
       { // unable to add node to store

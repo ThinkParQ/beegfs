@@ -37,6 +37,7 @@ struct MountConfig
    unsigned connMgmtdPortUDP;
    unsigned connMgmtdPortTCP;
    unsigned sysMountSanityCheckMS;
+   char* connInterfacesList;
 };
 
 

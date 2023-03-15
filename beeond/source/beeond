@@ -742,9 +742,12 @@ create_storage_pools()
             TARGET_IDS="$TARGET_IDS$HOST_TARGETS"
          done < <(echo "${HOSTS}" | tr ',' '\n')
 
-         # create pool with collected ids
-         "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
-             --addstoragepool --desc="${POOL}" --targets="${TARGET_IDS}"
+         if [ "$POOL" != "default" ] && [ "$POOL" != "Default" ]
+         then
+            # create pool with collected ids
+            "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
+               --addstoragepool --desc="${POOL}" --targets="${TARGET_IDS}"
+         fi
       done < <(grep -v "^$" "${TARGETFILE}" | grep -v "^\s*\#")
    fi
 }

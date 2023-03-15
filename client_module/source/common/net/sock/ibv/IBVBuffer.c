@@ -1,7 +1,8 @@
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+
 
 #include "IBVBuffer.h"
 #include "IBVSocket.h"
+#ifdef BEEGFS_RDMA
 
 bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen,
     enum dma_data_direction dma_dir)

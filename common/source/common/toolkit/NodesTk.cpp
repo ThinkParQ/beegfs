@@ -148,7 +148,7 @@ std::shared_ptr<Node> NodesTk::downloadNodeInfo(const std::string& hostname,
  * Downloads node list from given sourceNode.
  *
  * Note: If you intend to connect to these nodes, you probably want to call
- * NodesTk::applyLocalNicCapsToList() on the result list before connecting.
+ * NodesTk::applyLocalNicListToList() on the result list before connecting.
  *
  * @param sourceNode the node from which node you want to download
  * @param nodeType which type of node list you want to download
@@ -367,21 +367,30 @@ void NodesTk::moveNodesFromListToStore(std::vector<NodeHandle>& nodes, AbstractN
 
 /**
  * Note: Useful if you got the list e.g. via downloadNodes(), because that doesn't set the
- * localNicCaps.
+ * localNicList and localNicCaps.
  * Note: Make sure you didn't use the connPools of the nodes before calling this.
  */
-void NodesTk::applyLocalNicCapsToList(Node& localNode, const std::vector<NodeHandle>& nodes)
+void NodesTk::applyLocalNicListToList(Node& localNode, const std::vector<NodeHandle>& nodes)
 {
-   for (auto iter = nodes.begin(); iter != nodes.end(); iter++)
+   // set local nic capabilities
+   NicAddressList localNicList(localNode.getNicList() );
+   NicListCapabilities localNicCaps;
+   NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
+   applyLocalNicListToList(localNicList, localNicCaps, nodes);
+}
+
+/**
+ * Note: Useful if you got the list e.g. via downloadNodes(), because that doesn't set the
+ * localNicList and localNicCaps.
+ * Note: Make sure you didn't use the connPools of the nodes before calling this.
+ */
+void NodesTk::applyLocalNicListToList(const NicAddressList& localNicList,
+   const NicListCapabilities& localNicCaps, const std::vector<NodeHandle>& nodes)
+{
+   // set local nic capabilities
+   for (auto& node : nodes)
    {
-      Node& currentNode = **iter;
-
-      // set local nic capabilities
-      NicAddressList localNicList(localNode.getNicList() );
-      NicListCapabilities localNicCaps;
-
-      NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
-      currentNode.getConnPool()->setLocalNicCaps(&localNicCaps);
+      node->getConnPool()->setLocalNicList(localNicList, localNicCaps);
    }
 }
 

@@ -54,6 +54,7 @@ class InternodeSyncer : public PThread
       std::atomic<bool> forceTargetStatesUpdate; // true to force update of node state
       std::atomic<bool> forcePublishCapacities; // true to force publishing free capacity
       std::atomic<bool> forceStoragePoolsUpdate; // true to force update of storage pools
+      std::atomic<bool> forceCheckNetwork; // true to force checking of network changes
 
       // Keeps track of the timeout during which the node may not send state reports because it is
       // waiting to be offlined by the mgmtd.
@@ -75,6 +76,8 @@ class InternodeSyncer : public PThread
 
       void forceMgmtdPoolsRefresh();
 
+      // returns true if the local interfaces have changed
+      bool checkNetwork();
       void dropIdleConns();
       unsigned dropIdleConnsByStore(NodeStoreServers* nodes);
 
@@ -107,6 +110,11 @@ class InternodeSyncer : public PThread
       void setForceStoragePoolsUpdate()
       {
          forceStoragePoolsUpdate = true;
+      }
+
+      void setForceCheckNetwork()
+      {
+         forceCheckNetwork = true;
       }
 
       TargetConsistencyState getNodeConsistencyState()

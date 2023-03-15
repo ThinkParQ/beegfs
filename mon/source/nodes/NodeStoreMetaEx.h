@@ -8,7 +8,7 @@ class NodeStoreMetaEx : public NodeStoreServers
    public:
       NodeStoreMetaEx();
 
-      virtual bool addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
+      virtual NodeStoreResult addOrUpdateNodeEx(std::shared_ptr<Node> receivedNode,
             NumNodeID* outNodeNumID) override;
 
 };

@@ -74,7 +74,7 @@ void _RDMASocket_uninit(Socket* this)
 
 bool RDMASocket_rdmaDevicesExist(void)
 {
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
    return true;
 #else
    return false;

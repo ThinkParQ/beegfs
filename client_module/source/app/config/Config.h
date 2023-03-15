@@ -81,6 +81,7 @@ static inline int Config_getConnHelperdPortTCP(Config* this);
 static inline int Config_getConnMgmtdPortTCP(Config* this);
 static inline unsigned Config_getConnMaxInternodeNum(Config* this);
 static inline char* Config_getConnInterfacesFile(Config* this);
+static inline char* Config_getConnInterfacesList(Config* this);
 static inline unsigned Config_getConnFallbackExpirationSecs(Config* this);
 static inline unsigned Config_getConnNumCommRetries(Config* this);
 static inline unsigned Config_getConnCommRetrySecs(Config* this);
@@ -137,6 +138,8 @@ static inline bool Config_getSysACLsEnabled(Config* this);
 static inline bool Config_getSysXAttrsImplicitlyEnabled(Config* this);
 
 static inline bool Config_getQuotaEnabled(Config* this);
+static inline char* Config_getConnMessagingTimeouts(Config* this);
+static inline char* Config_getConnRDMATimeouts(Config* this);
 static inline int Config_getConnRDMATimeoutConnect(Config* this);
 static inline int Config_getConnRDMATimeoutCompletion(Config* this);
 static inline int Config_getConnRDMATimeoutFlowSend(Config* this);
@@ -187,6 +190,7 @@ struct Config
    bool     connUseRDMA;
    unsigned       connMaxInternodeNum;
    char*          connInterfacesFile;
+   char*          connInterfacesList;
    unsigned       connFallbackExpirationSecs;
    unsigned       connNumCommRetries; // auto-computed from connCommRetrySecs
    unsigned       connCommRetrySecs;
@@ -201,6 +205,7 @@ struct Config
    uint64_t       connAuthHash; // implicitly set based on hash of connAuthFile contents
    char*          connTcpOnlyFilterFile; // allow only plain TCP (no RDMA etc) to these IPs
 
+   char*          connMessagingTimeouts;
    int            connMsgLongTimeout;
    int            connMsgMediumTimeout;
    int            connMsgShortTimeout; // connection (response) timeouts in ms
@@ -208,7 +213,7 @@ struct Config
                                        // responding for >30secs under high load is nothing
                                        // unusual, so never use connMsgShortTimeout for
                                        // IO-related operations.
-
+   char*          connRDMATimeouts;
    int            connRDMATimeoutConnect;
    int            connRDMATimeoutCompletion;
    int            connRDMATimeoutFlowSend;
@@ -339,6 +344,11 @@ unsigned Config_getConnMaxInternodeNum(Config* this)
 char* Config_getConnInterfacesFile(Config* this)
 {
    return this->connInterfacesFile;
+}
+
+char* Config_getConnInterfacesList(Config* this)
+{
+   return this->connInterfacesList;
 }
 
 unsigned Config_getConnFallbackExpirationSecs(Config* this)
@@ -619,6 +629,16 @@ bool Config_getSysXAttrsImplicitlyEnabled(Config* this)
 bool Config_getQuotaEnabled(Config* this)
 {
    return this->quotaEnabled;
+}
+
+char* Config_getConnMessagingTimeouts(Config* this)
+{
+   return this->connMessagingTimeouts;
+}
+
+char* Config_getConnRDMATimeouts(Config* this)
+{
+   return this->connRDMATimeouts;
 }
 
 int Config_getConnRDMATimeoutConnect(Config* this)

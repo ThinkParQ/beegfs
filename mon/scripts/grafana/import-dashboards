@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 function addDashboard()
 {
    echo -e "{\"dashboard\": $(cat $1) }" | \
@@ -13,27 +12,42 @@ function addDashboard()
 function addDatasource()
 {
    sed -e "s,%DATABASE_NAME%,$DATABASE_NAME,g" \
+      -e "s,%DATABASE_USER%,$DATABASE_USER,g" \
       -e "s,%DATASOURCE_URL%,$DATASOURCE_URL,g" \
       -e "s,%DATASOURCE_NAME%,$DATASOURCE_NAME,g" \
+      -e "s,%PASSWORD%,$PASSWORD,g" \
       "$1" | \
    curl -s -X POST "$HOST/api/datasources" \
       --header "Content-type: application/json" \
       --data @-
 }
 
+
+function addDatasourceV2()
+{
+   sed -e "s,%BUCKET_NAME%,$BUCKET_NAME,g" \
+      -e "s,%ORG_NAME%,$ORG_NAME,g" \
+      -e "s,%DATASOURCE_URL%,$DATASOURCE_URL,g" \
+      -e "s,%DATASOURCE_NAME%,$DATASOURCE_NAME,g" \
+      -e "s,%TOKEN%,$TOKEN,g" \
+      "$1" | \
+   curl -s -X POST "$HOST/api/datasources" \
+      --header "Content-type: application/json" \
+      --data @-
+}
+
+
 DATASOURCE_NAME="beegfs_mon_influxdb"
 HOST="http://admin:admin@localhost:3000"
-DATABASE_NAME="beegfs_mon"
 DATASOURCE_URL="http://localhost:8086"
 
-
-if [[ $1 != "default" ]] && [[ ! $# -eq 3 ]]; then
+if  [[ $1 != "default" ]] && [[ ! $# -eq 2 ]]; then
    echo "This script imports the default beegfs-mon Dashboards into Grafana using its HTTP API."
    echo "Curl is required."
    echo ""
    echo "Usage: "
    echo "Default installation to localhost: $(basename "$0") default"
-   echo "Custom installation: $(basename "$0") <grafana url> <datasource url> <database name>"
+   echo "Custom installation: $(basename "$0") <grafana url> <datasource url>"
    echo ""
    echo "Default:"
    echo "$(basename "$0") $HOST $DATASOURCE_URL $DATABASE_NAME"
@@ -46,18 +60,46 @@ command -v curl > /dev/null 2>&1 || \
    exit 1
 }
 
+echo "Please select influxdb version:"
+echo "1) Influxdb 1.x"
+echo "2) Influxdb 2.x"
+
 if [[ $1 != "default" ]]; then
    HOST="$1"
-   DATABASE_NAME="$3"
    DATASOURCE_URL="$2"
 fi
 
 GRAFANA_DIR=$(dirname "$0")
 
-addDatasource "$GRAFANA_DIR/influxdb.json"
+read -p "Enter your influxdb Verion: " influx_version
 
-addDashboard "$GRAFANA_DIR/meta.json"
-addDashboard "$GRAFANA_DIR/storage.json"
-addDashboard "$GRAFANA_DIR/storage_targets.json"
-addDashboard "$GRAFANA_DIR/client_ops_node.json"
-addDashboard "$GRAFANA_DIR/client_ops_user.json"
+if [ "$influx_version" == "1" ]; then
+   read -p "Enter Database Name: " DATABASE_NAME
+   read -p "Enter Database User: " DATABASE_USER
+   read -s -p "Enter Database Password: " PASSWORD
+
+   addDatasource "$GRAFANA_DIR/influxdb.json"
+   addDashboard "$GRAFANA_DIR/beegfs_overview_influxdbv1.json"
+   addDashboard "$GRAFANA_DIR/meta_influxdbv1.json"
+   addDashboard "$GRAFANA_DIR/storage_influxdbv1.json"
+   addDashboard "$GRAFANA_DIR/storage_targets_influxdbv1.json"
+   addDashboard "$GRAFANA_DIR/client_ops_node_influxdbv1.json"
+   addDashboard "$GRAFANA_DIR/client_ops_user_influxdbv1.json"
+
+elif [ "$influx_version" == "2" ]; then
+   read -p "Enter Bucket Name:" BUCKET_NAME
+   read -p "Enter Organizations: " ORG_NAME
+   read -s -p "Enter Token: " TOKEN
+
+   addDatasourceV2 "$GRAFANA_DIR/influxdbV2.json"
+   addDashboard "$GRAFANA_DIR/beegfs_overview_influxdbv2.json"
+   addDashboard "$GRAFANA_DIR/meta_influxdbv2.json"
+   addDashboard "$GRAFANA_DIR/storage_influxdbv2.json"
+   addDashboard "$GRAFANA_DIR/storage_targets_influxdbv2.json"
+   addDashboard "$GRAFANA_DIR/client_ops_node_influxdbv2.json"
+   addDashboard "$GRAFANA_DIR/client_ops_user_influxdbv2.json"
+
+else
+   echo "Please select correct version"
+   exit 1
+fi

@@ -1,6 +1,6 @@
 #include "IBVSocket.h"
 
-#if !defined(CONFIG_INFINIBAND) && !defined(CONFIG_INFINIBAND_MODULE)
+#ifndef BEEGFS_RDMA
 
 bool IBVSocket_init(IBVSocket* _this)
 {

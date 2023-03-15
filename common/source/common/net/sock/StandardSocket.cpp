@@ -8,8 +8,9 @@
 #include <sys/epoll.h>
 
 
-#define STANDARDSOCKET_CONNECT_TIMEOUT_MS    5000
-
+#define STANDARDSOCKET_CONNECT_TIMEOUT_MS         5000
+#define STANDARDSOCKET_UDP_COOLING_SLEEP_US      10000
+#define STANDARDSOCKET_UDP_COOLING_RETRIES           5
 
 /**
  * @throw SocketException
@@ -368,23 +369,56 @@ ssize_t StandardSocket::sendto(const void *buf, size_t len, int flags,
    const struct sockaddr *to, socklen_t tolen)
 {
    const char* logContext = "StandardSocket::sendto";
+   int tries = 0;
+   int errCode = 0;
+   long sleepUs = STANDARDSOCKET_UDP_COOLING_SLEEP_US;
 
-   ssize_t sendRes = ::sendto(sock, buf, len, flags | MSG_NOSIGNAL, to, tolen);
-   if(sendRes == (ssize_t)len)
+   while (tries < STANDARDSOCKET_UDP_COOLING_RETRIES)
    {
-      stats->incVals.netSendBytes += len;
-      return sendRes;
-   }
-   else
-   if(sendRes != -1)
-   {
-      throw SocketException(
-         std::string("send(): Sent only ") + StringTk::int64ToStr(sendRes) +
-         std::string(" bytes of the requested ") + StringTk::int64ToStr(len) +
-         std::string(" bytes of data") );
-   }
+      tries++;
+      ssize_t sendRes = ::sendto(sock, buf, len, flags | MSG_NOSIGNAL, to, tolen);
+      if(sendRes == (ssize_t)len)
+      {
+         stats->incVals.netSendBytes += len;
+         return sendRes;
+      }
+      else
+      if(sendRes != -1)
+      {
+         throw SocketException(
+            std::string("send(): Sent only ") + StringTk::int64ToStr(sendRes) +
+            std::string(" bytes of the requested ") + StringTk::int64ToStr(len) +
+            std::string(" bytes of data") );
+      }
 
-   int errCode = errno;
+      errCode = errno;
+
+      if (errCode != EPERM)
+         break;
+
+      // EPERM means UDP data is being sent too fast. This implements a
+      // cooling off mechanism to retry sending the data after sleeping.
+      // A random value is incorporated to prevent concurrent threads from
+      // waking up at the same time.
+      if (tries == 1)
+      {
+         sleepUs += rand.getNextInRange(1, STANDARDSOCKET_UDP_COOLING_SLEEP_US);
+      }
+      else
+      {
+         sleepUs += STANDARDSOCKET_UDP_COOLING_SLEEP_US;
+      }
+
+      LogContext(logContext).log(Log_NOTICE, "Retry sendto " + peername +
+         " after sleeping for " + StringTk::intToStr((int) sleepUs) +
+         " us, try=" + StringTk::intToStr(tries));
+
+      struct timespec ns = {
+         .tv_sec = 0,
+         .tv_nsec = sleepUs * 1000
+      };
+      ::nanosleep(&ns, NULL);
+   }
 
    std::string toStr;
    if(to)

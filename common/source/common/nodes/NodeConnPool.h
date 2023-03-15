@@ -89,7 +89,6 @@ struct NodeConnPoolErrorState
    }
 };
 
-
 /**
  * This class represents a pool of stream connections to a certain node.
  */
@@ -111,7 +110,8 @@ class NodeConnPool
 
       unsigned disconnectAndResetIdleStreams();
 
-      void updateInterfaces(unsigned short streamPort, NicAddressList& nicList);
+      // returns true if the interfaces are different than those currently known
+      virtual bool updateInterfaces(unsigned short streamPort, const NicAddressList& nicList);
 
       bool getFirstPeerName(NicAddrType nicType, std::string* outPeerName, bool* outIsNonPrimary);
 
@@ -124,6 +124,7 @@ class NodeConnPool
       Node& parentNode; // backlink to the node object to which this conn pool belongs
       unsigned short streamPort;
       NicListCapabilities localNicCaps;
+      NicAddressList localNicList;
 
       unsigned availableConns; // available established conns
       unsigned establishedConns; // not equal to connList.size!!
@@ -138,7 +139,7 @@ class NodeConnPool
       Condition changeCond;
 
       virtual void invalidateSpecificStreamSocket(Socket* sock);
-      virtual unsigned invalidateAllAvailableStreams(bool idleStreamsOnly);
+      virtual unsigned invalidateAllAvailableStreams(bool idleStreamsOnly, bool closeOnRelease);
       void resetStreamsIdleFlag();
       void applySocketOptionsPreConnect(RDMASocket* sock);
       void applySocketOptionsPreConnect(StandardSocket* sock);
@@ -166,13 +167,8 @@ class NodeConnPool
          return streamPort;
       }
 
-      /**
-       * @param localNicCaps will be copied
-       */
-      void setLocalNicCaps(NicListCapabilities* localNicCaps)
-      {
-         this->localNicCaps = *localNicCaps;
-      }
+      void setLocalNicList(const NicAddressList& localNicList,
+         const NicListCapabilities& localNicCaps);
 
       void setChannelDirect(bool isChannelDirect)
       {
@@ -197,6 +193,7 @@ class NodeConnPool
          *outStats = this->stats;
       }
 
+      void filterNicList(NicAddressList& outNicList);
 };
 
 #endif /*NODECONNPOOL_H_*/

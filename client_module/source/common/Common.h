@@ -186,6 +186,13 @@ static inline struct timespec current_fs_time(struct super_block *sb)
    #define swap(a, b) do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
 #endif
 
+#undef BEEGFS_RDMA
+#ifndef BEEGFS_NO_RDMA
+#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#define BEEGFS_RDMA 1
+#endif
+#endif
+
 static inline unsigned FhgfsCommon_getCurrentUserID(void);
 static inline unsigned FhgfsCommon_getCurrentGroupID(void);
 

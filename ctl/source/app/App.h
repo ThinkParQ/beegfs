@@ -51,6 +51,8 @@ class App : public AbstractApp
 
       virtual void stopComponents() override;
       virtual void handleComponentException(std::exception& e) override;
+      virtual void handleNetworkInterfaceFailure(const std::string& devname) override;
+
 
    private:
       int appResult;
@@ -185,6 +187,11 @@ class App : public AbstractApp
       Config* getConfig() const
       {
          return cfg;
+      }
+
+      NicAddressList getLocalNicList()
+      {
+         return localNicList;
       }
 
       Node& getLocalNode() const

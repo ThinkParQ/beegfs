@@ -631,7 +631,7 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
       loff_t pos = iocb->ki_pos;
       struct inode* inode = file_inode(filp);
 
-      mutex_lock(&inode->i_mutex);
+      os_inode_lock(inode);
       do {
          result = os_generic_write_checks(filp, &pos, &size, S_ISBLK(inode->i_mode) );
          if(result)
@@ -671,7 +671,7 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
          result = generic_file_direct_write(iocb, from, pos);
 #endif
       } while(0);
-      mutex_unlock(&inode->i_mutex);
+      os_inode_unlock(inode);
 #endif
 
       return result;
@@ -1038,7 +1038,7 @@ static void* __writepages_pool_alloc(gfp_t mask, void* pool_data)
    return state;
 
 fail_iov:
-   kfree(state->iov);
+   kfree(state->pages);
 fail_pages:
    kfree(state);
 fail_state:

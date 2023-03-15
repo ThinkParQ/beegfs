@@ -45,7 +45,7 @@ extern bool NodeConnPool_updateInterfaces(NodeConnPool* this, unsigned short str
 
 extern void __NodeConnPool_invalidateSpecificStreamSocket(NodeConnPool* this, Socket* sock);
 extern unsigned __NodeConnPool_invalidateAvailableStreams(NodeConnPool* this,
-   bool idleStreamsOnly);
+   bool idleStreamsOnly, bool closeOnRelease);
 extern void __NodeConnPool_resetStreamsIdleFlag(NodeConnPool* this);
 extern bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* sock);
 extern bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock);

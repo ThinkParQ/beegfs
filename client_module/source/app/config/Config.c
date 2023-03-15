@@ -82,12 +82,15 @@ bool Config_init(Config* this, MountConfig* mountConfig)
    this->connInterfacesFile = NULL;
    this->connNetFilterFile = NULL;
    this->connAuthFile = NULL;
+   this->connMessagingTimeouts = NULL;
+   this->connRDMATimeouts = NULL;
    this->connTcpOnlyFilterFile = NULL;
    this->tunePreferredMetaFile = NULL;
    this->tunePreferredStorageFile = NULL;
    this->tuneFileCacheType = NULL;
    this->sysMgmtdHost = NULL;
    this->sysInodeIDStyle = NULL;
+   this->connInterfacesList = NULL;
 
    return _Config_initConfig(this, mountConfig, true);
 }
@@ -115,11 +118,14 @@ void Config_uninit(Config* this)
    SAFE_KFREE(this->connNetFilterFile);
    SAFE_KFREE(this->connAuthFile);
    SAFE_KFREE(this->connTcpOnlyFilterFile);
+   SAFE_KFREE(this->connMessagingTimeouts);
+   SAFE_KFREE(this->connRDMATimeouts);
    SAFE_KFREE(this->tunePreferredMetaFile);
    SAFE_KFREE(this->tunePreferredStorageFile);
    SAFE_KFREE(this->tuneFileCacheType);
    SAFE_KFREE(this->sysMgmtdHost);
    SAFE_KFREE(this->sysInodeIDStyle);
+   SAFE_KFREE(this->connInterfacesList);
 
    StrCpyMap_uninit(&this->configMap);
 }
@@ -209,6 +215,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connUseRDMA",                      "true");
    _Config_configMapRedefine(this, "connMaxInternodeNum",              "8");
    _Config_configMapRedefine(this, "connInterfacesFile",               "");
+   _Config_configMapRedefine(this, "connInterfacesList",              "");
    _Config_configMapRedefine(this, "connFallbackExpirationSecs",       "900");
    _Config_configMapRedefine(this, "connCommRetrySecs",                "600");
    _Config_configMapRedefine(this, "connUnmountRetries",               "true");
@@ -362,6 +369,12 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          this->connInterfacesFile = StringTk_strDup(valueStr);
       }
       else
+      if(!strcmp(keyStr, "connInterfacesList") )
+      {
+         SAFE_KFREE(this->connInterfacesList);
+         this->connInterfacesList = StringTk_strDup(valueStr);
+      }
+      else
       IGNORE_CONFIG_VALUE("connNonPrimaryExpiration")
       if(!strcmp(keyStr, "connFallbackExpirationSecs") )
          this->connFallbackExpirationSecs = StringTk_strToUInt(valueStr);
@@ -412,6 +425,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          StrCpyList connMsgTimeoutList;
          StrCpyListIter iter;
 
+         SAFE_KFREE(this->connMessagingTimeouts);
+         this->connMessagingTimeouts = StringTk_strDup(valueStr);
+
          StrCpyList_init(&connMsgTimeoutList);
          StringTk_explode(valueStr, ',', &connMsgTimeoutList);
 
@@ -449,6 +465,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
             &this->connRDMATimeoutPoll
          };
          bool badVals = false;
+
+         SAFE_KFREE(this->connRDMATimeouts);
+         this->connRDMATimeouts = StringTk_strDup(valueStr);
 
          StrCpyList_init(&connRDMATimeoutList);
          StringTk_explode(valueStr, ',', &connRDMATimeoutList);
@@ -755,6 +774,19 @@ void __Config_loadFromMountConfig(Config* this, MountConfig* mountConfig)
    if(mountConfig->tunePreferredStorageFile)
       _Config_configMapRedefine(this, "tunePreferredStorageFile",
          mountConfig->tunePreferredStorageFile);
+
+   if(mountConfig->connInterfacesList)
+   {
+      char* delimiter  = mountConfig->connInterfacesList;
+      size_t listLength;
+      for (listLength = strlen(mountConfig->connInterfacesList); listLength;
+         ++delimiter,--listLength)
+      {
+         if(*delimiter == ' ')
+            *delimiter = ',';
+      }
+      _Config_configMapRedefine(this, "connInterfacesList", mountConfig->connInterfacesList);
+   }
 
    // integer args
 

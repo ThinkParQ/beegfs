@@ -168,6 +168,10 @@ SOURCES := \
 
 ${TARGET}-y	:= $(patsubst %.c,%.o,$(SOURCES))
 
+ifdef BEEGFS_NO_RDMA
+ccflags-y += -DBEEGFS_NO_RDMA
+endif
+
 ifneq ($(OFED_INCLUDE_PATH),)
 
 # RHEL/CentOS 8 + MLNX 4.7 requires extra flags (bug?)

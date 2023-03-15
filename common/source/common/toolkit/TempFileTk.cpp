@@ -21,6 +21,8 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const void* contents, s
    // Need a copy of the string, because the Xs will be replaced by mkstemp.
    std::string tmpname = filename + ".tmp-XXXXXX" + '\0'; // terminating 0 needed for c library calls
 
+   LOG(GENERAL, DEBUG, "Storing file using temporary file.", filename, tmpname);
+
    // Open temp file
    FDHandle fd(mkstemp(&tmpname[0]));
    if (!fd.valid())
