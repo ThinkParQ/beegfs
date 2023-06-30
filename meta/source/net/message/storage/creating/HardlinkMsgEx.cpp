@@ -1,10 +1,11 @@
 #include <program/Program.h>
-#include <common/net/message/storage/attribs/GetEntryInfoMsg.h>
-#include <common/net/message/storage/attribs/GetEntryInfoRespMsg.h>
 #include <common/net/message/storage/creating/HardlinkRespMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeRespMsg.h>
+#include <common/net/message/storage/attribs/SetAttrMsg.h>
+#include <common/net/message/storage/attribs/SetAttrRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <components/FileEventLogger.h>
-
 #include "HardlinkMsgEx.h"
 
 std::tuple<FileIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx::lock(
@@ -82,42 +83,172 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
    bool isSecondary)
 {
    const char* logContext = "create hard link";
-   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
    App* app = Program::getApp();
    MetaStore* metaStore = app->getMetaStore();
 
-   // this should never happen, because we already check on client
-   if (unlikely(getFromDirInfo()->getEntryID() != getToDirInfo()->getEntryID()))
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
+   FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
-   // simple and cheap link (everything local)
+   // reference directory where hardlink needs to be created
+   DirInode* toDir = metaStore->referenceDir(getToDirInfo()->getEntryID(),
+         getToDirInfo()->getIsBuddyMirrored(), true);
 
-   LOG_DEBUG(logContext, Log_SPAM, "Method: link in same dir");// debug in
-   IGNORE_UNUSED_VARIABLE(logContext);
-
-   DirInode* parentDir = metaStore->referenceDir(getFromDirInfo()->getEntryID(),
-         getFromDirInfo()->getIsBuddyMirrored(), true);
-   if (!parentDir)
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
-
-   retVal = metaStore->linkInSameDir(*parentDir, getFromInfo(), getFromName(), getToName());
-
-   if (retVal == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
+   if (!toDir)
    {
-      fixInodeTimestamp(*parentDir, dirTimestamps);
+      LogContext(logContext).logErr(std::string("target directory for hard-link doesn't exist,"
+         "dirname: " + getToDirInfo()->getFileName()));
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+   }
 
-      auto file = metaStore->referenceFile(getFromInfo());
-      if (file)
+   // check whether local node/group owns source file's inode or not
+   NumNodeID ownerNodeID = getFromInfo()->getOwnerNodeID();
+   bool isLocalOwner = ((!isMirrored() && ownerNodeID == app->getLocalNode().getNumID()) ||
+         (isMirrored() && ownerNodeID.val() == app->getMetaBuddyGroupMapper()->getLocalGroupID()));
+
+   if (isLocalOwner)
+   {
+      // if file Inode is already de-inlined then do not check/deinline again
+      if (!getFromInfo()->getIsInlined())
       {
-         fixInodeTimestamp(*file, fileTimestamps, getFromInfo());
-         metaStore->releaseFile(getFromDirInfo()->getEntryID(), file);
+         retVal = FhgfsOpsErr_SUCCESS;
+      }
+      else
+      {
+         DirInode* fromDir = metaStore->referenceDir(getFromDirInfo()->getEntryID(),
+               getFromDirInfo()->getIsBuddyMirrored(), true);
+
+         if (!fromDir)
+         {
+            LogContext(logContext).logErr("Parent dir of source file not exists."
+               "dirname: " + getFromDirInfo()->getFileName());
+
+            metaStore->releaseDir(toDir->getID());
+            return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+         }
+
+         retVal = metaStore->verifyAndMoveFileInode(*fromDir, getFromInfo(), MODE_DEINLINE);
+         metaStore->releaseDir(fromDir->getID());
+      }
+
+      if (retVal == FhgfsOpsErr_SUCCESS)
+      {
+         retVal = metaStore->incDecLinkCount(getFromInfo(), 1);
+      }
+
+      if (retVal != FhgfsOpsErr_SUCCESS)
+      {
+         // release toDir as well and return error without writting new dentry
+         metaStore->releaseDir(toDir->getID());
+         return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
+      }
+   }
+   else if (!isSecondary)
+   {
+      if (!getFromInfo()->getIsInlined())
+      {
+         retVal = FhgfsOpsErr_SUCCESS;
+      }
+      else
+      {
+         MoveFileInodeMsg deinlineMsg(getFromInfo(), MODE_DEINLINE);
+
+         RequestResponseArgs rrArgs(NULL, &deinlineMsg, NETMSGTYPE_MoveFileInodeResp);
+         RequestResponseNode rrNode(ownerNodeID, app->getMetaNodes());
+         if (getFromDirInfo()->getIsBuddyMirrored())
+         {
+            rrNode.setMirrorInfo(app->getMetaBuddyGroupMapper(), false);
+         }
+
+         do
+         {
+            // send request to other MDs and receive response
+            FhgfsOpsErr resp = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+
+            if (unlikely(resp != FhgfsOpsErr_SUCCESS))
+            {
+               // error
+               LogContext(logContext).logErr(std::string("Communication with metadata server failed. ") +
+                  "nodeID: " + ownerNodeID.str() + "; " +
+                  "file: " + getFromInfo()->getFileName().c_str());
+               retVal = resp;
+               break;
+            }
+
+            // response received
+            const auto moveFileInodeRespMsg = (MoveFileInodeRespMsg*) rrArgs.outRespMsg.get();
+            FhgfsOpsErr res = moveFileInodeRespMsg->getResult();
+            if (res != FhgfsOpsErr_SUCCESS)
+            {
+               // error: either source file not exists or deinline operation failed
+               LogContext(logContext).logErr("verify and move file inode failed! "
+                  "nodeID: " + ownerNodeID.str() + "; " +
+                  "fileName: " + getFromInfo()->getFileName().c_str());
+
+               retVal = res;
+               break;
+            }
+
+            // success
+            retVal = res;
+         } while (false);
+      }
+
+      if (retVal == FhgfsOpsErr_SUCCESS)
+      {
+         retVal = incDecRemoteLinkCount(ownerNodeID, true);
+         if (retVal != FhgfsOpsErr_SUCCESS)
+         {
+            LogContext(logContext).logErr(std::string("inc link count failed on remote"
+               "inode, ownerNodeID: " + ownerNodeID.str()));
+         }
       }
    }
 
-   metaStore->releaseDir(parentDir->getID());
+   // If verify/deinline and link count update is successful - only then create new
+   // dentry in "toDir" with entryID and ownerNodeID of "fromFile" which might reside
+   // on another meta node/buddy-group
+   if (retVal == FhgfsOpsErr_SUCCESS)
+   {
+      DirEntry newHardlink(DirEntryType_REGULARFILE, getToName(),
+         getFromInfo()->getEntryID(), getFromInfo()->getOwnerNodeID());
 
-   if (!isSecondary && retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
+      newHardlink.removeDentryFeatureFlag(DENTRY_FEATURE_INODE_INLINE);
+
+      if (isMirrored())
+         newHardlink.setBuddyMirrorFeatureFlag();
+
+      FhgfsOpsErr makeRes = toDir->makeDirEntry(newHardlink);
+
+      if (makeRes != FhgfsOpsErr_SUCCESS)
+      {
+         // compensate link count if dentry create fails
+         if (!isLocalOwner)
+            incDecRemoteLinkCount(ownerNodeID, false);
+         else
+            metaStore->incDecLinkCount(getFromInfo(), -1);
+
+         retVal = makeRes;
+      }
+   }
+
+   if (retVal == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
+   {
+      fixInodeTimestamp(*toDir, dirTimestamps);
+
+      if (isLocalOwner)
+      {
+        auto file = metaStore->referenceFile(getFromInfo());
+        if (file)
+        {
+           fixInodeTimestamp(*file, fileTimestamps, getFromInfo());
+           metaStore->releaseFile(getFromDirInfo()->getEntryID(), file);
+        }
+      }
+   }
+
+   metaStore->releaseDir(toDir->getID());
+
+   if (retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
    {
          app->getFileEventLogger()->log(
                   *getFileEvent(),
@@ -126,6 +257,71 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
    }
 
    return boost::make_unique<ResponseState>(retVal);
+}
+
+FhgfsOpsErr HardlinkMsgEx::incDecRemoteLinkCount(NumNodeID const& ownerNodeID, bool increment)
+{
+   const char* logContext = "incDecRemoteLinkCount";
+   App* app = Program::getApp();
+   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
+
+   SettableFileAttribs dummyAttrib;
+   SetAttrMsg msg(getFromInfo(), 0, &dummyAttrib);
+
+   if (increment)
+   {
+      msg.addMsgHeaderFeatureFlag(SETATTRMSG_FLAG_INCR_NLINKCNT);
+   }
+   else
+   {
+      msg.addMsgHeaderFeatureFlag(SETATTRMSG_FLAG_DECR_NLINKCNT);
+   }
+
+   RequestResponseArgs rrArgs(NULL, &msg, NETMSGTYPE_SetAttrResp);
+   RequestResponseNode rrNode(ownerNodeID, app->getMetaNodes());
+
+   rrNode.setTargetStates(app->getMetaStateStore());
+
+   if (getFromDirInfo()->getIsBuddyMirrored())
+   {
+      rrNode.setMirrorInfo(app->getMetaBuddyGroupMapper(), false);
+   }
+
+   do
+   {
+      // send request to other MDs and receive response
+      FhgfsOpsErr resp = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+
+      if (unlikely(resp != FhgfsOpsErr_SUCCESS))
+      {
+         // error
+         LogContext(logContext).log(Log_WARNING,
+            "Communication with metadata server failed. "
+            "nodeID: " + ownerNodeID.str() + "; " +
+            "file: " + getFromInfo()->getFileName().c_str());
+         retVal = resp;
+         break;
+      }
+
+      // response received
+      const auto incLinkCountResp = (SetAttrRespMsg*) rrArgs.outRespMsg.get();
+      FhgfsOpsErr res = static_cast<FhgfsOpsErr>(incLinkCountResp->getValue());
+      if (res != FhgfsOpsErr_SUCCESS)
+      {
+         // error: either source file not exists or nlink count increment failed
+         LogContext(logContext).logErr("nLink count increment failed! "
+            "nodeID: " + ownerNodeID.str() + "; " +
+            "fileName: " + getFromInfo()->getFileName().c_str());
+
+         retVal = res;
+         break;
+      }
+
+      // success
+      retVal = res;
+   } while (false);
+
+   return retVal;
 }
 
 void HardlinkMsgEx::forwardToSecondary(ResponseContext& ctx)

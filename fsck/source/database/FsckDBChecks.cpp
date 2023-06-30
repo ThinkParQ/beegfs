@@ -183,10 +183,10 @@ struct DuplicateIDGroup
 {
    typedef db::EntryID KeyType;
    typedef db::EntryID ProjType;
-   typedef std::set<std::pair<uint32_t,bool>> GroupType;
+   typedef std::set<FsckDuplicateInodeInfo> GroupType;
 
    bool hasTarget;
-   std::pair<uint32_t, bool> lastTarget;
+   FsckDuplicateInodeInfo lastTarget;
    GroupType group;
 
    DuplicateIDGroup()
@@ -200,31 +200,31 @@ struct DuplicateIDGroup
       group.clear();
    }
 
-   KeyType key(std::tuple<db::EntryID, uint32_t, bool>  tuple)
+   KeyType key(std::pair<db::EntryID, FsckDuplicateInodeInfo> pair)
    {
-      return std::get<0>(tuple);
+      return pair.first;
    }
 
-   ProjType project(std::tuple<db::EntryID, uint32_t, bool> tuple)
+   ProjType project(std::pair<db::EntryID, FsckDuplicateInodeInfo> pair)
    {
-      return std::get<0>(tuple);
+      return pair.first;
    }
 
-   void step(std::tuple<db::EntryID, uint32_t, bool> tuple)
+   void step(std::pair<db::EntryID, FsckDuplicateInodeInfo> pair)
    {
-      if(!hasTarget)
+      if (!hasTarget)
       {
-         lastTarget = std::make_pair(std::get<1>(tuple), std::get<2>(tuple));
+         lastTarget = pair.second;
          hasTarget = true;
          return;
       }
 
-      if(lastTarget.first != 0)
+      if (lastTarget.getSaveNodeID() != 0)
       {
          group.insert(lastTarget);
-         lastTarget.first = 0;
+         lastTarget.setSaveNodeID(0);
       }
-      group.insert(std::make_pair(std::get<1>(tuple), std::get<2>(tuple)));
+      group.insert(pair.second);
    }
 
    GroupType finish()
@@ -242,14 +242,16 @@ Cursor<checks::DuplicatedInode> FsckDB::findDuplicateInodeIDs()
 {
    struct ops
    {
-      static std::tuple<db::EntryID, uint32_t, bool> idAndTargetF(const db::FileInode& file)
+      static std::pair<db::EntryID, FsckDuplicateInodeInfo> idAndTargetF(const db::FileInode& file)
       {
-         return std::make_tuple(file.id, file.saveNodeID, file.isBuddyMirrored);
+         return std::make_pair(file.id, FsckDuplicateInodeInfo(file.id.str(), file.parentDirID.str(),
+                  file.saveNodeID, file.isInlined, file.isBuddyMirrored, DirEntryType_REGULARFILE));
       }
 
-      static std::tuple<db::EntryID, uint32_t, bool> idAndTargetD(const db::DirInode& file)
+      static std::pair<db::EntryID, FsckDuplicateInodeInfo> idAndTargetD(const db::DirInode& file)
       {
-         return std::make_tuple(file.id, file.saveNodeID, file.isBuddyMirrored);
+         return std::make_pair(file.id, FsckDuplicateInodeInfo(file.id.str(), file.parentDirID.str(),
+                  file.saveNodeID, false, file.isBuddyMirrored, DirEntryType_DIRECTORY));
       }
 
       static bool hasDuplicateID(const checks::DuplicatedInode& dInode)
@@ -1395,4 +1397,23 @@ Cursor<std::pair<FsckChunk, FsckFileInode> > FsckDB::findChunksInWrongPath()
          this->fileInodesTable->getInodes() )
       | db::where(ops::chunkInWrongPath)
       | db::select(ops::result) );
+}
+
+/**
+ * Find file inode(s) which are inlined and have linkCount > 1 (i.e. old styled links)
+ */
+Cursor<db::FileInode> FsckDB::findFilesWithMultipleHardlinks()
+{
+   struct ops
+   {
+      static bool hasMultipleHardlinks(db::FileInode& inode)
+      {
+         return (inode.numHardlinks > 1 && inode.isInlined);
+      }
+   };
+
+   return cursor(
+      fileInodesTable->getInodes()
+      | ignoreByID(modificationEventsTable->get())
+      | db::where(ops::hasMultipleHardlinks));
 }

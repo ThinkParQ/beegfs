@@ -333,6 +333,7 @@ class FsckDBFileInodesTable
 
       InodesQueryType getInodes();
       Table<db::StripeTargets, true>::QueryType getTargets();
+      UInt16Vector getStripeTargetsByKey(const db::EntryID& id);
 
       std::pair<bool, db::FileInode> get(std::string id);
 

@@ -16,6 +16,7 @@
 #include <common/fsck/FsckFileInode.h>
 #include <common/fsck/FsckFsID.h>
 #include <common/fsck/FsckTargetID.h>
+#include <common/fsck/FsckDuplicateInodeInfo.h>
 #include <common/nodes/TargetMapper.h>
 #include <common/storage/striping/StripePattern.h>
 #include <common/storage/StorageDefinitions.h>
@@ -67,10 +68,7 @@ struct OptionalInodeAttribs
    }
 };
 
-// represents a duplicated Inode. The set contains the IDs of the nodes / buddy groups where the 
-// entries were found. The boolean flag indicates if the corresponding ID is a node ID or a buddy 
-// group ID 
-typedef std::pair<db::EntryID, std::set<std::pair<uint32_t, bool>>> DuplicatedInode;
+typedef std::pair<db::EntryID, std::set<FsckDuplicateInodeInfo>> DuplicatedInode;
 }
 
 class FsckDB
@@ -114,6 +112,7 @@ class FsckDB
          MirrorBuddyGroupMapper* buddyGroupMapper);
       Cursor<std::pair<FsckChunk, FsckFileInode> > findChunksWithWrongPermissions();
       Cursor<std::pair<FsckChunk, FsckFileInode> > findChunksInWrongPath();
+      Cursor<db::FileInode> findFilesWithMultipleHardlinks();
 
    private:
       LogContext log;

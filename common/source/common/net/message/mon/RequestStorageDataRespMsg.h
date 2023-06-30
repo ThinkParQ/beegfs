@@ -12,6 +12,7 @@ class RequestStorageDataRespMsg: public NetMessageSerdes<RequestStorageDataRespM
 {
    private:
       std::string nodeID;
+      std::string hostnameid;
       NumNodeID nodeNumID;
       NicAddressList* nicList;
       uint32_t indirectWorkListSize;
@@ -31,16 +32,18 @@ class RequestStorageDataRespMsg: public NetMessageSerdes<RequestStorageDataRespM
 
    public:
       /**
+       * @param hostnameid it will get the hostname of server
        * @param nicList just a reference, so do not free it as long as you use this object!
        * @param statsList just a reference, so do not free it as long as you use this object!
        */
-      RequestStorageDataRespMsg(const std::string& nodeID, NumNodeID nodeNumID, NicAddressList *nicList,
+      RequestStorageDataRespMsg(const std::string& nodeID,  const std::string& hostnameid, NumNodeID nodeNumID, NicAddressList *nicList,
          unsigned indirectWorkListSize, unsigned directWorkListSize, int64_t diskSpaceTotal,
          int64_t diskSpaceFree, unsigned sessionCount, HighResStatsList* statsList,
          StorageTargetInfoList *storageTargets) :
          BaseType(NETMSGTYPE_RequestStorageDataResp)
       {
          this->nodeID = nodeID;
+         this->hostnameid = hostnameid;
          this->nodeNumID = nodeNumID;
          this->nicList = nicList;
          this->indirectWorkListSize = indirectWorkListSize;
@@ -69,6 +72,7 @@ class RequestStorageDataRespMsg: public NetMessageSerdes<RequestStorageDataRespM
       {
          ctx
             % obj->nodeID
+            % obj->hostnameid
             % obj->nodeNumID
             % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
             % obj->indirectWorkListSize
@@ -98,6 +102,11 @@ class RequestStorageDataRespMsg: public NetMessageSerdes<RequestStorageDataRespM
       const std::string& getNodeID() const
       {
          return nodeID;
+      }
+
+      const std::string& gethostnameid() const
+      {
+         return hostnameid;
       }
 
       NumNodeID getNodeNumID() const

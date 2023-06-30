@@ -120,7 +120,7 @@ error_closefile:
  * Store the dirEntry as file name
  */
 FhgfsOpsErr DirEntry::storeInitialDirEntryName(const char* logContext, const std::string& idPath,
-   const std::string& namePath, bool isDir)
+   const std::string& namePath, bool isNonInlinedInode)
 {
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
@@ -152,7 +152,7 @@ FhgfsOpsErr DirEntry::storeInitialDirEntryName(const char* logContext, const std
       return retVal;
    }
 
-   if (isDir)
+   if (isNonInlinedInode)
    {
       // unlink the dentry-by-id file - we don't need it for dirs (or non-inlined inodes in general)
       int unlinkRes = unlink(idPath.c_str() );
@@ -850,16 +850,16 @@ FhgfsOpsErr DirEntry::storeInitialDirEntry(const std::string& dirEntryPath)
    if (entryIdRes != FhgfsOpsErr_SUCCESS)
       return entryIdRes;
 
-   bool isDir = DirEntryType_ISDIR(getEntryType() );
+   bool nonInlined = DirEntryType_ISDIR(getEntryType()) || !this->getIsInodeInlined();
 
    // eventually the dirEntry-by-name
    std::string namePath = dirEntryPath + '/' + this->name;
-   FhgfsOpsErr result = this->storeInitialDirEntryName(logContext, idPath, namePath, isDir);
+   FhgfsOpsErr result = this->storeInitialDirEntryName(logContext, idPath, namePath, nonInlined);
 
    if (result == FhgfsOpsErr_SUCCESS && getIsBuddyMirrored())
       if (auto* resync = BuddyResyncer::getSyncChangeset())
       {
-         if (!isDir)
+         if (!nonInlined)
             resync->addModification(idPath, MetaSyncFileType::Inode);
 
          resync->addModification(namePath, MetaSyncFileType::Dentry);

@@ -385,9 +385,9 @@ DB_TEST(testFindDuplicateInodeIDs)
 
    ASSERT_TRUE(c.step());
    {
-      std::set<std::pair<uint32_t,bool>> nodes;
-      nodes.insert(std::make_pair(3000, false));
-      nodes.insert(std::make_pair(2, false));
+      std::set<FsckDuplicateInodeInfo> nodes;
+      nodes.insert(FsckDuplicateInodeInfo(std::string("0-1-1"), std::string("0-2-1"), 3000, false, false, DirEntryType_DIRECTORY));
+      nodes.insert(FsckDuplicateInodeInfo(std::string("0-1-1"), std::string("0-2-1"), 2, true, false, DirEntryType_REGULARFILE));
 
       ASSERT_EQ(c.get()->first, db::EntryID(0, 1, 1));
       ASSERT_EQ(c.get()->second.size(), 2u);
@@ -396,9 +396,9 @@ DB_TEST(testFindDuplicateInodeIDs)
 
    ASSERT_TRUE(c.step());
    {
-      std::set<std::pair<uint32_t,bool>> nodes;
-      nodes.insert(std::make_pair(3002, false));
-      nodes.insert(std::make_pair(2, false));
+      std::set<FsckDuplicateInodeInfo> nodes;
+      nodes.insert(FsckDuplicateInodeInfo(std::string("2-1-1"), std::string("2-2-1"), 3002, false, false, DirEntryType_DIRECTORY));
+      nodes.insert(FsckDuplicateInodeInfo(std::string("2-1-1"), std::string("2-2-1"), 2, false, false, DirEntryType_DIRECTORY));
 
       ASSERT_EQ(c.get()->first, db::EntryID(2, 1, 1));
       ASSERT_EQ(c.get()->second.size(), 2u);
@@ -407,9 +407,9 @@ DB_TEST(testFindDuplicateInodeIDs)
 
    ASSERT_TRUE(c.step());
    {
-      std::set<std::pair<uint32_t,bool>> nodes;
-      nodes.insert(std::make_pair(2006, false));
-      nodes.insert(std::make_pair(3, false));
+      std::set<FsckDuplicateInodeInfo> nodes;
+      nodes.insert(FsckDuplicateInodeInfo(std::string("6-1-1"), std::string("6-2-1"), 2006, true, false, DirEntryType_REGULARFILE));
+      nodes.insert(FsckDuplicateInodeInfo(std::string("6-1-1"), std::string("6-2-1"), 3, true, false, DirEntryType_REGULARFILE));
 
       ASSERT_EQ(c.get()->first, db::EntryID(6, 1, 1));
       ASSERT_EQ(c.get()->second.size(), 2u);

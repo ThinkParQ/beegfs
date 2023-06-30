@@ -23,6 +23,7 @@
 #include <common/net/message/fsck/UpdateDirAttribsRespMsg.h>
 #include <common/net/message/fsck/UpdateFileAttribsRespMsg.h>
 #include <net/message/fsck/FsckModificationEventMsgEx.h>
+#include <common/net/message/fsck/CheckAndRepairDupInodeRespMsg.h>
 
 // nodes messages
 #include <common/net/message/nodes/GetMirrorBuddyGroupsRespMsg.h>
@@ -42,6 +43,7 @@
 #include <common/net/message/storage/listing/ListDirFromOffsetRespMsg.h>
 #include <common/net/message/storage/lookup/FindOwnerRespMsg.h>
 #include <common/net/message/storage/StatStoragePathRespMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeRespMsg.h>
 
 // general includes
 #include <common/net/message/SimpleMsg.h>
@@ -84,6 +86,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_MkDirResp: { msg = new MkDirRespMsg(); } break;
       case NETMSGTYPE_SetLocalAttrResp: { msg = new SetLocalAttrRespMsg(); } break;
       case NETMSGTYPE_UnlinkFileResp: { msg = new UnlinkFileRespMsg(); } break;
+      case NETMSGTYPE_MoveFileInodeResp: {msg = new MoveFileInodeRespMsg(); } break;
 
       //fsck
       case NETMSGTYPE_RetrieveDirEntriesResp: { msg = new RetrieveDirEntriesRespMsg(); } break;
@@ -106,6 +109,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_FetchFsckChunkListResp: { msg = new FetchFsckChunkListRespMsg(); } break;
       case NETMSGTYPE_MoveChunkFileResp: { msg = new MoveChunkFileRespMsg(); } break;
       case NETMSGTYPE_RemoveInodesResp: { msg = new RemoveInodesRespMsg(); } break;
+      case NETMSGTYPE_CheckAndRepairDupInodeResp: { msg = new CheckAndRepairDupInodeRespMsg(); } break;
 
       //testing
       case NETMSGTYPE_Dummy: { msg = new DummyMsgEx(); } break;

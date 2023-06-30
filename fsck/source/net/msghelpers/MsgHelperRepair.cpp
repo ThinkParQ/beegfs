@@ -20,6 +20,8 @@
 #include <common/net/message/fsck/RecreateDentriesRespMsg.h>
 #include <common/net/message/fsck/RemoveInodesMsg.h>
 #include <common/net/message/fsck/RemoveInodesRespMsg.h>
+#include <common/net/message/fsck/CheckAndRepairDupInodeMsg.h>
+#include <common/net/message/fsck/CheckAndRepairDupInodeRespMsg.h>
 
 #include <common/net/message/fsck/UpdateFileAttribsMsg.h>
 #include <common/net/message/fsck/UpdateFileAttribsRespMsg.h>
@@ -35,6 +37,8 @@
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
 #include <common/net/message/storage/attribs/SetLocalAttrMsg.h>
 #include <common/net/message/storage/attribs/SetLocalAttrRespMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeRespMsg.h>
 
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/MetadataTk.h>
@@ -867,5 +871,81 @@ void MsgHelperRepair::deleteFileInodes(NumNodeID node, bool isBuddyMirrored,
       failedDeletes.clear();
       for (auto it = inodes.begin(); it != inodes.end(); ++it)
          failedDeletes.push_back(it->getID());
+   }
+}
+
+void MsgHelperRepair::deleteDuplicateFileInodes(NumNodeID node, bool isBuddyMirrored,
+      FsckDuplicateInodeInfoVector& dupInodes, StringList& failedEntries, std::set<NumNodeID>& secondariesWithRepair)
+{
+   const char* logContext = "MsgHelperRepair (check and repair duplicate inode)";
+
+   CheckAndRepairDupInodeMsg repairDupInodeMsg(&dupInodes);
+
+   RequestResponseNode rrNode(node, Program::getApp()->getMetaNodes());
+   RequestResponseArgs rrArgs(nullptr, &repairDupInodeMsg, NETMSGTYPE_CheckAndRepairDupInodeResp);
+
+   if (isBuddyMirrored)
+   {
+      rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, {}, failedEntries))
+      {
+         for (auto it = dupInodes.begin(); it != dupInodes.end(); ++it)
+            failedEntries.push_back(it->getID());
+         return;
+      }
+   }
+
+   FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+
+   if (commRes == FhgfsOpsErr_SUCCESS)
+   {
+      CheckAndRepairDupInodeRespMsg* repairDupInodeRespMsg = (CheckAndRepairDupInodeRespMsg*) rrArgs.outRespMsg.get();
+      failedEntries = repairDupInodeRespMsg->releaseFailedEntryIDList();
+
+      for (StringListIter iter = failedEntries.begin(); iter != failedEntries.end(); ++iter)
+      {
+         LogContext(logContext).logErr("Failed to repair duplicate inode, entryID: " + *iter);
+      }
+   }
+   else
+   {
+      LogContext(logContext).logErr("Communication error occured with node: " + std::to_string(node.val()));
+   }
+}
+
+void MsgHelperRepair::deinlineFileInode(NumNodeID node, EntryInfo* entryInfo, StringList& failedEntries,
+   std::set<NumNodeID>& secondariesWithRepair)
+{
+   const char* logContext = "MsgHelperRepair (Deinline File Inode)";
+
+   MoveFileInodeMsg msg(entryInfo, MODE_DEINLINE);
+
+   RequestResponseNode rrNode(node, Program::getApp()->getMetaNodes());
+   RequestResponseArgs rrArgs(nullptr, &msg, NETMSGTYPE_MoveFileInodeResp);
+
+   if (entryInfo->getIsBuddyMirrored())
+   {
+      rrNode.setMirrorInfo(Program::getApp()->getMetaMirrorBuddyGroupMapper(), false);
+      if (!setSecondaryBad(node.val(), secondariesWithRepair, {}, failedEntries))
+      {
+         failedEntries.push_back(entryInfo->getEntryID());
+         return;
+      }
+   }
+
+   FhgfsOpsErr commRes = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+   if (commRes == FhgfsOpsErr_SUCCESS)
+   {
+      auto respMsg = (MoveFileInodeRespMsg*) rrArgs.outRespMsg.get();
+      if (respMsg->getResult() != FhgfsOpsErr_SUCCESS)
+      {
+         LogContext(logContext).logErr("Failed to migrate hardlink metadata to new version, entryID: " + entryInfo->getEntryID());
+         failedEntries.push_back(entryInfo->getEntryID());
+      }
+   }
+   else
+   {
+      failedEntries.push_back(entryInfo->getEntryID());
+      LogContext(logContext).logErr("Communication error occured with node: " + std::to_string(node.val()));
    }
 }

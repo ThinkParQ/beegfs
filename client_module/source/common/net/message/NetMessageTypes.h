@@ -158,6 +158,10 @@
 #define NETMSGTYPE_ResyncRawInodesResp             2116
 #define NETMSGTYPE_GetMetaResyncStats              2117
 #define NETMSGTYPE_GetMetaResyncStatsResp          2118
+#define NETMSGTYPE_MoveFileInode                   2119
+#define NETMSGTYPE_MoveFileInodeResp               2120
+#define NETMSGTYPE_UnlinkLocalFileInode            2121
+#define NETMSGTYPE_UnlinkLocalFileInodeResp        2122
 
 // session messages
 #define NETMSGTYPE_OpenFile                        3001
@@ -259,5 +263,7 @@
 #define NETMSGTYPE_AdjustChunkPermissionsResp      7041
 #define NETMSGTYPE_MoveChunkFile                   7042
 #define NETMSGTYPE_MoveChunkFileResp               7043
+#define NETMSGTYPE_CheckAndRepairDupInode          7044
+#define NETMSGTYPE_CheckAndRepairDupInodeResp      7045
 
 #endif /*NETMESSAGETYPES_H_*/

@@ -83,6 +83,7 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
    EntryInfo* toDirInfo    = this->getToDirInfo();
    std::string newName     = this->getNewName();
 
+   EntryInfo overWrittenEntryInfo;
    std::unique_ptr<FileInode> unlinkInode;
    unsigned inodeBufLen;
    std::unique_ptr<char[]> inodeBuf;
@@ -93,7 +94,8 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
       return boost::make_unique<MovingFileInsertResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
    FhgfsOpsErr moveRes = metaStore->moveRemoteFileInsert(
-      fromFileInfo, *toDir, newName, getSerialBuf(), getSerialBufLen(), &unlinkInode, newFileInfo);
+      fromFileInfo, *toDir, newName, getSerialBuf(), getSerialBufLen(), &unlinkInode,
+      &overWrittenEntryInfo, newFileInfo);
    if (moveRes != FhgfsOpsErr_SUCCESS)
    {
       metaStore->releaseDir(toDir->getID());
@@ -155,7 +157,7 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
    metaStore->releaseDir(toDir->getID());
 
    return boost::make_unique<MovingFileInsertResponseState>(FhgfsOpsErr_SUCCESS, inodeBufLen,
-         std::move(inodeBuf));
+      std::move(inodeBuf), overWrittenEntryInfo);
 
 xattr_error:
    MsgHelperUnlink::unlinkMetaFile(*toDir, newName, NULL);

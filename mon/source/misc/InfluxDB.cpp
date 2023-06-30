@@ -57,11 +57,14 @@ void InfluxDB::insertMetaNodeData(std::shared_ptr<Node> node, const MetaNodeData
    point << "meta";
    point << ",nodeID=" << escapeStringForWrite(node->getID());
    point << ",nodeNumID=" << node->getNumID();
+
    if(data.isResponding)
    {
       point << " isResponding=" << std::boolalpha << true;
       point << ",indirectWorkListSize=" << data.indirectWorkListSize;
       point << ",directWorkListSize=" << data.directWorkListSize;
+      point << ",hostnameid=\"" << data.hostnameid << "\"";
+
    }
    else
    {
@@ -86,6 +89,8 @@ void InfluxDB::insertStorageNodeData(std::shared_ptr<Node> node,
       point << ",directWorkListSize=" << data.directWorkListSize;
       point << ",diskSpaceTotal=" << data.diskSpaceTotal;
       point << ",diskSpaceFree=" << data.diskSpaceFree;
+      point << ",hostnameid=\"" << data.hostnameid << "\"";
+
    }
    else
    {

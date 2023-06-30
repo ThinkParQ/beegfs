@@ -20,7 +20,7 @@ class HardlinkMsgEx : public MirroredMessage<HardlinkMsg,
       std::tuple<FileIDLock, ParentNameLock, ParentNameLock, FileIDLock>
          lock(EntryLockStore& store) override;
 
-      bool isMirrored() override { return getToDirInfo()->getIsBuddyMirrored(); }
+      bool isMirrored() override { return getFromInfo()->getIsBuddyMirrored(); }
 
    private:
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
@@ -32,6 +32,7 @@ class HardlinkMsgEx : public MirroredMessage<HardlinkMsg,
          return (FhgfsOpsErr) static_cast<HardlinkRespMsg&>(resp).getValue();
       }
 
+      FhgfsOpsErr incDecRemoteLinkCount(NumNodeID const& ownerNodeID, bool increment);
       const char* mirrorLogContext() const override { return "HardlinkMsgEx/forward"; }
 };
 

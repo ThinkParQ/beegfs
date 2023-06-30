@@ -95,7 +95,16 @@ void DiskMetaData::serializeInDentryFormat(Serializer& ser, DiskMetaDataType met
    }
    else
    {
-      if (this->inodeData->getOrigFeature() == FileInodeOrigFeature_TRUE)
+      if (metaDataType == DiskMetaDataType_FILEINODE)
+      {
+         dentryFormatVersion = DIRENTRY_STORAGE_FORMAT_VER6;
+      }
+      else if ((!(this->dentryDiskData->getDentryFeatureFlags() &
+         DENTRY_FEATURE_INODE_INLINE)))
+      {
+         dentryFormatVersion = DIRENTRY_STORAGE_FORMAT_VER3;
+      }
+      else if (this->inodeData->getOrigFeature() == FileInodeOrigFeature_TRUE)
          dentryFormatVersion = DIRENTRY_STORAGE_FORMAT_VER6;
       else
          dentryFormatVersion = DIRENTRY_STORAGE_FORMAT_VER4;

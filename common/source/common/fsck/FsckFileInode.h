@@ -133,6 +133,7 @@ class FsckFileInode
       uint64_t getUsedBlocks() const { return this->usedBlocks; }
 
       const UInt16Vector& getStripeTargets() const { return stripeTargets; }
+      void setStripeTargets(const UInt16Vector& targets) { stripeTargets = targets; }
 
       FsckStripePatternType getStripePatternType() const { return stripePatternType; }
 
@@ -141,6 +142,7 @@ class FsckFileInode
       NumNodeID getSaveNodeID() const { return saveNodeID; }
 
       bool getIsInlined() const { return isInlined; }
+      void setIsInlined(bool value) { isInlined = value; }
 
       bool getIsBuddyMirrored() const { return isBuddyMirrored; }
 

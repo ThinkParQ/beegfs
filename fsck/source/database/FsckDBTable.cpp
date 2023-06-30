@@ -264,6 +264,47 @@ Table<db::StripeTargets, true>::QueryType FsckDBFileInodesTable::getTargets()
    return this->targets.cursor();
 }
 
+UInt16Vector FsckDBFileInodesTable::getStripeTargetsByKey(const db::EntryID& id)
+{
+   UInt16Vector allStripeTargets;
+   std::pair<bool, db::FileInode> result = this->get(id.str());
+
+   if (!result.first)
+      return allStripeTargets;
+
+   // firstly copy stripeTargets from FileInode object
+   auto inode = result.second;
+   uint32_t targetArrSize = inode.NTARGETS;
+   uint32_t numTargets = (inode.stripePatternSize > targetArrSize) ? targetArrSize
+      : inode.stripePatternSize;
+
+   std::copy(inode.targets, inode.targets + numTargets, std::back_inserter(allStripeTargets));
+
+   // if extraTargets are present then get them from targets table
+   uint32_t numExtraTargets = inode.stripePatternSize - numTargets;
+   if (numExtraTargets)
+   {
+      this->targets.commitChanges();
+      auto dbRes = this->targets.getAllByKey(id);
+
+      while (dbRes.step())
+      {
+         auto elem = dbRes.get();
+
+         for (int i=0; i<elem->NTARGETS; i++)
+         {
+            allStripeTargets.push_back(elem->targets[i]);
+            numExtraTargets -= 1;
+            if (numExtraTargets == 0) break;
+         }
+
+         if (numExtraTargets == 0) break;
+      }
+   }
+
+   return allStripeTargets;
+}
+
 std::pair<bool, db::FileInode> FsckDBFileInodesTable::get(std::string id)
 {
    this->inodes.commitChanges();

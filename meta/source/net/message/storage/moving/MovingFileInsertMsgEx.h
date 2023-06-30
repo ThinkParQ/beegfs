@@ -31,17 +31,20 @@ class MovingFileInsertResponseState : public MirroredMessageResponseState
             inodeBuf.reset(new char[inodeBufLen]);
             des.getBlock(inodeBuf.get(), inodeBufLen);
          }
+
+         des % overWrittenEntryInfo;
       }
 
       MovingFileInsertResponseState(FhgfsOpsErr result, unsigned inodeBufLen,
-            std::unique_ptr<char[]> inodeBuf)
-         : result(result), inodeBufLen(inodeBufLen), inodeBuf(std::move(inodeBuf))
+            std::unique_ptr<char[]> inodeBuf, EntryInfo entryInfo)
+         : result(result), inodeBufLen(inodeBufLen), inodeBuf(std::move(inodeBuf)),
+            overWrittenEntryInfo(entryInfo)
       {
       }
 
       void sendResponse(NetMessage::ResponseContext& ctx) override
       {
-         ctx.sendResponse(MovingFileInsertRespMsg(result, inodeBufLen, inodeBuf.get()));
+         ctx.sendResponse(MovingFileInsertRespMsg(result, inodeBufLen, inodeBuf.get(), overWrittenEntryInfo));
       }
 
       bool changesObservableState() const override
@@ -65,6 +68,7 @@ class MovingFileInsertResponseState : public MirroredMessageResponseState
       FhgfsOpsErr result;
       unsigned inodeBufLen;
       std::unique_ptr<char[]> inodeBuf;
+      EntryInfo overWrittenEntryInfo;
 };
 
 class MovingFileInsertMsgEx : public MirroredMessage<MovingFileInsertMsg,

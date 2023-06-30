@@ -11,6 +11,7 @@ struct MetaNodeDataContent
    unsigned indirectWorkListSize;
    unsigned directWorkListSize;
    unsigned sessionCount;
+   std::string hostnameid;
 };
 
 class MetaNodeEx: public Node

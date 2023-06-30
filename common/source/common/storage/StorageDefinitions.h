@@ -54,6 +54,13 @@ enum DirEntryType
    DirEntryType_FIFO = 6, DirEntryType_SOCKET = 7
 };
 
+enum FileInodeMode
+{
+   MODE_INVALID = -1,
+   MODE_DEINLINE,
+   MODE_REINLINE
+};
+
 template<>
 struct SerializeAs<DirEntryType> {
    typedef uint8_t type;

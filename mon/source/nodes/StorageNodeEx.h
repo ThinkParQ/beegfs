@@ -18,6 +18,7 @@ struct StorageNodeDataContent
       int64_t diskWrite;
 
       unsigned sessionCount;
+      std::string hostnameid;
 };
 
 class StorageNodeEx : public Node

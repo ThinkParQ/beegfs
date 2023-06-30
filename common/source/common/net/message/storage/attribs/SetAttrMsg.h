@@ -10,8 +10,11 @@
 #include <common/storage/StorageDefinitions.h>
 
 
-#define SETATTRMSG_FLAG_USE_QUOTA            1 /* if the message contains quota informations */
-#define SETATTRMSG_FLAG_HAS_EVENT            4 /* contains file event logging information */
+#define SETATTRMSG_FLAG_USE_QUOTA            1  /* if the message contains quota informations */
+#define SETATTRMSG_FLAG_HAS_EVENT            4  /* contains file event logging information */
+#define SETATTRMSG_FLAG_INCR_NLINKCNT        8  /* increment nlink count */
+#define SETATTRMSG_FLAG_DECR_NLINKCNT        16 /* decrement nlink count */
+
 
 class SetAttrMsg : public MirroredMessageBase<SetAttrMsg>
 {
@@ -96,7 +99,9 @@ class SetAttrMsg : public MirroredMessageBase<SetAttrMsg>
       unsigned getSupportedHeaderFeatureFlagsMask() const
       {
          return SETATTRMSG_FLAG_USE_QUOTA |
-            SETATTRMSG_FLAG_HAS_EVENT;
+            SETATTRMSG_FLAG_HAS_EVENT |
+            SETATTRMSG_FLAG_INCR_NLINKCNT |
+            SETATTRMSG_FLAG_DECR_NLINKCNT;
       }
 
       bool supportsMirroring() const { return true; }

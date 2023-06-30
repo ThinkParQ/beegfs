@@ -13,6 +13,8 @@ class MsgHelperUnlink
          unsigned msgUserID);
       static FhgfsOpsErr unlinkMetaFile(DirInode& parentDir, const std::string& removeName,
          std::unique_ptr<FileInode>* outUnlinkedFile);
+      static FhgfsOpsErr unlinkFileInode(EntryInfo* delFileInfo,
+         std::unique_ptr<FileInode>* outUnlinkedFile);
       static FhgfsOpsErr unlinkChunkFiles(FileInode* unlinkedInode, unsigned msgUserID);
 
    private:

@@ -480,21 +480,20 @@ FhgfsOpsErr ModeCheckFS::gatherData(bool forceRestart)
 }
 
 template<typename Obj, typename State>
-int64_t ModeCheckFS::checkAndRepairGeneric(Cursor<Obj> cursor,
-   void (ModeCheckFS::*repair)(Obj&, State&), State& state)
+FsckErrCount ModeCheckFS::checkAndRepairGeneric(Cursor<Obj> cursor,
+   void (ModeCheckFS::*repair)(Obj&, FsckErrCount&, State&), State& state)
 {
-   int64_t errorCount = 0;
+   FsckErrCount errorCount;
 
    while(cursor.step() )
    {
       Obj* entry = cursor.get();
 
-      (this->*repair)(*entry, state);
-      errorCount++;
+      (this->*repair)(*entry, errorCount, state);
    }
 
 
-   if(errorCount)
+   if (errorCount.getTotalErrors())
    {
       database->getDentryTable()->commitChanges();
       database->getFileInodesTable()->commitChanges();
@@ -503,7 +502,7 @@ int64_t ModeCheckFS::checkAndRepairGeneric(Cursor<Obj> cursor,
       database->getContDirsTable()->commitChanges();
       database->getFsIDsTable()->commitChanges();
 
-      FsckTkEx::fsckOutput(">>> Found " + StringTk::int64ToStr(errorCount)
+      FsckTkEx::fsckOutput(">>> Found " + StringTk::int64ToStr(errorCount.getTotalErrors())
          + " errors. Detailed information can also be found in "
          + Program::getApp()->getConfig()->getLogOutFile() + ".",
       OutputOptions_DOUBLELINEBREAK);
@@ -517,7 +516,7 @@ int64_t ModeCheckFS::checkAndRepairGeneric(Cursor<Obj> cursor,
    return errorCount;
 }
 
-int64_t ModeCheckFS::checkAndRepairDanglingDentry()
+FsckErrCount ModeCheckFS::checkAndRepairDanglingDentry()
 {
    FsckRepairAction fileActions[] = {
       FsckRepairAction_NOTHING,
@@ -542,7 +541,7 @@ int64_t ModeCheckFS::checkAndRepairDanglingDentry()
       &ModeCheckFS::repairDanglingDirEntry, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairWrongInodeOwner()
+FsckErrCount ModeCheckFS::checkAndRepairWrongInodeOwner()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -558,7 +557,7 @@ int64_t ModeCheckFS::checkAndRepairWrongInodeOwner()
       &ModeCheckFS::repairWrongInodeOwner, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairWrongOwnerInDentry()
+FsckErrCount ModeCheckFS::checkAndRepairWrongOwnerInDentry()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -574,7 +573,7 @@ int64_t ModeCheckFS::checkAndRepairWrongOwnerInDentry()
       &ModeCheckFS::repairWrongInodeOwnerInDentry, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairOrphanedContDir()
+FsckErrCount ModeCheckFS::checkAndRepairOrphanedContDir()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -590,7 +589,7 @@ int64_t ModeCheckFS::checkAndRepairOrphanedContDir()
       &ModeCheckFS::repairOrphanedContDir, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairOrphanedDirInode()
+FsckErrCount ModeCheckFS::checkAndRepairOrphanedDirInode()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -602,14 +601,14 @@ int64_t ModeCheckFS::checkAndRepairOrphanedDirInode()
    FsckTkEx::fsckOutput("* Checking: Dir inode without a dentry pointing to it (orphaned inode) ...",
       OutputOptions_FLUSH | OutputOptions_LINEBREAK);
 
-   bool result = checkAndRepairGeneric(this->database->findOrphanedDirInodes(),
+   auto result = checkAndRepairGeneric(this->database->findOrphanedDirInodes(),
       &ModeCheckFS::repairOrphanedDirInode, prompt);
 
    releaseLostAndFound();
    return result;
 }
 
-int64_t ModeCheckFS::checkAndRepairOrphanedFileInode()
+FsckErrCount ModeCheckFS::checkAndRepairOrphanedFileInode()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -626,7 +625,22 @@ int64_t ModeCheckFS::checkAndRepairOrphanedFileInode()
       &ModeCheckFS::repairOrphanedFileInode, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairOrphanedChunk()
+FsckErrCount ModeCheckFS::checkAndRepairDuplicateInodes()
+{
+   FsckRepairAction possibleActions[] = {
+      FsckRepairAction_NOTHING,
+      FsckRepairAction_REPAIRDUPLICATEINODE,
+   };
+
+   UserPrompter prompt(possibleActions, FsckRepairAction_REPAIRDUPLICATEINODE);
+
+   FsckTkEx::fsckOutput("* Checking: Duplicate inodes ...", OutputOptions_FLUSH | OutputOptions_LINEBREAK);
+
+   return checkAndRepairGeneric(this->database->findDuplicateInodeIDs(),
+      &ModeCheckFS::repairDuplicateInode, prompt);
+}
+
+FsckErrCount ModeCheckFS::checkAndRepairOrphanedChunk()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -642,7 +656,7 @@ int64_t ModeCheckFS::checkAndRepairOrphanedChunk()
       &ModeCheckFS::repairOrphanedChunk, state);
 }
 
-int64_t ModeCheckFS::checkAndRepairMissingContDir()
+FsckErrCount ModeCheckFS::checkAndRepairMissingContDir()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -658,7 +672,7 @@ int64_t ModeCheckFS::checkAndRepairMissingContDir()
       &ModeCheckFS::repairMissingContDir, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairWrongFileAttribs()
+FsckErrCount ModeCheckFS::checkAndRepairWrongFileAttribs()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -674,7 +688,7 @@ int64_t ModeCheckFS::checkAndRepairWrongFileAttribs()
       &ModeCheckFS::repairWrongFileAttribs, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairWrongDirAttribs()
+FsckErrCount ModeCheckFS::checkAndRepairWrongDirAttribs()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -690,7 +704,7 @@ int64_t ModeCheckFS::checkAndRepairWrongDirAttribs()
       &ModeCheckFS::repairWrongDirAttribs, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairFilesWithMissingTargets()
+FsckErrCount ModeCheckFS::checkAndRepairFilesWithMissingTargets()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -708,7 +722,7 @@ int64_t ModeCheckFS::checkAndRepairFilesWithMissingTargets()
       &ModeCheckFS::repairFileWithMissingTargets, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairDirEntriesWithBrokeByIDFile()
+FsckErrCount ModeCheckFS::checkAndRepairDirEntriesWithBrokeByIDFile()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -724,7 +738,7 @@ int64_t ModeCheckFS::checkAndRepairDirEntriesWithBrokeByIDFile()
       &ModeCheckFS::repairDirEntryWithBrokenByIDFile, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairOrphanedDentryByIDFiles()
+FsckErrCount ModeCheckFS::checkAndRepairOrphanedDentryByIDFiles()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -740,7 +754,7 @@ int64_t ModeCheckFS::checkAndRepairOrphanedDentryByIDFiles()
       &ModeCheckFS::repairOrphanedDentryByIDFile, prompt);
 }
 
-int64_t ModeCheckFS::checkAndRepairChunksWithWrongPermissions()
+FsckErrCount ModeCheckFS::checkAndRepairChunksWithWrongPermissions()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -757,7 +771,7 @@ int64_t ModeCheckFS::checkAndRepairChunksWithWrongPermissions()
 }
 
 // no repair at the moment
-int64_t ModeCheckFS::checkAndRepairChunksInWrongPath()
+FsckErrCount ModeCheckFS::checkAndRepairChunksInWrongPath()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -773,28 +787,64 @@ int64_t ModeCheckFS::checkAndRepairChunksInWrongPath()
       &ModeCheckFS::repairWrongChunkPath, prompt);
 }
 
-int64_t ModeCheckFS::checkDuplicateInodeIDs()
+FsckErrCount ModeCheckFS::checkAndUpdateOldStyledHardlinks()
 {
-   FsckTkEx::fsckOutput("* Checking: Duplicated inode IDs ... ",
-      OutputOptions_FLUSH |  OutputOptions_LINEBREAK);
+   FsckRepairAction possibleActions[] = {
+      FsckRepairAction_NOTHING,
+      FsckRepairAction_UPDATEOLDTYLEDHARDLINKS,
+   };
 
-   int dummy = 0;
-   return checkAndRepairGeneric(this->database->findDuplicateInodeIDs(),
-      &ModeCheckFS::logDuplicateInodeID, dummy);
+   UserPrompter prompt(possibleActions, FsckRepairAction_UPDATEOLDTYLEDHARDLINKS);
+
+   FsckTkEx::fsckOutput("* Checking: Files having an inlined inode with multiple hardlinks ...",
+      OutputOptions_FLUSH | OutputOptions_LINEBREAK);
+
+   return checkAndRepairGeneric(this->database->findFilesWithMultipleHardlinks(),
+      &ModeCheckFS::updateOldStyledHardlinks, prompt);
 }
 
 void ModeCheckFS::logDuplicateInodeID(checks::DuplicatedInode& dups, int&)
 {
    FsckTkEx::fsckOutput(">>> Found duplicated ID " + dups.first.str(),
       OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
+
+   db::EntryID entryID = dups.first;
+   std::string filePath = this->database->getDentryTable()->getPathOf(entryID);
+   FsckTkEx::fsckOutput("     File path: " + filePath,
+      OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
+
    for(const auto& it : dups.second)
    {
-      FsckTkEx::fsckOutput("   * Found on " + std::string(it.second ? "buddy group " : "node ")
-            + StringTk::uintToStr(it.first), OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
+      std::string parentDirID = it.getParentDirID();
+      unsigned ownerNodeID = it.getSaveNodeID();
+      bool isInlined = it.getIsInlined();
+      bool isBuddyMirrored = it.getIsBuddyMirrored();
+
+      std::string metaFilePath;
+      if (isInlined)
+      {
+         std::string dentriesPath;
+         dentriesPath += isBuddyMirrored ? META_BUDDYMIRROR_SUBDIR_NAME : "";
+         dentriesPath += std::string("/") + META_DENTRIES_SUBDIR_NAME;
+
+         metaFilePath = StorageTk::getHashPath(dentriesPath, parentDirID, META_DENTRIES_LEVEL1_SUBDIR_NUM, META_DENTRIES_LEVEL2_SUBDIR_NUM);
+         metaFilePath += std::string("/") + META_DIRENTRYID_SUB_STR + "/" + entryID.str();
+      }
+      else
+      {
+         std::string inodesPath;
+         inodesPath += isBuddyMirrored ? META_BUDDYMIRROR_SUBDIR_NAME : "";
+         inodesPath += std::string("/") + META_INODES_SUBDIR_NAME;
+
+         metaFilePath = StorageTk::getHashPath(inodesPath, entryID.str(), META_INODES_LEVEL1_SUBDIR_NUM, META_INODES_LEVEL2_SUBDIR_NUM);
+      }
+
+      FsckTkEx::fsckOutput("   * Found on " + std::string(isBuddyMirrored ? "buddy group " : "node ")
+            + StringTk::uintToStr(ownerNodeID) + "; Metapath: " + metaFilePath, OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
    }
 }
 
-int64_t ModeCheckFS::checkDuplicateChunks()
+FsckErrCount ModeCheckFS::checkDuplicateChunks()
 {
    FsckTkEx::fsckOutput("* Checking: Duplicated chunks ...", OutputOptions_FLUSH | OutputOptions_LINEBREAK);
 
@@ -803,10 +853,13 @@ int64_t ModeCheckFS::checkDuplicateChunks()
       &ModeCheckFS::logDuplicateChunk, dummy);
 }
 
-void ModeCheckFS::logDuplicateChunk(std::list<FsckChunk>& dups, int&)
+void ModeCheckFS::logDuplicateChunk(std::list<FsckChunk>& dups, FsckErrCount& errCount, int&)
 {
    FsckTkEx::fsckOutput(">>> Found duplicated Chunks for ID " + dups.begin()->getID(),
       OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
+
+   errCount.unfixableErrors++;
+
    for(std::list<FsckChunk>::iterator it = dups.begin(), end = dups.end();
          it != end; ++it)
    {
@@ -819,7 +872,7 @@ void ModeCheckFS::logDuplicateChunk(std::list<FsckChunk>& dups, int&)
    }
 }
 
-int64_t ModeCheckFS::checkDuplicateContDirs()
+FsckErrCount ModeCheckFS::checkDuplicateContDirs()
 {
    FsckTkEx::fsckOutput("* Checking: Duplicated content directores ...",
          OutputOptions_FLUSH | OutputOptions_LINEBREAK);
@@ -829,8 +882,10 @@ int64_t ModeCheckFS::checkDuplicateContDirs()
       &ModeCheckFS::logDuplicateContDir, dummy);
 }
 
-void ModeCheckFS::logDuplicateContDir(std::list<db::ContDir>& dups, int&)
+void ModeCheckFS::logDuplicateContDir(std::list<db::ContDir>& dups, FsckErrCount& errCount, int&)
 {
+   errCount.unfixableErrors++;
+
    FsckTkEx::fsckOutput(">>> Found duplicated content directories for ID " + dups.front().id.str(),
       OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
    for (auto it = dups.begin(), end = dups.end(); it != end; ++it)
@@ -842,7 +897,7 @@ void ModeCheckFS::logDuplicateContDir(std::list<db::ContDir>& dups, int&)
    }
 }
 
-int64_t ModeCheckFS::checkMismirroredDentries()
+FsckErrCount ModeCheckFS::checkMismirroredDentries()
 {
    FsckTkEx::fsckOutput("* Checking: Bad target mirror information in dentry ...",
          OutputOptions_FLUSH | OutputOptions_LINEBREAK);
@@ -852,15 +907,17 @@ int64_t ModeCheckFS::checkMismirroredDentries()
       &ModeCheckFS::logMismirroredDentry, dummy);
 }
 
-void ModeCheckFS::logMismirroredDentry(db::DirEntry& entry, int&)
+void ModeCheckFS::logMismirroredDentry(db::DirEntry& entry, FsckErrCount& errCount, int&)
 {
+   errCount.unfixableErrors++;
+
    FsckTkEx::fsckOutput(">>> Found mismirrored dentry " +
          database->getDentryTable()->getNameOf(entry) + " on " +
          (entry.isBuddyMirrored ? "buddy group " : "node ") +
          StringTk::uintToStr(entry.saveNodeID) + " " + StringTk::uintToStr(entry.entryOwnerNodeID));
 }
 
-int64_t ModeCheckFS::checkMismirroredDirectories()
+FsckErrCount ModeCheckFS::checkMismirroredDirectories()
 {
    FsckTkEx::fsckOutput("* Checking: Bad content mirror information in dir inode ...",
          OutputOptions_FLUSH | OutputOptions_LINEBREAK);
@@ -870,15 +927,17 @@ int64_t ModeCheckFS::checkMismirroredDirectories()
       &ModeCheckFS::logMismirroredDirectory, dummy);
 }
 
-void ModeCheckFS::logMismirroredDirectory(db::DirInode& dir, int&)
+void ModeCheckFS::logMismirroredDirectory(db::DirInode& dir, FsckErrCount& errCount, int&)
 {
+   errCount.unfixableErrors++;
+
    FsckTkEx::fsckOutput(">>> Found mismirrored directory " + dir.id.str() + " on " +
          (dir.isBuddyMirrored ? "buddy group " : "node ") +
          StringTk::uintToStr(dir.saveNodeID));
 ;
 }
 
-int64_t ModeCheckFS::checkMismirroredFiles()
+FsckErrCount ModeCheckFS::checkMismirroredFiles()
 {
    FsckTkEx::fsckOutput("* Checking: Bad content mirror information in file inode ...",
          OutputOptions_FLUSH | OutputOptions_LINEBREAK);
@@ -888,14 +947,16 @@ int64_t ModeCheckFS::checkMismirroredFiles()
       &ModeCheckFS::logMismirroredFile, dummy);
 }
 
-void ModeCheckFS::logMismirroredFile(db::FileInode& file, int&)
+void ModeCheckFS::logMismirroredFile(db::FileInode& file, FsckErrCount& errCount, int&)
 {
+   errCount.unfixableErrors++;
+
    FsckTkEx::fsckOutput(">>> Found mismirrored file " + file.id.str() + " on " +
          std::string(file.isBuddyMirrored ? "buddy group " : "node ") +
          StringTk::uintToStr(file.saveNodeID));
 }
 
-int64_t ModeCheckFS::checkAndRepairMalformedChunk()
+FsckErrCount ModeCheckFS::checkAndRepairMalformedChunk()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
@@ -910,8 +971,10 @@ int64_t ModeCheckFS::checkAndRepairMalformedChunk()
       &ModeCheckFS::repairMalformedChunk, prompt);
 }
 
-void ModeCheckFS::repairMalformedChunk(FsckChunk& chunk, UserPrompter& prompt)
+void ModeCheckFS::repairMalformedChunk(FsckChunk& chunk, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("Chunk ID: " + chunk.getID() + " on " +
          (chunk.getBuddyGroupID()
             ? "buddy group " + StringTk::uintToStr(chunk.getBuddyGroupID())
@@ -955,37 +1018,76 @@ void ModeCheckFS::checkAndRepair()
 
    Config* cfg = Program::getApp()->getConfig();
 
-   int64_t errorCount = 0;
+   FsckErrCount errorCount;
 
-   errorCount += checkDuplicateInodeIDs();
+   errorCount += checkAndRepairDuplicateInodes();
    errorCount += checkDuplicateChunks();
    errorCount += checkDuplicateContDirs();
    errorCount += checkMismirroredDentries();
    errorCount += checkMismirroredDirectories();
    errorCount += checkMismirroredFiles();
 
-   if(errorCount)
+   if (errorCount.unfixableErrors)
    {
       FsckTkEx::fsckOutput("Found errors beegfs-fsck cannot fix. Please consult the log for "
          "more information.", OutputOptions_LINEBREAK);
       return;
    }
 
-   errorCount += checkAndRepairMalformedChunk();
-   errorCount += checkAndRepairFilesWithMissingTargets();
-   errorCount += checkAndRepairOrphanedDentryByIDFiles();
-   errorCount += checkAndRepairDirEntriesWithBrokeByIDFile();
-   errorCount += checkAndRepairOrphanedChunk();
-   errorCount += checkAndRepairChunksInWrongPath();
-   errorCount += checkAndRepairWrongInodeOwner();
-   errorCount += checkAndRepairWrongOwnerInDentry();
-   errorCount += checkAndRepairOrphanedContDir();
-   errorCount += checkAndRepairOrphanedDirInode();
-   errorCount += checkAndRepairOrphanedFileInode();
-   errorCount += checkAndRepairDanglingDentry();
-   errorCount += checkAndRepairMissingContDir();
-   errorCount += checkAndRepairWrongFileAttribs();
-   errorCount += checkAndRepairWrongDirAttribs();
+   std::bitset<CHECK_FS_ACTIONS_COUNT> checkFsActions = cfg->getCheckFsActions();
+   if (checkFsActions.none())
+   {
+      // enable all checks if user didn't specified specific checks to run
+      checkFsActions.set();
+   }
+
+   if (checkFsActions.test(CHECK_MALFORMED_CHUNK))
+      errorCount += checkAndRepairMalformedChunk();
+
+   if (checkFsActions.test(CHECK_FILES_WITH_MISSING_TARGETS))
+      errorCount += checkAndRepairFilesWithMissingTargets();
+
+   if (checkFsActions.test(CHECK_ORPHANED_DENTRY_BYIDFILES))
+      errorCount += checkAndRepairOrphanedDentryByIDFiles();
+
+   if (checkFsActions.test(CHECK_DIRENTRIES_WITH_BROKENIDFILE))
+      errorCount += checkAndRepairDirEntriesWithBrokeByIDFile();
+
+   if (checkFsActions.test(CHECK_ORPHANED_CHUNK))
+      errorCount += checkAndRepairOrphanedChunk();
+
+   if (checkFsActions.test(CHECK_CHUNKS_IN_WRONGPATH))
+      errorCount += checkAndRepairChunksInWrongPath();
+
+   if (checkFsActions.test(CHECK_WRONG_INODE_OWNER))
+      errorCount += checkAndRepairWrongInodeOwner();
+
+   if (checkFsActions.test(CHECK_WRONG_OWNER_IN_DENTRY))
+      errorCount += checkAndRepairWrongOwnerInDentry();
+
+   if (checkFsActions.test(CHECK_ORPHANED_CONT_DIR))
+      errorCount += checkAndRepairOrphanedContDir();
+
+   if (checkFsActions.test(CHECK_ORPHANED_DIR_INODE))
+      errorCount += checkAndRepairOrphanedDirInode();
+
+   if (checkFsActions.test(CHECK_ORPHANED_FILE_INODE))
+      errorCount += checkAndRepairOrphanedFileInode();
+
+   if (checkFsActions.test(CHECK_DANGLING_DENTRY))
+      errorCount += checkAndRepairDanglingDentry();
+
+   if (checkFsActions.test(CHECK_MISSING_CONT_DIR))
+      errorCount += checkAndRepairMissingContDir();
+
+   if (checkFsActions.test(CHECK_WRONG_FILE_ATTRIBS))
+      errorCount += checkAndRepairWrongFileAttribs();
+
+   if (checkFsActions.test(CHECK_WRONG_DIR_ATTRIBS))
+      errorCount += checkAndRepairWrongDirAttribs();
+
+   if (checkFsActions.test(CHECK_OLD_STYLED_HARDLINKS))
+      errorCount += checkAndUpdateOldStyledHardlinks();
 
    if ( cfg->getQuotaEnabled())
    {
@@ -995,7 +1097,7 @@ void ModeCheckFS::checkAndRepair()
    if ( cfg->getReadOnly() )
    {
       FsckTkEx::fsckOutput(
-         "Found " + StringTk::int64ToStr(errorCount)
+         "Found " + StringTk::int64ToStr(errorCount.getTotalErrors())
             + " errors. Detailed information can also be found in "
             + Program::getApp()->getConfig()->getLogOutFile() + ".",
          OutputOptions_ADDLINEBREAKBEFORE | OutputOptions_LINEBREAK);
@@ -1015,17 +1117,19 @@ void ModeCheckFS::checkAndRepair()
                OutputOptions_LINEBREAK);
    }
 
-   if(errorCount > 0)
-      FsckTkEx::fsckOutput(">>> Found " + StringTk::int64ToStr(errorCount) + " errors <<< ",
+   if (errorCount.getTotalErrors())
+      FsckTkEx::fsckOutput(">>> Found " + StringTk::int64ToStr(errorCount.getTotalErrors()) + " errors <<< ",
          OutputOptions_ADDLINEBREAKBEFORE | OutputOptions_LINEBREAK);
 }
 
 //////////////////////////
 // internals      ///////
 /////////////////////////
-void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry,
+void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry, FsckErrCount& errCount,
    std::pair<UserPrompter*, UserPrompter*>& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckDirEntry fsckEntry = entry;
 
    FsckRepairAction action;
@@ -1083,8 +1187,10 @@ void ModeCheckFS::repairDanglingDirEntry(db::DirEntry& entry,
    }
 }
 
-void ModeCheckFS::repairWrongInodeOwner(FsckDirInode& inode, UserPrompter& prompt)
+void ModeCheckFS::repairWrongInodeOwner(FsckDirInode& inode, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("Entry ID: " + inode.getID()
       + "; Path: "
       + this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(inode.getID() ) ) );
@@ -1116,8 +1222,10 @@ void ModeCheckFS::repairWrongInodeOwner(FsckDirInode& inode, UserPrompter& promp
 }
 
 void ModeCheckFS::repairWrongInodeOwnerInDentry(std::pair<db::DirEntry, NumNodeID>& error,
-   UserPrompter& prompt)
+   FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckDirEntry fsckEntry = error.first;
 
    FsckRepairAction action = prompt.chooseAction("File ID: " + fsckEntry.getID()
@@ -1151,8 +1259,10 @@ void ModeCheckFS::repairWrongInodeOwnerInDentry(std::pair<db::DirEntry, NumNodeI
    }
 }
 
-void ModeCheckFS::repairOrphanedDirInode(FsckDirInode& inode, UserPrompter& prompt)
+void ModeCheckFS::repairOrphanedDirInode(FsckDirInode& inode, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("Directory ID: " + inode.getID() + "; " +
          (inode.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + inode.getSaveNodeID().str());
 
@@ -1198,8 +1308,10 @@ void ModeCheckFS::repairOrphanedDirInode(FsckDirInode& inode, UserPrompter& prom
    }
 }
 
-void ModeCheckFS::repairOrphanedFileInode(FsckFileInode& inode, UserPrompter& prompt)
+void ModeCheckFS::repairOrphanedFileInode(FsckFileInode& inode, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("File ID: " + inode.getID() + "; " +
          (inode.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + inode.getSaveNodeID().str());
 
@@ -1228,8 +1340,108 @@ void ModeCheckFS::repairOrphanedFileInode(FsckFileInode& inode, UserPrompter& pr
    }
 }
 
-void ModeCheckFS::repairOrphanedChunk(FsckChunk& chunk, RepairChunkState& state)
+void ModeCheckFS::repairDuplicateInode(checks::DuplicatedInode& dupInode, FsckErrCount& errCount,
+   UserPrompter& prompt)
 {
+   int dummy = 0;
+   logDuplicateInodeID(dupInode, dummy);
+
+   // repair is not possible using FSCK for duplicate inodes if:
+   // (a) inodes are of type directory OR
+   // (b) inodes exists on different metadata nodes
+   // (c) both inodes are inlined
+
+   bool isDir = false;
+   for (const auto& it : dupInode.second)
+   {
+      if (it.getDirEntryType() == DirEntryType_DIRECTORY)
+      {
+         isDir = true;
+         break;
+      }
+   }
+
+   std::set<unsigned> nodeIDs;
+   for (const auto& it : dupInode.second)
+      nodeIDs.insert(it.getSaveNodeID());
+
+   bool bothInlined = true;
+   for (const auto& it : dupInode.second)
+      bothInlined &= it.getIsInlined();
+
+   if (nodeIDs.size() != 1 || isDir || bothInlined)
+   {
+      errCount.unfixableErrors++;
+      FsckTkEx::fsckOutput("> Repair is not allowed for above case using fsck. Please contact support team.",
+         OutputOptions_LINEBREAK | OutputOptions_NOSTDOUT);
+      return;
+   }
+   else
+   {
+      errCount.fixableErrors++;
+   }
+
+   FsckRepairAction action = prompt.chooseAction("EntryID: " + dupInode.first.str());
+
+   FsckDuplicateInodeInfo item;
+
+   for (const auto& it : dupInode.second)
+   {
+      // select item from duplicate inode list which has inlined flag
+      // set (because parent's entryID is available (non-empty) there)
+      if (it.getIsInlined())
+      {
+         item = it;
+         break;
+      }
+   }
+
+   switch (action)
+   {
+   case FsckRepairAction_UNDEFINED:
+   case FsckRepairAction_NOTHING:
+      break;
+
+   case FsckRepairAction_REPAIRDUPLICATEINODE:
+   {
+      FsckDuplicateInodeInfoVector dupInodes{item};
+      StringList failedEntries;
+
+      MsgHelperRepair::deleteDuplicateFileInodes(NumNodeID(item.getSaveNodeID()),
+         item.getIsBuddyMirrored(), dupInodes, failedEntries, secondariesSetBad);
+
+      if (failedEntries.empty())
+      {
+         auto res = this->database->getFileInodesTable()->get(dupInode.first.str());
+
+         if (res.first)
+         {
+            auto inode = res.second;
+            FsckFileInode fsckInode = inode.toInodeWithoutStripes();
+            fsckInode.setIsInlined(true);
+
+            // now set all stripe targets into FsckFileInode object
+            fsckInode.setStripeTargets(
+               this->database->getFileInodesTable()->getStripeTargetsByKey(dupInode.first)
+            );
+
+            FsckFileInodeList fsckInodeList{fsckInode};
+            this->database->getFileInodesTable()->update(fsckInodeList);
+         }
+      }
+
+      break;
+   }
+
+   default:
+      throw std::runtime_error("bad repair action");
+   }
+}
+
+void ModeCheckFS::repairOrphanedChunk(FsckChunk& chunk, FsckErrCount& errCount, RepairChunkState& state)
+{
+   errCount.fixableErrors++;
+
    // ask for repair action only once per chunk id, not once per chunk id and node
    if(state.lastID != chunk.getID() )
       state.lastChunkAction = state.prompt->chooseAction("Chunk ID: " + chunk.getID() + " on " +
@@ -1275,8 +1487,11 @@ void ModeCheckFS::repairOrphanedChunk(FsckChunk& chunk, RepairChunkState& state)
    }
 }
 
-void ModeCheckFS::repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt)
+void ModeCheckFS::repairMissingContDir(FsckDirInode& inode, FsckErrCount& errCount,
+   UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("Directory ID: " + inode.getID() +
       "; Path: " +
       this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(inode.getID())) + "; " +
@@ -1313,8 +1528,10 @@ void ModeCheckFS::repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt
    }
 }
 
-void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt)
+void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("Directory ID: " + dir.getID() + "; " +
          (dir.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") + dir.getSaveNodeID().str());
 
@@ -1342,8 +1559,10 @@ void ModeCheckFS::repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt)
 }
 
 void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::OptionalInodeAttribs>& error,
-   UserPrompter& prompt)
+   FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("File ID: " + error.first.getID() + "; Path: " +
          this->database->getDentryTable()->getPathOf(db::EntryID::fromStr(error.first.getID())) +
          "; " + (error.first.getIsBuddyMirrored() ? "Buddy group: " : "Node: ") +
@@ -1380,8 +1599,10 @@ void ModeCheckFS::repairWrongFileAttribs(std::pair<FsckFileInode, checks::Option
 }
 
 void ModeCheckFS::repairWrongDirAttribs(std::pair<FsckDirInode, checks::InodeAttribs>& error,
-   UserPrompter& prompt)
+   FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    std::string filePath = this->database->getDentryTable()->getPathOf(
       db::EntryID::fromStr(error.first.getID() ) );
    FsckRepairAction action = prompt.chooseAction("Directory ID: " + error.first.getID() +
@@ -1419,8 +1640,10 @@ void ModeCheckFS::repairWrongDirAttribs(std::pair<FsckDirInode, checks::InodeAtt
    }
 }
 
-void ModeCheckFS::repairFileWithMissingTargets(db::DirEntry& entry, UserPrompter& prompt)
+void ModeCheckFS::repairFileWithMissingTargets(db::DirEntry& entry, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckDirEntry fsckEntry = entry;
 
    FsckRepairAction action = prompt.chooseAction("Entry ID: " + fsckEntry.getID() +
@@ -1455,8 +1678,10 @@ void ModeCheckFS::repairFileWithMissingTargets(db::DirEntry& entry, UserPrompter
    }
 }
 
-void ModeCheckFS::repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, UserPrompter& prompt)
+void ModeCheckFS::repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckDirEntry fsckEntry = entry;
 
    FsckRepairAction action = prompt.chooseAction("Entry ID: " + fsckEntry.getID() +
@@ -1498,8 +1723,10 @@ void ModeCheckFS::repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, UserProm
    }
 }
 
-void ModeCheckFS::repairOrphanedDentryByIDFile(FsckFsID& id, UserPrompter& prompt)
+void ModeCheckFS::repairOrphanedDentryByIDFile(FsckFsID& id, FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction(
          "Entry ID: " + id.getID() +
          "; Path: " +
@@ -1537,8 +1764,9 @@ void ModeCheckFS::repairOrphanedDentryByIDFile(FsckFsID& id, UserPrompter& promp
 }
 
 void ModeCheckFS::repairChunkWithWrongPermissions(std::pair<FsckChunk, FsckFileInode>& error,
-   UserPrompter& prompt)
+   FsckErrCount& errCount, UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
    FsckRepairAction action = prompt.chooseAction(
          "Chunk ID: " + error.first.getID() + "; "
          + (error.first.getBuddyGroupID()
@@ -1583,9 +1811,11 @@ void ModeCheckFS::repairChunkWithWrongPermissions(std::pair<FsckChunk, FsckFileI
    }
 }
 
-void ModeCheckFS::repairWrongChunkPath(std::pair<FsckChunk, FsckFileInode>& error,
+void ModeCheckFS::repairWrongChunkPath(std::pair<FsckChunk, FsckFileInode>& error, FsckErrCount& errCount,
    UserPrompter& prompt)
 {
+   errCount.fixableErrors++;
+
    FsckRepairAction action = prompt.chooseAction("Entry ID: " + error.first.getID()
       + "; " + (error.first.getBuddyGroupID()
          ? "Group: " + StringTk::uintToStr(error.first.getBuddyGroupID())
@@ -1654,6 +1884,50 @@ void ModeCheckFS::repairWrongChunkPath(std::pair<FsckChunk, FsckFileInode>& erro
       {
          FsckTkEx::fsckOutput("Repair failed, see log file for more details.",
             OutputOptions_LINEBREAK);
+      }
+
+      break;
+   }
+
+   default:
+      throw std::runtime_error("bad repair action");
+   }
+}
+
+void ModeCheckFS::updateOldStyledHardlinks(db::FileInode& inode, FsckErrCount& errCount,
+   UserPrompter& prompt)
+{
+   errCount.fixableErrors++;
+
+   FsckRepairAction action = prompt.chooseAction("Entry ID:  " + inode.id.str()
+      + "; link count: " + std::to_string(inode.numHardlinks));
+
+   std::string linkName = this->database->getDentryTable()->getNameOf(inode.id);
+   switch (action)
+   {
+   case FsckRepairAction_UNDEFINED:
+   case FsckRepairAction_NOTHING:
+      break;
+
+   case FsckRepairAction_UPDATEOLDTYLEDHARDLINKS:
+   {
+      StringList failedEntries;
+      EntryInfo entryInfo(NumNodeID(inode.saveNodeID), inode.parentDirID.str(), inode.id.str(),
+         linkName, DirEntryType_REGULARFILE, 0);
+      entryInfo.setInodeInlinedFlag(inode.isInlined);
+      entryInfo.setBuddyMirroredFlag(inode.isBuddyMirrored);
+
+      MsgHelperRepair::deinlineFileInode(entryInfo.getOwnerNodeID(), &entryInfo, failedEntries,
+         secondariesSetBad);
+
+      if (failedEntries.empty())
+      {
+         FsckFileInode fsckInode = inode.toInodeWithoutStripes();
+         fsckInode.setIsInlined(false);
+
+         fsckInode.setStripeTargets(this->database->getFileInodesTable()->getStripeTargetsByKey(inode.id));
+         FsckFileInodeList fsckInodeList{fsckInode};
+         this->database->getFileInodesTable()->update(fsckInodeList);
       }
 
       break;

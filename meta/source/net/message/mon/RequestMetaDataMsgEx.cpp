@@ -14,6 +14,7 @@ bool RequestMetaDataMsgEx::processIncoming(ResponseContext& ctx)
    unsigned sessionCount = app->getSessions()->getSize() + app->getMirroredSessions()->getSize();
 
    NicAddressList nicList(node.getNicList());
+   std::string hostnameid = System::getHostname();
 
    // highresStats
    HighResStatsList statsHistory;
@@ -23,7 +24,7 @@ bool RequestMetaDataMsgEx::processIncoming(ResponseContext& ctx)
    StatsCollector* statsCollector = app->getStatsCollector();
    statsCollector->getStatsSince(lastStatsMS, statsHistory);
 
-   RequestMetaDataRespMsg requestMetaDataRespMsg(node.getID(), node.getNumID(), &nicList,
+   RequestMetaDataRespMsg requestMetaDataRespMsg(node.getID(), hostnameid, node.getNumID(), &nicList,
       app->getMetaRoot().getID() == node.getNumID(), workQueue->getIndirectWorkListSize(),
       workQueue->getDirectWorkListSize(), sessionCount, &statsHistory);
    ctx.sendResponse(requestMetaDataRespMsg);

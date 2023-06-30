@@ -33,8 +33,10 @@ enum FsckRepairAction
    FsckRepairAction_RECREATEDENTRY = 13,
    FsckRepairAction_FIXPERMISSIONS = 14,
    FsckRepairAction_MOVECHUNK = 15,
-   FsckRepairAction_NOTHING = 16,
-   FsckRepairAction_UNDEFINED = 17
+   FsckRepairAction_REPAIRDUPLICATEINODE = 16,
+   FsckRepairAction_UPDATEOLDTYLEDHARDLINKS = 17,
+   FsckRepairAction_NOTHING = 18,
+   FsckRepairAction_UNDEFINED = 19
 };
 
 struct FsckRepairActionElem
@@ -63,6 +65,9 @@ FsckRepairActionElem const __FsckRepairActions[] =
       {"RecreateDentry", "Recreate directory entry file", FsckRepairAction_RECREATEDENTRY},
       {"FixPermissions", "Fix permissions", FsckRepairAction_FIXPERMISSIONS},
       {"MoveChunk", "Move chunk", FsckRepairAction_MOVECHUNK},
+      {"RepairDuplicateInode", "Repair duplicate inode", FsckRepairAction_REPAIRDUPLICATEINODE},
+      {"UpdateOldStyledHardlinks", "Update metadata of old styled hardlinks to new format",
+         FsckRepairAction_UPDATEOLDTYLEDHARDLINKS},
       {"Nothing", "Do nothing", FsckRepairAction_NOTHING},
       {0, 0, FsckRepairAction_UNDEFINED}
 };

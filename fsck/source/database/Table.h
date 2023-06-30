@@ -54,6 +54,17 @@ class Table {
          Data operator()(std::pair<Data, Key*>& p) const { return p.first; }
       };
 
+      struct HasMatchingKey
+      {
+         HasMatchingKey(const typename Data::KeyType& k) : key(k) {}
+         typename Data::KeyType key;
+
+         bool operator()(std::pair<Data, Key*>& p) const
+         {
+            return (p.first.pkey() == key);
+         }
+      };
+
    private:
       std::string basename;
       size_t fragmentSize;
@@ -326,6 +337,34 @@ class Table {
                base.cursor(),
                deletes.cursor() )
             | db::where(SecondIsNull() )
+            | db::select(First() ),
+            inserts.cursor() );
+      }
+
+      typedef Union<
+         Select<
+            Filter<
+               Filter<
+                  LeftJoinEq<
+                     SetFragmentCursor<Data>,
+                     SetFragmentCursor<Key>,
+                     GetKey>,
+                  SecondIsNull>,
+               HasMatchingKey>,
+            First>,
+         SetFragmentCursor<Data>,
+         GetKey> MultiRowResultType;
+
+      MultiRowResultType getAllByKey(const typename Data::KeyType& key)
+      {
+         return db::unionBy(
+            GetKey(),
+            db::leftJoinBy(
+               GetKey(),
+               base.cursor(),
+               deletes.cursor() )
+            | db::where(SecondIsNull() )
+            | db::where(HasMatchingKey(key) )
             | db::select(First() ),
             inserts.cursor() );
       }

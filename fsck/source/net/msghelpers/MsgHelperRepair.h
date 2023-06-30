@@ -8,6 +8,7 @@
 #include <common/fsck/FsckDirEntry.h>
 #include <common/fsck/FsckDirInode.h>
 #include <common/fsck/FsckFsID.h>
+#include <common/fsck/FsckDuplicateInodeInfo.h>
 
 class MsgHelperRepair
 {
@@ -60,6 +61,10 @@ class MsgHelperRepair
          bool allowOverwrite);
       static void deleteFileInodes(NumNodeID node, bool isBuddyMirrored, FsckFileInodeList& inodes,
          StringList& failedDeletes, std::set<NumNodeID>& secondariesWithRepair);
+      static void deleteDuplicateFileInodes(NumNodeID node, bool isBuddyMirrored,
+         FsckDuplicateInodeInfoVector& dupInodes, StringList& failedEntries, std::set<NumNodeID>& secondariesWithRepair);
+      static void deinlineFileInode(NumNodeID node, EntryInfo* entryInfo, StringList& failedEntries,
+         std::set<NumNodeID>& secondariesWithRepair);
 
 
    private:

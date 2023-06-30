@@ -47,6 +47,7 @@ class MetaStore
          NumNodeID* outParentNodeID = NULL, std::string* outParentEntryID = NULL);
 
       FhgfsOpsErr setAttr(EntryInfo* entryInfo, int validAttribs, SettableFileAttribs* attribs);
+      FhgfsOpsErr incDecLinkCount(EntryInfo* entryInfo, int value);
       FhgfsOpsErr setDirParent(EntryInfo* entryInfo, NumNodeID parentNodeID);
 
       FhgfsOpsErr mkNewMetaFile(DirInode& dir, MkFileDetails* mkDetails,
@@ -61,15 +62,16 @@ class MetaStore
       FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID);
       FhgfsOpsErr unlinkFile(DirInode& dir, const std::string& fileName,
          EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outInode);
+      FhgfsOpsErr unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<FileInode>* outInode);
 
       FhgfsOpsErr unlinkInodeLater(EntryInfo* entryInfo, bool wasInlined);
 
       FhgfsOpsErr renameInSameDir(DirInode& parentDir, const std::string& fromName,
-         const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode);
+         const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode, DirEntry*& overWrittenEntry);
 
       FhgfsOpsErr moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
-            const std::string& newEntryName, const char* buf,
-            uint32_t bufLen, std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo& newFileInfo);
+            const std::string& newEntryName, const char* buf, uint32_t bufLen,
+            std::unique_ptr<FileInode>* outUnlinkedInode, EntryInfo* overWriteInfo, EntryInfo& newFileInfo);
 
       FhgfsOpsErr moveRemoteFileBegin(DirInode& dir, EntryInfo* entryInfo, char* buf, size_t bufLen,
          size_t* outUsedBufLen);
@@ -96,6 +98,10 @@ class MetaStore
       FhgfsOpsErr linkInSameDir(DirInode& parentDir, EntryInfo* fromFileInfo,
          const std::string& fromName, const std::string& toName);
 
+      FhgfsOpsErr verifyAndMoveFileInode(DirInode& parentDir, EntryInfo* fileInfo,
+         FileInodeMode moveMode);
+      FhgfsOpsErr checkAndRepairDupFileInode(DirInode& parentDir, EntryInfo* entryInfo);
+
       FhgfsOpsErr getRawMetadata(const Path& path, CharVector& contents);
       std::pair<FhgfsOpsErr, IncompleteInode> beginResyncFor(const Path& path, bool isDirectory);
       FhgfsOpsErr unlinkRawMetadata(const Path& path);
@@ -116,7 +122,7 @@ class MetaStore
       FhgfsOpsErr isFileUnlinkable(DirInode& subDir, EntryInfo* entryInfo);
 
       FhgfsOpsErr mkMetaFileUnlocked(DirInode& dir, const std::string& entryName,
-         DirEntryType entryType, FileInode* inode);
+         EntryInfo* entryInfo, FileInode* inode);
 
       FhgfsOpsErr unlinkInodeUnlocked(EntryInfo* entryInfo, DirInode* subDir,
          std::unique_ptr<FileInode>* outInode);
@@ -158,7 +164,12 @@ class MetaStore
 
       FhgfsOpsErr setAttrUnlocked(EntryInfo* entryInfo, int validAttribs,
          SettableFileAttribs* attribs);
+      FhgfsOpsErr incDecLinkCountUnlocked(EntryInfo* entryInfo, int value);
 
+      FhgfsOpsErr deinlineFileInode(DirInode& parentDir, EntryInfo* entryInfo,
+         DirEntry& dentry, const std::string& dirEntryPath);
+      FhgfsOpsErr reinlineFileInode(DirInode& parentDir, EntryInfo* entryInfo,
+         DirEntry& dentry, const std::string& dirEntryPath);
    public:
       // getters & setters
 

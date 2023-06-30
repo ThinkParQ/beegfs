@@ -11,6 +11,8 @@
 #include <common/net/message/storage/moving/RenameRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
+#include <common/net/message/storage/creating/UnlinkLocalFileInodeMsg.h>
+#include <common/net/message/storage/creating/UnlinkLocalFileInodeRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/MetadataTk.h>
 #include <components/FileEventLogger.h>
@@ -261,7 +263,7 @@ FhgfsOpsErr RenameV2MsgEx::movingPerform(DirInode& fromParent, EntryInfo* fromDi
    {
       LOG_DEBUG(logContext, Log_SPAM, "Received an invalid entry type!");
       return FhgfsOpsErr_INTERNAL;
-  }
+   }
 
    if (fromDirInfo->getEntryID() == toDirInfo->getEntryID())
    { // simple rename (<= not a move && everything local)
@@ -397,7 +399,7 @@ FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirIn
 
       LOG_DEBUG(logContext, Log_SPAM, "Method: remote file move."); // debug in
 
-      if (app->getConfig()->getStoreClientXAttrs())
+      if (app->getConfig()->getStoreClientXAttrs() && fromFileEntryInfo.getIsInlined())
       {
          FhgfsOpsErr listXAttrRes;
 
@@ -416,11 +418,25 @@ FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirIn
 
 
    // finish local part of the owned file move operation (+ remove local file-link)
-   if(retVal == FhgfsOpsErr_SUCCESS)
+   if (retVal == FhgfsOpsErr_SUCCESS)
    {
-      // We are not interested in the inode here , as we are not going to delete storage chunks.
-      EntryInfo entryInfo;
-      FhgfsOpsErr unlinkRes = metaStore->unlinkFile(fromParent, oldName, &entryInfo, NULL);
+      FhgfsOpsErr unlinkRes;
+
+      if (fromFileEntryInfo.getIsInlined())
+      {
+         // We are not interested in the inode here , as we are not going to delete storage chunks.
+         EntryInfo entryInfo;
+         unlinkRes = metaStore->unlinkFile(fromParent, oldName, &entryInfo, NULL);
+      }
+      else
+      {
+         // only unlink dentry-by-filename for nonInlined inode(s)
+         DirEntry oldDentry(oldName);
+         if (fromParent.getDentry(oldName, oldDentry))
+            unlinkRes = fromParent.unlinkDirEntry(oldName, &oldDentry, DirEntry_UNLINK_FILENAME);
+         else
+            unlinkRes = FhgfsOpsErr_PATHNOTEXISTS;
+      }
 
       if (unlikely (unlinkRes) )
       {
@@ -450,9 +466,10 @@ FhgfsOpsErr RenameV2MsgEx::renameInSameDir(DirInode& fromParent, const std::stri
     * essential in order not to dead-lock */
 
    std::unique_ptr<FileInode> unlinkInode; // inode belong to a possibly existing toName file
+   DirEntry* overWrittenEntry = NULL;
 
    FhgfsOpsErr renameRes = metaStore->renameInSameDir(fromParent, oldName, toName,
-         &unlinkInode);
+         &unlinkInode, overWrittenEntry);
 
    if (renameRes == FhgfsOpsErr_SUCCESS)
    {
@@ -486,7 +503,60 @@ FhgfsOpsErr RenameV2MsgEx::renameInSameDir(DirInode& fromParent, const std::stri
          }
       }
 
-      // handle unlinkInode
+      // update hardlink count + possibly unlink inode and delete chunk files for nonInlined inode
+      if (overWrittenEntry && !overWrittenEntry->getIsInodeInlined())
+      {
+         EntryInfo overWrittenEntryInfo;
+         overWrittenEntry->getEntryInfo(fromParent.getID(), 0, &overWrittenEntryInfo);
+
+         NumNodeID ownerNodeID = overWrittenEntry->getOwnerNodeID();
+
+         UnlinkLocalFileInodeMsg unlinkInodeMsg(&overWrittenEntryInfo);
+
+         RequestResponseArgs rrArgs(NULL, &unlinkInodeMsg, NETMSGTYPE_UnlinkLocalFileInodeResp);
+         RequestResponseNode rrNode(ownerNodeID, Program::getApp()->getMetaNodes());
+
+         if (overWrittenEntryInfo.getIsBuddyMirrored())
+         {
+            rrNode.setMirrorInfo(Program::getApp()->getMetaBuddyGroupMapper(), false);
+         }
+
+         do
+         {
+            FhgfsOpsErr resp = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+
+            if (unlikely(resp != FhgfsOpsErr_SUCCESS))
+            {
+               LogContext(logContext).log(Log_WARNING,
+                  "Communication with metadata server failed. "
+                  "nodeID: " + ownerNodeID.str() + "; " +
+                  "entryID: " + overWrittenEntryInfo.getEntryID().c_str());
+               renameRes = resp;
+               break;
+            }
+
+            // response received
+            const auto unlinkFileInodeRespMsg = (UnlinkLocalFileInodeRespMsg*) rrArgs.outRespMsg.get();
+            FhgfsOpsErr res = unlinkFileInodeRespMsg->getResult();
+            if (res != FhgfsOpsErr_SUCCESS)
+            {
+               // error: either inode file doesn't exists or some other error happened
+               LogContext(logContext).logErr("unlink file inode failed! "
+                  "nodeID: " + ownerNodeID.str() + "; " +
+                  "entryID: " + overWrittenEntryInfo.getEntryID().c_str());
+
+               renameRes = res;
+               break;
+            }
+
+            // success
+            renameRes = res;
+         } while (false);
+
+         SAFE_DELETE(overWrittenEntry);
+      }
+
+      // handle unlinkInode for inlined inode(s)
       if (unlinkInode && !hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
       {
          unlinkedEntryID = unlinkInode->getEntryID();
@@ -557,33 +627,81 @@ FhgfsOpsErr RenameV2MsgEx::remoteFileInsertAndUnlink(EntryInfo* fromFileInfo, En
    }
 
    // correct response type received
-
-   const auto insertRespMsg = (const MovingFileInsertRespMsg*)rrArgs.outRespMsg.get();
-
+   const auto insertRespMsg = (MovingFileInsertRespMsg*)rrArgs.outRespMsg.get();
    retVal = insertRespMsg->getResult();
 
-   unsigned unlinkedInodeBufLen = insertRespMsg->getInodeBufLen();
-   if (unlinkedInodeBufLen)
+   // handle unlink of chunk files for inlined inode(s)
+   // handle unlink of inode for non-inlined inode(s)
+   EntryInfo* overWrittenInfo = insertRespMsg->getOverWrittenEntryInfo();
+   if (overWrittenInfo->getEntryType() != DirEntryType_INVALID)
    {
-      const char* unlinkedInodeBuf = insertRespMsg->getInodeBuf();
-      FileInode* toUnlinkInode = new FileInode();
+      if (overWrittenInfo->getIsInlined())
+      {
+         unsigned unlinkedInodeBufLen = insertRespMsg->getInodeBufLen();
+         if (unlinkedInodeBufLen)
+         {
+            const char* unlinkedInodeBuf = insertRespMsg->getInodeBuf();
+            FileInode* toUnlinkInode = new FileInode();
 
-      Deserializer des(unlinkedInodeBuf, unlinkedInodeBufLen);
-      toUnlinkInode->deserializeMetaData(des);
-      if(unlikely(!des.good()))
-      { // deserialization of received inode failed (should never happen)
-         log.logErr("Failed to deserialize unlinked file inode. nodeID: " + toNodeID.str() );
-         delete(toUnlinkInode);
+            Deserializer des(unlinkedInodeBuf, unlinkedInodeBufLen);
+            toUnlinkInode->deserializeMetaData(des);
+            if(unlikely(!des.good()))
+            { // deserialization of received inode failed (should never happen)
+               log.logErr("Failed to deserialize unlinked file inode. nodeID: " + toNodeID.str() );
+               delete(toUnlinkInode);
+            }
+            else
+            {
+               MsgHelperUnlink::unlinkChunkFiles(
+                  toUnlinkInode, getMsgHeaderUserID() ); // destructs toUnlinkInode
+            }
+         }
       }
       else
       {
-         MsgHelperUnlink::unlinkChunkFiles(
-            toUnlinkInode, getMsgHeaderUserID() ); // destructs toUnlinkInode
+         NumNodeID ownerNodeID = overWrittenInfo->getOwnerNodeID();
+         UnlinkLocalFileInodeMsg unlinkInodeMsg(overWrittenInfo);
+
+         RequestResponseArgs rrArgs(NULL, &unlinkInodeMsg, NETMSGTYPE_UnlinkLocalFileInodeResp);
+         RequestResponseNode rrNode(ownerNodeID, Program::getApp()->getMetaNodes());
+
+         if (overWrittenInfo->getIsBuddyMirrored())
+         {
+            rrNode.setMirrorInfo(Program::getApp()->getMetaBuddyGroupMapper(), false);
+         }
+
+         do
+         {
+            FhgfsOpsErr resp = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+
+            if (unlikely(resp != FhgfsOpsErr_SUCCESS))
+            {
+               LogContext(log).log(Log_WARNING,
+                  "Communication with metadata server failed. "
+                  "nodeID: " + ownerNodeID.str() + "; " +
+                  "entryID: " + overWrittenInfo->getEntryID().c_str());
+               break;
+            }
+
+            // response received
+            const auto unlinkFileInodeRespMsg = (UnlinkLocalFileInodeRespMsg*) rrArgs.outRespMsg.get();
+            FhgfsOpsErr res = unlinkFileInodeRespMsg->getResult();
+            if (res != FhgfsOpsErr_SUCCESS)
+            {
+               // error: either inode file doesn't exists or some other error happened
+               LogContext(log).logErr("unlink of inode failed! "
+                  "nodeID: " + ownerNodeID.str() + "; " +
+                  "entryID: " + overWrittenInfo->getEntryID().c_str());
+
+               break;
+            }
+         } while (false);
       }
    }
 
-   if(retVal != FhgfsOpsErr_SUCCESS)
-   { // error: remote file not inserted
+   if (retVal != FhgfsOpsErr_SUCCESS)
+   {
+      // error: remote file not inserted
       LOG_DEBUG_CONTEXT(log, Log_NOTICE,
          "Metadata server was unable to insert file. "
          "nodeID: " + toNodeID.str() + "; "

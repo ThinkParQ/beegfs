@@ -4,6 +4,7 @@
 #include <modes/ModeDisposeUnusedFiles.h>
 #include <modes/ModeGenericDebug.h>
 #include <modes/ModeGetEntryInfo.h>
+#include <modes/ModeMoveFileInode.h>
 #include <modes/ModeGetNodes.h>
 #include <modes/ModeGetQuotaInfo.h>
 #include <modes/ModeHashDir.h>
@@ -81,6 +82,7 @@ RunModesElem const __RunModes[] =
    SIMPLE_RUN_MODE("--createfile", ModeCreateFile),
    SIMPLE_RUN_MODE("--createdir", ModeCreateDir),
    SIMPLE_RUN_MODE("--removenode", ModeRemoveNode),
+   SIMPLE_RUN_MODE("--movefileinode", ModeMoveFileInode),
    SIMPLE_RUN_MODE_HIDDEN("--iostat", ModeIOStat),
    // alias for "--iostat"
    SIMPLE_RUN_MODE("--serverstats", ModeIOStat),

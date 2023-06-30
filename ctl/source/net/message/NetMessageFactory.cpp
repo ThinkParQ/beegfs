@@ -42,6 +42,8 @@
 #include <common/net/message/storage/creating/RmDirRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeRespMsg.h>
 #include <common/net/message/storage/listing/ListDirFromOffsetRespMsg.h>
 #include <common/net/message/storage/lookup/FindOwnerRespMsg.h>
 #include <common/net/message/storage/lookup/FindLinkOwnerRespMsg.h>
@@ -155,6 +157,8 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_UnlinkLocalFileResp: { msg = new UnlinkLocalFileRespMsg(); } break;
       case NETMSGTYPE_GetDefaultQuotaResp: { msg = new GetDefaultQuotaRespMsg(); } break;
       case NETMSGTYPE_SetDefaultQuotaResp: { msg = new SetDefaultQuotaRespMsg(); } break;
+      case NETMSGTYPE_MoveFileInode: { msg = new MoveFileInodeMsg(); } break;
+      case NETMSGTYPE_MoveFileInodeResp: {msg = new MoveFileInodeRespMsg(); } break;
 
       // session messages
       case NETMSGTYPE_CloseChunkFileResp: { msg = new CloseChunkFileRespMsg(); } break;

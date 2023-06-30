@@ -140,9 +140,9 @@ int ModeGetEntryInfo::execute()
 
             std::cout << "Chunk path: " << chunkPath << std::endl;
 
-            std::cout << "Dentry path: " << dentryPath.substr(1) + '/' << std::endl;
-
-            if (!entryInfo.getIsInlined() )
+            if (entryInfo.getIsInlined())
+               std::cout << "Dentry path: " << dentryPath.substr(1) + '/' << std::endl;
+            else
                printInodeHashPath = true;
          }
          else

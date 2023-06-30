@@ -70,7 +70,7 @@ class DirEntry
 
       FhgfsOpsErr storeInitialDirEntryID(const char* logContext, const std::string& idPath);
       static FhgfsOpsErr storeInitialDirEntryName(const char* logContext, const std::string& idPath,
-         const std::string& namePath, bool isDir);
+         const std::string& namePath, bool isNonInlinedInode);
       bool storeUpdatedDirEntryBuf(const std::string& idStorePath, char* buf, unsigned bufLen);
       bool storeUpdatedDirEntryBufAsXAttr(const std::string& idStorePath, char* buf,
          unsigned bufLen);
@@ -234,6 +234,11 @@ class DirEntry
       void addDentryFeatureFlag(unsigned featureFlag)
       {
          this->dentryDiskData.addDentryFeatureFlag(featureFlag);
+      }
+
+      void removeDentryFeatureFlag(unsigned featureFlag)
+      {
+         this->dentryDiskData.removeDentryFeatureFlag(featureFlag);
       }
 
       // getters

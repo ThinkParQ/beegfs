@@ -51,6 +51,7 @@ void RequestStorageDataWork::process(char* bufIn, unsigned bufInLen,
          result.data.diskSpaceTotal = storageRspMsg->getDiskSpaceTotalMiB();
          result.data.diskSpaceFree = storageRspMsg->getDiskSpaceFreeMiB();
          result.data.sessionCount = storageRspMsg->getSessionCount();
+         result.data.hostnameid = storageRspMsg->gethostnameid();
 
          if (!result.highResStatsList.empty())
          {

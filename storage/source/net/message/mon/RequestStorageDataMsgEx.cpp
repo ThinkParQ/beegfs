@@ -33,6 +33,7 @@ bool RequestStorageDataMsgEx::processIncoming(ResponseContext& ctx)
    unsigned sessionCount = app->getSessions()->getSize();
 
    NicAddressList nicList(node.getNicList());
+   std::string hostnameid = System::getHostname();
 
    // highresStats
    HighResStatsList statsHistory;
@@ -52,7 +53,7 @@ bool RequestStorageDataMsgEx::processIncoming(ResponseContext& ctx)
       directWorkListSize += iter->second->getDirectWorkListSize();
    }
 
-   RequestStorageDataRespMsg requestStorageDataRespMsg(node.getID(), node.getNumID(),
+   RequestStorageDataRespMsg requestStorageDataRespMsg(node.getID(), hostnameid, node.getNumID(),
       &nicList, indirectWorkListSize, directWorkListSize, diskSpaceTotal, diskSpaceFree,
       sessionCount, &statsHistory, &storageTargetInfoList);
    ctx.sendResponse(requestStorageDataRespMsg);

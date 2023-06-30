@@ -2422,7 +2422,7 @@ FhgfsOpsErr FhgfsOpsRemoting_hardlink(App* app, const char* fromName, unsigned f
 
    HardlinkMsg requestMsg;
    RequestResponseNode rrNode = {
-      .peer = rrpeer_from_entryinfo(fromDirInfo),
+      .peer = rrpeer_from_entryinfo(toDirInfo),
       .nodeStore = app->metaNodes,
       .targetStates = app->metaStateStore,
       .mirrorBuddies = app->metaBuddyGroupMapper

@@ -9,15 +9,17 @@ class RequestMetaDataRespMsg : public NetMessageSerdes<RequestMetaDataRespMsg>
 {
    public:
       /**
+       * @param hostnameid it will get the hostname of server
        * @param nicList just a reference, so do not free it as long as you use this object!
        * @param statsList just a reference, so do not free it as long as you use this object!
        */
-      RequestMetaDataRespMsg(const std::string& nodeID, NumNodeID nodeNumID, NicAddressList *nicList,
+      RequestMetaDataRespMsg(const std::string& nodeID, const std::string& hostnameid, NumNodeID nodeNumID, NicAddressList *nicList,
          bool isRoot, unsigned IndirectWorkListSize, unsigned DirectWorkListSize,
          unsigned sessionCount, HighResStatsList* statsList)
          : BaseType(NETMSGTYPE_RequestMetaDataResp)
       {
          this->nodeID = nodeID;
+         this->hostnameid = hostnameid;	
          this->nodeNumID = nodeNumID;
          this->nicList = nicList;
          this->isRoot = isRoot;
@@ -41,6 +43,7 @@ class RequestMetaDataRespMsg : public NetMessageSerdes<RequestMetaDataRespMsg>
       {
          ctx
             % obj->nodeID
+            % obj->hostnameid
             % obj->nodeNumID
             % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
             % obj->isRoot
@@ -52,6 +55,7 @@ class RequestMetaDataRespMsg : public NetMessageSerdes<RequestMetaDataRespMsg>
 
    private:
       std::string nodeID;
+      std::string hostnameid;
       NumNodeID nodeNumID;
       bool isRoot;
       uint32_t indirectWorkListSize;
@@ -82,6 +86,11 @@ class RequestMetaDataRespMsg : public NetMessageSerdes<RequestMetaDataRespMsg>
       const std::string& getNodeID() const
       {
          return nodeID;
+      }
+
+      const std::string& gethostnameid() const
+      {
+         return hostnameid;
       }
 
       NumNodeID getNodeNumID() const

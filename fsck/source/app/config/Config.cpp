@@ -219,6 +219,38 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          quotaEnabled = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "ignoreDBDiskSpace", addDashes))
          ignoreDBDiskSpace = StringTk::strToBool(iter->second);
+      else if (testConfigMapKeyMatch(iter, "checkMalformedChunk", addDashes))
+         checkFsActions.set(CHECK_MALFORMED_CHUNK);
+      else if (testConfigMapKeyMatch(iter, "checkFilesWithMissingTargets", addDashes))
+         checkFsActions.set(CHECK_FILES_WITH_MISSING_TARGETS);
+      else if (testConfigMapKeyMatch(iter, "checkOrphanedDentryByIDFiles", addDashes))
+         checkFsActions.set(CHECK_ORPHANED_DENTRY_BYIDFILES);
+      else if (testConfigMapKeyMatch(iter, "checkDirEntriesWithBrokenIDFile", addDashes))
+         checkFsActions.set(CHECK_DIRENTRIES_WITH_BROKENIDFILE);
+      else if (testConfigMapKeyMatch(iter, "checkOrphanedChunk", addDashes))
+         checkFsActions.set(CHECK_ORPHANED_CHUNK);
+      else if (testConfigMapKeyMatch(iter, "checkChunksInWrongPath", addDashes))
+         checkFsActions.set(CHECK_CHUNKS_IN_WRONGPATH);
+      else if (testConfigMapKeyMatch(iter, "checkWrongInodeOwner", addDashes))
+         checkFsActions.set(CHECK_WRONG_INODE_OWNER);
+      else if (testConfigMapKeyMatch(iter, "checkWrongOwnerInDentry", addDashes))
+         checkFsActions.set(CHECK_WRONG_OWNER_IN_DENTRY);
+      else if (testConfigMapKeyMatch(iter, "checkOrphanedContDir", addDashes))
+         checkFsActions.set(CHECK_ORPHANED_CONT_DIR);
+      else if (testConfigMapKeyMatch(iter, "checkOrphanedDirInode", addDashes))
+         checkFsActions.set(CHECK_ORPHANED_DIR_INODE);
+      else if (testConfigMapKeyMatch(iter, "checkOrphanedFileInode", addDashes))
+         checkFsActions.set(CHECK_ORPHANED_FILE_INODE);
+      else if (testConfigMapKeyMatch(iter, "checkDanglingDentry", addDashes))
+         checkFsActions.set(CHECK_DANGLING_DENTRY);
+      else if (testConfigMapKeyMatch(iter, "checkMissingContDir", addDashes))
+         checkFsActions.set(CHECK_MISSING_CONT_DIR);
+      else if (testConfigMapKeyMatch(iter, "checkWrongFileAttribs", addDashes))
+         checkFsActions.set(CHECK_WRONG_FILE_ATTRIBS);
+      else if (testConfigMapKeyMatch(iter, "checkWrongDirAttribs", addDashes))
+         checkFsActions.set(CHECK_WRONG_DIR_ATTRIBS);
+      else if (testConfigMapKeyMatch(iter, "checkOldStyledHardlinks", addDashes))
+         checkFsActions.set(CHECK_OLD_STYLED_HARDLINKS);
       else
       {
          // unknown element occurred

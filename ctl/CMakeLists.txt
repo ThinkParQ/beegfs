@@ -100,6 +100,7 @@ add_library(
 	./source/modes/ModeSetQuota.cpp
 	./source/modes/ModeCreateDir.cpp
 	./source/modes/ModeGenericDebug.cpp
+	./source/modes/ModeMoveFileInode.cpp
 	./source/program/Program.h
 	./source/program/Program.cpp
 	./source/program/Main.cpp

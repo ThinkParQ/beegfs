@@ -99,6 +99,23 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
    if (!inode)
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
+   // update nlink count if requested by caller
+   if (isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) &&
+      isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_DECR_NLINKCNT))
+   {
+      // error: both increase and decrease of nlink count was requested
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
+   }
+   else if (isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) ||
+      isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_DECR_NLINKCNT))
+   {
+      int val = isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) ? 1 : -1;
+      setAttrRes = metaStore->incDecLinkCount(entryInfo, val);
+
+      if (setAttrRes != FhgfsOpsErr_SUCCESS)
+         return boost::make_unique<ResponseState>(setAttrRes);
+   }
+
    // in the following we need to distinguish between several cases.
    // 1. if times shall be updated we need to send the update to the storage servers first
    //    because, we need to rely on storage server's attrib version to prevent races with

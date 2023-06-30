@@ -1,0 +1,445 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_BEEGFS_MON_INFLUXDB",
+      "label": "beegfs_mon_influxdb",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.3.0"
+    },
+    {
+      "type": "datasource",
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "diskSpaceTotal"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Disk Space Total"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "diskSpaceUsed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "displayName",
+                "value": "Disk Space Used"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "diskSpaceFree"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.3.2",
+      "repeat": "storageTargetID",
+      "repeatDirection": "v",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+          },
+          "query": "from(bucket: \"${bucket}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) =>    r.storageTargetID == \"${storageTargetID}\") \r\n|> filter(fn: (r) =>    r._measurement == \"storageTargets\")\r\n|> filter(fn: (r) =>    r._field == \"diskSpaceTotal\" or r._field == \"diskSpaceFree\")\r\n|> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n|> map(fn: (r) => ({ r with _value: r.diskSpaceTotal - r.diskSpaceFree }))\r\n|> rename(columns: {_value: \"diskSpaceUsed\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Disk Usage ($storageTargetID)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlBl"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inodesTotal"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inodes Total"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73ffe4",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inodesUsed"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Inodes Used"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "inodesFree"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "repeat": "storageTargetID",
+      "repeatDirection": "v",
+      "targets": [
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+          },
+          "hide": false,
+          "query": "from(bucket: \"${bucket}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) =>    r.storageTargetID == \"${storageTargetID}\")  \r\n|> filter(fn: (r) =>    r._measurement == \"storageTargets\")\r\n|> filter(fn: (r) =>    r._field == \"inodesTotal\" or r._field == \"inodesFree\" )\r\n|> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n|> map(fn: (r) => ({ r with _value: r.inodesTotal - r.inodesFree }))\r\n|> rename(columns: {_value: \"inodesUsed\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Inodes ($storageTargetID)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+        },
+        "definition": "buckets()",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Bucket",
+        "multi": false,
+        "name": "bucket",
+        "options": [],
+        "query": "buckets()",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"schema.measurementTagValues(  bucket: \"${bucket}\",  tag: \"nodeID\",  measurement: \"storage\")",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Storage ID",
+        "multi": false,
+        "name": "storageID",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"schema.measurementTagValues(  bucket: \"${bucket}\",  tag: \"nodeID\",  measurement: \"storage\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_BEEGFS_MON_INFLUXDB}"
+        },
+        "definition": "import \"influxdata/influxdb/schema\"schema.tagValues(    bucket: \"${bucket}\",    tag: \"storageTargetID\",    predicate: (r) => r._measurement == \"storageTargets\" and r.nodeID == \"${storageID:\"\"}\")",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Storage TargetID",
+        "multi": true,
+        "name": "storageTargetID",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"schema.tagValues(    bucket: \"${bucket}\",    tag: \"storageTargetID\",    predicate: (r) => r._measurement == \"storageTargets\" and r.nodeID == \"${storageID:\"\"}\")",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-5m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "BeeGFS Storage Targets",
+  "uid": "CtdY1AVzy",
+  "version": 2,
+  "weekStart": ""
+}

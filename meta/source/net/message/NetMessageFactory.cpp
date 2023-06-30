@@ -61,6 +61,9 @@
 #include <common/net/message/storage/TruncLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeMsg.h>
+#include <common/net/message/storage/creating/MoveFileInodeRespMsg.h>
+#include <common/net/message/storage/creating/UnlinkLocalFileInodeRespMsg.h>
 #include <common/net/message/storage/attribs/GetEntryInfoRespMsg.h>
 #include <common/net/message/storage/attribs/RemoveXAttrRespMsg.h>
 #include <common/net/message/storage/attribs/SetXAttrRespMsg.h>
@@ -76,6 +79,7 @@
 #include <net/message/storage/creating/MkLocalDirMsgEx.h>
 #include <net/message/storage/creating/RmDirMsgEx.h>
 #include <net/message/storage/creating/RmLocalDirMsgEx.h>
+#include <net/message/storage/creating/UnlinkLocalFileInodeMsgEx.h>
 #include <net/message/storage/creating/RmDirEntryMsgEx.h>
 #include <net/message/storage/mirroring/GetMetaResyncStatsMsgEx.h>
 #include <net/message/storage/mirroring/ResyncSessionStoreMsgEx.h>
@@ -102,6 +106,7 @@
 #include <net/message/storage/attribs/RefreshEntryInfoMsgEx.h>
 #include <net/message/storage/lookup/FindLinkOwnerMsgEx.h>
 #include <net/message/storage/creating/HardlinkMsgEx.h>
+#include <net/message/storage/creating/MoveFileInodeMsgEx.h>
 #include <net/message/storage/attribs/UpdateDirParentMsgEx.h>
 #include <net/message/storage/mirroring/ResyncRawInodesMsgEx.h>
 
@@ -145,6 +150,7 @@
 #include <net/message/fsck/UpdateDirAttribsMsgEx.h>
 #include <net/message/fsck/UpdateFileAttribsMsgEx.h>
 #include <net/message/fsck/AdjustChunkPermissionsMsgEx.h>
+#include <net/message/fsck/CheckAndRepairDupInodeMsgEx.h>
 
 #include <common/net/message/SimpleMsg.h>
 #include <net/message/nodes/storagepools/RefreshStoragePoolsMsgEx.h>
@@ -271,6 +277,10 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_UnlinkLocalFileResp: { msg = new UnlinkLocalFileRespMsg(); } break;
       case NETMSGTYPE_UpdateDirParent: { msg = new UpdateDirParentMsgEx(); } break;
       case NETMSGTYPE_UpdateDirParentResp: { msg = new UpdateDirParentRespMsg(); } break;
+      case NETMSGTYPE_MoveFileInode: { msg = new MoveFileInodeMsgEx(); } break;
+      case NETMSGTYPE_MoveFileInodeResp: {msg = new MoveFileInodeRespMsg(); } break;
+      case NETMSGTYPE_UnlinkLocalFileInode: {msg = new UnlinkLocalFileInodeMsgEx(); } break;
+      case NETMSGTYPE_UnlinkLocalFileInodeResp: {msg = new UnlinkLocalFileInodeRespMsg(); } break;
 
       // session messages
       case NETMSGTYPE_BumpFileVersion: { msg = new BumpFileVersionMsgEx(); } break;
@@ -311,6 +321,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_RecreateDentries: { msg = new RecreateDentriesMsgEx(); } break;
       case NETMSGTYPE_FsckSetEventLogging: { msg = new FsckSetEventLoggingMsgEx(); } break;
       case NETMSGTYPE_AdjustChunkPermissions: { msg = new AdjustChunkPermissionsMsgEx(); } break;
+      case NETMSGTYPE_CheckAndRepairDupInode: { msg = new CheckAndRepairDupInodeMsgEx(); } break;
 
       default:
       {

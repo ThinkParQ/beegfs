@@ -35,7 +35,8 @@ Config::Config(int argc, char** argv): AbstractConfig(argc, argv)
             dbAuthToken = e.second;
          } else {
             throw InvalidConfigException("The InfluxDB authentication file may only contain "
-                  "the options username and password");
+                  "the options username and password for influxdb version 1.x "
+		            "organization and token for influxdb version 2.x" );
          }
       }
    }

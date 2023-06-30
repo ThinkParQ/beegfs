@@ -69,7 +69,10 @@ MetaFileHandle MetaStore::referenceFile(EntryInfo* entryInfo)
  */
 MetaFileHandle MetaStore::referenceFileUnlocked(EntryInfo* entryInfo)
 {
-   FileInode* inode = this->fileStore.referenceFileInode(entryInfo, false);
+   // load inode into global store from disk if it is nonInlined
+   bool loadFromDisk = !entryInfo->getIsInlined();
+   FileInode* inode = this->fileStore.referenceFileInode(entryInfo, loadFromDisk);
+
    if (inode)
       return {inode, nullptr};
 
@@ -571,6 +574,53 @@ FhgfsOpsErr MetaStore::setAttrUnlocked(EntryInfo* entryInfo, int validAttribs,
    return setAttrRes;
 }
 
+FhgfsOpsErr MetaStore::incDecLinkCount(EntryInfo* entryInfo, int value)
+{
+   UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
+   return incDecLinkCountUnlocked(entryInfo, value);
+}
+
+/**
+ * Update link count value in file inode
+ */
+FhgfsOpsErr MetaStore::incDecLinkCountUnlocked(EntryInfo* entryInfo, int value)
+{
+   FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
+
+   if (entryInfo->getIsInlined())
+   {
+      DirInode* parentDir = referenceDirUnlocked(entryInfo->getParentEntryID(),
+         entryInfo->getIsBuddyMirrored(), true);
+
+      if ( likely(parentDir) )
+      {
+         UniqueRWLock dirLock(parentDir->rwlock, SafeRWLock_READ);
+         MetaFileHandle fileInode = referenceFileUnlocked(*parentDir, entryInfo);
+
+         if (likely(fileInode))
+         {
+            retVal = parentDir->fileStore.incDecLinkCount(*fileInode, entryInfo, value);
+            releaseFileUnlocked(*parentDir, fileInode);
+         }
+
+         dirLock.unlock();
+      }
+
+      releaseDirUnlocked(entryInfo->getParentEntryID());
+   }
+   else
+   {
+      MetaFileHandle fileInode = referenceFileUnlocked(entryInfo);
+      if (likely(fileInode))
+      {
+         retVal = this->fileStore.incDecLinkCount(*fileInode, entryInfo, value);
+         releaseFileUnlocked(entryInfo->getParentEntryID(), fileInode);
+      }
+   }
+
+   return retVal;
+}
+
 /**
  * Set / update the parent information of a dir inode
  */
@@ -595,44 +645,55 @@ FhgfsOpsErr MetaStore::setDirParent(EntryInfo* entryInfo, NumNodeID parentNodeID
 }
 
 /**
- * Create a File (dentry + inlined-inode) from an existing inode.
+ * Create a File (dentry + inlined-inode) from an existing inlined inode
+ * Create a dentry (in Ver-3 format) from existing dentry (if inode was deinlined)
  *
  * @param dir         Already needs to be locked by the caller.
  * @param inode       Take values from this inode to create the new file. Object will be destroyed
  *                    here.
  */
 FhgfsOpsErr MetaStore::mkMetaFileUnlocked(DirInode& dir, const std::string& entryName,
-   DirEntryType entryType, FileInode* inode)
+   EntryInfo* entryInfo, FileInode* inode)
 {
    App* app = Program::getApp();
    Node& localNode = app->getLocalNode();
-
+   DirEntryType entryType = entryInfo->getEntryType();
    const std::string& entryID = inode->getEntryID();
-   FileInodeStoreData inodeDiskData(entryID, inode->getInodeDiskData() );
 
-   inodeDiskData.setInodeFeatureFlags(inode->getFeatureFlags() );
-
-   NumNodeID ownerNodeID = inode->getIsBuddyMirrored() ?
-      NumNodeID(app->getMetaBuddyGroupMapper()->getLocalGroupID() ) : localNode.getNumID();
+   NumNodeID ownerNodeID;
+   if (entryInfo->getIsInlined())
+   {
+      ownerNodeID = inode->getIsBuddyMirrored() ?
+         NumNodeID(app->getMetaBuddyGroupMapper()->getLocalGroupID() ) : localNode.getNumID();
+   }
+   else
+   {
+      // owner node may not be same as local node for files having deinlined inode
+      ownerNodeID = entryInfo->getOwnerNodeID();
+   }
 
    DirEntry newDentry (entryType, entryName, entryID, ownerNodeID);
 
    if (inode->getIsBuddyMirrored())
       newDentry.setBuddyMirrorFeatureFlag();
 
-   newDentry.setFileInodeData(inodeDiskData);
+   if (entryInfo->getIsInlined())
+   {
+      // only set inode data if we are dealing with inlined inode(s)
+      FileInodeStoreData inodeDiskData(entryID, inode->getInodeDiskData() );
+      inodeDiskData.setInodeFeatureFlags(inode->getFeatureFlags() );
+      newDentry.setFileInodeData(inodeDiskData);
+      inodeDiskData.setPattern(NULL); /* pattern now owned by newDentry, so make sure it won't be
+                                       * deleted on inodeMetadata object destruction */
+   }
 
-   inodeDiskData.setPattern(NULL); /* pattern now owned by newDentry, so make sure it won't be
-                                    * deleted on inodeMetadata object destruction */
-
-   // create a dir-entry with inlined inodes
+   // create a dir-entry
    FhgfsOpsErr makeRes = dir.makeDirEntryUnlocked(&newDentry);
 
    delete inode;
 
    return makeRes;
 }
-
 
 /**
  * Create a new File (directory-entry with inlined inode)
@@ -985,6 +1046,109 @@ FhgfsOpsErr MetaStore::unlinkFile(DirInode& dir, const std::string& fileName,
 }
 
 /**
+ *
+ * Decrement nlink count and remove file inode if link count reaches zero
+ */
+FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<FileInode>* outInode)
+{
+   const char* logContext = "Unlink File Inode";
+
+   FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
+   UniqueRWLock lock(rwlock, SafeRWLock_READ);
+
+   FhgfsOpsErr isUnlinkable = this->fileStore.isUnlinkable(delFileInfo);
+
+   if (isUnlinkable != FhgfsOpsErr_INUSE && isUnlinkable != FhgfsOpsErr_SUCCESS)
+      return isUnlinkable;
+
+   if (isUnlinkable == FhgfsOpsErr_INUSE)
+   {
+      FileInode* inode = this->fileStore.referenceLoadedFile(delFileInfo->getEntryID());
+
+      if (!inode)
+      {
+         LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it");
+         return FhgfsOpsErr_INTERNAL;
+      }
+
+      unsigned numHardLinks = inode->getNumHardlinks();
+
+      if (numHardLinks < 2)
+      {
+         retVal = FhgfsOpsErr_INUSE;
+      }
+      else
+      {
+         retVal = FhgfsOpsErr_SUCCESS;
+      }
+
+      FhgfsOpsErr decRes = this->fileStore.decLinkCount(*inode, delFileInfo);
+      if (decRes != FhgfsOpsErr_SUCCESS)
+      {
+         LogContext(logContext).logErr("Failed to decrease the link count!"
+            "entryID: "    + delFileInfo->getEntryID() +
+            "fileName: "   + delFileInfo->getFileName().c_str());
+      }
+
+      this->fileStore.releaseFileInode(inode);
+   }
+   else
+   {
+      // File is not IN_USE so decrement link count and if link count reach zero then
+      // delete inode file from disk
+      MetaFileHandle inode = referenceFileUnlocked(delFileInfo);
+      if (!inode)
+         return FhgfsOpsErr_PATHNOTEXISTS;
+
+      unsigned numHardLinks = inode->getNumHardlinks();
+
+      FhgfsOpsErr decRes = this->fileStore.decLinkCount(*inode, delFileInfo);
+      if (decRes != FhgfsOpsErr_SUCCESS)
+      {
+         LogContext(logContext).logErr("Failed to decrease the link count!"
+            "entryID: "    + delFileInfo->getEntryID() +
+            "fileName: "   + delFileInfo->getFileName().c_str());
+      }
+
+      releaseFileUnlocked(delFileInfo->getParentEntryID(), inode);
+
+      if (numHardLinks <=1)
+      {
+         retVal = this->fileStore.unlinkFileInode(delFileInfo, outInode);
+      }
+      else
+      {
+         retVal = decRes;
+      }
+   }
+
+   lock.unlock();
+
+   if (retVal != FhgfsOpsErr_INUSE)
+      return retVal;
+
+   FhgfsOpsErr laterRes = unlinkInodeLater(delFileInfo, true);
+
+   if (laterRes == FhgfsOpsErr_AGAIN)
+   {
+      // so the inode was not referenced in memory anymore and probably close() already deleted
+      // it. Just make sure here it really does not exist anymore
+      FhgfsOpsErr inodeUnlinkRes = unlinkInode(delFileInfo, outInode);
+
+      if (unlikely((inodeUnlinkRes != FhgfsOpsErr_PATHNOTEXISTS) &&
+         (inodeUnlinkRes != FhgfsOpsErr_SUCCESS) ) )
+      {
+         LogContext(logContext).logErr(std::string("Failed to unlink inode. Error: ") +
+            boost::lexical_cast<std::string>(inodeUnlinkRes));
+
+         retVal = inodeUnlinkRes;
+      }
+   }
+
+   return retVal;
+}
+
+/**
  * Unlink a dirEntry with an inlined inode
  */
 FhgfsOpsErr MetaStore::unlinkDirEntryWithInlinedInodeUnlocked(const std::string& entryName,
@@ -1137,11 +1301,20 @@ FhgfsOpsErr MetaStore::unlinkDentryAndInodeUnlocked(const std::string& fileName,
 
    dirEntry->getEntryInfo(parentEntryID, addionalEntryInfoFlags, &entryInfo);
 
-   FhgfsOpsErr unlinkFileRes = unlinkInodeUnlocked(&entryInfo, &subdir, outInode);
-   if(unlinkFileRes != FhgfsOpsErr_SUCCESS && unlinkFileRes == FhgfsOpsErr_INUSE)
-      retVal = FhgfsOpsErr_INUSE;
+   MetaFileHandle fileInode = referenceFileUnlocked(subdir, &entryInfo);
+   int numHardLinks = fileInode->getNumHardlinks();
 
-   return retVal;
+   if (likely(fileInode))
+      retVal = subdir.fileStore.decLinkCount(*fileInode, &entryInfo);
+   else
+      return FhgfsOpsErr_PATHNOTEXISTS;
+
+   this->releaseFileUnlocked(subdir, fileInode);
+
+   if (numHardLinks > 1)
+      return retVal;
+
+   return unlinkInodeUnlocked(&entryInfo, &subdir, outInode);
 }
 
 /**
@@ -1206,16 +1379,7 @@ FhgfsOpsErr MetaStore::unlinkInodeLaterUnlocked(EntryInfo* entryInfo, bool wasIn
       return FhgfsOpsErr_AGAIN;
    }
 
-   int linkCount = -1;
-
-   if (!wasInlined) // if the inode was inlined, it was already updated before
-   {
-      inode->setIsInlined(false); // it's now definitely not inlined anymore
-      linkCount = inode->getNumHardlinks();
-      if (likely (linkCount > 0) )
-         inode->setNumHardlinksUnpersistent(--linkCount);
-      inode->updateInodeOnDisk(entryInfo);
-   }
+   int linkCount = inode->getNumHardlinks();;
 
    this->fileStore.releaseFileInode(inode);
 
@@ -1527,6 +1691,7 @@ bool MetaStore::cacheSweepAsync()
 FhgfsOpsErr MetaStore::insertDisposableFile(FileInode* inode)
 {
    LogContext log("MetaStore (insert disposable file)");
+   App* app = Program::getApp();
 
    DirInode* disposalDir = inode->getIsBuddyMirrored()
       ? Program::getApp()->getBuddyMirrorDisposalDir()
@@ -1538,7 +1703,12 @@ FhgfsOpsErr MetaStore::insertDisposableFile(FileInode* inode)
    const std::string& fileName = inode->getEntryID(); // ID is also the file name
    DirEntryType entryType = MetadataTk::posixFileTypeToDirEntryType(inode->getMode() );
 
-   FhgfsOpsErr retVal = mkMetaFileUnlocked(*disposalDir, fileName, entryType, inode);
+   EntryInfo entryInfo;
+   NumNodeID ownerNodeID = inode->getIsBuddyMirrored() ?
+         NumNodeID(app->getMetaBuddyGroupMapper()->getLocalGroupID() ) : app->getLocalNode().getNumID();
+   entryInfo.set(ownerNodeID, "", inode->getEntryID(), "", entryType, 0);
+
+   FhgfsOpsErr retVal = mkMetaFileUnlocked(*disposalDir, fileName, &entryInfo, inode);
    if (retVal != FhgfsOpsErr_SUCCESS)
    {
       log.log(Log_WARNING,
@@ -1634,6 +1804,257 @@ outReleaseInode:
 outUnlock:
    parentDirLock.unlock();
 
+   return retVal;
+}
+
+/**
+ * Deinline or reinline file's Inode on current meta-data server. It first verifies Inode
+ * location (inlined or deinlined) and then performes requested inode movement if needed
+ *
+ * @returns FhgfsOpsErr_SUCCESS on success. FhgfsOpsErr_PATHNOTEXISTS if file does not exists
+ *          FhgfsOpsErr_INTERNAL on any other error
+ *
+ * @param parentDir     parent directory's inode object
+ * @param fileInfo      entryInfo of file for which inode movement is requested
+ * @param moveMode      requested fileInode mode (i.e. deinline or reinline)
+ *
+ */
+FhgfsOpsErr MetaStore::verifyAndMoveFileInode(DirInode& parentDir, EntryInfo* fileInfo, FileInodeMode moveMode)
+{
+   UniqueRWLock metaLock(rwlock, SafeRWLock_WRITE);
+
+   App* app = Program::getApp();
+   FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
+
+   if (!parentDir.loadIfNotLoadedUnlocked())
+   {
+      return FhgfsOpsErr_PATHNOTEXISTS;
+   }
+
+   DirEntry fileDentry(fileInfo->getFileName());
+   if (!parentDir.getDentry(fileInfo->getFileName(), fileDentry))
+   {
+      return FhgfsOpsErr_PATHNOTEXISTS;
+   }
+
+   if (moveMode == MODE_INVALID)
+      return FhgfsOpsErr_INTERNAL;
+
+   bool isInodeMoveRequired = ((moveMode == MODE_DEINLINE) && fileDentry.getIsInodeInlined()) ||
+                              ((moveMode == MODE_REINLINE) && !fileDentry.getIsInodeInlined());
+
+   if (isInodeMoveRequired)
+   {
+      // prepare dentry path
+      const Path* dentriesPath =
+         fileInfo->getIsBuddyMirrored() ? app->getBuddyMirrorDentriesPath() : app->getDentriesPath();
+      std::string dirEntryPath = MetaStorageTk::getMetaDirEntryPath(dentriesPath->str(), parentDir.getID());
+
+      switch (moveMode)
+      {
+         case MODE_DEINLINE:
+         {
+            retVal = deinlineFileInode(parentDir, fileInfo, fileDentry, dirEntryPath);
+            break;
+         }
+
+         case MODE_REINLINE:
+         {
+            retVal = reinlineFileInode(parentDir, fileInfo, fileDentry, dirEntryPath);
+            break;
+         }
+
+         case MODE_INVALID:
+            break;  // added just to please compiler (already handled above)
+      }
+   }
+   else
+   {
+      // due to unexpected failures (like node crash) there may some inconsistencies present in
+      // filesystem like duplicate inode(s) or dentry-by-entryID file missing for an inlined inode
+      // following code takes care to recover from such situations if user re-runs previous failed
+      // operation again (i.e. run beegfs-ctl command again in case of error)
+      switch (moveMode)
+      {
+         case MODE_DEINLINE:
+         {
+            // remove dentry-by-entryID file
+            parentDir.unlinkDirEntry(fileInfo->getFileName(), &fileDentry,  DirEntry_UNLINK_ID);
+            break;
+         }
+
+         case MODE_REINLINE:
+         {
+            // check if duplicate inode exists in inode Tree and remove associated meta file
+            EntryInfo fileInfoCopy(*fileInfo);
+            fileInfoCopy.setInodeInlinedFlag(false);
+            FileInode* inode = FileInode::createFromEntryInfo(&fileInfoCopy);
+            if (inode != NULL)
+            {
+               FileInode::unlinkStoredInodeUnlocked(fileInfo->getEntryID(), fileInfo->getIsBuddyMirrored());
+            }
+            break;
+         }
+
+         case MODE_INVALID:
+            break;  // nothing to do
+      }
+   }
+
+   return retVal;
+}
+
+/**
+ * Helper function of verifyAndMoveFileInode()
+ * Makes a file Inode non-inlined. Caller should check if inode is not already nonInlined
+ */
+FhgfsOpsErr MetaStore::deinlineFileInode(DirInode& parentDir, EntryInfo* entryInfo, DirEntry& dentry, std::string const& dirEntryPath)
+{
+   MetaFileHandle fileInode = referenceFileUnlocked(entryInfo);
+   if (!fileInode)
+      return FhgfsOpsErr_PATHNOTEXISTS;
+
+   UniqueRWLock dirLock(parentDir.rwlock, SafeRWLock_WRITE);
+
+   // 1. write inode meta-data file in inode's tree
+   fileInode->setIsInlined(false);
+   if (!fileInode->storeUpdatedInodeUnlocked(entryInfo))
+   {
+      releaseFileUnlocked(parentDir, fileInode);
+      return FhgfsOpsErr_INTERNAL;
+   }
+
+   // 2. update feature flags for passed-in dentry object so that when its
+   // saved to disk again, it gets written in VER-3 format
+   dentry.unsetInodeInlined();
+   dentry.getInodeStoreData()->setOrigFeature(FileInodeOrigFeature_UNSET);
+
+   // 3. write updated dentry data to disk
+   bool saveRes = dentry.storeUpdatedDirEntry(dirEntryPath);
+
+   // 4. unlink dentry-by-entryID file present in '#fSiDs#' directory
+   if (saveRes)
+   {
+      parentDir.unlinkDirEntryUnlocked(entryInfo->getFileName(), &dentry, DirEntry_UNLINK_ID);
+   }
+
+   dirLock.unlock();
+
+   // if we have reached till step-4 then inode file is written in inode's tree and dentry
+   // file also has updated data in VER-3 format (i.e. no more contains inlined inode).
+   // At this point - we should move file reference to global store. It is needed to take care
+   // of specific scenario when inode de-inline happens on an opened/busy file
+   if (!this->fileStore.isInStore(entryInfo->getEntryID()))
+   {
+      bool moveRes = moveReferenceToMetaFileStoreUnlocked(parentDir.getID(),
+                        parentDir.getIsBuddyMirrored(), entryInfo->getEntryID());
+
+      if (!moveRes)
+      {
+         releaseFileUnlocked(parentDir, fileInode);
+         return FhgfsOpsErr_INTERNAL;
+      }
+   }
+
+   releaseFileUnlocked(parentDir, fileInode);
+   return FhgfsOpsErr_SUCCESS;
+}
+
+/**
+ * Helper function of verifyAndMoveFileInode()
+ * Makes a file Inode inlined. Caller should check if inode is already not inlined
+ */
+FhgfsOpsErr MetaStore::reinlineFileInode(DirInode& parentDir, EntryInfo* entryInfo, DirEntry& dentry, std::string const& dirEntryPath)
+{
+   const char* logContext = "make fileInode Inlined";
+   MetaFileHandle fileInode = referenceFileUnlocked(entryInfo);
+   if (!fileInode)
+      return FhgfsOpsErr_PATHNOTEXISTS;
+
+   UniqueRWLock dirLock(parentDir.rwlock, SafeRWLock_WRITE);
+
+   // 1. set inode specific data in dentry object after updating inode feature flags
+   fileInode->setIsInlined(true);
+   dentry.setFileInodeData(*(fileInode->getInodeDiskData()));
+   fileInode->getInodeDiskData()->setPattern(NULL);
+
+   // 2. create link in '#fSiDs#' directory for dentry-by-entryID file
+   // needed because an inlined inode always have this link present
+   std::string idPath = MetaStorageTk::getMetaDirEntryIDPath(dirEntryPath) + entryInfo->getEntryID();
+   std::string namePath = dirEntryPath + "/" + entryInfo->getFileName();
+   int linkRes = link(namePath.c_str(), idPath.c_str());
+
+   if (linkRes)
+   {
+      if (errno != EEXIST)
+      {
+         LogContext(logContext).logErr("Creating dentry-by-entryid file failed: Path: "
+            + idPath + " SysErr: " + System::getErrString());
+
+         releaseFileUnlocked(parentDir, fileInode);
+         return FhgfsOpsErr_INTERNAL;
+      }
+   }
+
+   // 3. now save in-memory dentry data (having inlined inode) onto disk
+   bool saveRes = dentry.storeUpdatedDirEntry(dirEntryPath);
+
+   // 4. delete non-inlined inode meta file from disk
+   if (saveRes)
+   {
+      if (!FileInode::unlinkStoredInodeUnlocked(entryInfo->getEntryID(), entryInfo->getIsBuddyMirrored()))
+      {
+         releaseFileUnlocked(parentDir, fileInode);
+         return FhgfsOpsErr_INTERNAL;
+      }
+   }
+
+   releaseFileUnlocked(parentDir, fileInode);
+   return FhgfsOpsErr_SUCCESS;
+}
+
+/**
+ * Check if duplicate inodes exists or not (i.e. both inlined + nonInlined inode)
+ * If yes, then remove nonInlined inode to fix duplicacy
+ *
+ * @param parentDir parant directory of file for which duplicacy of inode needs to be checked
+ * @param entryInfo entry info of file
+ */
+FhgfsOpsErr MetaStore::checkAndRepairDupFileInode(DirInode& parentDir, EntryInfo* entryInfo)
+{
+   UniqueRWLock metaLock(rwlock, SafeRWLock_WRITE);
+   FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
+
+   if (!parentDir.loadIfNotLoadedUnlocked())
+   {
+      return FhgfsOpsErr_PATHNOTEXISTS;
+   }
+
+   // first try to load inlined inode
+   entryInfo->setInodeInlinedFlag(true);
+   MetaFileHandle inlinedInode = referenceFileUnlocked(entryInfo);
+   if (!(inlinedInode && inlinedInode->getIsInlined()))
+   {
+      return FhgfsOpsErr_PATHNOTEXISTS;
+   }
+
+   UniqueRWLock dirLock(parentDir.rwlock, SafeRWLock_WRITE);
+
+   // now try to load nonInlined inode
+   entryInfo->setInodeInlinedFlag(false);
+   FileInode*  nonInlinedInode = FileInode::createFromEntryInfo(entryInfo);
+   if (!nonInlinedInode)
+      return retVal;
+
+   // if we are here then we know that both inlined + nonInlined inodes exists and
+   // we can safely remove nonInlined inode to fix duplicacy
+   if (!FileInode::unlinkStoredInodeUnlocked(entryInfo->getEntryID(), entryInfo->getIsBuddyMirrored()))
+   {
+      retVal = FhgfsOpsErr_INTERNAL;
+   }
+
+   releaseFileUnlocked(parentDir, inlinedInode);
+   SAFE_DELETE(nonInlinedInode);
    return retVal;
 }
 

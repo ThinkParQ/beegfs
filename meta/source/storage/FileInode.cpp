@@ -264,20 +264,33 @@ bool FileInode::storeUpdatedMetaDataBufAsXAttr(char* buf, unsigned bufLen, std::
 {
    const char* logContext = "File (store updated xattr metadata)";
 
+   // open file (create file if not already present)
+   int openFlags = O_CREAT|O_TRUNC|O_WRONLY;
+   int fd = open(metaFilename.c_str(), openFlags, 0644);
+
+   if (unlikely(fd == -1))
+   {
+      LogContext(logContext).logErr("Unable to open/create inode metafile: " + metaFilename
+         + ". " + "SysErr: " + System::getErrString());
+      return false;
+   }
+
    // write data to file
 
-   int setRes = setxattr(metaFilename.c_str(), META_XATTR_NAME, buf, bufLen, 0);
+   int setRes = fsetxattr(fd, META_XATTR_NAME, buf, bufLen, 0);
 
    if(unlikely(setRes == -1) )
    { // error
       LogContext(logContext).logErr("Unable to write FileInode metadata update: " +
          metaFilename + ". " + "SysErr: " + System::getErrString() );
 
+      close(fd);
       return false;
    }
 
    LOG_DEBUG(logContext, 4, "File inode update stored: " + this->inodeDiskData.getEntryID() );
 
+   close(fd);
    return true;
 }
 

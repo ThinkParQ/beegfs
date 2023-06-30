@@ -56,6 +56,25 @@ FhgfsOpsErr MsgHelperUnlink::unlinkMetaFile(DirInode& parentDir,
 }
 
 /**
+ * Decrement hardlink count and
+ * Unlink file's inode if hardlink count reaches zero
+ *
+ * @return Success if hardlink count decrement is successful
+ * and if it became zero then fileinode removal is also sucessful (outUnlinkInode will be
+ * set in this case which will be later used to remove chunk files). If file is in use and
+ * its last entry getting removed then inode will be linked with disposal directory for later
+ * removal
+ *
+ */
+FhgfsOpsErr MsgHelperUnlink::unlinkFileInode(EntryInfo* delFileInfo,
+               std::unique_ptr<FileInode>* outUnlinkedFile)
+{
+   MetaStore* metaStore = Program::getApp()->getMetaStore();
+   FhgfsOpsErr unlinkRes = metaStore->unlinkFileInode(delFileInfo, outUnlinkedFile);
+   return unlinkRes;
+}
+
+/**
  * Unlink (storage) chunk files.
  *
  * Note: If chunk files unlink fails, this method will create a disposal entry.

@@ -176,6 +176,10 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_ResyncRawInodesResp: return "ResyncRawInodesResp (2116)";
       case NETMSGTYPE_GetMetaResyncStats: return "GetMetaResyncStats (2117)";
       case NETMSGTYPE_GetMetaResyncStatsResp: return "GetMetaResyncStatsResp (2118)";
+      case NETMSGTYPE_MoveFileInode: return "MoveFileInode (2119)";
+      case NETMSGTYPE_MoveFileInodeResp: return "MoveFileInodeResp(2120)";
+      case NETMSGTYPE_UnlinkLocalFileInode: return "UnlinkLocalFileInode (2121)";
+      case NETMSGTYPE_UnlinkLocalFileInodeResp: return "UnlinkLocalFileInodeResp (2122)";
       case NETMSGTYPE_OpenFile: return "OpenFile (3001)";
       case NETMSGTYPE_OpenFileResp: return "OpenFileResp (3002)";
       case NETMSGTYPE_CloseFile: return "CloseFile (3003)";
@@ -267,6 +271,8 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_AdjustChunkPermissionsResp: return "AdjustChunkPermissionsResp (7041)";
       case NETMSGTYPE_MoveChunkFile: return "MoveChunkFile (7042)";
       case NETMSGTYPE_MoveChunkFileResp: return "MoveChunkFileResp (7043)";
+      case NETMSGTYPE_CheckAndRepairDupInode: return "CheckAndRepairDupInode (7044)";
+      case NETMSGTYPE_CheckAndRepairDupInodeResp: return "CheckAndRepairDupInodeResp (7045)";
    }
 
    return "unknown (" + std::to_string(type) + ")";

@@ -46,6 +46,7 @@ void RequestMetaDataWork::process(char* bufIn, unsigned bufInLen, char* bufOut, 
          result.data.indirectWorkListSize = metaRspMsg->getIndirectWorkListSize();
          result.data.directWorkListSize = metaRspMsg->getDirectWorkListSize();
          result.data.sessionCount = metaRspMsg->getSessionCount();
+         result.data.hostnameid = metaRspMsg->gethostnameid();
 
          if (!result.highResStatsList.empty())
          {

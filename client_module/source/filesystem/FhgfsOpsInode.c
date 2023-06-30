@@ -1680,9 +1680,6 @@ extern int FhgfsOps_symlink(struct inode* dir, struct dentry* dentry, const char
 int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
    struct dentry* toFileDentry)
 {
-   // note: we don't support hardlinks yet, but have a config option to create symlinks instead
-      // of hardlinks.
-
    struct super_block* sb = toFileDentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
    Logger* log = App_getLogger(app);
@@ -1723,8 +1720,8 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
    toDirInfo     = FhgfsInode_getEntryInfo(fhgfsToDirInode);
    fromFileInfo  = FhgfsInode_getEntryInfo(fhgfsFileInode);
 
-   if (strcmp(fromDirInfo->entryID, toDirInfo->entryID) == 0)
-   {  // same inode, so hard link within the same directory
+   if (!Config_getSysCreateHardlinksAsSymlinks(cfg))
+   {  // create hardlink instead of symlink
       int linkRes;
       struct FileEvent event = FILEEVENT_EMPTY;
       const struct FileEvent* eventSent = NULL;
@@ -1761,19 +1758,8 @@ int FhgfsOps_link(struct dentry* fromFileDentry, struct inode* toDirInode,
    }
    else
    {
-      if(!Config_getSysCreateHardlinksAsSymlinks(cfg) )
-      { // creation of hardlinks not allowed/supported
-         FhgfsInode_entryInfoReadUnlock(fhgfsFileInode);    // UNLOCK fromFileInfo
-
-         FhgfsOpsHelper_logOpMsg(Log_DEBUG, app, toFileDentry, fileInode, logContext,
-            "Hardlinks between different dirs not supported yet.");
-
-         FhgfsInode_entryInfoReadLock(fhgfsFileInode);    // LOCK fromParentEntryInfo
-
-         retVal = -EPERM; // do not allow creation of hardlink
-      }
-      else
-         retVal = FhgfsOps_hardlinkAsSymlink(fromFileDentry, toDirInode, toFileDentry);
+      // create symlink instead of hardlink
+      retVal = FhgfsOps_hardlinkAsSymlink(fromFileDentry, toDirInode, toFileDentry);
    }
 
    FhgfsInode_entryInfoReadUnlock(fhgfsFileInode);    // UNLOCK fromFileInfo

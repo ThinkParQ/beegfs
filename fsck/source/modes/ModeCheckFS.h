@@ -30,6 +30,33 @@ struct RepairChunkState
    FsckRepairAction lastChunkAction;
 };
 
+struct FsckErrCount
+{
+   FsckErrCount() : unfixableErrors(0), fixableErrors(0)
+   {
+   }
+
+   FsckErrCount operator+(const FsckErrCount& other)
+   {
+      unfixableErrors += other.unfixableErrors;
+      fixableErrors += other.fixableErrors;
+      return *this;
+   }
+
+   void operator+=(const FsckErrCount& other)
+   {
+      *this = *this + other;
+   }
+
+   uint64_t getTotalErrors() const
+   {
+      return unfixableErrors + fixableErrors;
+   }
+
+   uint64_t unfixableErrors;
+   uint64_t fixableErrors;
+};
+
 class ModeCheckFS : public Mode
 {
    public:
@@ -57,71 +84,81 @@ class ModeCheckFS : public Mode
       FhgfsOpsErr gatherData(bool forceRestart);
 
       template<typename Obj, typename State>
-      int64_t checkAndRepairGeneric(Cursor<Obj> cursor,
-         void (ModeCheckFS::*repair)(Obj&, State&), State& state);
+      FsckErrCount checkAndRepairGeneric(Cursor<Obj> cursor,
+         void (ModeCheckFS::*repair)(Obj&, FsckErrCount&, State&), State& state);
 
-      int64_t checkAndRepairDanglingDentry();
-      int64_t checkAndRepairWrongInodeOwner();
-      int64_t checkAndRepairWrongOwnerInDentry();
-      int64_t checkAndRepairOrphanedContDir();
-      int64_t checkAndRepairOrphanedDirInode();
-      int64_t checkAndRepairOrphanedFileInode();
-      int64_t checkAndRepairOrphanedChunk();
-      int64_t checkAndRepairMissingContDir();
-      int64_t checkAndRepairWrongFileAttribs();
-      int64_t checkAndRepairWrongDirAttribs();
-      int64_t checkAndRepairFilesWithMissingTargets();
-      int64_t checkAndRepairDirEntriesWithBrokeByIDFile();
-      int64_t checkAndRepairOrphanedDentryByIDFiles();
-      int64_t checkAndRepairChunksWithWrongPermissions();
-      int64_t checkMissingMirrorChunks();
-      int64_t checkMissingPrimaryChunks();
-      int64_t checkDifferingChunkAttribs();
-      int64_t checkAndRepairChunksInWrongPath();
+      FsckErrCount checkAndRepairDanglingDentry();
+      FsckErrCount checkAndRepairWrongInodeOwner();
+      FsckErrCount checkAndRepairWrongOwnerInDentry();
+      FsckErrCount checkAndRepairOrphanedContDir();
+      FsckErrCount checkAndRepairOrphanedDirInode();
+      FsckErrCount checkAndRepairOrphanedFileInode();
+      FsckErrCount checkAndRepairDuplicateInodes();
+      FsckErrCount checkAndRepairOrphanedChunk();
+      FsckErrCount checkAndRepairMissingContDir();
+      FsckErrCount checkAndRepairWrongFileAttribs();
+      FsckErrCount checkAndRepairWrongDirAttribs();
+      FsckErrCount checkAndRepairFilesWithMissingTargets();
+      FsckErrCount checkAndRepairDirEntriesWithBrokeByIDFile();
+      FsckErrCount checkAndRepairOrphanedDentryByIDFiles();
+      FsckErrCount checkAndRepairChunksWithWrongPermissions();
+      FsckErrCount checkMissingMirrorChunks();
+      FsckErrCount checkMissingPrimaryChunks();
+      FsckErrCount checkDifferingChunkAttribs();
+      FsckErrCount checkAndRepairChunksInWrongPath();
+      FsckErrCount checkAndUpdateOldStyledHardlinks();
 
-      int64_t checkDuplicateInodeIDs();
       void logDuplicateInodeID(checks::DuplicatedInode& dups, int&);
 
-      int64_t checkDuplicateChunks();
-      void logDuplicateChunk(std::list<FsckChunk>& dups, int&);
+      FsckErrCount checkDuplicateChunks();
+      void logDuplicateChunk(std::list<FsckChunk>& dups, FsckErrCount& errCount, int&);
 
-      int64_t checkDuplicateContDirs();
-      void logDuplicateContDir(std::list<db::ContDir>& dups, int&);
+      FsckErrCount checkDuplicateContDirs();
+      void logDuplicateContDir(std::list<db::ContDir>& dups, FsckErrCount& errCount, int&);
 
-      int64_t checkMismirroredDentries();
-      void logMismirroredDentry(db::DirEntry& entry, int&);
+      FsckErrCount checkMismirroredDentries();
+      void logMismirroredDentry(db::DirEntry& entry, FsckErrCount& errCount, int&);
 
-      int64_t checkMismirroredDirectories();
-      void logMismirroredDirectory(db::DirInode& dir, int&);
+      FsckErrCount checkMismirroredDirectories();
+      void logMismirroredDirectory(db::DirInode& dir, FsckErrCount& errCount, int&);
 
-      int64_t checkMismirroredFiles();
-      void logMismirroredFile(db::FileInode& file, int&);
+      FsckErrCount checkMismirroredFiles();
+      void logMismirroredFile(db::FileInode& file, FsckErrCount& errCount, int&);
 
-      int64_t checkAndRepairMalformedChunk();
-      void repairMalformedChunk(FsckChunk& chunk, UserPrompter& prompt);
+      FsckErrCount checkAndRepairMalformedChunk();
+      void repairMalformedChunk(FsckChunk& chunk, FsckErrCount& errCount, UserPrompter& prompt);
 
       void checkAndRepair();
 
-      void repairDanglingDirEntry(db::DirEntry& entry,
+      void repairDanglingDirEntry(db::DirEntry& entry, FsckErrCount& errCount,
          std::pair<UserPrompter*, UserPrompter*>& prompt);
-      void repairWrongInodeOwner(FsckDirInode& inode, UserPrompter& prompt);
+      void repairWrongInodeOwner(FsckDirInode& inode, FsckErrCount& errCount,
+         UserPrompter& prompt);
       void repairWrongInodeOwnerInDentry(std::pair<db::DirEntry, NumNodeID>& error,
+         FsckErrCount& errCount, UserPrompter& prompt);
+      void repairOrphanedDirInode(FsckDirInode& inode, FsckErrCount& errCount,
          UserPrompter& prompt);
-      void repairOrphanedDirInode(FsckDirInode& inode, UserPrompter& prompt);
-      void repairOrphanedFileInode(FsckFileInode& inode, UserPrompter& prompt);
-      void repairOrphanedChunk(FsckChunk& chunk, RepairChunkState& state);
-      void repairMissingContDir(FsckDirInode& inode, UserPrompter& prompt);
-      void repairOrphanedContDir(FsckContDir& dir, UserPrompter& prompt);
+      void repairOrphanedFileInode(FsckFileInode& inode, FsckErrCount& errCount,
+         UserPrompter& prompt);
+      void repairDuplicateInode(checks::DuplicatedInode& dupInode, FsckErrCount& errCount,
+         UserPrompter& prompt);
+      void repairOrphanedChunk(FsckChunk& chunk, FsckErrCount& errCount, RepairChunkState& state);
+      void repairMissingContDir(FsckDirInode& inode, FsckErrCount& errCount, UserPrompter& prompt);
+      void repairOrphanedContDir(FsckContDir& dir, FsckErrCount& errCount, UserPrompter& prompt);
       void repairWrongFileAttribs(std::pair<FsckFileInode, checks::OptionalInodeAttribs>& error,
-         UserPrompter& prompt);
+         FsckErrCount& errCount, UserPrompter& prompt);
       void repairWrongDirAttribs(std::pair<FsckDirInode, checks::InodeAttribs>& error,
+         FsckErrCount& errCount, UserPrompter& prompt);
+      void repairFileWithMissingTargets(db::DirEntry& entry, FsckErrCount& errCount,
          UserPrompter& prompt);
-      void repairFileWithMissingTargets(db::DirEntry& entry, UserPrompter& prompt);
-      void repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, UserPrompter& prompt);
-      void repairOrphanedDentryByIDFile(FsckFsID& id, UserPrompter& prompt);
+      void repairDirEntryWithBrokenByIDFile(db::DirEntry& entry, FsckErrCount& errCount,
+         UserPrompter& prompt);
+      void repairOrphanedDentryByIDFile(FsckFsID& id, FsckErrCount& errCount, UserPrompter& prompt);
       void repairChunkWithWrongPermissions(std::pair<FsckChunk, FsckFileInode>& error,
+         FsckErrCount& errCount, UserPrompter& prompt);
+      void repairWrongChunkPath(std::pair<FsckChunk, FsckFileInode>& error, FsckErrCount& errCount,
          UserPrompter& prompt);
-      void repairWrongChunkPath(std::pair<FsckChunk, FsckFileInode>& error, UserPrompter& prompt);
+      void updateOldStyledHardlinks(db::FileInode& inode, FsckErrCount& errCount, UserPrompter& prompt);
 
       void deleteFsIDsFromDB(FsckDirEntryList& dentries);
       void deleteFilesFromDB(FsckDirEntryList& dentries);
