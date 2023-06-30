@@ -42,7 +42,6 @@ NodeConnPool::NodeConnPool(Node& parentNode, unsigned short streamPort, const Ni
    memset(&stats, 0, sizeof(stats) );
    memset(&errState, 0, sizeof(errState) );
 
-   filterNicList(this->nicList);
 }
 
 void NodeConnPool::setLocalNicList(const NicAddressList& localNicList,
@@ -72,20 +71,6 @@ NodeConnPool::~NodeConnPool()
    }
 
    nicList.clear();
-}
-
-void NodeConnPool::filterNicList(NicAddressList& nicList)
-{
-   for (NicAddressListIter nicIter = nicList.begin(); nicIter != nicList.end(); )
-   {
-      if(!app->getNetFilter()->isAllowed(nicIter->ipAddr.s_addr) )
-      {
-         nicIter = nicList.erase(nicIter);
-         continue;
-      }
-
-      nicIter++;
-   }
 }
 
 /**
@@ -169,12 +154,15 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
       RDMASocket* newRDMASock = NULL; // (to find out whether we need to set the
          // socketOptions without runtime type info)
 
-      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
-         Socket::endpointAddrToString(&iter->ipAddr, port);
+      if(!app->getNetFilter()->isAllowed(iter->ipAddr.s_addr) )
+         continue;
 
       if( (iter->nicType != NICADDRTYPE_STANDARD) &&
          app->getTcpOnlyFilter()->isContained(iter->ipAddr.s_addr) )
          continue;
+
+      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
+         Socket::endpointAddrToString(&iter->ipAddr, port);
 
       try
       {
@@ -579,14 +567,11 @@ bool NodeConnPool::updateInterfaces(unsigned short streamPort, const NicAddressL
          hasChanged = true;
       }
 
-      NicAddressList filtNicList = nicList;
-      filterNicList(filtNicList);
-
-      if (!(this->nicList == filtNicList))
+      if (!(this->nicList == nicList))
       {
          LOG(GENERAL, NOTICE, "Node interfaces have changed", ("node", parentNode.getNodeIDWithTypeStr()));
          hasChanged = true;
-         this->nicList = filtNicList;
+         this->nicList = nicList;
       }
    }
 

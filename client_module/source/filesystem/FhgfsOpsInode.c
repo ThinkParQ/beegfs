@@ -1498,7 +1498,13 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
          fileInode->i_ctime = dir->i_ctime;
 
          spin_lock(&fileInode->i_lock);
-         drop_nlink(fileInode);
+         // only try to drop link count if it still is > 0. Check is needed,
+         // because there are some situations in which this is called when the
+         // link count is already 0. NFS for example does the same.
+         if(fileInode->i_nlink > 0)
+         {
+            drop_nlink(fileInode);
+         }
          spin_unlock(&fileInode->i_lock);
       }
    }

@@ -87,7 +87,7 @@ if [ "$influx_version" == "1" ]; then
    addDashboard "$GRAFANA_DIR/client_ops_user_influxdbv1.json"
 
 elif [ "$influx_version" == "2" ]; then
-   read -p "Enter Bucket Name:" BUCKET_NAME
+   read -p "Enter Bucket Name: " BUCKET_NAME
    read -p "Enter Organizations: " ORG_NAME
    read -s -p "Enter Token: " TOKEN
 

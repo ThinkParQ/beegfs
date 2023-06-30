@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_BEEGFS_MON_INFLUXDB",
-      "label": "Data Source",
+      "label": "beegfs_mon_influxdb",
       "description": "",
       "type": "datasource",
       "pluginId": "influxdb",
@@ -15,19 +15,13 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.3.2"
+      "version": "9.3.0"
     },
     {
       "type": "datasource",
       "id": "influxdb",
       "name": "InfluxDB",
       "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
     },
     {
       "type": "panel",
@@ -80,6 +74,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisSoftMin": 0,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 30,
@@ -93,8 +88,7 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "log": 2,
-              "type": "log"
+              "type": "linear"
             },
             "showPoints": "never",
             "spanNulls": false,
@@ -126,26 +120,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Disk Space Total"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-green",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "unit",
-                "value": "bytes"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Disk Space Free"
+              "options": "storageTargets.Total"
             },
             "properties": [
               {
@@ -158,23 +133,68 @@
               {
                 "id": "unit",
                 "value": "bytes"
+              },
+              {
+                "id": "displayName",
+                "value": "Disk Total"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Used"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "displayName",
+                "value": "Disk Used"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "storageTargets.Free"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 8,
-        "w": 24,
+        "h": 7,
+        "w": 12,
         "x": 0,
         "y": 0
       },
       "id": 1,
       "links": [],
+      "maxPerRow": 2,
       "options": {
         "legend": {
           "calcs": [
-            "max"
+            "max",
+            "lastNotNull"
           ],
           "displayMode": "table",
           "placement": "bottom",
@@ -186,9 +206,10 @@
         }
       },
       "pluginVersion": "9.3.2",
+      "repeat": "storageTargetID",
+      "repeatDirection": "v",
       "targets": [
         {
-          "alias": "Disk Space Total",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -211,6 +232,8 @@
           "measurement": "storageTargets",
           "orderByTime": "ASC",
           "policy": "default",
+          "query": "SELECT max(\"diskSpaceTotal\"), last(\"diskSpaceFree\"), difference(\"diskSpaceTotal\"), difference(\"diskSpaceTotal\") FROM \"storageTargets\" WHERE (\"storageTargetID\" =~ /^$storageTargetID$/) AND $timeFilter GROUP BY time($__interval) fill(none)",
+          "rawQuery": false,
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -224,45 +247,14 @@
               {
                 "params": [],
                 "type": "max"
+              },
+              {
+                "params": [
+                  "Total"
+                ],
+                "type": "alias"
               }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "storageTargetID",
-              "operator": "=~",
-              "value": "/^$storageTargetID$/"
-            }
-          ]
-        },
-        {
-          "alias": "Disk Space Free",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-          },
-          "dsType": "influxdb",
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "none"
-              ],
-              "type": "fill"
-            }
-          ],
-          "hide": false,
-          "measurement": "storageTargets",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "B",
-          "resultFormat": "time_series",
-          "select": [
+            ],
             [
               {
                 "params": [
@@ -272,7 +264,13 @@
               },
               {
                 "params": [],
-                "type": "max"
+                "type": "last"
+              },
+              {
+                "params": [
+                  "Free"
+                ],
+                "type": "alias"
               }
             ]
           ],
@@ -285,7 +283,29 @@
           ]
         }
       ],
-      "title": "Disk Space",
+      "title": "Disk Space  ($storageTargetID)",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Used",
+            "binary": {
+              "left": "storageTargets.Total",
+              "operator": "-",
+              "reducer": "sum",
+              "right": "storageTargets.Free"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
@@ -350,13 +370,32 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Inodes Total"
+              "options": "storageTargets.Inodes Total"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "semi-dark-blue",
+                  "fixedColor": "#73ffe4",
+                  "mode": "fixed"
+                }
+	      },	
+              {	
+                "id": "displayName",	
+                "value": "Inodes Total"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Inodes Used"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-yellow",
                   "mode": "fixed"
                 }
               }
@@ -365,14 +404,15 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Inodes Free"
+              "options": "storageTargets.Inodes Free"
             },
             "properties": [
               {
-                "id": "color",
+                "id": "custom.hideFrom",
                 "value": {
-                  "fixedColor": "super-light-yellow",
-                  "mode": "fixed"
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
                 }
               }
             ]
@@ -380,16 +420,18 @@
         ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 8
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 0
       },
       "id": 5,
+      "maxPerRow": 2,
       "options": {
         "legend": {
           "calcs": [
-            "max"
+            "max",
+            "lastNotNull"
           ],
           "displayMode": "table",
           "placement": "bottom",
@@ -400,9 +442,10 @@
           "sort": "none"
         }
       },
+      "repeat": "storageTargetID",
+      "repeatDirection": "v",
       "targets": [
         {
-          "alias": "Inodes Total",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -437,44 +480,14 @@
               {
                 "params": [],
                 "type": "max"
+              },
+              {
+                "params": [
+                  "Inodes Total"
+                ],
+                "type": "alias"
               }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "storageTargetID",
-              "operator": "=~",
-              "value": "/^$storageTargetID$/"
-            }
-          ]
-        },
-        {
-          "alias": "Inodes Free",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "hide": false,
-          "measurement": "storageTargets",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "B",
-          "resultFormat": "time_series",
-          "select": [
+            ],
             [
               {
                 "params": [
@@ -484,116 +497,13 @@
               },
               {
                 "params": [],
-                "type": "max"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "storageTargetID",
-              "operator": "=~",
-              "value": "/^$storageTargetID$/"
-            }
-          ]
-        }
-      ],
-      "title": "Inodes",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "rgba(245, 54, 54, 0.9)",
-                "value": null
+                "type": "last"
               },
-              {
-                "color": "rgba(237, 129, 40, 0.89)",
-                "value": 1
-              },
-              {
-                "color": "rgba(50, 172, 45, 0.97)"
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 17
-      },
-      "id": 3,
-      "links": [],
-      "maxDataPoints": 100,
-      "options": {
-        "colorMode": "none",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "/^last$/",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "9.3.2",
-      "targets": [
-        {
-          "alias": "Target Consistency State",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-          },
-          "dsType": "influxdb",
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "none"
-              ],
-              "type": "fill"
-            }
-          ],
-          "limit": "1",
-          "measurement": "storageTargets",
-          "orderByTime": "DESC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "table",
-          "select": [
-            [
               {
                 "params": [
-                  "targetConsistencyState"
+                  "Inodes Free"
                 ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "last"
+                "type": "alias"
               }
             ]
           ],
@@ -606,11 +516,33 @@
           ]
         }
       ],
-      "title": "Target Consistency State",
-      "type": "stat"
+      "title": "Inodes ($storageTargetID)",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Inodes Used",
+            "binary": {
+              "left": "storageTargets.Inodes Total",
+              "operator": "-",
+              "reducer": "sum",
+              "right": "storageTargets.Inodes Free"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "timeseries"
     }
   ],
-  "refresh": "5m",
+  "refresh": "",
   "schemaVersion": 37,
   "style": "dark",
   "tags": [],
@@ -625,6 +557,7 @@
         "definition": "",
         "hide": 0,
         "includeAll": false,
+        "label": "Storage ID",
         "multi": false,
         "name": "storageID",
         "options": [],
@@ -646,8 +579,9 @@
         },
         "definition": "",
         "hide": 0,
-        "includeAll": false,
-        "multi": false,
+        "includeAll": true,
+        "label": "Storage TargetID",
+        "multi": true,
         "name": "storageTargetID",
         "options": [],
         "query": "show tag values from storageTargets with key = \"storageTargetID\" where nodeID =~ /^$storageID$/",
@@ -663,7 +597,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {

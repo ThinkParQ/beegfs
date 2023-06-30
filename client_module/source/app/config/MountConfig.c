@@ -23,6 +23,9 @@ enum {
    Opt_connMgmtdPortTCP,
    Opt_sysMountSanityCheckMS,
 
+   /* Mount options that take no arguments */
+   Opt_grpid,
+
    Opt_err
 };
 
@@ -44,6 +47,8 @@ static match_table_t fhgfs_mount_option_tokens =
    { Opt_connMgmtdPortUDP, "connMgmtdPortUDP=%u" },
    { Opt_connMgmtdPortTCP, "connMgmtdPortTCP=%u" },
    { Opt_sysMountSanityCheckMS, "sysMountSanityCheckMS=%u" },
+
+   { Opt_grpid, "grpid" },
 
    { Opt_err, NULL }
 };
@@ -161,6 +166,10 @@ bool MountConfig_parseFromRawOptions(MountConfig* this, char* mountOptions)
             this->sysMountSanityCheckMSDefined = true;
          } break;
 
+         case Opt_grpid:
+            this->grpid = true;
+            break;
+
          default:
             goto err_exit_unknown_option;
       }
@@ -212,4 +221,7 @@ void MountConfig_showOptions(MountConfig* this, struct seq_file* sf)
 
    if (this->sysMountSanityCheckMSDefined)
       seq_printf(sf, ",sysMountSanityCheckMS=%u", this->sysMountSanityCheckMS);
+
+   if (this->grpid)
+      seq_printf(sf, ",grpid");
 }

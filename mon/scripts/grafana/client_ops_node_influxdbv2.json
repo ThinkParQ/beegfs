@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_BEEGFS_MON_INFLUXDB",
-      "label": "Data Source",
+      "label": "beegfs_mon_influxdb",
       "description": "",
       "type": "datasource",
       "pluginId": "influxdb",
@@ -15,7 +15,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.3.2"
+      "version": "9.3.0"
     },
     {
       "type": "datasource",
@@ -97,7 +97,9 @@
       },
       "id": 2,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -106,14 +108,14 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.0",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
           },
-          "query": "  from(bucket: \"${bucket}\")    |> range(start: -${aggregationPeriod})    |> filter(fn: (r) => r._measurement == \"metaClientOpsByNode\")    |> sum()    |> group()     |> pivot(rowKey:[\"node\"], columnKey: [\"_field\"], valueColumn: \"_value\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"metaClientOpsByNode\")\r\n  |> filter(fn: (r) => r.node =~ /${nodeID:regex}/)\r\n  |> sum()\r\n  |> group()\r\n     |> pivot(rowKey:[\"node\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n  \r\n",
           "refId": "A"
         }
       ],
@@ -176,14 +178,16 @@
         ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 24,
         "x": 0,
         "y": 9
       },
       "id": 4,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "enablePagination": false,
           "fields": "",
           "reducer": [
@@ -193,14 +197,14 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.0",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
           },
-          "query": "  from(bucket: \"${bucket}\")    |> range(start: -${aggregationPeriod})    |> filter(fn: (r) => r._measurement == \"storageClientOpsByNode\")    |> sum()    |> group()     |> pivot(rowKey:[\"node\"], columnKey: [\"_field\"], valueColumn: \"_value\")",
+          "query": "  from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r._measurement == \"storageClientOpsByNode\")\r\n  |> filter(fn: (r) => r.node =~ /${nodeID:regex}/)\r\n  |> sum()\r\n  |> group()\r\n     |> pivot(rowKey:[\"node\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n  \r\n",
           "refId": "A"
         }
       ],
@@ -208,6 +212,7 @@
       "type": "table"
     }
   ],
+  "refresh": "",
   "schemaVersion": 37,
   "style": "dark",
   "tags": [],
@@ -234,85 +239,35 @@
         "type": "query"
       },
       {
-        "auto": false,
-        "auto_count": 30,
-        "auto_min": "10s",
-        "current": {
-          "selected": false,
-          "text": "30m",
-          "value": "30m"
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
+        "definition": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.measurementTagValues(\r\n  bucket: \"${bucket}\",\r\n  tag: \"node\",\r\n  measurement: \"metaClientOpsByNode\"\r\n)",
         "hide": 0,
-        "label": "Aggregation Period",
-        "name": "aggregationPeriod",
-        "options": [
-          {
-            "selected": false,
-            "text": "1m",
-            "value": "1m"
-          },
-          {
-            "selected": false,
-            "text": "10m",
-            "value": "10m"
-          },
-          {
-            "selected": true,
-            "text": "30m",
-            "value": "30m"
-          },
-          {
-            "selected": false,
-            "text": "1h",
-            "value": "1h"
-          },
-          {
-            "selected": false,
-            "text": "6h",
-            "value": "6h"
-          },
-          {
-            "selected": false,
-            "text": "12h",
-            "value": "12h"
-          },
-          {
-            "selected": false,
-            "text": "1d",
-            "value": "1d"
-          },
-          {
-            "selected": false,
-            "text": "7d",
-            "value": "7d"
-          },
-          {
-            "selected": false,
-            "text": "14d",
-            "value": "14d"
-          },
-          {
-            "selected": false,
-            "text": "30d",
-            "value": "30d"
-          }
-        ],
-        "query": "1m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
-        "queryValue": "",
-        "refresh": 2,
+        "includeAll": true,
+        "label": "nodeID",
+        "multi": true,
+        "name": "nodeID",
+        "options": [],
+        "query": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.measurementTagValues(\r\n  bucket: \"${bucket}\",\r\n  tag: \"node\",\r\n  measurement: \"metaClientOpsByNode\"\r\n)",
+        "refresh": 1,
+        "regex": "",
         "skipUrlSync": false,
-        "type": "interval"
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-2d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "BeeGFS Client Operations (by Node)",
-  "uid": "V56Me2Vk",
+  "uid": "V5Me2Vk",
   "version": 2,
   "weekStart": ""
 }

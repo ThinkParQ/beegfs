@@ -126,13 +126,22 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
    else if (isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_USE_QUOTA) && forwardToStorage)
    {
       const UInt16Vector* targetIdVec = inode->getStripePattern()->getStripeTargetIDs();
+      ExceededQuotaStorePtr quotaExStore;
       for (auto targetIter = targetIdVec->begin(); targetIter != targetIdVec->end(); targetIter++)
       {
-         // this is not very efficient at the moment, as we need to look at every quota exceeded
-         // store for every target in the stripe pattern; we need to do that because storage pools
-         // might change over time, i.e. the pool that is stored in the metadata doesn't always
-         // match the actual targets a file is stored on
-         ExceededQuotaStorePtr quotaExStore = app->getExceededQuotaStores()->get(*targetIter);
+         if (inode->getStripePattern()->getPatternType() == StripePatternType_BuddyMirror)
+         {
+            uint16_t primaryTargetID = app->getStorageBuddyGroupMapper()->getPrimaryTargetID(*targetIter);
+            quotaExStore = app->getExceededQuotaStores()->get(primaryTargetID);
+         }
+         else
+         {
+            // this is not very efficient at the moment, as we need to look at every quota exceeded
+            // store for every target in the stripe pattern; we need to do that because storage pools
+            // might change over time, i.e. the pool that is stored in the metadata doesn't always
+            // match the actual targets a file is stored on
+            quotaExStore = app->getExceededQuotaStores()->get(*targetIter);
+         }
 
          // check if exceeded quotas exists, before doing a more expensive and explicit check
          if (quotaExStore && quotaExStore->someQuotaExceeded())

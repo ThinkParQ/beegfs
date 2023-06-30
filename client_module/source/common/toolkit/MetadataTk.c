@@ -10,7 +10,6 @@
 
 #include "MetadataTk.h"
 
-
 /**
  * Used to initialize struct CreateInfo. This function always should be used, to make sure,
  * values are not forgotten.
@@ -22,13 +21,15 @@ void CreateInfo_init(App* app, struct inode* parentDirInode, const char* entryNa
    int mode, int umask, bool isExclusiveCreate, const struct FileEvent* fileEvent,
    CreateInfo* outCreateInfo)
 {
+   MountConfig *mountConfig = app->mountConfig;
+
    outCreateInfo->userID = FhgfsCommon_getCurrentUserID();
 
    // groupID and mode logic taken from inode_init_owner()
-   if (parentDirInode && (parentDirInode->i_mode & S_ISGID) )
+   if (parentDirInode && ((parentDirInode->i_mode & S_ISGID) || mountConfig->grpid))
    {
       outCreateInfo->groupID = i_gid_read(parentDirInode);
-      if (S_ISDIR(mode))
+      if (S_ISDIR(mode) && (parentDirInode->i_mode & S_ISGID))
          mode |= S_ISGID;
    }
    else
