@@ -296,3 +296,20 @@ $(call define_if_matches, KERNEL_ACCESS_OK_WANTS_TYPE, "define access_ok(type, a
 $(call define_if_matches, KERNEL_SPIN_RELEASE_HAS_3_ARGUMENTS, "\#define spin_release(l, n, i)", lockdep.h)
 
 $(call define_if_matches, KERNEL_HAS_NEW_PDE_DATA, "pde_data", proc_fs.h)
+
+# From linux-5.18, .readpages, .invalidatepage, .set_page_dirty, .launder_page
+# are replaced by.readahead, .invalidate_folio, .dirty_folio, launder_folio
+#$(call define_if_matches, KERNEL_HAS_READAHEAD, -F "void (*readahead)", fs.h)
+$(call define_if_matches, KERNEL_HAS_FOLIO, -F "bool (*dirty_folio)", fs.h)
+
+$(call define_if_matches, KERNEL_HAS_READ_FOLIO, -F "int (*read_folio)", fs.h)
+
+KERNEL_FEATURE_DETECTION += $(shell \
+    grep -sFA1 "int (*write_begin)" ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
+      | grep -qsF "unsigned flags" \
+      && echo "-DKERNEL_WRITE_BEGIN_HAS_FLAGS")
+
+# linux-6.0 has iov_iter_get_pages2
+$(call define_if_matches, KERNEL_HAS_IOV_ITER_GET_PAGES2, "iov_iter_get_pages2", uio.h)
+
+$(call define_if_matches, KERNEL_HAS_GET_RANDOM_INT, "get_random_int", random.h)

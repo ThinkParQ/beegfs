@@ -23,15 +23,16 @@ ifeq ($(KRELEASE),)
 KRELEASE := $(shell uname -r)
 endif
 
-ifdef BEEGFS_NO_RDMA
+ifneq ($(BEEGFS_NO_RDMA),)
 BEEGFS_CFLAGS += -DBEEGFS_NO_RDMA
-endif
+else
 
 $(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
 
 ifneq ($(OFED_INCLUDE_PATH),)
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
+endif
 endif
 
 # The following section deals with the auto-detection of the kernel
@@ -86,6 +87,7 @@ KSRCDIR_PRUNED := $(foreach dir, $(KSRCDIR), $(test_dir) )
 # We use the first valid entry of the pruned KSRCDIR list
 KSRCDIR_PRUNED_HEAD := $(firstword $(KSRCDIR_PRUNED) )
 
+ifeq ($(BEEGFS_NO_RDMA),)
 # OFED
 -include /etc/beegfs/beegfs-client-build.mk
 ifneq ($(OFED_INCLUDE_PATH),)
@@ -95,6 +97,7 @@ BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 module: $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h
 $(OFED_INCLUDE_PATH)/rdma/rdma_cm.h:
 	$(error OFED_INCLUDE_PATH not valid: $(OFED_INCLUDE_PATH))
+endif
 endif
 
 # Include kernel feature auto-detectors
@@ -135,6 +138,7 @@ else
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_DEBUG)
 endif
 
+ifeq ($(BEEGFS_NO_RDMA),)
 # NVFS
 ifneq ($(NVFS_INCLUDE_PATH),)
 $(NVFS_INCLUDE_PATH)/nvfs-dma.h:
@@ -154,7 +158,7 @@ endif
 ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
 endif
-
+endif
 
 # if path to strip command was not given, use default
 # (alternative strip is important when cross-compiling)

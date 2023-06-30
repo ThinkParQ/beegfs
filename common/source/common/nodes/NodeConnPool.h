@@ -193,7 +193,6 @@ class NodeConnPool
          *outStats = this->stats;
       }
 
-      void filterNicList(NicAddressList& outNicList);
 };
 
 #endif /*NODECONNPOOL_H_*/

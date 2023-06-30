@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_BEEGFS_MON_INFLUXDB",
-      "label": "Data Source",
+      "label": "beegfs_mon_influxdb",
       "description": "",
       "type": "datasource",
       "pluginId": "influxdb",
@@ -15,7 +15,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.3.2"
+      "version": "9.3.0"
     },
     {
       "type": "datasource",
@@ -122,7 +122,42 @@
           },
           "unit": "decbytes"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Received"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#3274d9",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.transform",
+                "value": "negative-Y"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -300,7 +335,38 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Processed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#36bdbc",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Queued"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ffb357",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -465,7 +531,9 @@
       "id": 46,
       "links": [],
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -474,7 +542,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.3.0",
       "targets": [
         {
           "alias": "Responding",
@@ -803,6 +871,6 @@
   "timezone": "",
   "title": "BeeGFS Meta Server",
   "uid": "OUJBUPQW",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }

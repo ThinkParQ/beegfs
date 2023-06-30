@@ -46,6 +46,17 @@ static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter 
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to);
 #endif // LINUX_VERSION_CODE
 
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
+int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
+      loff_t pos, unsigned len, unsigned flags, struct page** pagep, void** fsdata);
+#else
+int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
+      loff_t pos, unsigned len, struct page** pagep, void** fsdata);
+#endif
+
+int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
+      loff_t pos, unsigned len, unsigned copied, struct page* page, void* fsdata);
+
 #define MMAP_RETRY_LOCK_EASY 100
 #define MMAP_RETRY_LOCK_HARD 500
 
@@ -152,11 +163,21 @@ struct file_operations fhgfs_dir_ops =
  */
 struct address_space_operations fhgfs_address_ops =
 {
+#ifdef KERNEL_HAS_READ_FOLIO
+   .read_folio     = FhgfsOps_read_folio,
+#else
    .readpage       = FhgfsOpsPages_readpage,
+#endif
+
+#ifdef KERNEL_HAS_FOLIO
+   .readahead      = FhgfsOpsPages_readahead,
+   .dirty_folio    = filemap_dirty_folio,
+#else
    .readpages      = FhgfsOpsPages_readpages,
+   .set_page_dirty = __set_page_dirty_nobuffers,
+#endif
    .writepage      = FhgfsOpsPages_writepage,
    .writepages     = FhgfsOpsPages_writepages,
-   .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
    .write_begin   = FhgfsOps_write_begin,
    .write_end     = FhgfsOps_write_end,
@@ -167,11 +188,21 @@ struct address_space_operations fhgfs_address_ops =
  */
 struct address_space_operations fhgfs_address_pagecache_ops =
 {
+#ifdef KERNEL_HAS_READ_FOLIO
+   .read_folio     = FhgfsOps_read_folio,
+#else
    .readpage       = FhgfsOpsPages_readpage,
+#endif
+
+#ifdef KERNEL_HAS_FOLIO
+   .readahead      = FhgfsOpsPages_readahead,
+   .dirty_folio    = filemap_dirty_folio,
+#else
    .readpages      = FhgfsOpsPages_readpages,
+   .set_page_dirty = __set_page_dirty_nobuffers,
+#endif
    .writepage      = FhgfsOpsPages_writepage,
    .writepages     = FhgfsOpsPages_writepages,
-   .set_page_dirty = __set_page_dirty_nobuffers,
    .direct_IO      = FhgfsOps_directIO,
    .write_begin   = FhgfsOps_write_begin,
    .write_end     = FhgfsOps_write_end,
@@ -1652,8 +1683,13 @@ exit:
  * prepare_write() doesn't have this)
  * @return 0 on success
  */
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
 int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
    loff_t pos, unsigned len, unsigned flags, struct page** pagep, void** fsdata)
+#else
+int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
+   loff_t pos, unsigned len, struct page** pagep, void** fsdata)
+#endif
 {
    pgoff_t index = pos >> PAGE_SHIFT;
    loff_t offset = pos & (PAGE_SIZE - 1);
@@ -1669,7 +1705,12 @@ int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
    //   (long long)offset, (long long)page_start, len);
    IGNORE_UNUSED_VARIABLE(app);
 
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
    page = grab_cache_page_write_begin(mapping, index, flags);
+#else
+   page = grab_cache_page_write_begin(mapping, index);
+#endif
+
    if(!page)
    {
       retVal = -ENOMEM;

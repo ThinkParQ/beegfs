@@ -96,11 +96,6 @@ extern ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t 
 
 extern int FhgfsOps_mmap(struct file *, struct vm_area_struct *);
 
-extern int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
-      loff_t pos, unsigned len, unsigned flags, struct page** pagep, void** fsdata);
-extern int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
-      loff_t pos, unsigned len, unsigned copied, struct page* page, void* fsdata);
-
 #if defined(KERNEL_HAS_IOV_DIO)
    extern ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter);
 #elif defined(KERNEL_HAS_LONG_IOV_DIO)

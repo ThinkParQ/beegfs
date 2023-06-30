@@ -490,7 +490,7 @@ void ModeGetQuotaInfo::printHelp()
    std::cout << std::endl;
    std::cout << " Optional for argument --uid and --gid:" << std::endl;
    std::cout << "    --withzero           Print also users/groups that use no disk space. It is " << std::endl;
-   std::cout << "                         default for a single UID/GID and a list of UIDs/GIDs." << std::endl;
+   std::cout << "                         default for a single UID/GID." << std::endl;
    std::cout << "    --withsystem         Print also system users/groups. It is default for a single" << std::endl;
    std::cout << "                         UID/GID and a list of UIDs/GIDs." << std::endl;
    std::cout << std::endl;

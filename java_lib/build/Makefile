@@ -53,7 +53,7 @@ lib$(LIB_NAME).so: $(CPP_BUILD_DIR)/lib$(LIB_NAME).so
 cppheaders: $(CPPHEADER) $(CPPINCLUDES)
 
 # Java 11 no longer has javah.
-ifeq ($(if $(findstring javac 11.,$(shell $(JAVAC) -version)),true,false),true)
+ifneq ($(or $(findstring javac 11.,$(shell $(JAVAC) -version)), $(findstring javac 17.,$(shell $(JAVAC) -version))),)
 $(CPPHEADER): $(CLASSFILES) | $(CPP_BUILD_DIR)
 	$(JAVAC) -classpath $(JAVA_BUILD_DIR) -d $(CPP_BUILD_DIR) -h $(CPP_BUILD_DIR) $(SOURCES)
 else # But java 1.8 needs it.

@@ -159,10 +159,18 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
    NicAddressStats* min = NULL;
    NicAddressStatsListIter statsIter;
    bool skipped;
-   int numa = cpu_to_node(current->cpu);
+   int numa;
+
 #ifdef BEEGFS_NVFS
    int minNvfsPrio = INT_MAX;
    int nvfsPrio;
+   numa = cpu_to_node(current->cpu);
+#endif
+
+#ifdef KERNEL_HAS_CPU_IN_THREAD_INFO
+   numa = cpu_to_node(task_thread_info(current)->cpu);
+#else
+   numa = cpu_to_node(current->cpu);
 #endif
 
    if (NicAddressStatsList_length(&this->rdmaNicStatsList) < 1)

@@ -1938,7 +1938,12 @@ struct ib_cq* __IBVSocket_createCompletionQueue(struct ib_device* device,
    #elif defined OFED_HAS_IB_CREATE_CQATTR || defined ib_create_cq
       struct ib_cq_init_attr attrs = {
          .cqe = cqe,
+         #ifdef KERNEL_HAS_GET_RANDOM_INT
          .comp_vector = get_random_int()%device->num_comp_vectors,
+         #else
+         .comp_vector = get_random_long()%device->num_comp_vectors,
+         #endif
+
       };
 
       return ib_create_cq(device, comp_handler, event_handler, cq_context, &attrs);

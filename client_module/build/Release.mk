@@ -19,13 +19,14 @@ ifeq ($(KRELEASE),)
 KRELEASE := $(shell uname -r)
 endif
 
-ifdef BEEGFS_NO_RDMA
+ifneq ($(BEEGFS_NO_RDMA),)
 BEEGFS_CFLAGS += -DBEEGFS_NO_RDMA
-endif
+else
 
 ifneq ($(OFED_INCLUDE_PATH),)
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
+endif
 endif
 
 # The following section deals with the auto-detection of the kernel
@@ -107,6 +108,7 @@ ifneq ($(BEEGFS_VERSION),)
 BEEGFS_CFLAGS += '-DBEEGFS_VERSION=\"$(BEEGFS_VERSION)\"'
 endif
 
+ifeq ($(BEEGFS_NO_RDMA),)
 # OFED
 ifneq ($(OFED_INCLUDE_PATH),)
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
@@ -142,6 +144,7 @@ endif
 # OFED API version
 ifneq ($(BEEGFS_OFED_1_2_API),)
 BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
+endif
 endif
 
 

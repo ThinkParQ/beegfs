@@ -72,10 +72,12 @@ static int _FhgfsOpsPages_writepages(struct address_space* mapping, struct write
    struct page* page);
 static int FhgfsOpsPages_writePageCallBack(struct page *page, struct writeback_control *wbc,
    void *data);
-
-
-static int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
+#ifdef KERNEL_HAS_FOLIO
+int _FhgfsOpsPages_readahead(struct readahead_control *ractl, struct page* page);
+#else
+int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
    struct list_head* pageList, struct page* page);
+#endif
 static int FhgfsOpsPages_readPageCallBack(void *dataPtr, struct page *page);
 
 
@@ -902,7 +904,12 @@ int FhgfsOpsPages_readpageSync(struct file* file, struct page* page)
 
    ClearPageUptodate(page);
 
+#ifdef KERNEL_HAS_READ_FOLIO
+   retVal = FhgfsOps_read_folio(file, page_folio(page)); // note: async read will unlock the page
+#else
    retVal = FhgfsOpsPages_readpage(file, page); // note: async read will unlock the page
+#endif
+
    if (retVal)
    {
       lock_page(page); // re-lock it
@@ -932,16 +939,35 @@ int FhgfsOpsPages_readpageSync(struct file* file, struct page* page)
  *
  * @return 0 on success, negative linux error code otherwise
  */
+
+#ifdef KERNEL_HAS_READ_FOLIO
+int FhgfsOps_read_folio(struct file *file, struct folio *folio)
+#else
 int FhgfsOpsPages_readpage(struct file* file, struct page* page)
+#endif
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    struct inode* inode = file_inode(file);
+
+#ifdef KERNEL_HAS_READ_FOLIO
+   struct page* page = &folio->page;
+   DEFINE_READAHEAD(ractl, file, &file->f_ra, file->f_mapping, folio->index);
+#elif defined(KERNEL_HAS_FOLIO)
+   DEFINE_READAHEAD(ractl, file, &file->f_ra, file->f_mapping, page->index);
+#endif
+
    int writeBackRes;
 
    int retVal;
 
+#ifdef KERNEL_HAS_READ_FOLIO
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__,
+         "folio-index: %lu", folio->index);
+#else
    FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__,
          "page-index: %lu", page->index);
+#endif
+
    IGNORE_UNUSED_VARIABLE(app);
 
    writeBackRes = FhgfsOpsPages_writeBackPage(inode, page);
@@ -951,33 +977,53 @@ int FhgfsOpsPages_readpage(struct file* file, struct page* page)
       goto outErr;
    }
 
+#if defined(KERNEL_HAS_FOLIO)
+   retVal = _FhgfsOpsPages_readahead(&ractl, page);
+   #if defined(KERNEL_HAS_READ_FOLIO)
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "folio-index: %lu retVal: %d",
+         folio->index, retVal);
+   #else
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "page-index: %lu retVal: %d",
+      page->index, retVal);
+   #endif
+#else
    retVal = _FhgfsOpsPages_readpages(file, file->f_mapping, NULL, page);
 
    FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "page-index: %lu retVal: %d",
       page->index, retVal);
+#endif
 
    return retVal;
 
 outErr:
+
+#ifdef KERNEL_HAS_READ_FOLIO
+   folio_unlock(folio);
+
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "folio-index: %lu retVal: %d",
+      folio->index, retVal);
+#else
    unlock_page(page);
 
    FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "page-index: %lu retVal: %d",
       page->index, retVal);
+#endif
 
    return retVal;
 }
 
-
-/**
- * Read a list of pages or a single page
- *
- * @param pageList/page  either of both must be NULL
- * @param retVal 0 on success, otherwise negative linux error code
- */
+#ifdef KERNEL_HAS_FOLIO
+int _FhgfsOpsPages_readahead(struct readahead_control *ractl, struct page *page)
+{
+   struct inode* inode = ractl->mapping->host;
+   struct file *file = ractl->file;
+#else
 int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
    struct list_head* pageList, struct page* page)
 {
    struct inode* inode = mapping->host;
+#endif
+
    int referenceRes;
 
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
@@ -1002,10 +1048,23 @@ int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
 
    ihold(inode); // make sure the inode is not released
 
+#ifdef KERNEL_HAS_FOLIO
+   if (readahead_count(ractl))
+   {
+      while ((page = readahead_page(ractl)) != NULL)
+      {
+         retVal = FhgfsOpsPages_readPageCallBack(&pageData, page);
+         put_page(page);
+         if (retVal)
+            break;
+      }
+   }
+#else
    if (pageList)
    {  // classical readpages, we get a list pages, which are not in the page cache yet
       retVal = read_cache_pages(mapping, pageList, FhgfsOpsPages_readPageCallBack, &pageData);
    }
+#endif
    else
    { /* Called with a single page only, that does not need to be added to the cache,
       * we are called from ->readpage */
@@ -1056,11 +1115,31 @@ int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
 }
 
 /**
+ * address_space_operations.readahead method
+ */
+#ifdef KERNEL_HAS_FOLIO
+void FhgfsOpsPages_readahead(struct readahead_control *ractl)
+{
+
+   struct file *file = ractl->file;
+
+   struct dentry* dentry = file_dentry(file);
+   App* app = FhgfsOps_getApp(dentry->d_sb);
+
+   FhgfsOpsHelper_logOpDebug(app, dentry, ractl->mapping->host, __func__, "(nr_pages: %u)", readahead_count(ractl));
+   IGNORE_UNUSED_VARIABLE(app);
+   _FhgfsOpsPages_readahead(ractl, NULL);
+   return;
+}
+#else
+
+/**
  * address_space_operations.readpages method
  */
 int FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
    struct list_head* pageList, unsigned numPages)
 {
+
    struct dentry* dentry = file_dentry(file);
    struct inode* inode = mapping->host;
    App* app = FhgfsOps_getApp(dentry->d_sb);
@@ -1074,7 +1153,7 @@ int FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
 
    return _FhgfsOpsPages_readpages(file, mapping, pageList, NULL);
 }
-
+#endif
 
 /*
  * Write back all requests on one page - we do this before reading it.

@@ -20,9 +20,19 @@ extern void FhgfsOpsPages_destroyPageListVecCache(void);
 extern int FhgfsOps_readpagesVec(struct file* file, struct address_space* mapping,
    struct list_head* page_list, unsigned num_pages);
 extern int FhgfsOpsPages_readpageSync(struct file* file, struct page* page);
+#ifdef KERNEL_HAS_READ_FOLIO
+extern int FhgfsOps_read_folio(struct file *file, struct folio *folio);
+#else
 extern int FhgfsOpsPages_readpage(struct file *file, struct page *page);
+#endif
+
+#ifdef KERNEL_HAS_FOLIO
+extern void FhgfsOpsPages_readahead(struct readahead_control *ractl);
+#else
 extern int FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
    struct list_head* pageList, unsigned numPages);
+#endif
+
 extern int FhgfsOpsPages_writepage(struct page *page, struct writeback_control *wbc);
 extern int FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_control* wbc);
 

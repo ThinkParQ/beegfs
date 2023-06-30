@@ -56,7 +56,20 @@ static void beegfs_readsink_reserve_pipe(BeeGFS_ReadSink *rs, struct iov_iter *i
 
       size_t view_size = 0;
 
+      #ifdef KERNEL_HAS_IOV_ITER_GET_PAGES2
+
+      struct iov_iter copyIter = *iter; //Copying the iterator because iov_iter_get_pages2()
+                                        //also performs the auto-advance of the iterator and
+                                        //we don't want auto-advancement because in the end
+                                        //of the while loop of the FhgfsOpsRemoting_readfileVec()
+                                        //doing the same thing.
+      gpr = iov_iter_get_pages2(&copyIter, pages, size, max_pages, &start);
+
+      #else
+
       gpr = iov_iter_get_pages(iter, pages, size, max_pages, &start);
+
+      #endif
 
       if (gpr < 0)
       {

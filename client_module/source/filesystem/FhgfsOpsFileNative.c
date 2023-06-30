@@ -144,147 +144,6 @@ static void pvr_merge(struct page* page, unsigned first, unsigned last)
 }
 
 
-
-struct append_range_descriptor
-{
-   unsigned long firstPageIndex;
-
-   loff_t fileOffset;
-   loff_t firstPageStart;
-
-   size_t size;
-   size_t dataPresent;
-
-   struct mutex mtx;
-
-   struct kref refs;
-};
-
-static struct append_range_descriptor* ard_create(size_t size)
-{
-   struct append_range_descriptor* ard;
-
-   ard = kmalloc(sizeof(*ard), GFP_NOFS);
-   if(!ard)
-      return NULL;
-
-   ard->fileOffset = -1;
-   ard->firstPageIndex = 0;
-   ard->firstPageStart = -1;
-
-   ard->size = size;
-   ard->dataPresent = 0;
-
-   mutex_init(&ard->mtx);
-
-   kref_init(&ard->refs);
-
-   return ard;
-}
-
-static void ard_kref_release(struct kref* kref)
-{
-   struct append_range_descriptor* ard = container_of(kref, struct append_range_descriptor, refs);
-
-   mutex_destroy(&ard->mtx);
-   kfree(ard);
-}
-
-static void ard_get(struct append_range_descriptor* ard)
-{
-   kref_get(&ard->refs);
-}
-
-static int ard_put(struct append_range_descriptor* ard)
-{
-   return kref_put(&ard->refs, ard_kref_release);
-}
-
-static struct append_range_descriptor* ard_from_page(struct page* page)
-{
-   if(!PagePrivate(page) || !PageChecked(page) )
-      return NULL;
-
-   return (struct append_range_descriptor*) page->private;
-}
-
-static struct append_range_descriptor* __mapping_ard(struct address_space* mapping)
-{
-#ifdef KERNEL_HAS_ADDRSPACE_ASSOC_MAPPING
-   // guarantees that pointer casting round-trips properly. gotta love C
-   BUILD_BUG_ON(__alignof__(struct append_range_descriptor) < __alignof(struct address_space) );
-   // same field, same semantics, different type.
-   return (struct append_range_descriptor*) mapping->assoc_mapping;
-#else
-   return mapping->private_data;
-#endif
-}
-
-static struct append_range_descriptor* mapping_ard_get(struct address_space* mapping)
-{
-   struct append_range_descriptor* ard;
-
-   spin_lock(&mapping->private_lock);
-   {
-      ard = __mapping_ard(mapping);
-      if(ard)
-         ard_get(ard);
-   }
-   spin_unlock(&mapping->private_lock);
-
-   return ard;
-}
-
-static void __set_mapping_ard(struct address_space* mapping, struct append_range_descriptor* ard)
-{
-#ifdef KERNEL_HAS_ADDRSPACE_ASSOC_MAPPING
-   mapping->assoc_mapping = (struct address_space*) ard;
-#else
-   mapping->private_data = ard;
-#endif
-}
-
-static void set_mapping_ard(struct address_space* mapping, struct append_range_descriptor* ard)
-{
-   struct append_range_descriptor* oldArd;
-
-   if (ard)
-      ard_get(ard);
-
-   spin_lock(&mapping->private_lock);
-   oldArd = __mapping_ard(mapping);
-   __set_mapping_ard(mapping, ard);
-   spin_unlock(&mapping->private_lock);
-
-   if (oldArd)
-      ard_put(oldArd);
-}
-
-static void ard_assign(struct page* page, struct append_range_descriptor* ard)
-{
-   if(!ard)
-   {
-      ard = ard_from_page(page);
-
-      BUG_ON(!ard);
-
-      ard_put(ard);
-      ClearPagePrivate(page);
-      ClearPageChecked(page);
-      page->private = 0;
-      return;
-   }
-
-   BUG_ON(ard_from_page(page) );
-
-   ard_get(ard);
-   SetPagePrivate(page);
-   SetPageChecked(page);
-   page->private = (unsigned long) ard;
-}
-
-
-
 static void beegfs_drop_all_caches(struct inode* inode)
 {
    os_inode_lock(inode);
@@ -315,7 +174,7 @@ static int beegfs_release_range(struct file* filp, loff_t first, loff_t last)
 
    clear_bit(AS_EIO, &filp->f_mapping->flags);
 
-   writeRes = filemap_write_and_wait_range(filp->f_mapping, first, last);
+   writeRes = file_write_and_wait_range(filp, first, last);
    if(writeRes < 0)
    {
       App* app = FhgfsOps_getApp(file_dentry(filp)->d_sb);
@@ -491,180 +350,71 @@ static ssize_t beegfs_file_write_iter(struct kiocb* iocb, struct iov_iter* from)
 }
 #endif
 
-
-static struct append_range_descriptor* beegfs_get_or_create_ard(struct address_space* mapping,
-   loff_t begin, size_t newData)
+static ssize_t beegfs_write_iter_direct(struct kiocb* iocb, struct iov_iter* from)
 {
-   struct append_range_descriptor* ard;
+#ifdef KERNEL_HAS_IOCB_DIRECT
 
-   ard = mapping_ard_get(mapping);
+      iocb->ki_flags |= IOCB_DIRECT;
+      return generic_file_write_iter(iocb, from);
 
-   if(!ard)
-      goto no_ard;
-
-   mutex_lock(&ard->mtx);
-
-   if(ard->fileOffset >= 0)
-      goto replace_ard;
-
-   if(ard->firstPageIndex * PAGE_SIZE + ard->firstPageStart + ard->size < begin)
-      goto replace_ard;
-
-   ard->size += newData;
-
-   mutex_unlock(&ard->mtx);
-   return ard;
-
-replace_ard:
-   ard_put(ard);
-   set_mapping_ard(mapping, NULL);
-   mutex_unlock(&ard->mtx);
-
-no_ard:
-   ard = ard_create(newData);
-   if(!ard)
-      return ERR_PTR(-ENOMEM);
-
-   set_mapping_ard(mapping, ard);
-   return ard;
+#else
+   #error IOCB_DIRECT feature required.
+#endif
 }
 
-static ssize_t beegfs_append_iter(struct kiocb* iocb, struct iov_iter* from)
+static ssize_t beegfs_write_iter_locked_append(struct kiocb* iocb, struct iov_iter* from)
 {
    struct file* filp = iocb->ki_filp;
-   struct FhgfsInode* inode = BEEGFS_INODE(filp->f_mapping->host);
-   size_t size = from->count;
+   struct inode *inode = file_inode(filp);
+   App* app = FhgfsOps_getApp(file_dentry(filp)->d_sb);
+   FhgfsInode *fhgfsInode = BEEGFS_INODE(inode);
+   FhgfsIsizeHints iSizeHints;
+   RemotingIOInfo ioInfo;
+   FhgfsOpsErr ferr;
+   ssize_t ret = 0;
 
-   struct append_range_descriptor* ard;
-   ssize_t written;
+   FsFileInfo_getIOInfo(__FhgfsOps_getFileInfo(filp), fhgfsInode, &ioInfo);
 
-   Mutex_lock(&inode->appendMutex);
-   do {
-      /* if the append is too large, we may overflow the page cache. make sure concurrent
-       * flushers will allocate the correct size on the storage servers if nothing goes wrong
-       * during the actual append write. if errors do happen, we will produce a hole in the
-       * file. */
-      ard = beegfs_get_or_create_ard(inode->vfs_inode.i_mapping, iocb->ki_pos, size);
-      if(IS_ERR(ard) )
-      {
-         written = PTR_ERR(ard);
-         break;
-      }
+   Mutex_lock(&fhgfsInode->appendMutex);
 
-      written = beegfs_file_write_iter(iocb, from);
+   ferr = FhgfsOpsHelper_getAppendLock(fhgfsInode, &ioInfo);
+   if (ferr)
+   {
+      ret = FhgfsOpsErr_toSysErr(ferr);
+      goto out;
+   }
 
-      mutex_lock(&ard->mtx);
-      os_inode_lock(&inode->vfs_inode);
-      do {
-         if(ard->fileOffset >= 0)
-         {
-            set_mapping_ard(inode->vfs_inode.i_mapping, NULL);
-            ard->dataPresent += MAX(written, 0);
-            i_size_write(&inode->vfs_inode, i_size_read(&inode->vfs_inode) + size);
-            break;
-         }
+   ret = __FhgfsOps_doRefreshInode(app, inode, NULL, &iSizeHints, false);
 
-         if(written < 0)
-            ard->size -= size;
-         else
-         {
-            ard->size -= size - written;
-            i_size_write(&inode->vfs_inode, iocb->ki_pos);
-            ard->dataPresent += written;
-         }
+   if (! ret)
+      ret = beegfs_write_iter_direct(iocb, from);
 
-         if(ard->size == 0)
-            set_mapping_ard(inode->vfs_inode.i_mapping, NULL);
-      } while (0);
-      os_inode_unlock(&inode->vfs_inode);
-      mutex_unlock(&ard->mtx);
+   FhgfsOpsHelper_releaseAppendLock(fhgfsInode, &ioInfo);
 
-      ard_put(ard);
-   } while (0);
-   Mutex_unlock(&inode->appendMutex);
+out:
+   Mutex_unlock(&fhgfsInode->appendMutex);
 
-   return written;
+   return ret;
 }
 
 static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
 {
 
    struct file* filp = iocb->ki_filp;
-   size_t size = from->count;
-
    App* app = FhgfsOps_getApp(file_dentry(filp)->d_sb);
-
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(filp), file_inode(filp), __func__,
-      "(offset: %lld; size: %zu)", iocb->ki_pos, size);
-   IGNORE_UNUSED_VARIABLE(app);
-   IGNORE_UNUSED_VARIABLE(size);
 
    atomic_set(&BEEGFS_INODE(file_inode(filp))->modified, 1);
 
-   if(filp->f_flags & O_APPEND)
-      return beegfs_append_iter(iocb, from);
+   if ((filp->f_flags & O_APPEND)
+         && Config_getTuneUseGlobalAppendLocks(App_getConfig(app)))
+      return beegfs_write_iter_locked_append(iocb, from);
 
+   // Switch to direct (non-buffered) writes in various circumstances.
+   //
    if (!iov_iter_is_pipe(from)
          && (from->count >= Config_getTuneFileCacheBufSize(App_getConfig(app))
                || BEEGFS_SHOULD_FAIL(write_force_cache_bypass, 1)))
-   {
-      ssize_t result;
-
-#ifdef KERNEL_HAS_IOCB_DIRECT
-      iocb->ki_flags |= IOCB_DIRECT;
-      result = generic_file_write_iter(iocb, from);
-#else
-      /* we have to do basically all of generic_file_write_iter by foot here, because only
-       * new kernels provide an iocb flag to force direct IO, which would do the right thing. */
-      size_t size = from->count;
-      loff_t pos = iocb->ki_pos;
-      struct inode* inode = file_inode(filp);
-
-      os_inode_lock(inode);
-      do {
-         result = os_generic_write_checks(filp, &pos, &size, S_ISBLK(inode->i_mode) );
-         if(result)
-            break;
-
-         iov_iter_truncate(from, size);
-
-#ifdef KERNEL_HAS_FILE_REMOVE_SUID
-         result = file_remove_suid(filp);
-#elif defined(KERNEL_HAS_FILE_REMOVE_PRIVS)
-         result = file_remove_privs(filp);
-#else
-         result = remove_suid(file_dentry(filp));
-#endif
-         if(result)
-            break;
-
-#ifndef KERNEL_HAS_WRITE_ITER
-         /* if we ever *do* get an iterator with a non-zero iov_offset, warn and fail. we should
-          * never get one of these, because iov_iter appeared in 3.16. anything that does create
-          * such an iterator must have originated in this file.
-          */
-         if (unlikely(from->iov_offset > 0))
-         {
-            WARN_ON(1);
-            result = -EINVAL;
-         }
-         else
-         {
-            result = generic_file_direct_write(iocb, from->iov, &from->nr_segs, pos,
-            #ifdef KERNEL_HAS_GENERIC_FILE_DIRECT_WRITE_POSP
-               &iocb->ki_pos,
-            #endif
-               size, size);
-         }
-#else
-         result = generic_file_direct_write(iocb, from, pos);
-#endif
-      } while(0);
-      os_inode_unlock(inode);
-#endif
-
-      return result;
-   }
+      return beegfs_write_iter_direct(iocb, from);
 
    return beegfs_file_write_iter(iocb, from);
 }
@@ -985,7 +735,6 @@ struct beegfs_writepages_context
    RemotingIOInfo ioInfo;
    struct writeback_control* wbc;
    bool unlockPages;
-   bool appendLockTaken;
 
    // only ever written by the flusher thread
    struct beegfs_writepages_state* currentState;
@@ -1083,88 +832,14 @@ static void wps_free(struct beegfs_writepages_state* state)
    mempool_free(state, writepages_pool);
 }
 
-static int beegfs_allocate_ard(struct beegfs_writepages_state* state)
-{
-   struct append_range_descriptor* ard = ard_from_page(state->pages[0]);
-   struct address_space* mapping = state->pages[0]->mapping;
-   App* app = FhgfsOps_getApp(mapping->host->i_sb);
-
-   int err = 0;
-
-   mutex_lock(&ard->mtx);
-   if(ard->fileOffset >= 0)
-   {
-      mutex_unlock(&ard->mtx);
-      return 0;
-   }
-
-   if(!Config_getTuneUseGlobalAppendLocks(App_getConfig(app) ) )
-   {
-      char zero = 0;
-      size_t size = sizeof zero;
-      struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(&zero, size, WRITE);
-
-      ssize_t appendRes = FhgfsOpsHelper_appendfileVecOffset(BEEGFS_INODE(mapping->host), iter, size,
-            &state->context->ioInfo, ard->size - size, &ard->fileOffset);
-
-      if (appendRes >= 0)
-         ard->fileOffset -= ard->size;
-      else
-         err = appendRes;
-   }
-   else
-   if(!state->context->appendLockTaken)
-   {
-      FhgfsOpsErr lockRes;
-      FhgfsOpsErr statRes;
-      fhgfs_stat stat;
-      FhgfsInode* inode = BEEGFS_INODE(mapping->host);
-
-      lockRes = FhgfsOpsHelper_getAppendLock(inode, &state->context->ioInfo);
-      if(lockRes)
-      {
-         err = -lockRes;
-         goto error;
-      }
-
-      /* when global append locks are used, this will run in the writeback thread, not in a work
-       * queue, so no synchronization is needed. */
-      state->context->appendLockTaken = true;
-
-      FhgfsInode_entryInfoReadLock(inode); // LOCK EntryInfo
-      statRes = FhgfsOpsRemoting_statDirect(app, FhgfsInode_getEntryInfo(inode), &stat);
-      FhgfsInode_entryInfoReadUnlock(inode); // UNLOCK EntryInfo
-
-      if(unlikely(statRes != FhgfsOpsErr_SUCCESS) )
-      {
-         err = -statRes;
-         goto error;
-      }
-
-      ard->fileOffset = stat.size;
-   }
-
-   if (err < 0)
-      err = FhgfsOpsErr_toSysErr(-err);
-
-error:
-   mutex_unlock(&ard->mtx);
-   return err;
-}
-
 static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* offset, size_t* size)
 {
-   struct append_range_descriptor* ard;
-   int err;
    int i;
-   loff_t appendEnd;
 
    *size = 0;
 
    if(pvr_present(state->pages[0]) )
    {
-      loff_t isize = i_size_read(state->pages[0]->mapping->host);
-
       *offset = page_offset(state->pages[0]) + pvr_get_first(state->pages[0]);
 
       for(i = 0; i < state->nr_pages; i++)
@@ -1172,10 +847,7 @@ static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* off
          struct page* page = state->pages[i];
          unsigned length;
 
-         if(page_offset(page) + pvr_get_last(page) >= isize)
-            length = isize - page_offset(page) - pvr_get_first(page);
-         else
-            length = pvr_get_last(page) - pvr_get_first(page) + 1;
+         length = pvr_get_last(page) - pvr_get_first(page) + 1;
 
          state->kvecs[i].iov_base = page_address(page) + pvr_get_first(page);
          state->kvecs[i].iov_len = length;
@@ -1186,123 +858,85 @@ static int beegfs_wps_prepare(struct beegfs_writepages_state* state, loff_t* off
       return 0;
    }
 
-   ard = ard_from_page(state->pages[0]);
-   BUG_ON(!ard);
-
-   err = beegfs_allocate_ard(state);
-   if(err < 0)
-      return err;
-
-   *offset = ard->fileOffset;
-   if (state->pages[0]->index != ard->firstPageIndex)
-      *offset += (state->pages[0]->index - ard->firstPageIndex) * PAGE_SIZE - ard->firstPageStart;
-
-   appendEnd = ard->firstPageIndex * PAGE_SIZE + ard->firstPageStart + ard->dataPresent;
-
-   for(i = 0; i < state->nr_pages; i++)
-   {
-      struct page* page = state->pages[i];
-      loff_t offsetInPage;
-
-      if(page->index == ard->firstPageIndex)
-         offsetInPage = ard->firstPageStart;
-      else
-         offsetInPage = 0;
-
-      state->kvecs[i].iov_base = page_address(page) + offsetInPage;
-      state->kvecs[i].iov_len = min_t(size_t, appendEnd - (page_offset(page) + offsetInPage),
-            PAGE_SIZE - offsetInPage);
-
-      *size += state->kvecs[i].iov_len;
-   }
-
-   return 0;
+   // ARDs were deleted
+   BUG();
 }
 
-static int beegfs_writepages_work(struct beegfs_writepages_state* state)
+static void __beegfs_writepages_work(struct beegfs_writepages_state* state)
 {
-   App* app;
-   struct iov_iter iter;
-   unsigned i;
-   int result = 0;
-   ssize_t written;
+   int err = 0;
    loff_t offset;
-   size_t size;
+   ssize_t size;
+   ssize_t written = 0;
 
-   if(state->nr_pages == 0)
-      goto free;
+   err = beegfs_wps_prepare(state, &offset, &size);
 
-   app = FhgfsOps_getApp(state->pages[0]->mapping->host->i_sb);
-
-   FhgfsOpsHelper_logOpDebug(app, NULL, state->pages[0]->mapping->host, __func__,
-      "first offset: %lld nr_pages %u", page_offset(state->pages[0]), state->nr_pages);
-   IGNORE_UNUSED_VARIABLE(app);
-
-   result = beegfs_wps_prepare(state, &offset, &size);
-   if(result < 0)
-      goto writes_done;
-
-   if(BEEGFS_SHOULD_FAIL(writepage, 1) )
+   if(err < 0)
    {
-      result = -EIO;
-      goto artifical_write_error;
+      // Probably EIO or EDQUOT
+   }
+   else if(BEEGFS_SHOULD_FAIL(writepage, 1) )
+   {
+      // artificial write error
+      err = -EIO;
+   }
+   else
+   {
+      struct iov_iter iter;
+      BEEGFS_IOV_ITER_KVEC(&iter, WRITE, state->kvecs, state->nr_pages, size);
+
+      written = FhgfsOpsRemoting_writefileVec(&iter, offset, &state->context->ioInfo, false);
+
+      if(written < 0)
+         err = FhgfsOpsErr_toSysErr(-written);
+      else
+         task_io_account_write(written);
    }
 
-   BEEGFS_IOV_ITER_KVEC(&iter, WRITE, state->kvecs, state->nr_pages, size);
-   written = FhgfsOpsRemoting_writefileVec(&iter, offset, &state->context->ioInfo,
-      state->context->appendLockTaken);
-
-   if(written < 0)
-   {
-      result = FhgfsOpsErr_toSysErr(-written);
-
-artifical_write_error:
-      for(i = 0; i < state->nr_pages; i++)
-      {
-         page_endio(state->pages[i], WRITE, result);
-         redirty_page_for_writepage(state->context->wbc, state->pages[i]);
-      }
-
-      goto out;
-   }
-
-   task_io_account_write(written);
-   size = written;
-
-writes_done:
-   for(i = 0; i < state->nr_pages; i++)
+   size = 0;
+   for(unsigned i = 0; i < state->nr_pages; i++)
    {
       struct page* page = state->pages[i];
+      struct address_space *mapping = page->mapping;
+      BUG_ON(! mapping);  //???
 
-      if(size >= state->kvecs[i].iov_len)
+      size += state->kvecs[i].iov_len;
+
+      if (size <= written)
       {
-         size -= state->kvecs[i].iov_len;
+         pvr_clear(page);
+      }
+      else if (err)
+      {
+         mapping_set_error(mapping, err);
 
-         if(pvr_present(page) )
-            pvr_clear(page);
-         else
-            ard_assign(page, NULL);
-
-         page_endio(page, WRITE, 0);
+         pvr_clear(page);
       }
       else
       {
-         // can't decipher *what* exactly happened, but it was a short write and thus bad
-         result = -EIO;
+         // NOTE: this will cause the kernel to retry writeback at a later point
          redirty_page_for_writepage(state->context->wbc, page);
       }
-   }
 
-out:
-   if(state->context->unlockPages)
-   {
-      for(i = 0; i < state->nr_pages; i++)
-         unlock_page(state->pages[i]);
-   }
+      /*
+      Note: As per the documentation, as of Linux 2.5.12,
+      we could unlock the pages as early as after marking them using
+      set_page_writeback().
+      It could be that our own code requires it somewhere, though.
+      */
+      if(state->context->unlockPages)
+         unlock_page(page);
 
-free:
+      end_page_writeback(page);
+   }
+}
+
+static void beegfs_writepages_work(struct beegfs_writepages_state* state)
+{
+   if(state->nr_pages > 0)
+      __beegfs_writepages_work(state);
+
    wps_free(state);
-   return result;
 }
 
 static void beegfs_writepages_work_wrapper(struct work_struct* w)
@@ -1317,17 +951,6 @@ static void beegfs_writepages_work_wrapper(struct work_struct* w)
 static void beegfs_writepages_submit(struct beegfs_writepages_context* context)
 {
    struct beegfs_writepages_state* state = context->currentState;
-   Config* config = App_getConfig(context->ioInfo.app);
-
-   if(state->nr_pages && ard_from_page(state->pages[0]) &&
-      Config_getTuneUseGlobalAppendLocks(config) )
-   {
-      /* execute globally locked appends from the writeback thread to ensure correct write ordering
-       * on the storage servers. PVR flushes can still run from the workqueue because they cannot
-       * intersect any ARD on the same file and client. */
-      beegfs_writepages_work(state);
-      return;
-   }
 
    context->submitted += 1;
 
@@ -1337,8 +960,6 @@ static void beegfs_writepages_submit(struct beegfs_writepages_context* context)
 
 static bool beegfs_wps_must_flush_before(struct beegfs_writepages_state* state, struct page* next)
 {
-   struct append_range_descriptor* ard;
-
    if(state->nr_pages == 0)
       return false;
 
@@ -1360,13 +981,6 @@ static bool beegfs_wps_must_flush_before(struct beegfs_writepages_state* state, 
          return true;
    }
 
-   ard = ard_from_page(next);
-   if(ard)
-   {
-      if(ard_from_page(state->pages[state->nr_pages - 1]) != ard)
-         return true;
-   }
-
    return false;
 }
 
@@ -1375,7 +989,7 @@ static int beegfs_writepages_callback(struct page* page, struct writeback_contro
    struct beegfs_writepages_context* context = data;
    struct beegfs_writepages_state* state = context->currentState;
 
-   BUG_ON(!pvr_present(page) && !ard_from_page(page) );
+   BUG_ON(!pvr_present(page));
 
    if(beegfs_wps_must_flush_before(state, page) )
    {
@@ -1386,6 +1000,8 @@ static int beegfs_writepages_callback(struct page* page, struct writeback_contro
 
    state->pages[state->nr_pages] = page;
    state->nr_pages += 1;
+
+   //XXX can't we defer this to later?
    set_page_writeback(page);
 
    return 0;
@@ -1405,7 +1021,6 @@ static int beegfs_do_write_pages(struct address_space* mapping, struct writeback
       .unlockPages = unlockPages,
       .wbc = wbc,
       .submitted = 0,
-      .appendLockTaken = false,
    };
 
    FhgfsOpsHelper_logOpDebug(app, NULL, inode, __func__, "page? %i %lu", page != NULL,
@@ -1425,45 +1040,21 @@ static int beegfs_do_write_pages(struct address_space* mapping, struct writeback
 
    FhgfsInode_incWriteBackCounter(BEEGFS_INODE(inode) );
 
-   if(Config_getTuneUseGlobalAppendLocks(App_getConfig(app) ) )
-   {
-      /* ensure that the active ARD is written out end to end when global append locks are used,
-       * to make sure that tail(1)-like readers never read blocks of zeroes from reserved-unwritten
-       * ranges of the file. since it is unlikely that files opened with O_APPEND will have
-       * significant PVR write traffic, just sync the whole file.
-       *
-       * we cannot simply flush the ARD attached to the first page of the range (if present),
-       * because there may be an ARD lurking somewhere in the entire range that must not be flushed
-       * only partially.
-       *
-       * if we were only supposed to write out an ARD page (e.g. when an ARD page is modified
-       * by non-append writes), also sync the whole file.
-       *
-       * PVR pages are safe for now. inodes that have not had O_APPEND writes are also safe from
-       * special treatment. we approximate "has O_APPEND writes" by "has O_APPEND handles". that's
-       * not perfect, but close enough for most cases. */
-      if( (page && ard_from_page(page) ) ||
-          (!page && AtomicInt_read(&BEEGFS_INODE(inode)->appendFDsOpen) ) )
-      {
-         wbc->range_cyclic = 0;
-         wbc->range_start = 0;
-         wbc->range_end = LLONG_MAX;
-         wbc->nr_to_write = LONG_MAX;
-         wbc->sync_mode = WB_SYNC_ALL;
-      }
-   }
-
    if(page)
+   {
       err = beegfs_writepages_callback(page, wbc, &context);
+
+      //XXX not sure if it's supposed to be like that
+      WARN_ON(wbc->nr_to_write != 1);
+      if (! err)
+         -- wbc->nr_to_write;
+   }
    else
       err = write_cache_pages(mapping, wbc, beegfs_writepages_callback, &context);
 
    beegfs_writepages_submit(&context);
 
    SynchronizedCounter_waitForCount(&context.barrier, context.submitted);
-
-   if(context.appendLockTaken)
-      FhgfsOpsHelper_releaseAppendLock(BEEGFS_INODE(inode), &context.ioInfo);
 
    FhgfsInode_releaseHandle(BEEGFS_INODE(inode), handleType, NULL);
 
@@ -1505,7 +1096,9 @@ static int beegfs_flush_page(struct page* page)
    };
 
    if(!clear_page_dirty_for_io(page) )
+   {
       return 0;
+   }
 
    return beegfs_do_write_pages(page->mapping, &wbc, page, false);
 }
@@ -1527,7 +1120,7 @@ static int beegfs_readpage(struct file* filp, struct page* page)
 
    FsFileInfo_getIOInfo(fileInfo, fhgfsInode, &ioInfo);
 
-   if(pvr_present(page) || ard_from_page(page) )
+   if (pvr_present(page))
    {
       readRes = beegfs_flush_page(page);
       if(readRes)
@@ -1557,6 +1150,12 @@ out:
    return readRes;
 }
 
+#ifdef KERNEL_HAS_READ_FOLIO
+static int beegfs_read_folio(struct file* filp, struct folio* folio)
+{
+   return beegfs_readpage(filp, &folio->page);
+}
+#endif
 
 struct beegfs_readpages_context
 {
@@ -1774,12 +1373,24 @@ static int beegfs_readpages_add_page(void* data, struct page* page)
    return 0;
 }
 
+#ifdef KERNEL_HAS_FOLIO
+static void beegfs_readahead(struct readahead_control *ractl)
+#else
 static int beegfs_readpages(struct file* filp, struct address_space* mapping,
    struct list_head* pages, unsigned nr_pages)
+#endif
 {
+
+#ifdef KERNEL_HAS_FOLIO
+   struct inode* inode = ractl->mapping->host;
+   struct file* filp = ractl->file;
+   struct page* page_ra;
+#else
+   struct inode* inode = mapping->host;
+#endif
+
    App* app = FhgfsOps_getApp(file_dentry(filp)->d_sb);
 
-   struct inode* inode = mapping->host;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(filp);
    RemotingIOInfo ioInfo;
@@ -1789,7 +1400,11 @@ static int beegfs_readpages(struct file* filp, struct address_space* mapping,
 
    context = rpc_create(inode);
    if(IS_ERR(context) )
+   #ifdef KERNEL_HAS_FOLIO
+      return;
+   #else
       return PTR_ERR(context);
+   #endif
 
    context->currentState = rps_alloc(context);
    if(!context->currentState)
@@ -1798,61 +1413,59 @@ static int beegfs_readpages(struct file* filp, struct address_space* mapping,
       goto out;
    }
 
+   #ifdef KERNEL_HAS_FOLIO
+   FhgfsOpsHelper_logOpDebug(app, file_dentry(filp), inode, __func__,
+         "first offset: %lld \n nr_pages %u \n no. of bytes in this readahead request: %zu\n",
+         readahead_pos(ractl), readahead_count(ractl), readahead_length(ractl));
+   #else
    FhgfsOpsHelper_logOpDebug(app, file_dentry(filp), inode, __func__,
          "first offset: %lld nr_pages %u", page_offset(list_entry(pages->prev, struct page, lru)),
          nr_pages);
+   #endif
+
    IGNORE_UNUSED_VARIABLE(app);
 
    FsFileInfo_getIOInfo(fileInfo, fhgfsInode, &ioInfo);
 
+   #ifdef KERNEL_HAS_FOLIO
+   if (readahead_count(ractl))
+   {
+      while ((page_ra = readahead_page(ractl)) != NULL)
+      {
+         err = beegfs_readpages_add_page(context, page_ra);
+         put_page(page_ra);
+         if (err)
+            goto out;
+      }
+   }
+   #else
    err = read_cache_pages(mapping, pages, beegfs_readpages_add_page, context);
+   #endif
+
    beegfs_readpages_submit(context);
 
 out:
    rpc_put(context);
+   #ifdef KERNEL_HAS_FOLIO
+   return;
+   #else
    return err;
+   #endif
 }
-
-
 
 static int __beegfs_write_begin(struct file* filp, loff_t pos, unsigned len, struct page* page)
 {
-   struct append_range_descriptor* ard;
    int result = 0;
 
-   if(filp->f_flags & O_APPEND)
-   {
-      if(pvr_present(page) )
-         goto flush_page;
+   if(!pvr_present(page) )
+      goto success;
 
-      ard = ard_from_page(page);
-      if(!ard)
-         goto page_clean;
+   if(pvr_can_merge(page, pos & ~PAGE_MASK, (pos & ~PAGE_MASK) + len - 1))
+      goto success;
 
-      /* mapping_ard will not change here because the write path holds a reference to it. */
-      if(ard == __mapping_ard(page->mapping) )
-         goto success;
-   }
-   else
-   {
-      if(ard_from_page(page) )
-         goto flush_page;
-
-      if(!pvr_present(page) )
-         goto success;
-
-      if(pvr_can_merge(page, pos & ~PAGE_MASK, (pos & ~PAGE_MASK) + len - 1))
-         goto success;
-   }
-
-flush_page:
    result = beegfs_flush_page(page);
    if(result)
       goto out_err;
-
-page_clean:
-   if(filp->f_flags & O_APPEND)
-      ard_assign(page, __mapping_ard(page->mapping) );
 
 success:
    return result;
@@ -1878,24 +1491,6 @@ static int __beegfs_write_end(struct file* filp, loff_t pos, unsigned len, unsig
       goto out;
    }
 
-   if(filp->f_flags & O_APPEND)
-   {
-      struct append_range_descriptor* ard = ard_from_page(page);
-
-      BUG_ON(!ard);
-
-      if( (filp->f_flags & O_APPEND) && ard->firstPageStart < 0)
-      {
-         mutex_lock(&ard->mtx);
-         ard->firstPageIndex = page->index;
-         ard->firstPageStart = pos & ~PAGE_MASK;
-         mutex_unlock(&ard->mtx);
-      }
-
-      goto out;
-   }
-
-   /* write_iter updates isize for appends, since a later page may fail on an allocated ard */
    if(i_size_read(inode) < pos + copied)
    {
       i_size_write(inode, pos + copied);
@@ -1915,7 +1510,12 @@ static int __beegfs_write_end(struct file* filp, loff_t pos, unsigned len, unsig
 
 out:
    ClearPageUptodate(page);
+
+#ifdef KERNEL_HAS_FOLIO
+   filemap_dirty_folio(page->mapping, page_folio(page));
+#else
    __set_page_dirty_nobuffers(page);
+#endif
 
    unlock_page(page);
    put_page(page);
@@ -1923,12 +1523,22 @@ out:
    return result;
 }
 
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
 static int beegfs_write_begin(struct file* filp, struct address_space* mapping, loff_t pos,
    unsigned len, unsigned flags, struct page** pagep, void** fsdata)
+#else
+static int beegfs_write_begin(struct file* filp, struct address_space* mapping, loff_t pos,
+   unsigned len, struct page** pagep, void** fsdata)
+#endif
 {
    pgoff_t index = pos >> PAGE_SHIFT;
 
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
    *pagep = grab_cache_page_write_begin(mapping, index, flags);
+#else
+   *pagep = grab_cache_page_write_begin(mapping, index);
+#endif
+
    if(!*pagep)
       return -ENOMEM;
 
@@ -1943,6 +1553,7 @@ static int beegfs_write_end(struct file* filp, struct address_space* mapping, lo
 
 static int beegfs_releasepage(struct page* page, gfp_t gfp)
 {
+
    IGNORE_UNUSED_VARIABLE(gfp);
 
    if(pvr_present(page) )
@@ -1951,28 +1562,45 @@ static int beegfs_releasepage(struct page* page, gfp_t gfp)
       return 1;
    }
 
-   BUG_ON(!ard_from_page(page) );
-   ard_assign(page, NULL);
-   return 1;
+   // ARDs were deleted
+   BUG();
 }
 
+#ifdef KERNEL_HAS_READ_FOLIO
+static bool beegfs_release_folio(struct folio* folio, gfp_t gfp)
+{
+   return beegfs_releasepage(&folio->page, gfp) != 0;
+}
+#endif
+
+#ifdef KERNEL_HAS_FOLIO
+static bool beegfs_set_dirty_folio(struct address_space *mapping, struct folio *folio)
+{
+   struct page *page = &folio->page;
+   if (folio_test_dirty(folio))
+   {
+      printk_fhgfs_debug(KERN_INFO,"%s %p dirty_folio %p idx %lu -- already dirty\n", __func__,
+         mapping->host, folio, folio->index);
+      VM_BUG_ON_FOLIO(!folio_test_private(folio), folio);
+      return false;
+   }
+
+#else
 static int beegfs_set_page_dirty(struct page* page)
 {
+#endif
+
    atomic_set(&BEEGFS_INODE(page->mapping->host)->modified, 1);
-
-   if(ard_from_page(page) )
-   {
-      int err;
-
-      err = beegfs_flush_page(page);
-      if(err < 0)
-         return err;
-   }
 
    pvr_init(page);
    pvr_set_first(page, 0);
    pvr_set_last(page, PAGE_SIZE - 1);
+
+#ifdef KERNEL_HAS_FOLIO
+   return filemap_dirty_folio(mapping,folio);
+#else
    return __set_page_dirty_nobuffers(page);
+#endif
 }
 
 static void __beegfs_invalidate_page(struct page* page, unsigned begin, unsigned end)
@@ -1998,12 +1626,22 @@ static void __beegfs_invalidate_page(struct page* page, unsigned begin, unsigned
       return;
    }
 
-   BUG_ON(!ard_from_page(page) );
-
-   ard_assign(page, NULL);
+   // ARDs were deleted
+   BUG();
 }
 
-#if !defined(KERNEL_HAS_INVALIDATEPAGE_RANGE)
+#if defined(KERNEL_HAS_FOLIO)
+static void beegfs_invalidate_folio(struct folio *folio, size_t offset, size_t length)
+{
+   if (offset != 0 || length < folio_size(folio))
+      return;
+
+   //FIX ME: If this folio_wait_writeback(folio) makes sense here (imp: as per doc)
+   __beegfs_invalidate_page(&folio->page, offset, (offset+length));
+
+}
+
+#elif !defined(KERNEL_HAS_INVALIDATEPAGE_RANGE)
 static void beegfs_invalidate_page(struct page* page, unsigned long begin)
 {
    __beegfs_invalidate_page(page, begin, PAGE_CACHE_SIZE);
@@ -2137,24 +1775,43 @@ static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* 
 }
 #endif
 
+#ifdef KERNEL_HAS_FOLIO
+static int beegfs_launder_folio(struct folio *folio)
+{
+   return beegfs_flush_page(&folio->page);
+}
+#else
 static int beegfs_launderpage(struct page* page)
 {
    return beegfs_flush_page(page);
 }
+#endif
 
 const struct address_space_operations fhgfs_addrspace_native_ops = {
+#ifdef KERNEL_HAS_READ_FOLIO
+   .read_folio = beegfs_read_folio,
+   .release_folio = beegfs_release_folio,
+#else
    .readpage = beegfs_readpage,
-   .writepage = beegfs_writepage,
    .releasepage = beegfs_releasepage,
-   .set_page_dirty = beegfs_set_page_dirty,
-   .invalidatepage = beegfs_invalidate_page,
+#endif
+
+   .writepage = beegfs_writepage,
    .direct_IO = beegfs_direct_IO,
 
+#ifdef KERNEL_HAS_FOLIO
+   .readahead = beegfs_readahead,
+   .dirty_folio = beegfs_set_dirty_folio,
+   .invalidate_folio = beegfs_invalidate_folio,
+   .launder_folio = beegfs_launder_folio,
+#else
    .readpages = beegfs_readpages,
-   .writepages = beegfs_writepages,
-
+   .set_page_dirty = beegfs_set_page_dirty,
+   .invalidatepage = beegfs_invalidate_page,
    .launder_page = beegfs_launderpage,
+#endif
 
+   .writepages = beegfs_writepages,
    .write_begin = beegfs_write_begin,
    .write_end = beegfs_write_end,
 };

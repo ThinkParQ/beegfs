@@ -32,7 +32,7 @@ struct NicAddress
    struct in_addr    ipAddr;
    NicAddrType_t     nicType;
    char              name[IFNAMSIZ];
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
    struct ib_device *ibdev;
 #endif
 };

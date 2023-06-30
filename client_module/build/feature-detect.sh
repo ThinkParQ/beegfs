@@ -348,6 +348,11 @@ check_struct_field_type \
    KERNEL_HAS_XATTR_HANDLERS_INODE_ARG \
    linux/xattr.h
 
+check_struct_field \
+   thread_info::cpu \
+   KERNEL_HAS_CPU_IN_THREAD_INFO \
+   linux/thread_info.h
+
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to
 # detect and remove again.

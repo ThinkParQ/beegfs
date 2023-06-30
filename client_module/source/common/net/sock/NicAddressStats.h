@@ -3,7 +3,7 @@
 
 #include <common/Common.h>
 #include <common/toolkit/Time.h>
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
 #include <rdma/ib_verbs.h>
 #endif
 
@@ -52,7 +52,7 @@ int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o,
 {
    int rc;
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
    // device on the same numa node as current thread has higher priority
    if (likely(this->nic.ibdev && o->nic.ibdev))
    {
@@ -97,7 +97,7 @@ bool NicAddressStats_lastErrorExpired(NicAddressStats* this, Time* now, int expi
 
 bool NicAddressStats_usable(NicAddressStats* this, int maxConns)
 {
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
    if (unlikely(!this->nic.ibdev))
       return false;
 #endif

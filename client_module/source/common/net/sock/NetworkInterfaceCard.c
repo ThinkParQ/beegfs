@@ -93,7 +93,7 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
    struct in_device* in_dev;
    struct in_ifaddr *ifa;
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
    outAddr->ibdev = NULL;
 #endif
    // name
@@ -115,11 +115,7 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
 
    // SIOCGIFHWADDR:
    // get hardware address (MAC)
-   if(!dev->addr_len || !dev->dev_addr)
-      memset(ifr.ifr_hwaddr.sa_data, 0, sizeof(ifr.ifr_hwaddr.sa_data) );
-   else
-      memcpy(ifr.ifr_hwaddr.sa_data, dev->dev_addr,
-             min(sizeof(ifr.ifr_hwaddr.sa_data), (size_t) dev->addr_len) );
+   memcpy(ifr.ifr_hwaddr.sa_data, dev->dev_addr, (size_t) dev->addr_len);
 
    ifr.ifr_hwaddr.sa_family = dev->type;
 
@@ -304,7 +300,7 @@ void __NIC_filterInterfacesForRDMA(NicAddressList* nicList, NicAddressList* outL
 
          *nicAddrCopy = *nicAddr;
 
-#if defined(CONFIG_INFINIBAND) || defined(CONFIG_INFINIBAND_MODULE)
+#ifdef BEEGFS_RDMA
          nicAddrCopy->ibdev = rdmaSock.ibvsock.cm_id->device;
 #endif
          nicAddrCopy->nicType = NICADDRTYPE_RDMA;

@@ -38,6 +38,8 @@ struct MountConfig
    unsigned connMgmtdPortTCP;
    unsigned sysMountSanityCheckMS;
    char* connInterfacesList;
+
+   bool grpid;
 };
 
 
