@@ -104,6 +104,7 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
       isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_DECR_NLINKCNT))
    {
       // error: both increase and decrease of nlink count was requested
+      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
       return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
    }
    else if (isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) ||
@@ -112,8 +113,8 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
       int val = isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) ? 1 : -1;
       setAttrRes = metaStore->incDecLinkCount(entryInfo, val);
 
-      if (setAttrRes != FhgfsOpsErr_SUCCESS)
-         return boost::make_unique<ResponseState>(setAttrRes);
+      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
+      return boost::make_unique<ResponseState>(setAttrRes);
    }
 
    // in the following we need to distinguish between several cases.
