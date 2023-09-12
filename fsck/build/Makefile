@@ -6,7 +6,7 @@ sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
 $(call build-static-library,\
    Fsck,\
    $(sources),\
-   common dl,\
+   common dl nl3-route,\
    ../source)
 
 $(call define-dep-lib,\
@@ -17,12 +17,12 @@ $(call define-dep-lib,\
 $(call build-executable,\
    beegfs-fsck,\
    $(main),\
-   Fsck common dl)
+   Fsck common dl nl3-route)
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   Fsck common dl,\
+   Fsck common dl nl3-route,\
    ../tests)
 
 CXXFLAGS += -DBOOST_RESULT_OF_USE_DECLTYPE

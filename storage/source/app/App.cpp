@@ -406,6 +406,13 @@ void App::initBasicNetwork()
 
    findAllowedInterfaces(localNicList);
 
+   noDefaultRouteNets = std::make_shared<NetVector>();
+   if(!initNoDefaultRouteList(noDefaultRouteNets.get()))
+      throw InvalidConfigException("Failed to parse connNoDefaultRoute");
+
+   initRoutingTable();
+   updateRoutingTable();
+
    // prepare factory for incoming messages
    this->netMessageFactory = new NetMessageFactory();
 }
@@ -568,7 +575,8 @@ void App::initComponents()
    this->log->log(Log_DEBUG, "Initializing components...");
    NicAddressList nicList = getLocalNicList();
    this->dgramListener = new DatagramListener(
-      netFilter, nicList, ackStore, cfg->getConnStoragePortUDP());
+      netFilter, nicList, ackStore, cfg->getConnStoragePortUDP(),
+      this->cfg->getConnRestrictOutboundInterfaces() );
    if(cfg->getTuneListenerPrioShift() )
       dgramListener->setPriorityShift(cfg->getTuneListenerPrioShift() );
 
@@ -659,7 +667,7 @@ void App::stopComponents()
 void App::updateLocalNicList(NicAddressList& localNicList)
 {
    std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes});
-   updateLocalNicListInNodes(log, localNicList, allNodes);
+   updateLocalNicListAndRoutes(log, localNicList, allNodes);
    localNode->updateInterfaces(0, 0, localNicList);
    dgramListener->setLocalNicList(localNicList);
    connAcceptor->updateLocalNicList(localNicList);
@@ -1017,7 +1025,8 @@ bool App::waitForMgmtNode()
    std::string mgmtdHost = cfg->getSysMgmtdHost();
    NicAddressList nicList = getLocalNicList();
 
-   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort);
+   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort,
+      this->cfg->getConnRestrictOutboundInterfaces() );
 
    regDGramLis.start();
 
@@ -1274,7 +1283,8 @@ bool App::registerAndDownloadMgmtInfo()
 
    // start temporary registration datagram listener
 
-   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort);
+   RegistrationDatagramListener regDGramLis(netFilter, nicList, ackStore, udpListenPort,
+      this->cfg->getConnRestrictOutboundInterfaces() );
 
    regDGramLis.start();
 

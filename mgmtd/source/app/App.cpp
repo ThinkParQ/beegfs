@@ -294,6 +294,13 @@ void App::initLocalNodeInfo()
    if (localNicList.empty())
       throw InvalidConfigException("Couldn't find any usable NIC");
 
+   noDefaultRouteNets = std::make_shared<NetVector>();
+   if(!initNoDefaultRouteList(noDefaultRouteNets.get()))
+      throw InvalidConfigException("Failed to parse connNoDefaultRoute");
+
+   initRoutingTable();
+   updateRoutingTable();
+
    // try to load localNodeID from file and fall back to auto-generated ID otherwise
 
    try
@@ -575,7 +582,8 @@ void App::initComponents()
 
    NicAddressList nicList = getLocalNicList();
    this->dgramListener = new DatagramListener(
-      netFilter, nicList, ackStore, cfg->getConnMgmtdPortUDP());
+      netFilter, nicList, ackStore, cfg->getConnMgmtdPortUDP(),
+      this->cfg->getConnRestrictOutboundInterfaces() );
    this->heartbeatMgr = new HeartbeatManager(dgramListener);
 
    // attach heartbeat manager to storagePoolStore to enable sending of modifications
@@ -659,7 +667,7 @@ void App::stopComponents()
 void App::updateLocalNicList(NicAddressList& localNicList)
 {
    std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes, clientNodes});
-   updateLocalNicListInNodes(log, localNicList, allNodes);
+   updateLocalNicListAndRoutes(log, localNicList, allNodes);
    localNode->updateInterfaces(0, 0, localNicList);
    dgramListener->setLocalNicList(localNicList);
    // Updating StreamListener localNicList is not required. That is only

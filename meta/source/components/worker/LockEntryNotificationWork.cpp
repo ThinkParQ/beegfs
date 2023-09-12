@@ -214,5 +214,5 @@ unsigned LockEntryNotificationWork::incAckCounter()
 
 Mutex* LockEntryNotificationWork::getDGramLisMutex(AbstractDatagramListener* dgramLis)
 {
-   return &dgramLis->sendMutex;
+   return dgramLis->getSendMutex();
 }

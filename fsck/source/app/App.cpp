@@ -266,6 +266,9 @@ void App::initLocalNodeInfo()
    if ( this->localNicList.empty() )
       throw InvalidConfigException("Couldn't find any usable NIC");
 
+   initRoutingTable();
+   updateRoutingTable();
+
    std::string nodeID = System::getHostname();
 
    this->localNode = std::make_shared<LocalNode>(NODETYPE_Client, nodeID, NumNodeID(), 0, 0,
@@ -279,7 +282,8 @@ void App::initComponents()
    // Note: We choose a random udp port here to avoid conflicts with the client
    unsigned short udpListenPort = 0;
 
-   this->dgramListener = new DatagramListener(netFilter, localNicList, ackStore, udpListenPort);
+   this->dgramListener = new DatagramListener(netFilter, localNicList, ackStore, udpListenPort,
+      this->cfg->getConnRestrictOutboundInterfaces());
 
    // update the local node info with udp port
    this->localNode->updateInterfaces(dgramListener->getUDPPort(), 0, this->localNicList);
@@ -446,7 +450,7 @@ bool App::waitForMgmtNode()
    std::string mgmtdHost = cfg->getSysMgmtdHost();
 
    RegistrationDatagramListener regDGramLis(this->netFilter, this->localNicList, this->ackStore,
-      udpListenPort);
+      udpListenPort, this->cfg->getConnRestrictOutboundInterfaces());
 
    regDGramLis.start();
 
@@ -468,7 +472,7 @@ bool App::waitForMgmtNode()
 void App::updateLocalNicList(NicAddressList& localNicList)
 {
    std::vector<AbstractNodeStore*> allNodes({ mgmtNodes, metaNodes, storageNodes});
-   updateLocalNicListInNodes(log, localNicList, allNodes);
+   updateLocalNicListAndRoutes(log, localNicList, allNodes);
    localNode->updateInterfaces(0, 0, localNicList);
    dgramListener->setLocalNicList(localNicList);
 }

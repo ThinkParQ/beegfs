@@ -379,3 +379,27 @@ void NetworkInterfaceCard::supportedCapabilities(NicAddressList* nicList,
    outCapabilities->supportsRDMA = supportsRDMA(nicList);
 }
 
+bool IPv4Network::parse(const std::string& cidr, IPv4Network& net)
+{
+   std::size_t s = cidr.find('/');
+   if (s > 0 && s < cidr.length() - 1)
+   {
+      std::string addr = cidr.substr(0, s);
+      net.prefix = std::stoi(cidr.substr(s + 1));
+      if (net.prefix > 32)
+         return false;
+
+      struct in_addr ina;
+      if (::inet_pton(AF_INET, addr.c_str(), &ina) == 1)
+      {
+         net.netmask = generateNetmask(net.prefix);
+         net.address.s_addr = ina.s_addr & net.netmask.s_addr;
+         return true;
+      }
+      else
+         return false;
+   }
+   else
+      return false;
+}
+

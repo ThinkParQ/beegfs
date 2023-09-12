@@ -18,14 +18,14 @@
 #define DGRAMMGR_RECVBUF_SIZE    65536
 #define DGRAMMGR_SENDBUF_SIZE    DGRAMMGR_RECVBUF_SIZE
 
-
 // forward declaration
 class NetFilter;
 
+typedef std::unordered_map<struct in_addr, std::shared_ptr<StandardSocket>, InAddrHash> StandardSocketMap;
 
 class AbstractDatagramListener : public PThread
 {
-   // for efficient individual multi-notifications (needs access to sendMutex)
+   // for efficient individual multi-notifications (needs access to mutex)
    friend class LockEntryNotificationWork;
    friend class LockRangeNotificationWork;
 
@@ -43,40 +43,65 @@ class AbstractDatagramListener : public PThread
          int ackWaitSleepMS = 1000, int numRetries=2);
       bool sendToNodeUDPwithAck(const NodeHandle& node, AcknowledgeableMsg* msg,
          int ackWaitSleepMS = 1000, int numRetries=2);
-      void sendBufToNode(Node& node, const char* buf, size_t bufLen);
-      void sendMsgToNode(Node& node, NetMessage* msg);
+      bool sendBufToNode(Node& node, const char* buf, size_t bufLen);
+      bool sendMsgToNode(Node& node, NetMessage* msg);
 
       void sendDummyToSelfUDP();
 
+   private:
+      std::shared_ptr<StandardSocket> findSenderSockUnlocked(struct in_addr addr);
 
    protected:
       AbstractDatagramListener(const std::string& threadName, NetFilter* netFilter,
-         NicAddressList& localNicList, AcknowledgmentStore* ackStore, unsigned short udpPort);
+         NicAddressList& localNicList, AcknowledgmentStore* ackStore, unsigned short udpPort,
+         bool restrictOutboundInterfaces);
 
       LogContext log;
 
       NetFilter* netFilter;
       AcknowledgmentStore* ackStore;
-      NicAddressList localNicList;
-      Mutex localNicListMutex;
+      bool restrictOutboundInterfaces;
 
-      StandardSocket* udpSock;
+      unsigned short udpPort;
       unsigned short udpPortNetByteOrder;
       in_addr_t loopbackAddrNetByteOrder; // (because INADDR_... constants are in host byte order)
+
       char* sendBuf;
-      Mutex sendMutex;
 
       virtual void handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessage* msg) = 0;
 
+      std::shared_ptr<StandardSocket> findSenderSock(struct in_addr addr);
+
+      /**
+       * Returns the mutex related to seralization of sends.
+       */
+      Mutex* getSendMutex()
+      {
+         return &mutex;
+      }
 
    private:
+      std::shared_ptr<StandardSocketGroup> udpSock;
+      StandardSocketMap interfaceSocks;
+      IpSourceMap ipSrcMap;
       char* recvBuf;
       int recvTimeoutMS;
+      RoutingTable routingTable;
+      /**
+       * For now, use a single mutex for all of the members that are subject to
+       * thread contention. Using multiple mutexes makes the locking more difficult
+       * and can lead to deadlocks. The state dependencies are all intertwined,
+       * anyway.
+       */
+      Mutex mutex;
 
       AtomicUInt32 ackCounter; // used to generate ackIDs
 
-      bool initSock(unsigned short udpPort);
+      NicAddressList localNicList;
+
+      bool initSocks();
       void initBuffers();
+      void configSocket(StandardSocket* sock, NicAddress* nicAddr, int bufsize);
 
       void run();
       void listenLoop();
@@ -84,24 +109,34 @@ class AbstractDatagramListener : public PThread
       bool isDGramFromSelf(struct sockaddr_in* fromAddr);
       unsigned incAckCounter();
 
-
    public:
       // inliners
 
+      /**
+       * Returns ENETUNREACH if no local NIC found to reach @to.
+       */
       ssize_t sendto(const void* buf, size_t len, int flags,
          const struct sockaddr* to, socklen_t tolen)
       {
-         const std::lock_guard<Mutex> lock(sendMutex);
-
-         return udpSock->sendto(buf, len, flags, to, tolen);
+         const std::lock_guard<Mutex> lock(mutex);
+         struct in_addr a = reinterpret_cast<const struct sockaddr_in*>(to)->sin_addr;
+         std::shared_ptr<StandardSocket> s = findSenderSockUnlocked(a);
+         if (s == nullptr)
+            return ENETUNREACH;
+         return s->sendto(buf, len, flags, to, tolen);
       }
 
+      /**
+       * Returns ENETUNREACH if no local NIC found to reach @ipAddr.
+       */
       ssize_t sendto(const void *buf, size_t len, int flags,
          struct in_addr ipAddr, unsigned short port)
       {
-         const std::lock_guard<Mutex> lock(sendMutex);
-
-         return udpSock->sendto(buf, len, flags, ipAddr, port);
+         const std::lock_guard<Mutex> lock(mutex);
+         std::shared_ptr<StandardSocket> s = findSenderSockUnlocked(ipAddr);
+         if (s == nullptr)
+            return ENETUNREACH;
+         return s->sendto(buf, len, flags, ipAddr, port);
       }
 
       // getters & setters
@@ -112,14 +147,11 @@ class AbstractDatagramListener : public PThread
 
       unsigned short getUDPPort()
       {
-         return ntohs(udpPortNetByteOrder);
+         return udpPort;
       }
 
-      void setLocalNicList(NicAddressList& nicList)
-      {
-         const std::lock_guard<Mutex> lock(localNicListMutex);
-         localNicList = nicList;
-      }
+      void setLocalNicList(NicAddressList& nicList);
+
 };
 
 #endif /*ABSTRACTDATAGRAMLISTENER_H_*/

@@ -65,7 +65,6 @@ class App : public AbstractApp
       NetFilter* netFilter; // empty filter means "all nets allowed"
       NetFilter* tcpOnlyFilter; // for IPs that allow only plain TCP (no RDMA etc)
       StringList* allowedInterfaces; // empty list means "all interfaces accepted"
-      NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       std::shared_ptr<Node> localNode;
 
       NodeStoreServers* mgmtNodes;
@@ -187,11 +186,6 @@ class App : public AbstractApp
       Config* getConfig() const
       {
          return cfg;
-      }
-
-      NicAddressList getLocalNicList()
-      {
-         return localNicList;
       }
 
       Node& getLocalNode() const

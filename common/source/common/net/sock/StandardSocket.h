@@ -8,7 +8,7 @@
 class StandardSocket : public PooledSocket
 {
    public:
-      StandardSocket(int domain, int type, int protocol=0);
+      StandardSocket(int domain, int type, int protocol=0, bool epoll = true);
       virtual ~StandardSocket();
 
       static void createSocketPair(int domain, int type, int protocol,
@@ -45,18 +45,18 @@ class StandardSocket : public PooledSocket
       void setTcpNoDelay(bool enable);
       void setTcpCork(bool enable);
 
-
    protected:
       int sock;
       unsigned short sockDomain; // socket domain (aka protocol family) e.g. PF_INET
       const bool isDgramSocket;
+      int epollFD; // only valid for connected or dgram sockets, not valid (-1) for listening sockets
 
       StandardSocket(int fd, unsigned short sockDomain, struct in_addr peerIP,
          std::string peername);
 
+      void addToEpoll(StandardSocket* other);
 
    private:
-      int epollFD; // only valid for connected sockets, not valid (-1) for listening sockets
       RandomReentrant rand;
 
    public:
@@ -133,4 +133,28 @@ class StandardSocket : public PooledSocket
       }
 };
 
+/**
+ * A "main" StandardSocket (this) that manages a set of subordinate StandardSocket
+ * instances.
+ *
+ * The general idea is that "this" and subordinates can be used for sending. recvT() and
+ * recfromT() are invoked upon "this" to wait for packets from any of the sockets
+ * in this group.
+ */
+class StandardSocketGroup : public StandardSocket
+{
+   private:
+      std::vector<std::shared_ptr<StandardSocket>> subordinates;
+
+   public:
+      StandardSocketGroup(int domain, int type, int protocol=0);
+
+      /**
+       * Create a new StandardSocket that is subordinate to "this". The socket can be used
+       * for anything except methods that require epoll (i.e. recvT(), recvfromT().
+       */
+      std::shared_ptr<StandardSocket> createSubordinate(int domain, int type, int protocol=0);
+
+      virtual ~StandardSocketGroup();
+};
 #endif /*STANDARDSOCKET_H_*/

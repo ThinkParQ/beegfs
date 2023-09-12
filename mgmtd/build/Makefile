@@ -6,7 +6,7 @@ sources := $(filter-out $(main), $(shell find ../source -iname '*.cpp'))
 $(call build-static-library,\
    Mgmtd,\
    $(sources),\
-   common dl,\
+   common dl nl3-route,\
    ../source)
 
 $(call define-dep-lib,\
@@ -17,10 +17,10 @@ $(call define-dep-lib,\
 $(call build-executable,\
    beegfs-mgmtd,\
    $(main),\
-   Mgmtd common dl)
+   Mgmtd common dl nl3-route)
 
 $(call build-test,\
    test-runner,\
    $(shell find ../tests -name '*.cpp'),\
-   Mgmtd common dl,\
+   Mgmtd common dl nl3-route,\
    ../tests)

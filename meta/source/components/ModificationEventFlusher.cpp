@@ -17,6 +17,10 @@ ModificationEventFlusher::ModificationEventFlusher()
 {
    NicAddressList nicList;
    this->fsckNode = std::make_shared<Node>(NODETYPE_Invalid, "fsck", NumNodeID(), 0, 0, nicList);
+   NicListCapabilities localNicCaps;
+   NicAddressList localNicList = Program::getApp()->getLocalNicList();
+   NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
+   this->fsckNode->getConnPool()->setLocalNicList(localNicList, localNicCaps);
 }
 
 void ModificationEventFlusher::run()

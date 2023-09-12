@@ -28,6 +28,7 @@ NodeConnPool::NodeConnPool(Node& parentNode, unsigned short streamPort, const Ni
    auto cfg = app->getCommonConfig();
 
    this->nicList = nicList;
+   this->restrictOutboundInterfaces = cfg->getConnRestrictOutboundInterfaces();
 
    this->establishedConns = 0;
    this->availableConns = 0;
@@ -41,7 +42,6 @@ NodeConnPool::NodeConnPool(Node& parentNode, unsigned short streamPort, const Ni
    memset(&localNicCaps, 0, sizeof(localNicCaps) );
    memset(&stats, 0, sizeof(stats) );
    memset(&errState, 0, sizeof(errState) );
-
 }
 
 void NodeConnPool::setLocalNicList(const NicAddressList& localNicList,
@@ -50,6 +50,7 @@ void NodeConnPool::setLocalNicList(const NicAddressList& localNicList,
    std::unique_lock<Mutex> mutexLock(mutex);
    this->localNicList = localNicList;
    this->localNicCaps = localNicCaps;
+   loadIpSourceMap(this->nicList);
    mutexLock.unlock();
    invalidateAllAvailableStreams(false, true);
 }
@@ -71,6 +72,35 @@ NodeConnPool::~NodeConnPool()
    }
 
    nicList.clear();
+}
+
+bool NodeConnPool::loadIpSourceMap()
+{
+   if (restrictOutboundInterfaces)
+   {
+      std::unique_lock<Mutex> mutexLock(mutex);
+      return loadIpSourceMap(nicList);
+   }
+   return true;
+}
+
+/**
+ * Reload ipSrcMap. Mutex must be held.
+ */
+bool NodeConnPool::loadIpSourceMap(const NicAddressList& nicList)
+{
+   bool result = false;
+   if (restrictOutboundInterfaces && !nicList.empty())
+   {
+      LogContext log("NodeConn (loadIPSourceMap)");
+      RoutingTable rt = app->getRoutingTable();
+      result = rt.loadIpSourceMap(nicList, localNicList, ipSrcMap);
+      if (!result)
+         log.log(Log_ERR, std::string("No routes found, node: ") + parentNode.getNodeIDWithTypeStr());
+   }
+   else
+      result = true;
+   return result;
 }
 
 /**
@@ -139,6 +169,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
    port = this->streamPort;
    NicAddressList nicListCopy = this->nicList;
    NicListCapabilities localNicCapsCopy = this->localNicCaps;
+   IpSourceMap ipSrcMapCopy = this->ipSrcMap;
 
    establishedConns++;
 
@@ -154,15 +185,29 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
       RDMASocket* newRDMASock = NULL; // (to find out whether we need to set the
          // socketOptions without runtime type info)
 
+      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
+         Socket::endpointAddrToString(&iter->ipAddr, port);
+
+      struct in_addr srcIp = {
+         .s_addr = 0
+      };
+      if (restrictOutboundInterfaces)
+      {
+         srcIp = ipSrcMapCopy[iter->ipAddr];
+         if (srcIp.s_addr == 0)
+         {
+            log.log(Log_DEBUG, "Skip NIC, no route for " + endpointStr);
+            continue;
+         }
+         log.log(Log_DEBUG, std::string("Use ") + Socket::ipaddrToStr(&srcIp) + " for " + endpointStr);
+      }
+
       if(!app->getNetFilter()->isAllowed(iter->ipAddr.s_addr) )
          continue;
 
       if( (iter->nicType != NICADDRTYPE_STANDARD) &&
          app->getTcpOnlyFilter()->isContained(iter->ipAddr.s_addr) )
          continue;
-
-      std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
-         Socket::endpointAddrToString(&iter->ipAddr, port);
 
       try
       {
@@ -224,6 +269,8 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
          if(newStandardSock)
             applySocketOptionsPreConnect(newStandardSock);
 
+         if (srcIp.s_addr)
+            sock->bindToAddr(srcIp.s_addr, 0);
          sock->connect(&iter->ipAddr, port);
 
          if(errState.shouldPrintConnectedLogMsg(sock->getPeerIP(), sock->getSockType() ) )
@@ -572,7 +619,9 @@ bool NodeConnPool::updateInterfaces(unsigned short streamPort, const NicAddressL
          LOG(GENERAL, NOTICE, "Node interfaces have changed", ("node", parentNode.getNodeIDWithTypeStr()));
          hasChanged = true;
          this->nicList = nicList;
+         loadIpSourceMap(this->nicList);
       }
+
    }
 
    if(unlikely(hasChanged) )

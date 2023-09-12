@@ -6,12 +6,111 @@
 
 #include <net/if.h>
 
-
 enum NicAddrType {
    NICADDRTYPE_STANDARD,
    NICADDRTYPE_SDP,
    NICADDRTYPE_RDMA
 };
+
+
+/**
+ * Returns true if a and b represent the same value.
+ */
+static inline bool operator==(const struct in_addr a, const struct in_addr b)
+{
+   return a.s_addr == b.s_addr;
+}
+
+/**
+ * Returns true if a's value is numerically less-than b's value.
+ */
+static inline bool operator<(const struct in_addr a, const struct in_addr b)
+{
+   return a.s_addr < b.s_addr;
+}
+
+/**
+ * Hash functor for in_addr.
+ */
+class InAddrHash
+{
+   public:
+      std::size_t operator() (const struct in_addr a) const
+      {
+         return std::hash<uint32_t>()(a.s_addr);
+      }
+};
+
+/**
+ * Create an in_addr from a uint32_t.
+ */
+static inline struct in_addr in_addr_ctor(uint32_t a)
+{
+   struct in_addr r = {
+      .s_addr = a
+   };
+   return r;
+}
+
+class IPv4Network
+{
+public:
+   struct in_addr address;
+   struct in_addr netmask;
+   uint8_t prefix;
+
+   static struct in_addr generateNetmask(uint8_t prefix)
+   {
+      uint32_t res = static_cast<uint32_t>(-1);
+      if (prefix < 32)
+         res = ~(res >> prefix);
+      struct in_addr r = {
+         .s_addr = ::htonl(res)
+      };
+      return r;
+   };
+
+   /**
+    * @param address network address in network byte order.
+    * @param network prefix length, 0 - 32.
+    */
+   IPv4Network(struct in_addr address, uint8_t prefix)
+   {
+      netmask = generateNetmask(prefix);
+      this->address.s_addr= address.s_addr & netmask.s_addr;
+      this->prefix = prefix;
+   }
+
+   IPv4Network()
+      : IPv4Network(in_addr_ctor(0), 0) {}
+
+   /**
+    * Parse CIDR and populate net with
+    * data in network byte order.
+    * @param cidr network address in CIDR format (e.g. 10.10.0.0/16)
+    * @param net instance to populate
+    * @return true if parsing was successful
+    */
+   static bool parse(const std::string& cidr, IPv4Network& net);
+
+   /**
+    * Indicate if passed addr is in the network described by
+    * this instance.
+    * @param addr address to test
+    * @return true if addr is in this subnet
+    */
+   bool matches(struct in_addr addr) const
+   {
+      return (addr.s_addr & netmask.s_addr) == address.s_addr;
+   }
+
+   bool operator==(const IPv4Network& o) const
+   {
+      return address == o.address && prefix == o.prefix && netmask == o.netmask;
+   }
+};
+
+typedef std::vector<IPv4Network> NetVector;
 
 /**
  * Note: Make sure this struct can be copied with the assignment operator.

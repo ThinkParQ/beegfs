@@ -54,6 +54,11 @@ void* os_kzalloc(size_t size)
    return buf;
 }
 
+/**
+ * strncasecmp was broken in the linux kernel pre-3.18. strnicmp was
+ * implemented correctly in that timeframe. In kernel >= 3.18, strnicmp
+ * is either a wrapper for strncasecmp or is not defined.
+ */
 int os_strnicmp(const char *s1, const char *s2, size_t n)
 {
    #ifdef KERNEL_HAS_STRNICMP

@@ -4,7 +4,7 @@ include ../../build/Makefile
 $(call build-static-library,\
    beegfs-common,\
    $(shell find ../source -iname '*.cpp'),\
-   dl,\
+   dl nl3-route,\
    ../source)
 
 $(call build-shared-library,\

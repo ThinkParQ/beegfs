@@ -100,7 +100,7 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
       ktime_get_real_ts64(&now);
       cacheValidityMS = Config_getTuneENOENTCacheValidityMS(cfg);
       nowTime = (now.tv_sec * 1000000000UL + now.tv_nsec);
-      if (((nowTime - dentry->d_time)/1000000UL) > cacheValidityMS)
+      if (!cacheValidityMS || ((nowTime - dentry->d_time)/1000000UL) > cacheValidityMS)
       {
          d_drop(dentry);
          goto cleanup_put_parent;

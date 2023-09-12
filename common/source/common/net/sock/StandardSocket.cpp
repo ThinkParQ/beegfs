@@ -12,10 +12,11 @@
 #define STANDARDSOCKET_UDP_COOLING_SLEEP_US      10000
 #define STANDARDSOCKET_UDP_COOLING_RETRIES           5
 
+
 /**
  * @throw SocketException
  */
-StandardSocket::StandardSocket(int domain, int type, int protocol)
+StandardSocket::StandardSocket(int domain, int type, int protocol, bool epoll)
    : isDgramSocket(type == SOCK_DGRAM)
 {
    this->sockDomain = domain;
@@ -30,30 +31,21 @@ StandardSocket::StandardSocket(int domain, int type, int protocol)
          System::getErrString() );
    }
 
-   this->epollFD = epoll_create(1); // "1" is just a hint (and is actually ignored)
-   if(epollFD == -1)
+   if (epoll)
    {
-      int sysErr = errno;
-      close(sock);
+      this->epollFD = epoll_create(1); // "1" is just a hint (and is actually ignored)
+      if(epollFD == -1)
+      {
+         int sysErr = errno;
+         close(sock);
 
-      throw SocketException(std::string("Error during epoll_create(): ") +
-         System::getErrString(sysErr) );
+         throw SocketException(std::string("Error during epoll_create(): ") +
+            System::getErrString(sysErr) );
+      }
+      this->addToEpoll(this);
    }
-
-   struct epoll_event epollEvent;
-   epollEvent.events = EPOLLIN;
-   epollEvent.data.ptr = NULL;
-
-   if(epoll_ctl(epollFD, EPOLL_CTL_ADD, sock, &epollEvent) == -1)
-   {
-      int sysErr = errno;
-      close(sock);
-      close(epollFD);
-
-      throw SocketException(std::string("Unable to add sock to epoll set: ") +
-         System::getErrString(sysErr) );
-   }
-
+   else
+      this->epollFD = -1;
 }
 
 /**
@@ -82,18 +74,7 @@ StandardSocket::StandardSocket(int fd, unsigned short sockDomain, struct in_addr
          System::getErrString() );
    }
 
-   struct epoll_event epollEvent;
-   epollEvent.events = EPOLLIN;
-   epollEvent.data.ptr = NULL;
-
-   if(epoll_ctl(epollFD, EPOLL_CTL_ADD, sock, &epollEvent) == -1)
-   {
-      close(epollFD);
-
-      throw SocketException(std::string("Unable to add sock to epoll set: ") +
-         System::getErrString() );
-   }
-
+   addToEpoll(this);
 }
 
 
@@ -166,12 +147,12 @@ void StandardSocket::connect(const struct sockaddr* serv_addr, socklen_t addrlen
    unsigned short peerPort = ntohs(( (struct sockaddr_in*)serv_addr)->sin_port);
 
    this->peerIP = ( (struct sockaddr_in*)serv_addr)->sin_addr;
-
+#ifdef BEEGFS_DEBUG_IP
+   LOG(SOCKLIB, DEBUG, "Connect StandardSocket", ("socket", this), ("ipAddr", Socket::ipaddrToStr(&peerIP)), ("port", peerPort));
+#endif
    // set peername if not done so already (e.g. by connect(hostname) )
-
    if(peername.empty() )
       peername = Socket::ipaddrToStr(&peerIP) + ":" + StringTk::intToStr(peerPort);
-
 
    int flagsOrig = fcntl(sock, F_GETFL, 0);
    fcntl(sock, F_SETFL, flagsOrig | O_NONBLOCK); // make the socket nonblocking
@@ -234,12 +215,20 @@ void StandardSocket::bindToAddr(in_addr_t ipAddr, unsigned short port)
    localaddr_in.sin_addr.s_addr = ipAddr;
    localaddr_in.sin_port = htons(port);
 
+#ifdef BEEGFS_DEBUG_IP
+   LOG(SOCKLIB, DEBUG, "Bind StandardSocket", ("socket", this), ("ipAddr", Socket::ipaddrToStr(ipAddr)), ("port", port));
+#endif
    int bindRes = ::bind(sock, (struct sockaddr *)&localaddr_in, sizeof(localaddr_in) );
    if (bindRes == -1)
       throw SocketException("Unable to bind to port: " + StringTk::uintToStr(port) +
          ". SysErr: " + System::getErrString() );
 
-   peername = std::string("Listen(Port: ") + StringTk::uintToStr(port) + std::string(")");
+   bindIP.s_addr = ipAddr;
+   bindPort = port;
+
+   if (isDgramSocket)
+      peername = std::string("Listen(Port: ") + StringTk::uintToStr(bindPort) + std::string(")");
+
 }
 
 /**
@@ -255,6 +244,8 @@ void StandardSocket::listen()
    int listenRes = ::listen(sock, backlog);
    if(listenRes == -1)
       throw SocketException(std::string("listen: ") + System::getErrString() );
+
+   peername = std::string("Listen(Port: ") + StringTk::uintToStr(bindPort) + std::string(")");
 
    if(this->epollFD != -1)
    { // we won't need epoll for listening sockets (we use it only for recvT/recvfromT)
@@ -376,6 +367,13 @@ ssize_t StandardSocket::sendto(const void *buf, size_t len, int flags,
    while (tries < STANDARDSOCKET_UDP_COOLING_RETRIES)
    {
       tries++;
+#ifdef BEEGFS_DEBUG_IP
+      if (to != NULL)
+         LOG(COMMUNICATION, DEBUG, std::string("sendto"),
+            ("addr", Socket::ipaddrToStr(&((const struct sockaddr_in*) to)->sin_addr) +
+               ":" + StringTk::intToStr(ntohs(((const struct sockaddr_in*) to)->sin_port))),
+            ("len", len));
+#endif
       ssize_t sendRes = ::sendto(sock, buf, len, flags | MSG_NOSIGNAL, to, tolen);
       if(sendRes == (ssize_t)len)
       {
@@ -489,14 +487,17 @@ ssize_t StandardSocket::recvT(void *buf, size_t len, int flags, int timeoutMS)
 {
    struct epoll_event epollEvent;
 
+   if (epollFD == -1)
+      throw SocketException("recvT called on non-epoll socket instance");
+
    while (true)
    {
       int epollRes = epoll_wait(epollFD, &epollEvent, 1, timeoutMS);
 
       if(likely( (epollRes > 0) && (epollEvent.events & EPOLLIN) ) )
       {
-         int recvRes = this->recv(buf, len, flags);
-         return recvRes;
+         StandardSocket* s = reinterpret_cast<StandardSocket*>(epollEvent.data.ptr);
+         return s->recv(buf, len, flags);
       }
       else
       if(!epollRes)
@@ -537,6 +538,13 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
    struct sockaddr *from, socklen_t *fromlen)
 {
    int recvRes = ::recvfrom(sock, buf, len, flags, from, fromlen);
+#ifdef BEEGFS_DEBUG_IP
+   if (isDgramSocket && from)
+         LOG(COMMUNICATION, DEBUG, std::string("recvfrom"),
+            ("addr", Socket::ipaddrToStr(&((const struct sockaddr_in*) from)->sin_addr) +
+               ":" + StringTk::intToStr(ntohs(((const struct sockaddr_in*) from)->sin_port))),
+            ("recvRes", recvRes));
+#endif
    if(recvRes > 0)
    {
       stats->incVals.netRecvBytes += recvRes;
@@ -549,7 +557,8 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
       {
          struct sockaddr_in* sin = (struct sockaddr_in*)from;
          LOG(COMMUNICATION, NOTICE, "Received empty UDP datagram.", peername,
-               ("IP", Socket::ipaddrToStr(&sin->sin_addr)), ("port", ntohs(sin->sin_port)));
+            ("IP", (sin? Socket::ipaddrToStr(&sin->sin_addr) : std::string("null"))),
+            ("port", (sin? ntohs(sin->sin_port) : (uint16_t) 0)));
          return 0;
       }
       else
@@ -565,6 +574,24 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
    }
 }
 
+void StandardSocket::addToEpoll(StandardSocket* other)
+{
+   struct epoll_event epollEvent;
+   epollEvent.events = EPOLLIN;
+   epollEvent.data.ptr = other;
+
+   if(epoll_ctl(epollFD, EPOLL_CTL_ADD, other->sock, &epollEvent) == -1)
+   {
+      int sysErr = errno;
+      close(sock);
+      close(epollFD);
+
+      throw SocketException(std::string("Unable to add sock to epoll set: ") +
+         System::getErrString(sysErr) );
+   }
+
+}
+
 /**
  * This is the epoll-based version.
  *
@@ -575,13 +602,17 @@ ssize_t StandardSocket::recvfromT(void  *buf, size_t len, int flags,
 {
    struct epoll_event epollEvent;
 
+   if (epollFD == -1)
+      throw SocketException("recvfromT called on non-epoll socket instance");
+
    while (true)
    {
       int epollRes = epoll_wait(epollFD, &epollEvent, 1, timeoutMS);
 
       if(likely( (epollRes > 0) && (epollEvent.events & EPOLLIN) ) )
       {
-         int recvRes = this->recvfrom(buf, len, flags, from, fromlen);
+         StandardSocket* s = reinterpret_cast<StandardSocket*>(epollEvent.data.ptr);
+         int recvRes = s->recvfrom(buf, len, flags, from, fromlen);
          return recvRes;
       }
       else
@@ -786,3 +817,23 @@ void StandardSocket::setTcpCork(bool enable)
 }
 
 
+StandardSocketGroup::StandardSocketGroup(int domain, int type, int protocol)
+   : StandardSocket(domain, type, protocol, true)
+{
+}
+
+std::shared_ptr<StandardSocket> StandardSocketGroup::createSubordinate(int domain, int type, int protocol)
+{
+   std::shared_ptr<StandardSocket> newSock = std::make_shared<StandardSocket>(domain, type, protocol, false);
+   subordinates.push_back(newSock);
+   addToEpoll(newSock.get());
+   return newSock;
+}
+
+StandardSocketGroup::~StandardSocketGroup()
+{
+   // close the epollFD before the subordinates get cleared to prevent potential
+   // access to deleted memory in the epoll_wait handler.
+   ::close(epollFD);
+   epollFD = -1;
+}

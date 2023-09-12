@@ -85,6 +85,9 @@ void __IBVSocket_initFromCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    #endif // SYSTEM_HAS_RDMA_MIGRATE_ID
 
    _this->sockValid = true;
+   LOG(SOCKLIB, DEBUG, __func__,
+      ("_this", StringTk::uint64ToHexStr((uint64_t) _this)),
+      ("device", cm_id->verbs->device->name));
 
    return;
 }
@@ -198,6 +201,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    int oldChannelFlags;
    int setOldFlagsRes;
 
+   LOG(SOCKLIB, DEBUG, "Connect RDMASocket", ("socket", _this), ("ipAddr", Socket::ipaddrToStr(ipaddress)), ("port", port));
 
    // resolve IP address...
 
@@ -399,6 +403,8 @@ bool IBVSocket_bindToAddr(IBVSocket* _this, in_addr_t ipAddr, unsigned short por
    bindAddr.sin_family = AF_INET;
    bindAddr.sin_addr.s_addr = ipAddr;
    bindAddr.sin_port = htons(port);
+
+   LOG(SOCKLIB, DEBUG, "Bind RDMASocket", ("socket", _this), ("ipAddr", Socket::ipaddrToStr(ipAddr)), ("port", port));
 
    if(rdma_bind_addr(_this->cm_id, (struct sockaddr*)&bindAddr) )
    {
@@ -1107,6 +1113,10 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       LOG(SOCKLIB, WARNING, "Couldn't request CQ notification.");
       goto err_cleanup;
    }
+
+   LOG(SOCKLIB, DEBUG, __func__,
+      ("_this", StringTk::uint64ToHexStr((uint64_t) _this)),
+      ("device", cm_id->verbs->device->name));
 
    *outCommContext = commContext;
    return true;

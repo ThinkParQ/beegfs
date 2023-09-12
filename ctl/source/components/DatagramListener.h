@@ -7,7 +7,7 @@ class DatagramListener : public AbstractDatagramListener
 {
    public:
       DatagramListener(NetFilter* netFilter, NicAddressList& localNicList, AcknowledgmentStore* ackStore,
-         unsigned short udpPort);
+         unsigned short udpPort, bool restrictOutboundInterfaces);
       virtual ~DatagramListener();
 
 

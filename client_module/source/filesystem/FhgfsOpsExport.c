@@ -124,9 +124,11 @@ int __FhgfsOpsExport_encodeNfsFileHandleV3(struct inode* inode, __u32* file_hand
    FhgfsNfsHandleType retVal = FhgfsNfsHandle_STANDARD_V3;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    struct FhgfsNfsFileHandleV3* fhgfsNfsHandle = (void*)file_handle_buf;
+   __u8* handleAsArray = (__u8 *)fhgfsNfsHandle; // Used for padding
 
    size_t fhgfsNfsHandleLen = sizeof(struct FhgfsNfsFileHandleV3);
    size_t givenHandleByteLength = (*max_len) * sizeof(__u32);
+   size_t padIndex;
 
    const EntryInfo* entryInfo;
    bool parseParentIDRes;
@@ -178,6 +180,11 @@ int __FhgfsOpsExport_encodeNfsFileHandleV3(struct inode* inode, __u32* file_hand
    }
    else
       fhgfsNfsHandle->parentOwnerNodeID = (NumNodeID){0};
+
+   // Pad remaining space between real file handle length and max_len with zeroes
+   for (padIndex = fhgfsNfsHandleLen; padIndex < givenHandleByteLength; padIndex++) {
+      handleAsArray[padIndex] = 0x00;
+   }
 
 cleanup:
    FhgfsInode_entryInfoReadUnlock(fhgfsInode);       // UNLOCK EntryInfo

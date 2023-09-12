@@ -9,6 +9,9 @@
 #include <common/toolkit/NetFilter.h>
 #include <common/toolkit/LockFD.h>
 #include <common/Common.h>
+#include <common/net/sock/RoutingTable.h>
+
+#include <mutex>
 
 #include <mutex>
 
@@ -58,8 +61,10 @@ class AbstractApp : public PThread
    protected:
       NicAddressList localNicList; // intersection set of dicsovered NICs and allowedInterfaces
       Mutex localNicListMutex;
+      std::shared_ptr<NetVector> noDefaultRouteNets;
 
-      AbstractApp() : PThread("Main", this)
+      AbstractApp() : PThread("Main", this),
+                      noDefaultRouteNets(nullptr)
       {
          if (!didRunTimeInit)
          {
@@ -75,14 +80,16 @@ class AbstractApp : public PThread
          basicDestructions();
       }
 
-      void updateLocalNicListInNodes(LogContext* log, NicAddressList& nicList,
+      void updateLocalNicListAndRoutes(LogContext* log, NicAddressList& nicList,
          std::vector<AbstractNodeStore*>& nodeStores);
 
+      bool initNoDefaultRouteList(NetVector* outNets);
 
    private:
       static bool basicInitializations();
       bool basicDestructions();
       static bool performBasicInitialRunTimeChecks();
+      RoutingTableFactory routingTableFactory;
 
       // inliners
 
@@ -104,6 +111,21 @@ class AbstractApp : public PThread
          didRunTimeInit = true;
 
          return true;
+      }
+
+      void initRoutingTable()
+      {
+         routingTableFactory.init();
+      }
+
+      bool updateRoutingTable()
+      {
+         return routingTableFactory.load();
+      }
+
+      RoutingTable getRoutingTable()
+      {
+         return routingTableFactory.create(noDefaultRouteNets);
       }
 
 };

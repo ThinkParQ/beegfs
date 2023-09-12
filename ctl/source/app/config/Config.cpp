@@ -53,7 +53,7 @@ static std::unique_ptr<Mode> instantiateUserStats()
 {
    std::unique_ptr<ModeClientStats> result(new ModeClientStats);
    result->setPerUser(true);
-   return std::move(result);
+   return result;
 }
 
 static std::unique_ptr<Mode> instantiateHelp()

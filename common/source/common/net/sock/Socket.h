@@ -27,6 +27,7 @@ class Socket : public Channel
       virtual ~Socket();
 
       static std::string ipaddrToStr(const struct in_addr* ipaddress);
+      static std::string ipaddrToStr(uint32_t addr);
       static std::string endpointAddrToString(struct in_addr* ipaddress, unsigned short port);
       static std::string endpointAddrToString(const char* hostname, unsigned short port);
 
@@ -56,8 +57,9 @@ class Socket : public Channel
       HighResolutionStats* stats;
       NicAddrType sockType;
       struct in_addr peerIP;
+      struct in_addr bindIP;
+      unsigned short bindPort; // set by bindToAddr
       std::string peername;
-
 
       void connect(const char* hostname, unsigned short port, int ai_family, int ai_socktype);
 
@@ -71,6 +73,11 @@ class Socket : public Channel
       inline uint32_t getPeerIP()
       {
          return peerIP.s_addr;
+      }
+
+      inline struct in_addr getBindIP()
+      {
+         return bindIP;
       }
 
       inline std::string getPeername()
@@ -93,6 +100,10 @@ class Socket : public Channel
          this->stats = &dummyStats;
       }
 
+      inline unsigned short getBindPort()
+      {
+         return bindPort;
+      }
 
       // inliners
 

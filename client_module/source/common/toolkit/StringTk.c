@@ -53,10 +53,10 @@ bool StringTk_strToBool(const char* s)
 {
    if( !StringTk_hasLength(s) ||
        !strcmp(s, "1") ||
-       !os_strnicmp(s, "y", 2) ||
-       !os_strnicmp(s, "on", 3) ||
-       !os_strnicmp(s, "yes", 4) ||
-       !os_strnicmp(s, "true", 5) )
+       !strcasecmp(s, "y") ||
+       !strcasecmp(s, "on") ||
+       !strcasecmp(s, "yes") ||
+       !strcasecmp(s, "true") )
       return true;
 
    return false;

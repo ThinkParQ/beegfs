@@ -1132,13 +1132,13 @@ void __Config_initTuneFileCacheTypeNum(Config* this)
 {
    const char* valueStr = this->tuneFileCacheType;
 
-   if(!os_strnicmp(valueStr, FILECACHETYPE_NATIVE_STR, strlen(FILECACHETYPE_NATIVE_STR) ) )
+   if(!strcasecmp(valueStr, FILECACHETYPE_NATIVE_STR))
       this->tuneFileCacheTypeNum = FILECACHETYPE_Native;
    else
-   if(!os_strnicmp(valueStr, FILECACHETYPE_BUFFERED_STR, strlen(FILECACHETYPE_BUFFERED_STR) ) )
+   if(!strcasecmp(valueStr, FILECACHETYPE_BUFFERED_STR))
       this->tuneFileCacheTypeNum = FILECACHETYPE_Buffered;
    else
-   if(!os_strnicmp(valueStr, FILECACHETYPE_PAGED_STR, strlen(FILECACHETYPE_PAGED_STR) ) )
+   if(!strcasecmp(valueStr, FILECACHETYPE_PAGED_STR))
       this->tuneFileCacheTypeNum = FILECACHETYPE_Paged;
    else
       this->tuneFileCacheTypeNum = FILECACHETYPE_None;
@@ -1164,18 +1164,16 @@ void __Config_initSysInodeIDStyleNum(Config* this)
 {
    const char* valueStr = this->sysInodeIDStyle;
 
-   if(!os_strnicmp(valueStr, INODEIDSTYLE_HASH64HSIEH_STR,
-      strlen(INODEIDSTYLE_HASH64HSIEH_STR) ) )
+   if(!strcasecmp(valueStr, INODEIDSTYLE_HASH64HSIEH_STR))
       this->sysInodeIDStyleNum = INODEIDSTYLE_Hash64HSieh;
    else
-   if(!os_strnicmp(valueStr, INODEIDSTYLE_HASH32HSIEH_STR,
-      strlen(INODEIDSTYLE_HASH32HSIEH_STR) ) )
+   if(!strcasecmp(valueStr, INODEIDSTYLE_HASH32HSIEH_STR))
       this->sysInodeIDStyleNum = INODEIDSTYLE_Hash32Hsieh;
    else
-   if(!os_strnicmp(valueStr, INODEIDSTYLE_HASH64MD4_STR, strlen(INODEIDSTYLE_HASH64MD4_STR) ) )
+   if(!strcasecmp(valueStr, INODEIDSTYLE_HASH64MD4_STR))
       this->sysInodeIDStyleNum = INODEIDSTYLE_Hash64MD4;
    else
-   if(!os_strnicmp(valueStr, INODEIDSTYLE_HASH32MD4_STR,  strlen(INODEIDSTYLE_HASH32MD4_STR) ) )
+   if(!strcasecmp(valueStr, INODEIDSTYLE_HASH32MD4_STR))
       this->sysInodeIDStyleNum = INODEIDSTYLE_Hash32MD4;
    else
    { // default
@@ -1206,7 +1204,7 @@ void __Config_initLogTypeNum(Config* this)
 {
    const char* valueStr = this->logType;
 
-   if(!os_strnicmp(valueStr, LOGGERTYPE_SYSLOG_STR, strlen(LOGGERTYPE_SYSLOG_STR) ) )
+   if(!strcasecmp(valueStr, LOGGERTYPE_SYSLOG_STR))
       this->logTypeNum = LOGTYPE_Syslog;
    else
       this->logTypeNum = LOGTYPE_Helperd;
