@@ -18,6 +18,10 @@ Socket::Socket()
    this->sockType = NICADDRTYPE_STANDARD;
 
    this->peerIP.s_addr = 0;
+
+   this->bindIP.s_addr = 0;
+
+   this->bindPort = 0;
 }
 
 Socket::~Socket()
@@ -98,7 +102,12 @@ void Socket::bind(unsigned short port)
 
 std::string Socket::ipaddrToStr(const struct in_addr* ipaddress)
 {
-   unsigned char* cIP = (unsigned char*)&ipaddress->s_addr;
+   return ipaddrToStr(ipaddress->s_addr);
+}
+
+std::string Socket::ipaddrToStr(uint32_t addr)
+{
+   unsigned char* cIP = (unsigned char*)&addr;
 
    std::string ipString =
       StringTk::uintToStr(cIP[0]) + "." +

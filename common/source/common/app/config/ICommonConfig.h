@@ -45,6 +45,8 @@ class ICommonConfig
       bool        connDisableAuthentication;
       uint64_t    connAuthHash; // implicitly set based on hash of connAuthFile contents
       std::string connTcpOnlyFilterFile; // for IPs that only allow plain TCP (no RDMA etc)
+      bool        connRestrictOutboundInterfaces;
+      std::string connNoDefaultRoute;
 
       int         connMsgLongTimeout;
       int         connMsgMediumTimeout;
@@ -204,6 +206,16 @@ class ICommonConfig
       const std::string& getConnTcpOnlyFilterFile() const
       {
          return connTcpOnlyFilterFile;
+      }
+
+      bool getConnRestrictOutboundInterfaces() const
+      {
+         return connRestrictOutboundInterfaces;
+      }
+
+      std::string getConnNoDefaultRoute() const
+      {
+         return connNoDefaultRoute;
       }
 
       int getConnMsgLongTimeout() const

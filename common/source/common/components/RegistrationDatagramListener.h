@@ -16,8 +16,8 @@ class RegistrationDatagramListener : public AbstractDatagramListener
 {
    public:
       RegistrationDatagramListener(NetFilter* netFilter, NicAddressList& localNicList,
-         AcknowledgmentStore* ackStore, unsigned short udpPort);
-
+         AcknowledgmentStore* ackStore, unsigned short udpPort,
+         bool restrictOutboundInterfaces);
 
    protected:
       virtual void handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessage* msg);

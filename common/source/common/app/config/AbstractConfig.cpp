@@ -90,6 +90,8 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("connAuthFile",               "", addDashes);
    configMapRedefine("connDisableAuthentication",  "false", addDashes);
    configMapRedefine("connTcpOnlyFilterFile",      "", addDashes);
+   configMapRedefine("connRestrictOutboundInterfaces", "false", addDashes);
+   configMapRedefine("connNoDefaultRoute",         "0.0.0.0/0", addDashes);
 
    /* connMessagingTimeouts: default to zero, indicating that constants
     * specified in Common.h are used.
@@ -176,6 +178,10 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          connDisableAuthentication = StringTk::strToBool(iter->second);
       else if (testConfigMapKeyMatch(iter, "connTcpOnlyFilterFile", addDashes))
          connTcpOnlyFilterFile = iter->second;
+      else if (testConfigMapKeyMatch(iter, "connRestrictOutboundInterfaces", addDashes))
+         connRestrictOutboundInterfaces = StringTk::strToBool(iter->second);
+      else if (testConfigMapKeyMatch(iter, "connNoDefaultRoute", addDashes))
+         connNoDefaultRoute = iter->second;
       else if (testConfigMapKeyMatch(iter, "connMessagingTimeouts", addDashes))
       {
          const size_t cfgValCount = 3; // count value in config file in order of long, medium and short
@@ -458,3 +464,4 @@ void AbstractConfig::assignKeyIfNotZero(const StringMapIter& it, int& intVal, bo
 
    intVal = tempVal;
 }
+

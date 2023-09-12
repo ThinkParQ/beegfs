@@ -102,6 +102,13 @@ void App::initLocalNodeInfo()
    localNicList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
    NetworkInterfaceCard::supportedCapabilities(&localNicList, &localNicCaps);
 
+   noDefaultRouteNets = std::make_shared<NetVector>();
+   if(!initNoDefaultRouteList(noDefaultRouteNets.get()))
+      throw InvalidConfigException("Failed to parse connNoDefaultRoute");
+
+   initRoutingTable();
+   updateRoutingTable();
+
    std::string nodeID = System::getHostname();
 
    // TODO add a Mon nodetype at some point

@@ -9,6 +9,7 @@
 #include <common/threading/Mutex.h>
 #include <common/threading/Condition.h>
 #include <common/Common.h>
+#include <common/net/sock/RoutingTable.h>
 
 #include <mutex>
 
@@ -119,6 +120,8 @@ class NodeConnPool
    private:
       NicAddressList nicList;
       ConnectionList connList;
+      bool restrictOutboundInterfaces;
+      IpSourceMap ipSrcMap;
 
       AbstractApp* app;
       Node& parentNode; // backlink to the node object to which this conn pool belongs
@@ -149,6 +152,7 @@ class NodeConnPool
 
       void statsAddNic(NicAddrType nicType);
       void statsRemoveNic(NicAddrType nicType);
+      bool loadIpSourceMap(const NicAddressList& nicList);
 
    public:
       // getters & setters
@@ -193,6 +197,7 @@ class NodeConnPool
          *outStats = this->stats;
       }
 
+      bool loadIpSourceMap();
 };
 
 #endif /*NODECONNPOOL_H_*/

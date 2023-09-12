@@ -1,15 +1,24 @@
 #include "RegistrationDatagramListener.h"
 
 RegistrationDatagramListener::RegistrationDatagramListener(NetFilter* netFilter,
-   NicAddressList& localNicList, AcknowledgmentStore* ackStore, unsigned short udpPort) :
-   AbstractDatagramListener("RegDGramLis", netFilter, localNicList, ackStore, udpPort)
+   NicAddressList& localNicList, AcknowledgmentStore* ackStore, unsigned short udpPort,
+   bool restrictOutboundInterfaces) :
+   AbstractDatagramListener("RegDGramLis", netFilter, localNicList, ackStore, udpPort,
+      restrictOutboundInterfaces)
 {
 }
 
 void RegistrationDatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessage* msg)
 {
    HighResolutionStats stats; // currently ignored
-   NetMessage::ResponseContext rctx(fromAddr, udpSock, sendBuf, DGRAMMGR_SENDBUF_SIZE, &stats);
+   std::shared_ptr<StandardSocket> sock = findSenderSock(fromAddr->sin_addr);
+   if (sock == nullptr)
+   {
+      log.log(Log_WARNING, "Could not handle incoming message: no socket");
+      return;
+   }
+
+   NetMessage::ResponseContext rctx(fromAddr, sock.get(), sendBuf, DGRAMMGR_SENDBUF_SIZE, &stats);
 
    switch(msg->getMsgType() )
    {

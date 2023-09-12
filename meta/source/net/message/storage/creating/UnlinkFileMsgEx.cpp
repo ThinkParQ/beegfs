@@ -12,27 +12,38 @@
 #include <program/Program.h>
 #include "UnlinkFileMsgEx.h"
 
-std::tuple<FileIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLockStore& store)
+std::tuple<HashDirLock, FileIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLockStore& store)
 {
-   FileIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
-   ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getDelFileName());
+   HashDirLock hashLock;
+   FileIDLock inodeLock;
 
    // we also have to lock the inode attached to the dentry - if we delete the inode, we must
    // exclude concurrent actions on the same inode. if we cannot look up a file inode for the
    // dentry, nothing bad happens.
-   FileIDLock inodeLock;
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    auto dir = metaStore->referenceDir(getParentInfo()->getEntryID(), true, false);
 
    DirEntry dentry(getDelFileName());
-   if (dir->getFileDentry(getDelFileName(), dentry))
+   bool dentryExists = dir->getFileDentry(getDelFileName(), dentry);
+
+   if (dentryExists)
    {
       dentry.getEntryInfo(getParentInfo()->getEntryID(), 0, &fileInfo);
-      inodeLock = {&store, dentry.getID(), true};
+
+      // lock hash dir where we are going to remove (or update) file inode
+      // need to take it only if it is a non-inlined inode and resynch is running
+      if (resyncJob && resyncJob->isRunning() && !dentry.getIsInodeInlined())
+         hashLock = {&store, MetaStorageTk::getMetaInodeHash(dentry.getID())};
    }
 
+   FileIDLock dirLock(&store, getParentInfo()->getEntryID(), true);
+   ParentNameLock dentryLock(&store, getParentInfo()->getEntryID(), getDelFileName());
+
+   if (dentryExists)
+      inodeLock = {&store, dentry.getID(), true};
+
    metaStore->releaseDir(dir->getID());
-   return std::make_tuple(std::move(dirLock), std::move(dentryLock), std::move(inodeLock));
+   return std::make_tuple(std::move(hashLock), std::move(dirLock), std::move(dentryLock), std::move(inodeLock));
 }
 
 bool UnlinkFileMsgEx::processIncoming(ResponseContext& ctx)
@@ -68,7 +79,7 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
 
    DirEntry dentryToRemove(getDelFileName());
    if (!dir->getFileDentry(getDelFileName(), dentryToRemove))
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
    // get entryInfo
    dentryToRemove.getEntryInfo(getParentInfo()->getEntryID(), 0, &delFileInfo);

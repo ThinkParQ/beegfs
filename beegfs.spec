@@ -424,6 +424,7 @@ The package contains files required by all BeeGFS daemons
 Summary: BeeGFS InfiniBand support
 Group: Software/Other
 Buildrequires: librdmacm-devel, libibverbs-devel
+BuildRequires: libnl3-devel
 
 %description -n libbeegfs-ib
 This package contains support libraries for InfiniBand.
@@ -438,6 +439,7 @@ This package contains support libraries for InfiniBand.
 Summary: BeeGFS meta server daemon
 Group: Software/Other
 requires: beegfs-common = %{FULL_VERSION}
+BuildRequires: libnl3-devel
 
 %description meta
 This package contains the BeeGFS meta server binaries.
@@ -465,6 +467,7 @@ This package contains the BeeGFS meta server binaries.
 Summary: BeeGFS management daemon
 Group: Software/Other
 requires: beegfs-common = %{FULL_VERSION}
+BuildRequires: libnl3-devel
 
 %description mgmtd
 The package contains the BeeGFS management daemon.
@@ -492,6 +495,7 @@ The package contains the BeeGFS management daemon.
 Summary: BeeGFS storage server daemon
 Group: Software/Other
 requires: beegfs-common = %{FULL_VERSION}
+BuildRequires: libnl3-devel
 
 %description storage
 This package contains the BeeGFS storage server binaries.
@@ -519,6 +523,7 @@ This package contains the BeeGFS storage server binaries.
 Summary: BeeGFS client helper daemon
 Group: Software/Other
 requires: beegfs-common = %{FULL_VERSION}
+BuildRequires: libnl3-devel
 
 %description helperd
 The package contains the BeeGFS helper daemon.
@@ -545,6 +550,7 @@ The package contains the BeeGFS helper daemon.
 Summary: BeeGFS mon server daemon
 Group: Software/Other
 requires: beegfs-common = %{FULL_VERSION}
+BuildRequires: libnl3-devel
 
 %description mon
 This package contains the BeeGFS mon server binaries.
@@ -589,6 +595,7 @@ The default dashboard setup requires both Grafana, and InfluxDB.
 Summary: BeeGFS utilities
 Group: Software/Other
 requires: beegfs-common = %{FULL_VERSION}
+BuildRequires: libnl3-devel
 
 %description utils
 This package contains BeeGFS utilities.

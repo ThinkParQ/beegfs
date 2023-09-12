@@ -337,6 +337,9 @@ extern void assertMsg(const char* file, unsigned line, const char* condition);
 # define BEEGFS_FALLTHROUGH
 #endif
 
+// XXX not sure about this. C++17 is the requirement for [[nodiscard]]
+#define BEEGFS_NODISCARD [[nodiscard]]
+
 // version number of both the network protocol and the on-disk data structures that are versioned.
 // must be kept in sync with client.
 #define BEEGFS_DATA_VERSION (uint32_t(0))

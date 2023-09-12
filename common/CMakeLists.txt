@@ -1,5 +1,17 @@
+
+include(FindPkgConfig)
+if(NOT PKG_CONFIG_FOUND)
+	message(FATAL_ERROR "pkg-config not found!" )
+endif()
+
+pkg_check_modules(NL3ROUTE REQUIRED IMPORTED_TARGET libnl-route-3.0)
+
 include_directories(
 	source
+)
+
+link_directories(
+	${NL3ROUTE_LIBRARY_DIRS}
 )
 
 add_library(
@@ -80,6 +92,8 @@ add_library(
 	./source/common/net/sock/SocketDisconnectException.h
 	./source/common/net/sock/Socket.cpp
 	./source/common/net/sock/SocketTimeoutException.h
+	./source/common/net/sock/RoutingTable.h
+	./source/common/net/sock/RoutingTable.cpp
 	./source/common/net/sock/RDMASocket.cpp
 	./source/common/net/sock/StandardSocket.h
 	./source/common/net/sock/SocketException.h
@@ -519,6 +533,7 @@ add_library(
 if(NOT BEEGFS_SKIP_TESTS)
 	add_executable(
 		test-common
+		./tests/TestIPv4Network.cpp
 		./tests/TestUiTk.cpp
 		./tests/TestPreallocatedFile.cpp
 		./tests/TestRWLock.cpp
@@ -545,6 +560,7 @@ if(NOT BEEGFS_SKIP_TESTS)
 		pthread
 		gtest_main
 		dl
+		${NL3ROUTE_LIBRARIES}
 	)
 
 	add_test(
@@ -560,6 +576,15 @@ add_library(
 	./ib_lib/net/sock/ibvsocket/IBVSocket.h
 	./ib_lib/net/sock/ibvsocket/IBVSocket.cpp
 	./ib_lib/RDMASocketImpl.cpp
+)
+
+target_include_directories(
+	beegfs-common PRIVATE ${NL3ROUTE_INCLUDE_DIRS}
+)
+
+target_link_libraries(
+	beegfs-common
+	${NL3ROUTE_LIBRARIES}
 )
 
 target_include_directories(beegfs_ib PRIVATE ./ib_lib)

@@ -430,7 +430,7 @@ bool Logger_getLogTopicFromStr(const char* logTopicStr, LogTopic* outLogTopic)
    {
       const char* currentLogTopicStr = Logger_getLogTopicStr( (LogTopic)i);
 
-      if(!os_strnicmp(logTopicStr, currentLogTopicStr, strlen(currentLogTopicStr) ) )
+      if(!strcasecmp(logTopicStr, currentLogTopicStr))
       {
          *outLogTopic = i;
          return true;

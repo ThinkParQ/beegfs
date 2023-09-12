@@ -6,7 +6,17 @@
 
 std::tuple<HashDirLock, FileIDLock> UnlinkLocalFileInodeMsgEx::lock(EntryLockStore& store)
 {
-   HashDirLock hashLock = {&store, MetaStorageTk::getMetaInodeHash(getDelEntryInfo()->getEntryID())};
+   // we must not lock hash dir and inode if it is owned by current node. if it is a locally
+   // generated message which is sent by unlinkmsg and renamev2msg sends then aforementioned
+   // locks are already held by them
+   if (rctx->isLocallyGenerated())
+      return {};
+
+   HashDirLock hashLock;
+
+   if (resyncJob && resyncJob->isRunning())
+      HashDirLock hashLock = {&store, MetaStorageTk::getMetaInodeHash(getDelEntryInfo()->getEntryID())};
+
    return std::make_tuple(
          std::move(hashLock),
          FileIDLock(&store, getDelEntryInfo()->getEntryID(), true));

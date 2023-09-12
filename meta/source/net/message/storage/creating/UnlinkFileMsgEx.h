@@ -8,14 +8,14 @@
 #include <net/message/MirroredMessage.h>
 
 class UnlinkFileMsgEx : public MirroredMessage<UnlinkFileMsg,
-   std::tuple<FileIDLock, ParentNameLock, FileIDLock>>
+   std::tuple<HashDirLock, FileIDLock, ParentNameLock, FileIDLock>>
 {
    public:
       typedef ErrorCodeResponseState<UnlinkFileRespMsg, NETMSGTYPE_UnlinkFile> ResponseState;
 
       virtual bool processIncoming(ResponseContext& ctx) override;
 
-      std::tuple<FileIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
+      std::tuple<HashDirLock, FileIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
 
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;

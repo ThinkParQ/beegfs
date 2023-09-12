@@ -265,7 +265,7 @@ else
 
    $(call define-dep-lib, blkid, , , -lblkid)
    $(call define-dep-lib, uuid, , , -luuid)
-
+   $(call define-dep-lib-system, nl3-route, libnl-route-3.0)
 endif
 
 

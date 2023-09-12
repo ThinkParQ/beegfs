@@ -67,7 +67,8 @@ class MetaStore
       FhgfsOpsErr unlinkInodeLater(EntryInfo* entryInfo, bool wasInlined);
 
       FhgfsOpsErr renameInSameDir(DirInode& parentDir, const std::string& fromName,
-         const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode, DirEntry*& overWrittenEntry);
+         const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode,
+         DirEntry*& outOverWrittenEntry, bool& outUnlinkedWasInlined);
 
       FhgfsOpsErr moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& toParent,
             const std::string& newEntryName, const char* buf, uint32_t bufLen,

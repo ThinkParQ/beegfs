@@ -11,69 +11,127 @@
 
 AbstractDatagramListener::AbstractDatagramListener(const std::string& threadName,
    NetFilter* netFilter, NicAddressList& localNicList, AcknowledgmentStore* ackStore,
-   unsigned short udpPort)
+   unsigned short udpPort, bool restrictOutboundInterfaces)
     : PThread(threadName),
       log(threadName),
       netFilter(netFilter),
       ackStore(ackStore),
-      localNicList(localNicList),
+      restrictOutboundInterfaces(restrictOutboundInterfaces),
+      udpPort(udpPort),
       sendBuf(NULL),
       recvBuf(NULL),
-      recvTimeoutMS(4000)
+      recvTimeoutMS(4000),
+      localNicList(localNicList)
 {
-   if(!initSock(udpPort) )
+   if(!initSocks() )
       throw ComponentInitException("Unable to initialize the socket");
 }
 
 AbstractDatagramListener::~AbstractDatagramListener()
 {
-   delete udpSock;
-
    SAFE_FREE(sendBuf);
    SAFE_FREE(recvBuf);
 }
 
-bool AbstractDatagramListener::initSock(unsigned short udpPort)
+void AbstractDatagramListener::configSocket(StandardSocket* s, NicAddress* nicAddr, int bufsize)
+{
+   s->setSoBroadcast(true);
+   s->setSoReuseAddr(true);
+   if (bufsize > 0)
+      s->setSoRcvBuf(bufsize);
+
+   if (nicAddr)
+      s->bindToAddr(nicAddr->ipAddr.s_addr, udpPort);
+   else
+      s->bind(udpPort);
+
+   /*
+     Note that if udpPort was intialized as zero, it will be set according to the
+     value used by the first created socket and any future sockets created by this method
+     will use that value. That may or may not work, depending upon the current socket
+     bindings.
+   */
+   if(udpPort == 0)
+   { // find out which port we are actually using
+      sockaddr_in bindAddr;
+      socklen_t bindAddrLen = sizeof(bindAddr);
+
+      int getSockNameRes = getsockname(s->getFD(), (sockaddr*)&bindAddr, &bindAddrLen);
+      if(getSockNameRes == -1)
+         throw SocketException("getsockname() failed: " + System::getErrString() );
+
+      udpPortNetByteOrder = bindAddr.sin_port;
+      udpPort = htons(bindAddr.sin_port);
+   }
+
+   std::string ifname;
+   if (nicAddr)
+      ifname = Socket::ipaddrToStr(&nicAddr->ipAddr);
+   else
+      ifname = "any";
+
+   log.log(Log_NOTICE, std::string("Listening for UDP datagrams: ") + ifname + " Port " +
+      StringTk::intToStr(udpPort) );
+
+}
+
+/**
+ * mutex must be held in a multi-threaded scenario.
+ */
+bool AbstractDatagramListener::initSocks()
 {
    auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
-
-   udpPortNetByteOrder = htons(udpPort);
-   loopbackAddrNetByteOrder = htonl(INADDR_LOOPBACK);
+   int bufsize = cfg->getConnUDPRcvBufSize();
 
    try
    {
-      udpSock = new StandardSocket(PF_INET, SOCK_DGRAM);
-      udpSock->setSoBroadcast(true);
-      udpSock->setSoReuseAddr(true);
-      int bufsize = cfg->getConnUDPRcvBufSize();
-      if (bufsize > 0)
-         udpSock->setSoRcvBuf(bufsize);
+      udpPortNetByteOrder = htons(udpPort);
+      loopbackAddrNetByteOrder = htonl(INADDR_LOOPBACK);
 
-      udpSock->bind(udpPort);
+      if (restrictOutboundInterfaces)
+      {
+         routingTable = PThread::getCurrentThreadApp()->getRoutingTable();
 
-      if(udpPort == 0)
-      { // find out which port we are actually using
-         sockaddr_in bindAddr;
-         socklen_t bindAddrLen = sizeof(bindAddr);
+         interfaceSocks.clear();
+         udpSock = nullptr;
+         ipSrcMap.clear();
 
-         int getSockNameRes = getsockname(udpSock->getFD(), (sockaddr*)&bindAddr, &bindAddrLen);
-         if(getSockNameRes == -1)
-            throw SocketException("getsockname() failed: " + System::getErrString() );
-
-         udpPortNetByteOrder = bindAddr.sin_port;
-         udpPort = htons(bindAddr.sin_port);
+         for (auto& i : localNicList)
+         {
+            if (i.nicType == NICADDRTYPE_STANDARD)
+            {
+               std::shared_ptr<StandardSocket> s;
+               if (udpSock == nullptr)
+               {
+                  udpSock = std::make_shared<StandardSocketGroup>(PF_INET, SOCK_DGRAM);
+                  s = udpSock;
+               }
+               else
+               {
+                  s = udpSock->createSubordinate(PF_INET, SOCK_DGRAM);
+               }
+               configSocket(s.get(), &i, bufsize);
+               interfaceSocks[i.ipAddr] = s;
+            }
+         }
       }
-
-      log.log(Log_NOTICE, std::string("Listening for UDP datagrams: Port ") +
-         StringTk::intToStr(udpPort) );
-
-      return true;
+      else
+      {
+         // no need to close down any existing unbound UDP socket, it listens to all interfaces
+         if (udpSock == nullptr)
+         {
+            udpSock = std::make_shared<StandardSocketGroup>(PF_INET, SOCK_DGRAM);
+            configSocket(udpSock.get(), NULL, bufsize);
+         }
+      }
    }
    catch(SocketException& e)
    {
       log.logErr(std::string("UDP socket: ") + e.what() );
       return false;
    }
+
+   return true;
 }
 
 /**
@@ -92,6 +150,56 @@ void AbstractDatagramListener::initBuffers()
 
    this->recvBuf = (char*)bufInVoid;
    this->sendBuf = (char*)bufOutVoid;
+}
+
+std::shared_ptr<StandardSocket> AbstractDatagramListener::findSenderSock(struct in_addr addr)
+{
+   std::lock_guard<Mutex> lock(mutex);
+   return findSenderSockUnlocked(addr);
+}
+
+/**
+ * mutex must be held.
+ */
+std::shared_ptr<StandardSocket> AbstractDatagramListener::findSenderSockUnlocked(struct in_addr addr)
+{
+   std::shared_ptr<StandardSocket> sock = udpSock;
+   if (restrictOutboundInterfaces)
+   {
+      if (addr.s_addr != loopbackAddrNetByteOrder)
+      {
+         struct in_addr k;
+         if (auto it { ipSrcMap.find(addr) }; it != std::end(ipSrcMap))
+         {
+            k = it->second;
+         }
+         else
+         {
+            if (!routingTable.match(addr, localNicList, k))
+            {
+               k.s_addr = 0;
+               // addr may have come from whoever sent a message, so this is a warning
+               LOG(COMMUNICATION, WARNING, "No routes found.", ("addr", Socket::ipaddrToStr(&addr)));
+            }
+            ipSrcMap[addr] = k;
+         }
+
+         sock = interfaceSocks[k];
+         //LOG(COMMUNICATION, DEBUG, "findInterfaceSock", ("addr", Socket::ipaddrToStr(addr.s_addr).c_str()),
+         //   ("k", Socket::ipaddrToStr(k).c_str()), ("sock", sock));
+
+      }
+   }
+
+   return sock;
+}
+
+void AbstractDatagramListener::setLocalNicList(NicAddressList& nicList)
+{
+   const std::lock_guard<Mutex> lock(mutex);
+   localNicList = nicList;
+   LOG(COMMUNICATION, DEBUG, "setLocalNicList");
+   initSocks();
 }
 
 void AbstractDatagramListener::run()
@@ -126,7 +234,6 @@ void AbstractDatagramListener::listenLoop()
          ssize_t recvRes = udpSock->recvfromT(
             recvBuf, DGRAMMGR_RECVBUF_SIZE, 0, (struct sockaddr*)&fromAddr, &fromAddrLen,
             recvTimeoutMS);
-
          if(isDGramFromSelf(&fromAddr) )
          { // note: important if we're sending msgs to all hosts and don't want to include ourselves
             //log.log(Log_SPAM, "Discarding DGram from localhost");
@@ -322,12 +429,14 @@ bool AbstractDatagramListener::sendToNodeUDPwithAck(const NodeHandle& node, Ackn
 
 /**
  * Sends the buffer to all available node interfaces.
+ * @return true if at least one buffer was sent
  */
-void AbstractDatagramListener::sendBufToNode(Node& node, const char* buf, size_t bufLen)
+bool AbstractDatagramListener::sendBufToNode(Node& node, const char* buf, size_t bufLen)
 {
    NicAddressList nicList(node.getNicList() );
    unsigned short portUDP = node.getPortUDP();
 
+   bool sent = false;
    for(NicAddressListIter iter = nicList.begin(); iter != nicList.end(); iter++)
    {
       if(iter->nicType != NICADDRTYPE_STANDARD)
@@ -336,18 +445,21 @@ void AbstractDatagramListener::sendBufToNode(Node& node, const char* buf, size_t
       if(!netFilter->isAllowed(iter->ipAddr.s_addr) )
          continue;
 
-      sendto(buf, bufLen, 0, iter->ipAddr, portUDP);
+      if (sendto(buf, bufLen, 0, iter->ipAddr, portUDP) >0)
+         sent = true;
    }
+   if (!sent)
+      LOG(COMMUNICATION, ERR, std::string("Failed to send buf"), ("node", node.getNodeIDWithTypeStr()));
+   return sent;
 }
 
 /**
  * Sends the message to all available node interfaces.
  */
-void AbstractDatagramListener::sendMsgToNode(Node& node, NetMessage* msg)
+bool AbstractDatagramListener::sendMsgToNode(Node& node, NetMessage* msg)
 {
    const auto msgBuf = MessagingTk::createMsgVec(*msg);
-
-   sendBufToNode(node, &msgBuf[0], msgBuf.size());
+   return sendBufToNode(node, &msgBuf[0], msgBuf.size());
 }
 
 /**
@@ -362,7 +474,7 @@ void AbstractDatagramListener::sendDummyToSelfUDP()
    DummyMsg msg;
    const auto msgBuf = MessagingTk::createMsgVec(msg);
 
-   this->sendto(&msgBuf[0], msgBuf.size(), 0, hostAddr, ntohs(udpPortNetByteOrder) );
+   this->sendto(&msgBuf[0], msgBuf.size(), 0, hostAddr, udpPort);
 }
 
 /**
@@ -378,12 +490,17 @@ bool AbstractDatagramListener::isDGramFromSelf(struct sockaddr_in* fromAddr)
    if(fromAddr->sin_port != udpPortNetByteOrder)
       return false;
 
-   const std::lock_guard<Mutex> lock(localNicListMutex);
+   if (loopbackAddrNetByteOrder == fromAddr->sin_addr.s_addr)
+      return true;
+
+   const std::lock_guard<Mutex> lock(mutex);
    for(NicAddressListIter iter = localNicList.begin(); iter != localNicList.end(); iter++)
    {
+      //LogContext("isDGramFromSelf").log(Log_DEBUG, std::string("fromAddr=") + Socket::ipaddrToStr(&fromAddr->sin_addr)
+      //+ " nic=" + Socket::ipaddrToStr(&iter->ipAddr));
       if(iter->ipAddr.s_addr == fromAddr->sin_addr.s_addr)
          return true;
    }
 
-   return loopbackAddrNetByteOrder == fromAddr->sin_addr.s_addr;
+   return false;
 }

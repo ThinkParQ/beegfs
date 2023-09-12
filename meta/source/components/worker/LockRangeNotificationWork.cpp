@@ -181,5 +181,5 @@ unsigned LockRangeNotificationWork::incAckCounter()
 
 Mutex* LockRangeNotificationWork::getDGramLisMutex(AbstractDatagramListener* dgramLis)
 {
-   return &dgramLis->sendMutex;
+   return dgramLis->getSendMutex();
 }

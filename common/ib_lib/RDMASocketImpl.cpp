@@ -115,8 +115,8 @@ void RDMASocketImpl::bindToAddr(in_addr_t ipAddr, unsigned short port)
    if(!bindRes)
       throw SocketException("RDMASocket unable to bind to port: " +
          StringTk::uintToStr(port) );
-
-   peername = std::string("Listen(Port: ") + StringTk::uintToStr(port) + std::string(")");
+   this->bindIP.s_addr = ipAddr;
+   this->bindPort =  port;
 }
 
 /**
@@ -129,6 +129,7 @@ void RDMASocketImpl::listen()
       throw SocketException(std::string("RDMASocket unable to listen.") );
 
    this->fd = IBVSocket_getConnManagerFD(ibvsock);
+   peername = std::string("Listen(Port: ") + StringTk::uintToStr(bindPort) + std::string(")");
 }
 
 /**

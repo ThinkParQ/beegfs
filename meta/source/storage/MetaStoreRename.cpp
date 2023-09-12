@@ -24,7 +24,8 @@
  *    existed).
  */
 FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& fromName,
-   const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode, DirEntry*& overWrittenEntry)
+   const std::string& toName, std::unique_ptr<FileInode>* outUnlinkInode,
+   DirEntry*& outOverWrittenEntry, bool& outUnlinkedWasInlined)
 {
    const char* logContext = "Rename in dir";
 
@@ -32,41 +33,40 @@ FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& f
    SafeRWLock fromMutexLock(&parentDir.rwlock, SafeRWLock_WRITE); // L O C K ( F R O M )
 
    FhgfsOpsErr retVal;
-   FhgfsOpsErr unlinkRes;
+   FhgfsOpsErr unlinkRes = FhgfsOpsErr_SUCCESS; // initialize just to please compiler
 
-   overWrittenEntry = NULL;
+   outOverWrittenEntry = NULL;
 
-   retVal = performRenameEntryInSameDir(parentDir, fromName, toName, &overWrittenEntry);
+   retVal = performRenameEntryInSameDir(parentDir, fromName, toName, &outOverWrittenEntry);
 
    if (retVal != FhgfsOpsErr_SUCCESS)
    {
       fromMutexLock.unlock();
       safeLock.unlock();
 
-      SAFE_DELETE(overWrittenEntry);
+      SAFE_DELETE(outOverWrittenEntry);
 
       return retVal;
    }
 
    EntryInfo unlinkEntryInfo;
-   bool unlinkedWasInlined;
 
-   // unlink for nonInlined inode will be done later
-   if (overWrittenEntry && overWrittenEntry->getIsInodeInlined())
+   // unlink for non-inlined inode will be handled later
+   if (outOverWrittenEntry)
    {
       const std::string& parentDirID = parentDir.getID();
-      overWrittenEntry->getEntryInfo(parentDirID, 0, &unlinkEntryInfo);
-      unlinkedWasInlined = overWrittenEntry->getIsInodeInlined();
+      outOverWrittenEntry->getEntryInfo(parentDirID, 0, &unlinkEntryInfo);
+      outUnlinkedWasInlined = outOverWrittenEntry->getIsInodeInlined();
 
-      unlinkRes = unlinkOverwrittenEntryUnlocked(parentDir, overWrittenEntry, outUnlinkInode);
-   }
-   else
-   {
-      outUnlinkInode->reset();
-
-      // irrelevant values, just to please the compiler
-      unlinkRes = FhgfsOpsErr_SUCCESS;
-      unlinkedWasInlined = true;
+      if (outOverWrittenEntry->getIsInodeInlined())
+      {
+         unlinkRes = unlinkOverwrittenEntryUnlocked(parentDir, outOverWrittenEntry, outUnlinkInode);
+      }
+      else
+      {
+         outUnlinkInode->reset();
+         unlinkRes = FhgfsOpsErr_SUCCESS;
+      }
    }
 
    /* Now update the ctime (attribChangeTime) of the renamed entry.
@@ -96,14 +96,14 @@ FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& f
 
    // unlink later must be called after releasing all locks
 
-   if (overWrittenEntry)
+   if (outOverWrittenEntry)
    {
       if (unlinkRes == FhgfsOpsErr_INUSE)
       {
-         unlinkRes = unlinkInodeLater(&unlinkEntryInfo, unlinkedWasInlined );
+         unlinkRes = unlinkInodeLater(&unlinkEntryInfo, outUnlinkedWasInlined );
          if (unlinkRes == FhgfsOpsErr_AGAIN)
          {
-            unlinkRes = unlinkOverwrittenEntry(parentDir, overWrittenEntry, outUnlinkInode);
+            unlinkRes = unlinkOverwrittenEntry(parentDir, outOverWrittenEntry, outUnlinkInode);
          }
       }
 
@@ -112,7 +112,7 @@ FhgfsOpsErr MetaStore::renameInSameDir(DirInode& parentDir, const std::string& f
          LogContext(logContext).logErr("Failed to unlink overwritten entry:"
             " FileName: "      + toName                         +
             " ParentEntryID: " + parentDir.getID()             +
-            " entryID: "       + overWrittenEntry->getEntryID() +
+            " entryID: "       + outOverWrittenEntry->getEntryID() +
             " Error: "         + boost::lexical_cast<std::string>(unlinkRes));
 
 

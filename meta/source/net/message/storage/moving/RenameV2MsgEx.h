@@ -10,6 +10,8 @@
 
 struct RenameV2Locks
 {
+   HashDirLock toFileHashLock;
+
    ParentNameLock fromNameLock;
    ParentNameLock toNameLock;
    FileIDLock fromDirLock;
@@ -40,6 +42,7 @@ struct RenameV2Locks
 
    void swap(RenameV2Locks& other)
    {
+      std::swap(toFileHashLock, other.toFileHashLock);
       std::swap(fromNameLock, other.fromNameLock);
       std::swap(toNameLock, other.toNameLock);
       std::swap(fromDirLock, other.fromDirLock);
@@ -83,6 +86,7 @@ class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
       FhgfsOpsErr remoteDirInsert(EntryInfo* toDirInfo, const std::string& newName,
          char* serialBuf, size_t serialBufLen);
       FhgfsOpsErr updateRenamedDirInode(EntryInfo* renamedDirEntryInfo, EntryInfo* toDirInfo);
+      FhgfsOpsErr unlinkRemoteFileInode(EntryInfo* entryInfo);
 
       void forwardToSecondary(ResponseContext& ctx) override;
 

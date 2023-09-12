@@ -228,7 +228,7 @@ bool MetaStore::releaseFileUnlocked(const std::string& parentEntryID, MetaFileHa
    releaseDirUnlocked(parentEntryID);
 
    // when we referenced the inode we did not release the directory yet, so do that here
-   releaseDirUnlocked(inode.parent->getID());
+   releaseDirUnlocked(parentEntryID);
 
    return releaseRes;
 }
@@ -1068,7 +1068,7 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
 {
    const char* logContext = "Unlink File Inode";
 
-   FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
+   FhgfsOpsErr retVal;
    UniqueRWLock lock(rwlock, SafeRWLock_READ);
 
    FhgfsOpsErr isUnlinkable = this->fileStore.isUnlinkable(delFileInfo);
@@ -1142,9 +1142,9 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
    if (retVal != FhgfsOpsErr_INUSE)
       return retVal;
 
-   FhgfsOpsErr laterRes = unlinkInodeLater(delFileInfo, true);
+   retVal = unlinkInodeLater(delFileInfo, delFileInfo->getIsInlined());
 
-   if (laterRes == FhgfsOpsErr_AGAIN)
+   if (retVal == FhgfsOpsErr_AGAIN)
    {
       // so the inode was not referenced in memory anymore and probably close() already deleted
       // it. Just make sure here it really does not exist anymore

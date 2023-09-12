@@ -261,6 +261,9 @@ void App::initLocalNodeInfo()
 
    localNicList.sort(NetworkInterfaceCard::NicAddrComp{allowedInterfaces});
 
+   initRoutingTable();
+   updateRoutingTable();
+
    std::string nodeID = System::getHostname() + "-" + StringTk::uint64ToHexStr(System::getPID() ) +
       "-" + StringTk::uintToHexStr(TimeAbs().getTimeMS() ) + "-" "ctl";
 
@@ -275,7 +278,8 @@ void App::initComponents()
    // Note: We choose a random udp port here to avoid conflicts with the client
    unsigned short udpListenPort = 0; //this->cfg->getConnClientPortUDP();
    this->dgramListener = new DatagramListener(
-      netFilter, localNicList, ackStore, udpListenPort);
+      netFilter, localNicList, ackStore, udpListenPort,
+      this->cfg->getConnRestrictOutboundInterfaces());
    this->dgramListener->setRecvTimeoutMS(20);
 
    workersInit();

@@ -164,9 +164,14 @@ void AbstractApp::logUsableNICs(LogContext* log, NicAddressList& nicList)
    }
 }
 
-void AbstractApp::updateLocalNicListInNodes(LogContext* log, NicAddressList& localNicList,
+void AbstractApp::updateLocalNicListAndRoutes(LogContext* log, NicAddressList& localNicList,
    std::vector<AbstractNodeStore*>& nodeStores)
 {
+   bool needRoutes = getCommonConfig()->getConnRestrictOutboundInterfaces();
+
+   if (needRoutes)
+      updateRoutingTable();
+
    std::unique_lock<Mutex> lock(localNicListMutex);
    this->localNicList = localNicList;
    lock.unlock();
@@ -182,3 +187,17 @@ void AbstractApp::updateLocalNicListInNodes(LogContext* log, NicAddressList& loc
    }
 }
 
+bool AbstractApp::initNoDefaultRouteList(NetVector* outNets)
+{
+   std::string connNoDefaultRoute = getCommonConfig()->getConnNoDefaultRoute();
+   StringVector cidrs;
+   StringTk::explodeEx(connNoDefaultRoute, ',', true, &cidrs);
+   for (auto& c : cidrs)
+   {
+      IPv4Network net;
+      if (!IPv4Network::parse(c, net))
+         return false;
+      outNets->push_back(net);
+   }
+   return true;
+}
