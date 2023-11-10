@@ -43,16 +43,16 @@ struct NicAddressStats;
 typedef struct NicAddressStats NicAddressStats;
 
 // construction/destruction
-extern __must_check bool IBVSocket_init(IBVSocket* _this, struct in_addr* srcIpAddr, NicAddressStats* nicStats);
+extern __must_check bool IBVSocket_init(IBVSocket* _this, struct in_addr srcIpAddr, NicAddressStats* nicStats);
 extern void IBVSocket_uninit(IBVSocket* _this);
 
 // static
 extern bool IBVSocket_rdmaDevicesExist(void);
 
 // methods
-extern bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress,
+extern bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress,
    unsigned short port, IBVCommConfig* commCfg);
-extern bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr* ipAddr,
+extern bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr ipAddr,
    unsigned short port);
 extern bool IBVSocket_listen(IBVSocket* _this);
 extern bool IBVSocket_shutdown(IBVSocket* _this);
@@ -88,7 +88,14 @@ struct IBVTimeoutConfig
 struct IBVCommConfig
 {
    unsigned bufNum; // number of available buffers
-   unsigned bufSize; // size of each buffer
+   unsigned bufSize; // total size of each buffer
+   /**
+    * IBVBuffer can allocate the buffer in multiple memory regions. This
+    * is to allow allocation of large buffers without requiring the
+    * buffer to be entirely contiguous. A value of 0 means that the
+    * buffer should not be fragmented.
+    */
+   unsigned fragmentSize; // size of buffer fragments
 };
 
 

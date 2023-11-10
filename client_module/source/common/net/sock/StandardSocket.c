@@ -356,7 +356,7 @@ bool StandardSocket_setTcpCork(StandardSocket* this, bool enable)
    return r == 0;
 }
 
-bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned short port)
+bool _StandardSocket_connectByIP(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
    // note: does not set the family type to the one of this socket (would lead to problems with SDP)
 
@@ -374,7 +374,7 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
    struct sockaddr_in serveraddr =
    {
       .sin_family = AF_INET,
-      .sin_addr = *ipaddress,
+      .sin_addr = ipaddress,
       .sin_port = htons(port),
    };
 
@@ -408,8 +408,8 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
 
             if(!this->peername[0])
             {
-               SocketTk_endpointAddrToStringNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
-               this->peerIP = *ipaddress;
+               SocketTk_endpointAddrToStrNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
+               this->peerIP = ipaddress;
             }
 
             return true;
@@ -428,8 +428,8 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
       // set peername if not done so already (e.g. by connect(hostname) )
       if(!this->peername[0])
       {
-         SocketTk_endpointAddrToStringNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
-         this->peerIP = *ipaddress;
+         SocketTk_endpointAddrToStrNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
+         this->peerIP = ipaddress;
       }
 
       return true;
@@ -439,7 +439,7 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
 }
 
 
-bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigned short port)
+bool _StandardSocket_bindToAddr(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
    StandardSocket* thisCast = (StandardSocket*)this;
 
@@ -447,7 +447,7 @@ bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigne
    int bindRes;
 
    bindAddr.sin_family = thisCast->sockDomain;
-   bindAddr.sin_addr = *ipaddress;
+   bindAddr.sin_addr = ipaddress;
    bindAddr.sin_port = htons(port);
 
    bindRes = kernel_bind(thisCast->sock, (struct sockaddr*)&bindAddr, sizeof(bindAddr) );

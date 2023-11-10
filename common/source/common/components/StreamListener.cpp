@@ -288,8 +288,8 @@ void StreamListener::onIncomingStandardConnection(StandardSocket* sock)
          (StandardSocket*)sock->accept( (struct sockaddr*)&peerAddr, &peerAddrLen));
 
       // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
-      log.log(Log_DEBUG, std::string("Accepted new connection from " +
-         Socket::endpointAddrToString(&peerAddr.sin_addr, ntohs(peerAddr.sin_port) ) ) +
+      log.log(Log_DEBUG, std::string("Accepted new connection from ") +
+         Socket::endpointAddrToStr(&peerAddr) +
          std::string(" [SockFD: ") + StringTk::intToStr(acceptedSock->getFD() ) +
          std::string("]") );
 
@@ -343,8 +343,8 @@ void StreamListener::onIncomingRDMAConnection(RDMASocket* sock)
          }
 
          // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
-         log.log(Log_DEBUG, std::string("Accepted new RDMA connection from " +
-            Socket::endpointAddrToString(&peerAddr.sin_addr, ntohs(peerAddr.sin_port) ) ) +
+         log.log(Log_DEBUG, std::string("Accepted new RDMA connection from ") +
+            Socket::endpointAddrToStr(&peerAddr) +
             std::string(" [SockFD: ") + StringTk::intToStr(acceptedSock->getFD() ) +
             std::string("]") );
 

@@ -497,7 +497,7 @@ void MetaStore::closeFile(EntryInfo* entryInfo, MetaFileHandle inode, unsigned a
    releaseDirUnlocked(entryInfo->getParentEntryID());
 
    // we kept another dir reference in openFile(), so release it here
-   releaseDirUnlocked(inode.parent->getID());
+   releaseDirUnlocked(entryInfo->getParentEntryID());
 }
 
 /**
@@ -527,7 +527,9 @@ FhgfsOpsErr MetaStore::stat(EntryInfo* entryInfo, bool loadFromDisk, StatData& o
    }
 
    // first check if the inode is referenced in the global store
-   statRes = fileStore.stat(entryInfo, false, outStatData); // do not try to load from disk!
+   // if inode is non-inlined then forceLoad it from disk if it is not
+   // already present in global fileStore (similar to MetaStore::openFile())
+   statRes = fileStore.stat(entryInfo, !entryInfo->getIsInlined(), outStatData);
 
    if (statRes != FhgfsOpsErr_PATHNOTEXISTS)
       return statRes;
@@ -1068,9 +1070,9 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
 {
    const char* logContext = "Unlink File Inode";
 
-   FhgfsOpsErr retVal;
-   UniqueRWLock lock(rwlock, SafeRWLock_READ);
+   UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
 
+   FhgfsOpsErr retVal;
    FhgfsOpsErr isUnlinkable = this->fileStore.isUnlinkable(delFileInfo);
 
    if (isUnlinkable != FhgfsOpsErr_INUSE && isUnlinkable != FhgfsOpsErr_SUCCESS)
@@ -1079,8 +1081,7 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
    if (isUnlinkable == FhgfsOpsErr_INUSE)
    {
       FileInode* inode = this->fileStore.referenceLoadedFile(delFileInfo->getEntryID());
-
-      if (!inode)
+      if (unlikely(!inode))
       {
          LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it");
          return FhgfsOpsErr_INTERNAL;
@@ -1100,9 +1101,8 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
       FhgfsOpsErr decRes = this->fileStore.decLinkCount(*inode, delFileInfo);
       if (decRes != FhgfsOpsErr_SUCCESS)
       {
-         LogContext(logContext).logErr("Failed to decrease the link count!"
-            "entryID: "    + delFileInfo->getEntryID() +
-            "fileName: "   + delFileInfo->getFileName().c_str());
+         LogContext(logContext).logErr("Failed to decrease the link count. entryID: "
+            + delFileInfo->getEntryID());
       }
 
       this->fileStore.releaseFileInode(inode);
@@ -1112,37 +1112,35 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
       // File is not IN_USE so decrement link count and if link count reach zero then
       // delete inode file from disk
       MetaFileHandle inode = referenceFileUnlocked(delFileInfo);
-      if (!inode)
+      if (unlikely(!inode))
          return FhgfsOpsErr_PATHNOTEXISTS;
 
       unsigned numHardLinks = inode->getNumHardlinks();
-
-      FhgfsOpsErr decRes = this->fileStore.decLinkCount(*inode, delFileInfo);
-      if (decRes != FhgfsOpsErr_SUCCESS)
+      if (numHardLinks > 1)
       {
-         LogContext(logContext).logErr("Failed to decrease the link count!"
-            "entryID: "    + delFileInfo->getEntryID() +
-            "fileName: "   + delFileInfo->getFileName().c_str());
-      }
+         FhgfsOpsErr decRes = this->fileStore.decLinkCount(*inode, delFileInfo);
+         if (decRes != FhgfsOpsErr_SUCCESS)
+         {
+            LogContext(logContext).logErr("Failed to decrease the link count. entryID: "
+               + delFileInfo->getEntryID());
+         }
 
-      releaseFileUnlocked(delFileInfo->getParentEntryID(), inode);
-
-      if (numHardLinks <=1)
-      {
-         retVal = this->fileStore.unlinkFileInode(delFileInfo, outInode);
+         releaseFileUnlocked(delFileInfo->getParentEntryID(), inode);
+         retVal = FhgfsOpsErr_SUCCESS;
       }
       else
       {
-         retVal = decRes;
+         // release inodeRef before calling unlinkFileInode() because it checks for IN_USE situation
+         releaseFileUnlocked(delFileInfo->getParentEntryID(), inode);
+         retVal = this->fileStore.unlinkFileInode(delFileInfo, outInode);
       }
    }
-
-   lock.unlock();
 
    if (retVal != FhgfsOpsErr_INUSE)
       return retVal;
 
-   retVal = unlinkInodeLater(delFileInfo, delFileInfo->getIsInlined());
+   lock.unlock();
+   retVal = unlinkInodeLater(delFileInfo, false);
 
    if (retVal == FhgfsOpsErr_AGAIN)
    {
@@ -1300,6 +1298,8 @@ FhgfsOpsErr MetaStore::unlinkDentryAndInodeUnlocked(const std::string& fileName,
       DirInode& subdir, DirEntry* dirEntry, unsigned unlinkTypeFlags,
       std::unique_ptr<FileInode>* outInode)
 {
+   const char* logContext = "Unlink DirEntry with non-inlined inode";
+
    // unlink dirEntry first
    FhgfsOpsErr retVal = subdir.unlinkDirEntryUnlocked(fileName, dirEntry, unlinkTypeFlags);
 
@@ -1316,23 +1316,68 @@ FhgfsOpsErr MetaStore::unlinkDentryAndInodeUnlocked(const std::string& fileName,
 
    dirEntry->getEntryInfo(parentEntryID, addionalEntryInfoFlags, &entryInfo);
 
-   MetaFileHandle fileInode = referenceFileUnlocked(subdir, &entryInfo);
-   int numHardLinks = 0;
+   FhgfsOpsErr isUnlinkable = isFileUnlinkable(subdir, &entryInfo);
+   if (isUnlinkable != FhgfsOpsErr_INUSE && isUnlinkable != FhgfsOpsErr_SUCCESS)
+      return isUnlinkable;
 
-   if (likely(fileInode))
+   if (isUnlinkable == FhgfsOpsErr_INUSE)
    {
-      numHardLinks = fileInode->getNumHardlinks();
-      retVal = subdir.fileStore.decLinkCount(*fileInode, &entryInfo);
+      MetaFileHandle inode = referenceLoadedFileUnlocked(subdir, dirEntry->getEntryID());
+      if (unlikely(!inode))
+      {
+         LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it");
+         return FhgfsOpsErr_INTERNAL;
+      }
+
+      unsigned numHardLinks = inode->getNumHardlinks();
+      if (numHardLinks > 1)
+      {
+         retVal = FhgfsOpsErr_SUCCESS;
+      }
+      else
+      {
+         retVal = FhgfsOpsErr_INUSE;
+      }
+
+      FhgfsOpsErr decRes = subdir.fileStore.decLinkCount(*inode, &entryInfo);
+      if (decRes != FhgfsOpsErr_SUCCESS)
+      {
+         LogContext(logContext).logErr("Failed to decrease the link count."
+            " parentEntryID: " + parentEntryID +
+            ", entryID: "      + entryInfo.getEntryID() +
+            ", entryName: "    + fileName);
+      }
+
+      releaseFileUnlocked(subdir, inode);
+      return retVal;
    }
    else
-      return FhgfsOpsErr_PATHNOTEXISTS;
+   {
+      MetaFileHandle inode = referenceFileUnlocked(subdir, &entryInfo);
+      if (unlikely(!inode))
+         return FhgfsOpsErr_PATHNOTEXISTS;
 
-   this->releaseFileUnlocked(subdir, fileInode);
+      unsigned numHardLinks = inode->getNumHardlinks();
+      if (numHardLinks > 1)
+      {
+         FhgfsOpsErr decRes = subdir.fileStore.decLinkCount(*inode, &entryInfo);
+         if (decRes != FhgfsOpsErr_SUCCESS)
+         {
+            LogContext(logContext).logErr("Failed to decrease the link count."
+               " parentEntryID: " + parentEntryID +
+               ", entryID: "      + entryInfo.getEntryID() +
+               ", entryName: "    + fileName);
+         }
 
-   if (numHardLinks > 1)
-      return retVal;
-
-   return unlinkInodeUnlocked(&entryInfo, &subdir, outInode);
+         releaseFileUnlocked(subdir, inode);
+         return FhgfsOpsErr_SUCCESS;
+      }
+      else
+      {
+         releaseFileUnlocked(subdir, inode);
+         return unlinkInodeUnlocked(&entryInfo, &subdir, outInode);
+      }
+   }
 }
 
 /**
@@ -1945,6 +1990,9 @@ FhgfsOpsErr MetaStore::deinlineFileInode(DirInode& parentDir, EntryInfo* entryIn
    // 2. update feature flags for passed-in dentry object so that when its
    // saved to disk again, it gets written in VER-3 format
    dentry.unsetInodeInlined();
+   unsigned flags = dentry.getDentryFeatureFlags();
+   flags &= ~(DENTRY_FEATURE_IS_FILEINODE);
+   dentry.setDentryFeatureFlags(flags);
    dentry.getInodeStoreData()->setOrigFeature(FileInodeOrigFeature_UNSET);
 
    // 3. write updated dentry data to disk

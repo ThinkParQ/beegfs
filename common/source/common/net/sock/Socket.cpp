@@ -99,33 +99,36 @@ void Socket::bind(unsigned short port)
    this->bindToAddr(ipAddr, port);
 }
 
-
-std::string Socket::ipaddrToStr(const struct in_addr* ipaddress)
+std::string Socket::ipaddrToStr(in_addr_t addr)
 {
-   return ipaddrToStr(ipaddress->s_addr);
+   char buf[4*4];
+   const char* a = ::inet_ntop(AF_INET, &addr, buf, sizeof(buf));
+   return a != NULL? a : "error";
 }
 
-std::string Socket::ipaddrToStr(uint32_t addr)
+std::string Socket::ipaddrToStr(struct in_addr ipaddress)
 {
-   unsigned char* cIP = (unsigned char*)&addr;
-
-   std::string ipString =
-      StringTk::uintToStr(cIP[0]) + "." +
-      StringTk::uintToStr(cIP[1]) + "." +
-      StringTk::uintToStr(cIP[2]) + "." +
-      StringTk::uintToStr(cIP[3]);
-
-   return ipString;
+   return Socket::ipaddrToStr(ipaddress.s_addr);
 }
 
-std::string Socket::endpointAddrToString(struct in_addr* ipaddress, unsigned short port)
+std::string Socket::endpointAddrToStr(struct in_addr ipaddress, unsigned short port)
 {
    return Socket::ipaddrToStr(ipaddress) + ":" + StringTk::uintToStr(port);
 }
 
-std::string Socket::endpointAddrToString(const char* hostname, unsigned short port)
+std::string Socket::endpointAddrToStr(in_addr_t ipaddress, unsigned short port)
+{
+   return Socket::ipaddrToStr(ipaddress) + ":" + StringTk::uintToStr(port);
+}
+
+std::string Socket::endpointAddrToStr(const char* hostname, unsigned short port)
 {
    return std::string(hostname) + ":" + StringTk::uintToStr(port);
+}
+
+std::string Socket::endpointAddrToStr(const struct sockaddr_in* sin)
+{
+   return Socket::endpointAddrToStr(sin->sin_addr, sin->sin_port);
 }
 
 

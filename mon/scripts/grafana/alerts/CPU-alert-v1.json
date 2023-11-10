@@ -1,0 +1,155 @@
+{
+    "id": 2,
+    "uid": "cf53330f-49cf-4b1e-bb59-e4580d32e707",
+    "orgID": 1,
+    "folderUID": "beegfsalertfolder",
+    "ruleGroup": "evaluate",
+    "title": "CPU Alert",
+    "condition": "C",
+    "data": [
+        {
+            "refId": "A",
+            "queryType": "",
+            "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+            },
+            "datasourceUid": "${DS_UID}",
+            "model": {
+                "groupBy": [
+                    {
+                        "params": [
+                            "host::tag"
+                        ],
+                        "type": "tag"
+                    }
+                ],
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "measurement": "cpu",
+                "orderByTime": "ASC",
+                "policy": "auto",
+                "query": "SELECT mean(\"usage_system\") FROM \"auto\".\"cpu\" WHERE $timeFilter GROUP BY \"host\"::tag",
+                "rawQuery": true,
+                "refId": "A",
+                "resultFormat": "time_series",
+                "select": [
+                    [
+                        {
+                            "params": [
+                                "usage_system"
+                            ],
+                            "type": "field"
+                        },
+                        {
+                            "params": [],
+                            "type": "mean"
+                        }
+                    ]
+                ],
+                "tags": []
+            }
+        },
+        {
+            "refId": "B",
+            "queryType": "",
+            "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+            },
+            "datasourceUid": "__expr__",
+            "model": {
+                "conditions": [
+                    {
+                        "evaluator": {
+                            "params": [
+                                0,
+                                0
+                            ],
+                            "type": "gt"
+                        },
+                        "operator": {
+                            "type": "and"
+                        },
+                        "query": {
+                            "params": []
+                        },
+                        "reducer": {
+                            "params": [],
+                            "type": "avg"
+                        },
+                        "type": "query"
+                    }
+                ],
+                "datasource": {
+                    "name": "Expression",
+                    "type": "__expr__",
+                    "uid": "__expr__"
+                },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "reducer": "last",
+                "refId": "B",
+                "type": "reduce"
+            }
+        },
+        {
+            "refId": "C",
+            "queryType": "",
+            "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+            },
+            "datasourceUid": "__expr__",
+            "model": {
+                "conditions": [
+                    {
+                        "evaluator": {
+                            "params": [
+                                0,
+                                0
+                            ],
+                            "type": "gt"
+                        },
+                        "operator": {
+                            "type": "and"
+                        },
+                        "query": {
+                            "params": []
+                        },
+                        "reducer": {
+                            "params": [],
+                            "type": "avg"
+                        },
+                        "type": "query"
+                    }
+                ],
+                "datasource": {
+                    "name": "Expression",
+                    "type": "__expr__",
+                    "uid": "__expr__"
+                },
+                "expression": "$B > 80",
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "C",
+                "type": "math"
+            }
+        }
+    ],
+    "updated": "2023-10-17T18:28:40+05:30",
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "30m",
+    "annotations": {
+        "summary": "CPU usage is above thershold set",
+        "description": "Please check host \"{{ $labels.host }}\"  its cpu usage is above thershold"
+    },
+    "labels": {
+        "cpu-severity": "{{if gt $values.B.Value 90.0}}critical{{else if gt $values.B.Value 80.0}}warning{{else}}info{{end}}"
+    },
+    "isPaused": true
+}

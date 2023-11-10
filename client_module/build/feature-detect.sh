@@ -324,6 +324,11 @@ check_struct_field_type \
    linux/fs.h
 
 check_struct_field_type \
+   inode_operations::get_inode_acl "struct posix_acl* (*)(struct inode *, int, bool)" \
+   KERNEL_HAS_GET_INODE_ACL \
+   linux/fs.h
+
+check_struct_field_type \
    inode_operations::set_acl "int (*)(struct inode *, struct posix_acl *, int)" \
    KERNEL_HAS_SET_ACL \
    linux/fs.h
@@ -331,6 +336,11 @@ check_struct_field_type \
 check_struct_field_type \
    inode_operations::set_acl "int (*)(struct user_namespace *, struct inode *, struct posix_acl *, int)" \
    KERNEL_HAS_SET_ACL \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::set_acl "int (*)(struct user_namespace *, struct dentry *, struct posix_acl *, int)" \
+   KERNEL_HAS_SET_DENTRY_ACL \
    linux/fs.h
 
 check_function \

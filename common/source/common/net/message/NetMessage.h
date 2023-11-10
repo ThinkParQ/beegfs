@@ -129,7 +129,7 @@ class NetMessage
 
             std::string peerName() const
             {
-               return fromAddr ? Socket::ipaddrToStr(&fromAddr->sin_addr) : socket->getPeername();
+               return fromAddr ? Socket::ipaddrToStr(fromAddr->sin_addr) : socket->getPeername();
             }
 
             bool isLocallyGenerated() const { return locallyGenerated; }

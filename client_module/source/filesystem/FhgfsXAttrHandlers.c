@@ -429,20 +429,25 @@ struct xattr_handler fhgfs_xattr_security_handler =
    .get    = FhgfsXAttr_getSecurity,
 };
 
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_HAS_GET_ACL
 #ifdef KERNEL_HAS_CONST_XATTR_HANDLER
 const struct xattr_handler* fhgfs_xattr_handlers[] =
 #else
 struct xattr_handler* fhgfs_xattr_handlers[] =
 #endif // KERNEL_HAS_CONST_XATTR_HANDLER
 {
+#ifdef KERNEL_HAS_GET_INODE_ACL
+   &posix_acl_access_xattr_handler,
+   &posix_acl_default_xattr_handler,
+#else
    &fhgfs_xattr_acl_access_handler,
    &fhgfs_xattr_acl_default_handler,
+#endif
    &fhgfs_xattr_user_handler,
    &fhgfs_xattr_security_handler,
    NULL
 };
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
 
 #ifdef KERNEL_HAS_CONST_XATTR_HANDLER
 const struct xattr_handler* fhgfs_xattr_handlers_noacl[] =

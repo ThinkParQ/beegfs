@@ -223,7 +223,7 @@ void ModeClientStats::loop()
                   id = SocketTk::getHostnameFromIP(&inAddr, false, false);
 
                if (id.empty())
-                  id = Socket::ipaddrToStr(&inAddr);
+                  id = Socket::ipaddrToStr(inAddr);
             }
 
             if (filter.empty() || filter == id)

@@ -44,7 +44,11 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "connTcpOnlyFilterFile",
    "connFallbackExpirationSecs",
    "connRDMABufSize",
+   "connRDMAFragmentSize",
    "connRDMABufNum",
+   "connRDMAMetaBufSize",
+   "connRDMAMetaFragmentSize",
+   "connRDMAMetaBufNum",
    "connCommRetrySecs",
    "connNumCommRetries",
    "connUnmountRetries",
@@ -116,7 +120,11 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connFallbackExpirationSecs = %u\n",
       Config_getConnFallbackExpirationSecs(cfg) );
    seq_printf(file, "connRDMABufSize = %u\n", Config_getConnRDMABufSize(cfg) );
+   seq_printf(file, "connRDMAFragmentSize = %u\n", Config_getConnRDMAFragmentSize(cfg) );
    seq_printf(file, "connRDMABufNum = %u\n", Config_getConnRDMABufNum(cfg) );
+   seq_printf(file, "connRDMAMetaBufSize = %u\n", Config_getConnRDMAMetaBufSize(cfg) );
+   seq_printf(file, "connRDMAMetaFragmentSize = %u\n", Config_getConnRDMAMetaFragmentSize(cfg) );
+   seq_printf(file, "connRDMAMetaBufNum = %u\n", Config_getConnRDMAMetaBufNum(cfg) );
    seq_printf(file, "connCommRetrySecs = %u\n", Config_getConnCommRetrySecs(cfg) );
    seq_printf(file, "connNumCommRetries = %u\n", Config_getConnNumCommRetries(cfg) );
    seq_printf(file, "connUnmountRetries = %d\n", (int)Config_getConnUnmountRetries(cfg) );
@@ -239,8 +247,20 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
    if(!strcmp(currentKey, "connRDMABufSize") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMABufSize(cfg) );
    else
+   if(!strcmp(currentKey, "connRDMAFragmentSize") )
+      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAFragmentSize(cfg) );
+   else
    if(!strcmp(currentKey, "connRDMABufNum") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMABufNum(cfg) );
+   else
+   if(!strcmp(currentKey, "connRDMAMetaBufSize") )
+      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaBufSize(cfg) );
+   else
+   if(!strcmp(currentKey, "connRDMAMetaFragmentSize") )
+      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaFragmentSize(cfg) );
+   else
+   if(!strcmp(currentKey, "connRDMAMetaBufNum") )
+      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaBufNum(cfg) );
    else
    if(!strcmp(currentKey, "connCommRetrySecs") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnCommRetrySecs(cfg) );
@@ -639,9 +659,11 @@ int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
    Node* localNode = App_getLocalNode(app);
    char* localNodeID = Node_getID(localNode);
 
-   NicAddressList* nicList = Node_getNicList(localNode);
-   NicAddressList* rdmaNicList = App_getRDMANicList(app);
+   NicAddressList nicList;
+   NicAddressList rdmaNicList;
 
+   Node_cloneNicList(localNode, &nicList);
+   App_cloneLocalRDMANicList(app, &rdmaNicList);
    // print local clientID
 
    seq_printf(file, "ClientID: %s\n", localNodeID);
@@ -649,15 +671,20 @@ int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
    // list usable network interfaces
 
    seq_printf(file, "Interfaces:\n");
-   ProcFsHelper_readV2_nics(file, nicList);
+   ProcFsHelper_readV2_nics(file, &nicList);
    if (Config_getConnUseRDMA(App_getConfig(app)))
    {
       seq_printf(file, "Outbound RDMA Interfaces:\n");
-      if (NicAddressList_length(rdmaNicList) == 0)
+      if (NicAddressList_length(&rdmaNicList) == 0)
          seq_printf(file, "%sAny\n", NIC_INDENTATION_STR);
       else
-         ProcFsHelper_readV2_nics(file, rdmaNicList);
+         ProcFsHelper_readV2_nics(file, &rdmaNicList);
    }
+
+   ListTk_kfreeNicAddressListElems(&nicList);
+   NicAddressList_uninit(&nicList);
+   ListTk_kfreeNicAddressListElems(&rdmaNicList);
+   NicAddressList_uninit(&rdmaNicList);
 
    return 0;
 }
@@ -673,15 +700,16 @@ int ProcFsHelper_read_clientInfo(char* buf, char** start, off_t offset, int size
 
    size_t nicListStrLen = 1024;
    char* extendedNicListStr = vmalloc(nicListStrLen);
-   NicAddressList* nicList = Node_getNicList(localNode);
+   NicAddressList nicList;
    NicAddressListIter nicIter;
 
 
+   Node_cloneNicList(localNode, &nicList);
    // print local clientID
    count += scnprintf(buf+count, size-count, "ClientID: %s\n", localNodeID);
 
    // list usable network interfaces
-   NicAddressListIter_init(&nicIter, nicList);
+   NicAddressListIter_init(&nicIter, &nicList);
    extendedNicListStr[0] = 0;
 
    for( ; !NicAddressListIter_end(&nicIter); NicAddressListIter_next(&nicIter) )
@@ -707,6 +735,9 @@ int ProcFsHelper_read_clientInfo(char* buf, char** start, off_t offset, int size
    SAFE_VFREE(extendedNicListStr);
 
    *eof = 1;
+
+   ListTk_kfreeNicAddressListElems(&nicList);
+   NicAddressList_uninit(&nicList);
 
    return count;
 }

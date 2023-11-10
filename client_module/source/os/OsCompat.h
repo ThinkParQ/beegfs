@@ -193,11 +193,13 @@ static inline int os_posix_acl_to_xattr(const struct posix_acl* acl, void* buffe
 #endif
 }
 
-#ifdef KERNEL_HAS_SET_ACL
+#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_DENTRY_ACL)
 static inline int os_posix_acl_chmod(struct inode *inode, umode_t mode)
 {
-#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS) && defined(KERNEL_HAS_POSIX_GET_ACL)
    return posix_acl_chmod(&init_user_ns, inode, mode);
+#elif defined(KERNEL_HAS_IDMAPPED_MOUNTS) && defined(KERNEL_HAS_GET_INODE_ACL)
+   return posix_acl_chmod(&init_user_ns, d_find_alias(inode), mode);
 #else
    return posix_acl_chmod(inode, mode);
 #endif

@@ -10,12 +10,6 @@
 
 #include <os/iov_iter.h>
 
-#ifndef BEEGFS_IBVERBS_FRAGMENT_PAGES
-#define BEEGFS_IBVERBS_FRAGMENT_PAGES 1
-#endif
-
-#define IBV_FRAGMENT_SIZE ((BEEGFS_IBVERBS_FRAGMENT_PAGES) * PAGE_SIZE)
-
 
 struct IBVBuffer;
 typedef struct IBVBuffer IBVBuffer;
@@ -24,7 +18,7 @@ struct IBVCommContext;
 
 
 extern bool IBVBuffer_init(IBVBuffer* buffer, struct IBVCommContext* ctx, size_t bufLen,
-   enum dma_data_direction dma_dir);
+   size_t fragmentLen, enum dma_data_direction dma_dir);
 extern void IBVBuffer_free(IBVBuffer* buffer, struct IBVCommContext* ctx);
 extern ssize_t IBVBuffer_fill(IBVBuffer* buffer, struct iov_iter* iter);
 

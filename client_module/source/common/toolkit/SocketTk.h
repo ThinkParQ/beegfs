@@ -6,8 +6,8 @@
 #include <common/toolkit/Time.h>
 #include <linux/poll.h>
 
-#define SOCKETTK_ENDPOINTSTR_LEN       SOCKET_PEERNAME_LEN // size for _endpointAddrToStringNoAlloc()
-
+#define SOCKETTK_ENDPOINTSTR_LEN       SOCKET_PEERNAME_LEN // size for _endpointAddrToStrNoAlloc()
+#define SOCKETTK_IPADDRSTR_LEN         (4*4)
 
 // forward declarations
 struct PollState;
@@ -27,10 +27,11 @@ extern bool SocketTk_getHostByName(struct ExternalHelperd* helperd, const char* 
 extern bool SocketTk_getHostByAddrStr(const char* hostAddr, struct in_addr* outIPAddr);
 extern struct in_addr SocketTk_in_aton(const char* hostAddr);
 
-extern char* SocketTk_ipaddrToStr(struct in_addr* ipaddress);
-extern char* SocketTk_endpointAddrToString(struct in_addr* ipaddress, unsigned short port);
-extern void SocketTk_endpointAddrToStringNoAlloc(char* buf, unsigned bufLen,
-   struct in_addr* ipaddress, unsigned short port);
+extern char* SocketTk_ipaddrToStr(struct in_addr ipaddress);
+extern void SocketTk_ipaddrToStrNoAlloc(struct in_addr ipaddress, char* ipStr, size_t ipStrLen);
+extern char* SocketTk_endpointAddrToStr(struct in_addr ipaddress, unsigned short port);
+extern void SocketTk_endpointAddrToStrNoAlloc(char* buf, size_t bufLen,
+   struct in_addr ipaddress, unsigned short port);
 
 
 struct PollState

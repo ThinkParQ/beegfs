@@ -1601,7 +1601,6 @@ ssize_t FhgfsOpsRemoting_readfileVec(struct iov_iter* iter, size_t toBeRead, lof
    const char* fileHandleID = ioInfo->fileHandleID;
    int maxUsedTargetIndex = AtomicInt_read(ioInfo->maxUsedTargetIndex);
    size_t stripeSetSize = (size_t) chunkSize * numStripeNodes;
-   size_t maxReadSize = min_t(size_t, stripeSetSize, toBeRead);
 
    __FhgfsOpsRemoting_logDebugIOCall(__func__, iov_iter_count(iter), offset, ioInfo, NULL);
 
@@ -1615,6 +1614,7 @@ ssize_t FhgfsOpsRemoting_readfileVec(struct iov_iter* iter, size_t toBeRead, lof
       struct FileOpVecState* state;
       ssize_t bytesReadThisRound = 0;
       struct iov_iter stripeSetIter;
+      size_t maxReadSize = min_t(size_t, stripeSetSize, toBeRead);
 
       beegfs_readsink_reserve(&readsink, iter, maxReadSize);
       stripeSetIter = readsink.sanitized_iter;

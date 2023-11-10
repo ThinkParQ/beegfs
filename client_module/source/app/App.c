@@ -78,7 +78,7 @@ void App_init(App* this, MountConfig* mountConfig)
    this->dirInodeOps = NULL;
    this->specialInodeOps = NULL;
 
-   NicAddressList_init(&this->rdmaNicList);
+   Mutex_init(&this->nicListMutex);
 
 #ifdef BEEGFS_DEBUG
    Mutex_init(&this->debugCounterMutex);
@@ -137,6 +137,8 @@ void App_uninit(App* this)
    kfree(this->symlinkInodeOps);
    kfree(this->dirInodeOps);
    kfree(this->specialInodeOps);
+
+   Mutex_uninit(&this->nicListMutex);
 
 #ifdef BEEGFS_DEBUG
    Mutex_uninit(&this->debugCounterMutex);
@@ -245,7 +247,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    size_t msgBufsSize;
    char* interfacesList;
 
-
    AtomicInt_init(&this->lockAckAtomicCounter, 0);
 
    this->cfg = Config_construct(mountConfig);
@@ -259,6 +260,37 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
       return false;
    }
 
+   if (Config_getConnUseRDMA(this->cfg))
+   {
+      unsigned bufSize = Config_getConnRDMABufSize(this->cfg);
+      unsigned fragmentSize = Config_getConnRDMAFragmentSize(this->cfg);
+
+      if (fragmentSize != 0)
+      {
+         if (fragmentSize > bufSize)
+         {
+            printk_fhgfs(KERN_WARNING, "RDMA fragment size must be <= buffer size\n");
+            return false;
+         }
+         if (fragmentSize < PAGE_SIZE)
+         {
+            printk_fhgfs(KERN_WARNING, "RDMA fragment size must be >= %zu\n", PAGE_SIZE);
+            return false;
+         }
+         if (fragmentSize % PAGE_SIZE != 0)
+         {
+            printk_fhgfs(KERN_WARNING, "RDMA fragment size must be a multiple of %zu\n", PAGE_SIZE);
+            return false;
+         }
+         if (bufSize % fragmentSize != 0)
+         {
+            // Technically, it would be a good idea for bufSize to be a multiple of
+            // fragment size but we've never enforced that in the past. Warn but don't
+            // fail.
+            printk_fhgfs(KERN_WARNING, "RDMA buffer size is not a multiple of fragment size\n");
+         }
+      }
+   }
 
    { // load net filter (required before any connection can be made, incl. local conns)
       const char* netFilterFile = Config_getConnNetFilterFile(this->cfg);
@@ -506,23 +538,158 @@ bool __App_initInodeOperations(App* this)
 
       if (Config_getSysACLsEnabled(cfg) )
       {
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_DENTRY_ACL)
+         this->fileInodeOps->set_acl = FhgfsOps_set_acl;
+         this->dirInodeOps->set_acl  = FhgfsOps_set_acl;
+#if defined(KERNEL_HAS_POSIX_GET_ACL) 
          this->fileInodeOps->get_acl = FhgfsOps_get_acl;
          this->dirInodeOps->get_acl  = FhgfsOps_get_acl;
          // Note: symlinks don't have ACLs
-#ifdef KERNEL_HAS_SET_ACL
-         this->fileInodeOps->set_acl = FhgfsOps_set_acl;
-         this->dirInodeOps->set_acl  = FhgfsOps_set_acl;
-#endif // LINUX_VERSION_CODE
+#elif defined(KERNEL_HAS_GET_INODE_ACL)
+         this->fileInodeOps->get_inode_acl = FhgfsOps_get_acl;
+         this->dirInodeOps->get_inode_acl  = FhgfsOps_get_acl;
 #else
          Logger_logErr(this->logger, "Init inode operations",
-            "ACLs activated in config, but not supported on this kernel version.");
+            "ACLs activated in config, but the signature inode->i_op->get_acl()"
+            "or inode->i_op->get_inode_acl() are not supported on this"
+            "kernel version.");
          return false;
 #endif // KERNEL_HAS_POSIX_GET_ACL
+#else
+         Logger_logErr(this->logger, "Init inode operations",
+            "ACLs activated in config, but the signature inode->i_op->set_acl()"
+            "not supported on this kernel version.");
+         return false;
+#endif // KERNEL_HAS_SET_ACL or KERNEL_HAS_SET_DENTRY_ACL
       }
    }
 
    return true;
+}
+
+/**
+ * Retrieve NICs for the local node.
+ *
+ * @param nicList an uninitialized NicAddressList. Caller is responsible for
+ *        memory management.
+ */
+void App_cloneLocalNicList(App* this, NicAddressList* nicList)
+{
+   Node_cloneNicList(this->localNode, nicList);
+}
+
+void App_updateLocalInterfaces(App* this, NicAddressList* nicList)
+{
+   NicAddressList rdmaNicList;
+   NicListCapabilities nicCaps;
+   NodeStoreEx* stores[] = {
+      this->mgmtNodes, this->metaNodes, this->storageNodes, NULL
+   };
+   int i;
+
+   App_findAllowedRDMAInterfaces(this, nicList, &rdmaNicList);
+
+   Mutex_lock(&this->nicListMutex); // L O C K
+
+   ListTk_kfreeNicAddressListElems(&this->rdmaNicList);
+   NicAddressList_uninit(&this->rdmaNicList);
+   ListTk_cloneNicAddressList(&rdmaNicList, &this->rdmaNicList, true);
+
+   Mutex_unlock(&this->nicListMutex); // U N L O C K
+
+   NIC_supportedCapabilities(nicList, &nicCaps);
+   Node_updateInterfaces(this->localNode, Node_getPortUDP(this->localNode),
+      Node_getPortTCP(this->localNode), nicList);
+   Node_updateLocalInterfaces(this->localNode, nicList, &nicCaps, NULL);
+
+   for (i = 0; stores[i] != NULL; ++i)
+   {
+      NodeStoreEx* store = stores[i];
+      Node* node;
+
+      for (node = NodeStoreEx_referenceFirstNode(store); node != NULL;
+           node = NodeStoreEx_referenceNextNodeAndReleaseOld(store, node))
+      {
+         int nodeType = Node_getNodeType(node);
+         Node_updateLocalInterfaces(node, nicList, &nicCaps,
+            nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage? &rdmaNicList : NULL);
+      }
+
+   }
+   ListTk_kfreeNicAddressListElems(&rdmaNicList);
+   NicAddressList_uninit(&rdmaNicList);
+}
+
+/**
+ * Populate nicList with the allowed and available interfaces.
+ *
+ * @param nicList uninitialized list to populate. Caller is responsible for memory
+ *        management
+ * @return true if an allowed and available NIC was found. nicList is initialized and
+ *         contains elements.
+ */
+bool App_findAllowedInterfaces(App* this, NicAddressList* nicList)
+{
+   NicAddressList tmpNicList;
+   bool useRDMA = Config_getConnUseRDMA(this->cfg);
+   bool result;
+
+   NicAddressList_init(&tmpNicList);
+   NIC_findAll(&this->allowedInterfaces, useRDMA, false, &tmpNicList);
+
+   if(!NicAddressList_length(&tmpNicList) )
+   {
+      result = false;
+      goto exit;
+   }
+
+   // created sorted tmpNicList clone
+   ListTk_cloneSortNicAddressList(&tmpNicList, nicList, &this->allowedInterfaces);
+
+   result = true;
+
+exit:
+   if (result)
+      ListTk_kfreeNicAddressListElems(&tmpNicList);
+   NicAddressList_uninit(&tmpNicList);
+   return result;
+}
+
+void App_cloneLocalRDMANicList(App* this, NicAddressList* rdmaNicList)
+{
+   Mutex_lock(&this->nicListMutex); // L O C K
+   ListTk_cloneNicAddressList(&this->rdmaNicList, rdmaNicList, true);
+   Mutex_unlock(&this->nicListMutex); // U N L O C K
+}
+
+void App_findAllowedRDMAInterfaces(App* this, NicAddressList* nicList, NicAddressList* rdmaNicList)
+{
+   const char* logContext = "App (find RDMA interfaces)";
+   bool useRDMA = Config_getConnUseRDMA(this->cfg);
+   if (useRDMA && StrCpyList_length(&this->allowedRDMAInterfaces) > 0)
+   {
+      NicAddressList tmpList;
+
+      NicAddressList_init(&tmpList);
+      NIC_findAll(&this->allowedRDMAInterfaces, true, true, &tmpList);
+
+      if(!NicAddressList_length(&tmpList) )
+      {
+         Logger_logErr(this->logger, logContext, "Couldn't find any filtered and usable outbound RDMA NIC, using any");
+         NicAddressList_init(rdmaNicList);
+      }
+      else
+      {
+         // created sorted rdmaNicList clone
+         ListTk_cloneSortNicAddressList(&tmpList, rdmaNicList, &this->allowedRDMAInterfaces);
+      }
+      ListTk_kfreeNicAddressListElems(&tmpList);
+      NicAddressList_uninit(&tmpList);
+   }
+   else
+   {
+      NicAddressList_init(rdmaNicList);
+   }
 }
 
 bool __App_initLocalNodeInfo(App* this)
@@ -530,51 +697,21 @@ bool __App_initLocalNodeInfo(App* this)
    const char* logContext = "App (init local node info)";
 
    NicAddressList nicList;
-   NicAddressList sortedNicList;
    char* hostname;
    Time now;
    pid_t currentPID;
    char* nodeID;
-   bool useRDMA = Config_getConnUseRDMA(this->cfg);
 
-   NicAddressList_init(&nicList);
-
-   NIC_findAll(&this->allowedInterfaces, useRDMA, false, &nicList);
-
-   if(!NicAddressList_length(&nicList) )
+   if (!App_findAllowedInterfaces(this, &nicList))
    {
       Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErr(this->logger, logContext, "Couldn't find any usable NIC");
-      NicAddressList_uninit(&nicList);
-
+      // required by App_uninit()
+      NicAddressList_init(&this->rdmaNicList);
       return false;
    }
 
-   // created sorted nicList clone
-   ListTk_cloneSortNicAddressList(&nicList, &sortedNicList, &this->allowedInterfaces);
-
-   if (useRDMA && StrCpyList_length(&this->allowedRDMAInterfaces) > 0)
-   {
-      NicAddressList rdmaNicList;
-
-      NicAddressList_init(&rdmaNicList);
-      NIC_findAll(&this->allowedRDMAInterfaces, true, true, &rdmaNicList);
-
-      if(!NicAddressList_length(&rdmaNicList) )
-      {
-         Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
-         Logger_logErr(this->logger, logContext, "Couldn't find any filtered and usable outbound RDMA NIC, using any");
-      }
-      else
-      {
-         NicAddressList_uninit(&this->rdmaNicList);
-         // created sorted rdmaNicList clone
-         ListTk_cloneSortNicAddressList(&rdmaNicList, &this->rdmaNicList, &this->allowedRDMAInterfaces);
-      }
-      ListTk_kfreeNicAddressListElems(&rdmaNicList);
-
-      NicAddressList_uninit(&rdmaNicList);
-   }
+   App_findAllowedRDMAInterfaces(this, &nicList, &this->rdmaNicList);
 
    // prepare clientID and create localNode
    Time_setToNowReal(&now);
@@ -586,17 +723,14 @@ bool __App_initLocalNodeInfo(App* this)
 
    // note: numeric ID gets initialized with 0; will be set by management later in InternodeSyncer
    this->localNode = Node_construct(this, nodeID, (NumNodeID){0},
-      Config_getConnClientPortUDP(this->cfg), 0, &sortedNicList);
+      Config_getConnClientPortUDP(this->cfg), 0, &nicList, NULL);
 
    // clean up
    kfree(nodeID);
    kfree(hostname);
 
    // delete nicList elems
-   ListTk_kfreeNicAddressListElems(&sortedNicList);
    ListTk_kfreeNicAddressListElems(&nicList);
-
-   NicAddressList_uninit(&sortedNicList);
    NicAddressList_uninit(&nicList);
 
    return true;
@@ -719,9 +853,10 @@ void __App_logInfos(App* this)
    size_t nicListStrLen = 1024;
    char* nicListStr = os_kmalloc(nicListStrLen);
    char* extendedNicListStr = os_kmalloc(nicListStrLen);
-   NicAddressList* nicList = Node_getNicList(this->localNode);
+   NicAddressList nicList;
    NicAddressListIter nicIter;
 
+   Node_cloneNicList(this->localNode, &nicList);
 
    // print software version (BEEGFS_VERSION)
    Logger_logFormatted(this->logger, 1, logContext, "BeeGFS Client Version: %s", BEEGFS_VERSION);
@@ -733,7 +868,7 @@ void __App_logInfos(App* this)
    Logger_logFormatted(this->logger, 2, logContext, "ClientID: %s", localNodeID);
 
    // list usable network interfaces
-   NicAddressListIter_init(&nicIter, nicList);
+   NicAddressListIter_init(&nicIter, &nicList);
    nicListStr[0] = 0;
    extendedNicListStr[0] = 0;
 
@@ -814,6 +949,10 @@ void __App_logInfos(App* this)
    // clean up
    SAFE_KFREE(nicListStr);
    SAFE_KFREE(extendedNicListStr);
+
+   ListTk_kfreeNicAddressListElems(&nicList);
+   NicAddressList_uninit(&nicList);
+
 }
 
 /**

@@ -342,7 +342,7 @@ std::string NetworkInterfaceCard::nicAddrToString(NicAddress* nicAddr)
    resultStr += nicAddr->name;
    resultStr += "[";
 
-   resultStr += std::string("ip addr: ") + Socket::ipaddrToStr(&nicAddr->ipAddr) + "; ";
+   resultStr += std::string("ip addr: ") + Socket::ipaddrToStr(nicAddr->ipAddr) + "; ";
    resultStr += std::string("type: ") + nicTypeToString(nicAddr->nicType);
 
    resultStr += "]";

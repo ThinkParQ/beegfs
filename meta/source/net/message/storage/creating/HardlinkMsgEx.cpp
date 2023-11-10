@@ -93,7 +93,18 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
    DirInode* toDir = metaStore->referenceDir(getToDirInfo()->getEntryID(),
          getToDirInfo()->getIsBuddyMirrored(), true);
 
-   if (!toDir)
+   // check if file dentry already exists with same name as hardlink
+   // return error if link already exists
+   if (likely(toDir))
+   {
+      DirEntry newLink(getToName());
+      if (toDir->getFileDentry(getToName(), newLink))
+      {
+         metaStore->releaseDir(toDir->getID());
+         return boost::make_unique<ResponseState>(FhgfsOpsErr_EXISTS);
+      }
+   }
+   else
    {
       LogContext(logContext).logErr(std::string("target directory for hard-link doesn't exist,"
          "dirname: " + getToDirInfo()->getFileName()));
@@ -214,15 +225,19 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
 
       newHardlink.removeDentryFeatureFlag(DENTRY_FEATURE_INODE_INLINE);
 
-      if (isMirrored())
-         newHardlink.setBuddyMirrorFeatureFlag();
+      if (toDir->getIsBuddyMirrored())
+         newHardlink.setBuddyMirrorFeatureFlag(); // buddy mirroring is inherited from parent
 
       FhgfsOpsErr makeRes = toDir->makeDirEntry(newHardlink);
 
       if (makeRes != FhgfsOpsErr_SUCCESS)
       {
          // compensate link count if dentry create fails
-         if (!isLocalOwner)
+         //
+         // for a remote inode, link count was incremented using SetAttrMsg which itself
+         // is a mirrored message. so to compensate link count, be careful not to send
+         // this message from secondary buddy (it will double decrease link count !!)
+         if (!isLocalOwner && !isSecondary)
             incDecRemoteLinkCount(ownerNodeID, false);
          else
             metaStore->incDecLinkCount(getFromInfo(), -1);
@@ -248,7 +263,7 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
 
    metaStore->releaseDir(toDir->getID());
 
-   if (retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
+   if (!isSecondary && retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
    {
          app->getFileEventLogger()->log(
                   *getFileEvent(),

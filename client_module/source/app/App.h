@@ -64,10 +64,14 @@ extern void __App_logInfos(App* this);
 
 extern bool __App_mountServerCheck(App* this);
 
+extern bool App_findAllowedInterfaces(App* this, NicAddressList* nicList);
+extern void App_findAllowedRDMAInterfaces(App* this, NicAddressList* nicList, NicAddressList* rdmaNicList);
 
 // external getters & setters
 extern const char* App_getVersionStr(void);
-
+extern void App_updateLocalInterfaces(App* app, NicAddressList* nicList);
+extern void App_cloneLocalNicList(App* this, NicAddressList* nicList);
+extern void App_cloneLocalRDMANicList(App* this, NicAddressList* rdmaNicList);
 
 // inliners
 static inline struct Logger* App_getLogger(App* this);
@@ -76,7 +80,17 @@ static inline struct Config* App_getConfig(App* this);
 static inline struct MountConfig* App_getMountConfig(App* this);
 static inline struct NetFilter* App_getNetFilter(App* this);
 static inline struct NetFilter* App_getTcpOnlyFilter(App* this);
-static inline NicAddressList* App_getRDMANicList(App* this);
+static inline NicAddressList* App_getLocalRDMANicListLocked(App* this);
+/**
+ * Called when access to the nicList is required but doesn't
+ * want the overhead of a clone operation. This locks the internel nicListMutex.
+ * App_unlockNicList must later be invoked.
+ */
+static inline void App_lockNicList(App* this);
+/**
+ * Release the lock on nicListMutex acquired by App_lockNicList.
+ */
+static inline void App_unlockNicList(App* this);
 static inline UInt16List* App_getPreferredStorageTargets(App* this);
 static inline UInt16List* App_getPreferredMetaNodes(App* this);
 static inline struct Node* App_getLocalNode(App* this);
@@ -118,7 +132,6 @@ static inline void App_incNumRemoteWrites(App* this);
 #endif // BEEGFS_DEBUG
 
 
-
 struct App
 {
    int appResult;
@@ -139,6 +152,7 @@ struct App
    // list is empty, any RDMA NIC on the client may be used for outbound RDMA.
    // allowedRDMAInterfaces contains the interface names used to populate this list.
    NicAddressList rdmaNicList;
+   Mutex nicListMutex;
 
    struct Node* localNode;
    struct NodeStoreEx* mgmtNodes;
@@ -226,7 +240,17 @@ UInt16List* App_getPreferredStorageTargets(App* this)
    return &this->preferredStorageTargets;
 }
 
-NicAddressList* App_getRDMANicList(App* this)
+void App_lockNicList(App* this)
+{
+   Mutex_lock(&this->nicListMutex); // L O C K
+}
+
+void App_unlockNicList(App* this)
+{
+   Mutex_unlock(&this->nicListMutex); // U N L O C K
+}
+
+NicAddressList* App_getLocalRDMANicListLocked(App* this)
 {
    return &this->rdmaNicList;
 }

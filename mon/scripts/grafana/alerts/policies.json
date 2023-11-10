@@ -1,0 +1,58 @@
+
+{
+    "receiver": "grafana-default-email",
+    "routes": [
+        {
+            "receiver": "beegfs-email",
+            "object_matchers": [
+                [
+                    "disk-severity",
+                    "=",
+                    "warning"
+                ]
+            ],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "6h"
+        },
+        {
+            "receiver": "beegfs-email",
+            "object_matchers": [
+                [
+                    "disk-severity",
+                    "=",
+                    "critical"
+                ]
+            ],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "6h"
+        },
+        {
+            "receiver": "beegfs-email",
+            "object_matchers": [
+                [
+                    "inodes",
+                    "=",
+                    "free"
+                ]
+            ],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "6h"
+        },
+        {
+            "receiver": "beegfs-email",
+            "object_matchers": [
+                [
+                    "queued",
+                    "=",
+                    "request"
+                ]
+            ],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "6h"
+        }
+    ]
+}

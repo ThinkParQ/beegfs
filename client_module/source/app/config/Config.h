@@ -91,7 +91,11 @@ static inline bool Config_getConnUnmountRetries(Config* this);
 static inline int Config_getConnTCPRcvBufSize(Config* this);
 static inline int Config_getConnUDPRcvBufSize(Config* this);
 static inline unsigned Config_getConnRDMABufSize(Config* this);
+static inline unsigned Config_getConnRDMAFragmentSize(Config* this);
 static inline unsigned Config_getConnRDMABufNum(Config* this);
+static inline unsigned Config_getConnRDMAMetaBufSize(Config* this);
+static inline unsigned Config_getConnRDMAMetaBufNum(Config* this);
+static inline unsigned Config_getConnRDMAMetaFragmentSize(Config* this);
 static inline int Config_getConnRDMATypeOfService(Config* this);
 static inline unsigned Config_getRemapConnectionFailureStatus(Config* this);
 static inline void Config_setRemapConnectionFailureStatus(Config* this, unsigned status);
@@ -204,7 +208,11 @@ struct Config
    int            connTCPRcvBufSize;
    int            connUDPRcvBufSize;
    unsigned       connRDMABufSize;
+   unsigned       connRDMAFragmentSize;
    unsigned       connRDMABufNum;
+   unsigned       connRDMAMetaBufSize;
+   unsigned       connRDMAMetaFragmentSize;
+   unsigned       connRDMAMetaBufNum;
    int            connRDMATypeOfService;
    char*          connNetFilterFile; // allowed IP addresses (all IPs allowed, if empty)
    unsigned       connMaxConcurrentAttempts;
@@ -404,9 +412,29 @@ unsigned Config_getConnRDMABufSize(Config* this)
    return this->connRDMABufSize;
 }
 
+unsigned Config_getConnRDMAFragmentSize(Config* this)
+{
+   return this->connRDMAFragmentSize;
+}
+
 unsigned Config_getConnRDMABufNum(Config* this)
 {
    return this->connRDMABufNum;
+}
+
+unsigned Config_getConnRDMAMetaBufSize(Config* this)
+{
+   return this->connRDMAMetaBufSize;
+}
+
+unsigned Config_getConnRDMAMetaFragmentSize(Config* this)
+{
+   return this->connRDMAMetaFragmentSize;
+}
+
+unsigned Config_getConnRDMAMetaBufNum(Config* this)
+{
+   return this->connRDMAMetaBufNum;
 }
 
 int Config_getConnRDMATypeOfService(Config* this)

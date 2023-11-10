@@ -13,6 +13,7 @@
 #define CONFIG_ERR_BUF_LENGTH          1024
 #define CONFIG_AUTHFILE_READSIZE       1024 // max amount of data that we read from auth file
 #define CONFIG_AUTHFILE_MINSIZE        4 // at least 2, because we compute two 32bit hashes
+#define CONFIG_CONN_RDMA_BUFNUM_MIN    3 // required by the IBVSocket logic and protocol
 
 #define FILECACHETYPE_NONE_STR      "none"
 #define FILECACHETYPE_BUFFERED_STR  "buffered"
@@ -29,6 +30,8 @@
 #define EVENTLOGMASK_CLOSE "close"
 #define EVENTLOGMASK_LINK_OP "link-op"
 #define EVENTLOGMASK_READ "read"
+
+#define RDMA_BUFNUM_MIN 3
 
 #define IGNORE_CONFIG_VALUE(compareStr) /* to be used in applyConfigMap() */ \
    if(!strcmp(keyStr, compareStr) ) \
@@ -225,7 +228,11 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connTCPRcvBufSize",                "0");
    _Config_configMapRedefine(this, "connUDPRcvBufSize",                "0");
    _Config_configMapRedefine(this, "connRDMABufSize",                  "8192");
+   _Config_configMapRedefine(this, "connRDMAFragmentSize",             "4096");
    _Config_configMapRedefine(this, "connRDMABufNum",                   "70");
+   _Config_configMapRedefine(this, "connRDMAMetaBufSize",              "0");
+   _Config_configMapRedefine(this, "connRDMAMetaFragmentSize",         "4096");
+   _Config_configMapRedefine(this, "connRDMAMetaBufNum",               "0");
    _Config_configMapRedefine(this, "connRDMATypeOfService",            "0");
    _Config_configMapRedefine(this, "connNetFilterFile",                "");
    _Config_configMapRedefine(this, "connMaxConcurrentAttempts",        "0");
@@ -409,8 +416,20 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "connRDMABufSize") )
          this->connRDMABufSize = StringTk_strToUInt(valueStr);
       else
+      if(!strcmp(keyStr, "connRDMAFragmentSize") )
+         this->connRDMAFragmentSize = StringTk_strToUInt(valueStr);
+      else
       if(!strcmp(keyStr, "connRDMABufNum") )
          this->connRDMABufNum = StringTk_strToUInt(valueStr);
+      else
+      if(!strcmp(keyStr, "connRDMAMetaBufSize") )
+         this->connRDMAMetaBufSize = StringTk_strToUInt(valueStr);
+      else
+      if(!strcmp(keyStr, "connRDMAMetaFragmentSize") )
+         this->connRDMAMetaFragmentSize = StringTk_strToUInt(valueStr);
+      else
+      if(!strcmp(keyStr, "connRDMAMetaBufNum") )
+         this->connRDMAMetaBufNum = StringTk_strToUInt(valueStr);
       else
       if(!strcmp(keyStr, "connNetFilterFile") )
       {
@@ -1102,6 +1121,20 @@ bool __Config_initImplicitVals(Config* this)
    if(!this->tuneUseGlobalAppendLocks)
       this->tuneUseBufferedAppend = false;
 
+   if (this->connRDMABufNum < RDMA_BUFNUM_MIN)
+   {
+      printk_fhgfs(KERN_WARNING, "connRDAMBufNum is too low, setting to %d\n", RDMA_BUFNUM_MIN);
+      this->connRDMABufNum = RDMA_BUFNUM_MIN;
+   }
+
+   if (this->connRDMAFragmentSize == 0)
+   {
+      /* 0 indicates that the fragment size is the same as the buffer size.
+         Thus, there will be no buffer fragmentation.
+      */
+      this->connRDMAFragmentSize = this->connRDMABufSize;
+   }
+
    if (this->connTCPRcvBufSize == 0)
    {
       /* 0 indicates that legacy behavior should be preserved. Legacy behavior used RDMA
@@ -1114,6 +1147,38 @@ bool __Config_initImplicitVals(Config* this)
       /* 0 indicates that legacy behavior should be preserved. Legacy behavior used RDMA
          settings for UDP bufsize. */
       this->connUDPRcvBufSize = this->connRDMABufNum * this->connRDMABufSize;
+   }
+
+   if (this->connRDMABufNum < CONFIG_CONN_RDMA_BUFNUM_MIN)
+   {
+      printk_fhgfs(KERN_WARNING, "connRDMABufNum %u is too low, using %d\n",
+         this->connRDMABufNum, CONFIG_CONN_RDMA_BUFNUM_MIN);
+      this->connRDMABufNum = CONFIG_CONN_RDMA_BUFNUM_MIN;
+   }
+
+   if (this->connRDMAMetaBufSize == 0)
+   {
+      this->connRDMAMetaBufSize = this->connRDMABufSize;
+   }
+
+   if (this->connRDMAMetaBufNum == 0)
+   {
+      this->connRDMAMetaBufNum = this->connRDMABufNum;
+   }
+
+   if (this->connRDMAMetaBufNum < CONFIG_CONN_RDMA_BUFNUM_MIN)
+   {
+      printk_fhgfs(KERN_WARNING, "connRDMAMetaBufNum value %u is too low, using %d\n",
+         this->connRDMAMetaBufNum, CONFIG_CONN_RDMA_BUFNUM_MIN);
+      this->connRDMAMetaBufNum = CONFIG_CONN_RDMA_BUFNUM_MIN;
+   }
+
+   if (this->connRDMAMetaFragmentSize == 0)
+   {
+      /* 0 indicates that the fragment size is the same as the buffer size.
+         Thus, there will be no buffer fragmentation.
+      */
+      this->connRDMAMetaFragmentSize = this->connRDMAMetaBufSize;
    }
 
    // Automatically enable XAttrs if ACLs have been enabled

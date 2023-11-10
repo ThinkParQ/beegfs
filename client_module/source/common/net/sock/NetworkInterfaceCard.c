@@ -289,10 +289,10 @@ void __NIC_filterInterfacesForRDMA(NicAddressList* nicList, NicAddressList* outL
       NicAddress* nicAddr = NicAddressListIter_value(&iter);
       bool bindRes;
 
-      if(!RDMASocket_init(&rdmaSock, &nicAddr->ipAddr, NULL) )
+      if(!RDMASocket_init(&rdmaSock, nicAddr->ipAddr, NULL) )
          continue;
 
-      bindRes = sock->ops->bindToAddr(sock, &nicAddr->ipAddr, 0);
+      bindRes = sock->ops->bindToAddr(sock, nicAddr->ipAddr, 0);
 
       if(bindRes)
       { // we've got an RDMA-capable interface => append it to outList

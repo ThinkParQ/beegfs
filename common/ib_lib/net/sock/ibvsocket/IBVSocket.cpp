@@ -192,10 +192,10 @@ bool IBVSocket_connectByName(IBVSocket* _this, const char* hostname, unsigned sh
    freeaddrinfo(res);
 
 
-   return IBVSocket_connectByIP(_this, &ipaddress, port, commCfg);
+   return IBVSocket_connectByIP(_this, ipaddress, port, commCfg);
 }
 
-bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned short port,
+bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned short port,
    IBVCommConfig* commCfg)
 {
    struct rdma_cm_event* event;
@@ -209,11 +209,12 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
    int oldChannelFlags;
    int setOldFlagsRes;
 
-   LOG(SOCKLIB, DEBUG, "Connect RDMASocket", ("socket", _this), ("ipAddr", Socket::ipaddrToStr(ipaddress)), ("port", port));
+   LOG(SOCKLIB, DEBUG, "Connect RDMASocket", ("socket", _this), ("addr", Socket::endpointAddrToStr(ipaddress, port)),
+      ("bindIP", Socket::ipaddrToStr(_this->bindIP)));
 
    // resolve IP address...
 
-   sin.sin_addr.s_addr = ipaddress->s_addr;
+   sin.sin_addr.s_addr = ipaddress.s_addr;
    sin.sin_family = AF_INET;
    sin.sin_port = htons(port);
 
@@ -417,7 +418,7 @@ bool IBVSocket_bindToAddr(IBVSocket* _this, in_addr_t ipAddr, unsigned short por
    bindAddr.sin_addr.s_addr = ipAddr;
    bindAddr.sin_port = htons(port);
 
-   LOG(SOCKLIB, DEBUG, "Bind RDMASocket", ("socket", _this), ("ipAddr", Socket::ipaddrToStr(ipAddr)), ("port", port));
+   LOG(SOCKLIB, DEBUG, "Bind RDMASocket", ("socket", _this), ("addr", Socket::endpointAddrToStr(ipAddr, port)));
 
    if(rdma_bind_addr(_this->cm_id, (struct sockaddr*)&bindAddr) )
    {
@@ -425,6 +426,8 @@ bool IBVSocket_bindToAddr(IBVSocket* _this, in_addr_t ipAddr, unsigned short por
          //__func__, __LINE__,  (int)port); // debug in
       goto err_invalidateSock;
    }
+
+   _this->bindIP.s_addr = ipAddr;
 
    return true;
 

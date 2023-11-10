@@ -15,7 +15,7 @@ bool GetHostByNameMsgEx::processIncoming(ResponseContext& ctx)
 
    const auto hostIP = SocketTk::getHostByName(hostname);
    if(hostIP)
-      hostAddrStr = Socket::ipaddrToStr(&hostIP.value());
+      hostAddrStr = Socket::ipaddrToStr(hostIP.value());
    else
       LOG(COMMUNICATION, ERR, "Failed to resolve hostname.", hostname,
             ("System error", hostIP.error().message()));

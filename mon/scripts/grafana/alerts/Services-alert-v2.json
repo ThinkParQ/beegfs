@@ -1,0 +1,126 @@
+{
+  "id": 1,
+  "uid": "a96d9b2e-2a6b-4ab3-9858-200da324672f",
+  "orgID": 1,
+  "folderUID": "beegfsalertfolder",
+  "ruleGroup": "evaluate",
+  "title": "Service Alert",
+  "condition": "C",
+  "data": [
+    {
+      "refId": "A",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "${DS_UID}",
+      "model": {
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "query": "from(bucket: \"${BUCKET}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"procstat_lookup\")\r\n  |> filter(fn: (r) => r._field == \"running\")\r\n  |> group(columns: [\"host\", \"systemd_unit\"], mode: \"by\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> keep(columns: [\"_time\", \"_value\", \"host\", \"systemd_unit\"])\r\n  |> sort(columns: [\"_time\"])",
+        "refId": "A"
+      }
+    },
+    {
+      "refId": "B",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "B"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "A",
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "reducer": "last",
+        "refId": "B",
+        "type": "reduce"
+      }
+    },
+    {
+      "refId": "C",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                1
+              ],
+              "type": "lt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "C"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "B",
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "refId": "C",
+        "type": "threshold"
+      }
+    }
+  ],
+  "updated": "2023-10-17T11:33:42Z",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "for": "1m",
+  "annotations": {
+    "description": "BeeGFS Service \"{{ $labels.systemd_unit }}\" is Down , Please check host \"{{ $labels.host }}\"",
+    "summary": "BeeGFS Service \"{{ $labels.systemd_unit }}\" is Down"
+  },
+  "labels": {
+    "service_status": "down"
+  },
+  "isPaused": true
+}

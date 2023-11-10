@@ -92,9 +92,13 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
       }
       else
       { // update heartbeat time of existing node
+         NicAddressList nicList;
+         Node_cloneNicList(*node, &nicList);
          Node_updateLastHeartbeatT(active);
          Node_updateInterfaces(active, Node_getPortUDP(*node), Node_getPortTCP(*node),
-            Node_getNicList(*node) );
+            &nicList);
+         ListTk_kfreeNicAddressListElems(&nicList);
+         NicAddressList_uninit(&nicList);
       }
 
       Node_put(*node);
@@ -529,8 +533,10 @@ void NodeStoreEx_syncNodes(NodeStoreEx* this, NodeList* masterList, NumNodeIDLis
    // set local nic capabilities
    if(appLocalNode)
    {
-      NicAddressList* localNicList = Node_getNicList(appLocalNode);
-      NIC_supportedCapabilities(localNicList, &localNicCaps);
+      NodeConnPool* connPool = Node_getConnPool(appLocalNode);
+      NodeConnPool_lock(connPool);
+      NIC_supportedCapabilities(NodeConnPool_getNicListLocked(connPool), &localNicCaps);
+      NodeConnPool_unlock(connPool);
    }
 
    // add nodes

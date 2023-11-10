@@ -24,13 +24,15 @@
 class Socket : public Channel
 {
    public:
+
+      static std::string ipaddrToStr(in_addr_t addr);
+      static std::string ipaddrToStr(struct in_addr ipaddress);
+      static std::string endpointAddrToStr(struct in_addr ipaddress, unsigned short port);
+      static std::string endpointAddrToStr(in_addr_t ipaddress, unsigned short port);
+      static std::string endpointAddrToStr(const char* hostname, unsigned short port);
+      static std::string endpointAddrToStr(const struct sockaddr_in* sin);
+
       virtual ~Socket();
-
-      static std::string ipaddrToStr(const struct in_addr* ipaddress);
-      static std::string ipaddrToStr(uint32_t addr);
-      static std::string endpointAddrToString(struct in_addr* ipaddress, unsigned short port);
-      static std::string endpointAddrToString(const char* hostname, unsigned short port);
-
       virtual void connect(const char* hostname, unsigned short port) = 0;
       virtual void connect(const struct sockaddr* serv_addr, socklen_t addrlen) = 0;
       virtual void bindToAddr(in_addr_t ipAddr, unsigned short port) = 0;
@@ -182,5 +184,6 @@ class Socket : public Channel
       }
 
 };
+
 
 #endif /*SOCKET_H_*/

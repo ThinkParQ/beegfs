@@ -1,0 +1,12 @@
+{
+        "uid": "d5c51f44-07d047ca-a580-5a66f643e",
+        "name": "beegfs-email",
+        "type": "email",
+        "settings": {
+            "addresses": "beegfsalert@example.com",
+	    "message": "{{ template \"beegfs.message\" . }}",
+            "singleEmail": false,
+	    "subject": "{{ template \"beegfs.title\" . }}"
+        },
+        "disableResolveMessage": false
+}

@@ -44,6 +44,7 @@ SOURCES := \
    common/net/sock/Socket.c \
    common/net/sock/NicAddress.c \
    common/net/sock/NetworkInterfaceCard.c \
+   common/net/sock/NicAddressList.c \
    common/net/sock/RDMASocket.c \
    common/net/sock/ibv/IBVSocket.c \
    common/net/sock/ibv/IBVBuffer.c \

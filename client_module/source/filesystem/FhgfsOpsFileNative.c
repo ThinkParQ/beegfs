@@ -169,8 +169,14 @@ static int beegfs_release_range(struct file* filp, loff_t first, loff_t last)
    int writeRes;
 
    // expand range to fit full pages
-   first &= ~PAGE_MASK;
-   last |= PAGE_MASK;
+   first &= PAGE_MASK;
+   last |= ~PAGE_MASK;
+
+   if (unlikely(last == -1))
+   {
+      printk_fhgfs(KERN_DEBUG, "range end given was -1");
+      last = LLONG_MAX;
+   }
 
    clear_bit(AS_EIO, &filp->f_mapping->flags);
 
@@ -194,8 +200,18 @@ static int beegfs_acquire_range(struct file* filp, loff_t first, loff_t last)
    int err;
 
    // expand range to fit full pages
-   first &= ~PAGE_MASK;
-   last |= PAGE_MASK;
+   first &= PAGE_MASK;
+   last |= ~PAGE_MASK;
+
+   if (unlikely(last == -1))
+   {
+      printk_fhgfs(KERN_DEBUG, "range end given was -1");
+      last = LLONG_MAX; // In linux-6.2, checks for the bytes offset i.e., (end_byte < start_byte)
+                        // moved from __filemap_fdatawrite_range() to the interface
+                        // file[map]_write_and_wait_range() in order to provide consistent
+                        // behaviour between write and wait.
+   }
+
 
    err = beegfs_release_range(filp, first, last);
    if(err)
@@ -252,7 +268,7 @@ static int beegfs_open(struct inode* inode, struct file* filp)
       AtomicInt_inc(&fhgfsInode->appendFDsOpen);
 
    if (mustAcquire)
-      err = beegfs_acquire_range(filp, 0, -1);
+      err = beegfs_acquire_range(filp, 0, LLONG_MAX);
 
    return err;
 }
@@ -282,7 +298,7 @@ static int beegfs_flush(struct file* filp, fl_owner_t id)
     * between modifiers and flushers, which is prohibitively expensive. */
    atomic_set(&inode->modified, 0);
 
-   result = beegfs_release_range(filp, 0, -1);
+   result = beegfs_release_range(filp, 0, LLONG_MAX);
    if (result < 0)
    {
       atomic_set(&inode->modified, 1);
@@ -318,7 +334,7 @@ static int beegfs_release(struct inode* inode, struct file* filp)
    // flush entire contents of file, if this fails, a previous release operation has likely also
    // failed. the only sensible thing to do then is to drop the entire cache (because we may be
    // arbitrarily inconsistent with the rest of the world and would never know).
-   flushRes = beegfs_release_range(filp, 0, -1);
+   flushRes = beegfs_release_range(filp, 0, LLONG_MAX);
 
    if(flushRes < 0)
       beegfs_drop_all_caches(inode);
@@ -638,11 +654,11 @@ static int beegfs_flock(struct file* filp, int cmd, struct file_lock* flock)
    {
       case F_RDLCK:
       case F_WRLCK:
-         err = beegfs_acquire_range(filp, 0, -1);
+         err = beegfs_acquire_range(filp, 0, LLONG_MAX);
          break;
 
       case F_UNLCK:
-         err = beegfs_release_range(filp, 0, -1);
+         err = beegfs_release_range(filp, 0, LLONG_MAX);
          break;
    }
 
@@ -686,7 +702,7 @@ static int beegfs_mmap(struct file* filp, struct vm_area_struct* vma)
    FhgfsOpsHelper_logOp(5, app, file_dentry(filp), file_inode(filp), __func__);
    IGNORE_UNUSED_VARIABLE(app);
 
-   err = beegfs_acquire_range(filp, 0, -1);
+   err = beegfs_acquire_range(filp, 0, LLONG_MAX);
    if(err)
       return err;
 

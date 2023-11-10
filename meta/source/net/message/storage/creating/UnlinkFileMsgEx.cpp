@@ -21,7 +21,8 @@ std::tuple<HashDirLock, FileIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx:
    // exclude concurrent actions on the same inode. if we cannot look up a file inode for the
    // dentry, nothing bad happens.
    MetaStore* metaStore = Program::getApp()->getMetaStore();
-   auto dir = metaStore->referenceDir(getParentInfo()->getEntryID(), true, false);
+   auto dir = metaStore->referenceDir(getParentInfo()->getEntryID(),
+                  getParentInfo()->getIsBuddyMirrored(), false);
 
    DirEntry dentry(getDelFileName());
    bool dentryExists = dir->getFileDentry(getDelFileName(), dentry);
@@ -68,6 +69,7 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
 {
    const char* logContext = "Unlink File Msg";
    App* app = Program::getApp();
+   FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
    MetaStore* metaStore = app->getMetaStore();
    EntryInfo delFileInfo;
 
@@ -102,7 +104,6 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
    else
    {
       // file's inode is on some different node/buddy-group
-      FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
       // reference parent dir again
       DirInode* parentDir = metaStore->referenceDir(getParentInfo()->getEntryID(),
@@ -111,14 +112,14 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
          return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
       // dirEntry already loaded before - now remove it
-      FhgfsOpsErr unlinkDentryRes = parentDir->unlinkDirEntry(getDelFileName(),
-         &dentryToRemove, DirEntry_UNLINK_FILENAME);
+      retVal = parentDir->unlinkDirEntry(getDelFileName(), &dentryToRemove,
+                  DirEntry_UNLINK_FILENAME);
 
       // release dir
       metaStore->releaseDir(parentDir->getID());
 
-      if (unlinkDentryRes != FhgfsOpsErr_SUCCESS)
-         return boost::make_unique<ResponseState>(unlinkDentryRes);
+      if (retVal != FhgfsOpsErr_SUCCESS)
+         return boost::make_unique<ResponseState>(retVal);
 
       if (!isSecondary)
       {
@@ -143,7 +144,6 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
                   "Communication with metadata server failed. "
                   "nodeID: " + ownerNodeID.str() + "; " +
                   "entryID: " + fileInfo.getEntryID().c_str());
-               retVal = resp;
                break;
             }
 
@@ -153,16 +153,17 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
             if (res != FhgfsOpsErr_SUCCESS)
             {
                // error: either inode file doesn't exists or some other error happened
-               LogContext(logContext).logErr("unlink file inode failed! "
+               LogContext(logContext).log(Log_WARNING, "unlink file inode failed! "
                   "nodeID: " + ownerNodeID.str() + "; " +
                   "entryID: " + fileInfo.getEntryID().c_str());
-
-               retVal = res;
                break;
             }
 
-            // success
-            retVal = res;
+            // since dentry has been removed successfully so all good for user - no need
+            // to return an error if unlinking remote inode fails due to some reasons.
+            // we still need to remove dentry from secondary buddy so should not overwrite
+            // local dentry removal success with some remote error
+            retVal = FhgfsOpsErr_SUCCESS;
          } while (false);
       }
 

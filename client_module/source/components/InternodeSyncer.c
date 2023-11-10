@@ -156,6 +156,7 @@ void _InternodeSyncer_requestLoop(InternodeSyncer* this)
    const unsigned idleDisconnectIntervalMS = 70*60*1000; /* 70 minutes (must be
       less than half the server-side streamlis idle disconnect interval to avoid
       server disconnecting first) */
+   const unsigned checkNetworkIntervalMS = 60*1000; // 1 minute
 
    Time lastMgmtInitT;
    Time lastReregisterT;
@@ -164,6 +165,7 @@ void _InternodeSyncer_requestLoop(InternodeSyncer* this)
    Time lastDelayedOpsT;
    Time lastIdleDisconnectT;
    Time lastTargetStatesUpdateT;
+   Time lastCheckNetworkT;
 
    Thread* thisThread = (Thread*)this;
 
@@ -174,6 +176,7 @@ void _InternodeSyncer_requestLoop(InternodeSyncer* this)
    Time_init(&lastDelayedOpsT);
    Time_init(&lastIdleDisconnectT);
    Time_init(&lastTargetStatesUpdateT);
+   Time_init(&lastCheckNetworkT);
 
    while(!_Thread_waitForSelfTerminateOrder(thisThread, sleepTimeMS) )
    {
@@ -194,6 +197,14 @@ void _InternodeSyncer_requestLoop(InternodeSyncer* this)
       }
 
       // everything below only happens after successful management init...
+
+      // check for NIC changes
+      if(Time_elapsedMS(&lastCheckNetworkT) > checkNetworkIntervalMS)
+      {
+         if (__InternodeSyncer_checkNetwork(this))
+            Time_setZero(&lastReregisterT);
+         Time_setToNow(&lastCheckNetworkT);
+      }
 
       // re-register
       if(Time_elapsedMS(&lastReregisterT) > reregisterIntervalMS)
@@ -385,20 +396,25 @@ bool __InternodeSyncer_registerNode(InternodeSyncer* this)
    const char* localNodeID = Node_getID(localNode);
    NumNodeID localNodeNumID = Node_getNumID(localNode);
    NumNodeID newLocalNodeNumID;
-   NicAddressList* nicList = Node_getNicList(localNode);
+   NicAddressList nicList;
 
    RegisterNodeMsg msg;
    char* respBuf;
    NetMessage* respMsg;
    FhgfsOpsErr requestRes;
    RegisterNodeRespMsg* registerResp;
+   bool result;
 
+   Node_cloneNicList(localNode, &nicList);
    mgmtNode = NodeStoreEx_referenceFirstNode(this->mgmtNodes);
    if(!mgmtNode)
-      return false;
+   {
+      result = false;
+      goto exit;
+   }
 
    RegisterNodeMsg_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client,
-      nicList, Config_getConnClientPortUDP(this->cfg));
+      &nicList, Config_getConnClientPortUDP(this->cfg));
 
    // connect & communicate
    requestRes = MessagingTk_requestResponse(this->app, mgmtNode,
@@ -443,7 +459,37 @@ cleanup_request:
       registrationFailureLogged = true;
    }
 
-   return this->nodeRegistered;
+   result = this->nodeRegistered;
+
+exit:
+
+   ListTk_kfreeNicAddressListElems(&nicList);
+   NicAddressList_uninit(&nicList);
+
+   return result;
+}
+
+bool __InternodeSyncer_checkNetwork(InternodeSyncer* this)
+{
+   Logger* log = App_getLogger(this->app);
+   NicAddressList newNicList;
+   NodeConnPool* connPool = Node_getConnPool(App_getLocalNode(this->app));
+   bool result = false;
+
+   if (App_findAllowedInterfaces(this->app, &newNicList))
+   {
+      NodeConnPool_lock(connPool);
+      result = !NicAddressList_equals(&newNicList, NodeConnPool_getNicListLocked(connPool));
+      NodeConnPool_unlock(connPool);
+      if (result)
+      {
+         Logger_log(log, Log_NOTICE, "checkNetwork", "Local interfaces have changed.");
+         App_updateLocalInterfaces(this->app, &newNicList);
+      }
+      ListTk_kfreeNicAddressListElems(&newNicList);
+      NicAddressList_uninit(&newNicList);
+   }
+   return result;
 }
 
 /**
@@ -457,20 +503,28 @@ void __InternodeSyncer_reregisterNode(InternodeSyncer* this)
    Node* localNode = App_getLocalNode(this->app);
    const char* localNodeID = Node_getID(localNode);
    NumNodeID localNodeNumID = Node_getNumID(localNode);
-   NicAddressList* nicList = Node_getNicList(localNode);
+   NicAddressList nicList;
 
    HeartbeatMsgEx msg;
 
+   Node_cloneNicList(localNode, &nicList);
+
    mgmtNode = NodeStoreEx_referenceFirstNode(this->mgmtNodes);
    if(!mgmtNode)
-      return;
+      goto exit;
 
-   HeartbeatMsgEx_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client, nicList);
+   HeartbeatMsgEx_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client, &nicList);
    HeartbeatMsgEx_setPorts(&msg, Config_getConnClientPortUDP(this->cfg), 0);
 
    DatagramListener_sendMsgToNode(this->dgramLis, mgmtNode, (NetMessage*)&msg);
 
    Node_put(mgmtNode);
+
+exit:
+
+   ListTk_kfreeNicAddressListElems(&nicList);
+   NicAddressList_uninit(&nicList);
+
 }
 
 /**

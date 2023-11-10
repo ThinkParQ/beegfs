@@ -290,7 +290,7 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
    if (Config_getSysXAttrsEnabled(cfg ) )
       sb->s_xattr = fhgfs_xattr_handlers_noacl; // handle only user xattrs
 
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_HAS_GET_ACL
    if (Config_getSysACLsEnabled(cfg) )
    {
       sb->s_xattr = fhgfs_xattr_handlers; // replace with acl-capable xattr handlers
@@ -300,7 +300,7 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
       sb->s_flags |= MS_POSIXACL;
 #endif
    }
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
 
    /* MS_ACTIVE is rather important as it marks the super block being successfully initialized and
     * allows the vfs to keep important inodes in the cache. However, it seems it is already

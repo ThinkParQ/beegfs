@@ -464,10 +464,10 @@ int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* value, 
    return 0;
 }
 
-#ifdef KERNEL_HAS_POSIX_GET_ACL
-#ifdef KERNEL_POSIX_GET_ACL_HAS_RCU
+#ifdef KERNEL_HAS_GET_ACL
+#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
 struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rcu)
-#else // KERNEL_POSIX_GET_ACL_HAS_RCU
+#else
 struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
 #endif // KERNEL_POSIX_GET_ACL_HAS_RCU
 {
@@ -484,7 +484,7 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
 
    int refreshRes;
 
-#ifdef KERNEL_POSIX_GET_ACL_HAS_RCU
+#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
    if (rcu)
       return ERR_PTR(-ECHILD);
 #endif // KERNEL_POSIX_GET_ACL_HAS_RCU
@@ -545,22 +545,32 @@ cleanup:
    kfree(xAttrBuf);
    return res;
 }
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
 
 #if defined(KERNEL_HAS_SET_ACL)
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
 extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* inode,
    struct posix_acl* acl, int type)
+{
 #else // KERNEL_HAS_IDMAPPED_MOUNTS
 extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
 {
+#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#elif defined(KERNEL_HAS_SET_DENTRY_ACL)
+extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct dentry* dentry,
+   struct posix_acl* acl, int type)
+{
+   struct inode* inode =  d_inode(dentry);
+#endif
    App* app = FhgfsOps_getApp(inode->i_sb);
    int res;
    FhgfsOpsErr remotingRes;
    char* xAttrName;
    int xAttrBufLen;
    void* xAttrBuf = NULL;
+
+#ifdef KERNEL_HAS_SET_DENTRY_ACL
+#endif
 
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
@@ -570,7 +580,34 @@ extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type
       return refreshRes;
 
    if (type == ACL_TYPE_ACCESS)
+   {
+#ifdef KERNEL_HAS_SET_DENTRY_ACL
+      if (acl)
+      {
+         int ret = 0;
+         struct iattr iattr;
+         int setAttrRes;
+
+         memset(&iattr, 0, sizeof iattr);
+
+         /* Update the file mode when setting an ACL: compute the new file permission
+          * bits based on the ACL.
+          */
+         ret = posix_acl_update_mode(&init_user_ns, inode, &iattr.ia_mode, &acl);
+         if (ret)
+            return ret;
+
+         if (inode->i_mode != iattr.ia_mode)
+         {
+            iattr.ia_valid = ATTR_MODE; //update the file mode permission bit
+            setAttrRes = FhgfsOps_setattr(&init_user_ns, dentry, &iattr);
+            if(setAttrRes < 0)
+               return setAttrRes;
+         }
+      }
+#endif //KERNEL_HAS_SET_DENTRY_ACL
       xAttrName = XATTR_NAME_POSIX_ACL_ACCESS;
+   }
    else if (type == ACL_TYPE_DEFAULT)
       xAttrName = XATTR_NAME_POSIX_ACL_DEFAULT;
    else
@@ -619,15 +656,14 @@ cleanup:
 
    return res;
 }
-#endif // KERNEL_HAS_SET_ACL
 
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_HAS_GET_ACL
 /**
  * Update the ACL of an inode after a chmod
  */
 int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry)
 {
-#ifdef KERNEL_HAS_SET_ACL
+#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_DENTRY_ACL)
    if (iattr->ia_valid & ATTR_MODE)
       return os_posix_acl_chmod(dentry->d_inode, iattr->ia_mode);
    else
@@ -688,7 +724,7 @@ cleanup:
    return res;
 #endif //  LINUX_VERSION_CODE >= KERNEL_VERSION(3,14,0)
 }
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
 
 /**
  * @return 0 on success, negative linux error code otherwise
@@ -787,10 +823,10 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
       {
          FhgfsOps_newAttrToInode(iattr, inode);
 
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_HAS_GET_ACL
          if (Config_getSysACLsEnabled(cfg) )
             FhgfsOps_aclChmod(iattr, dentry);
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
       }
 
       // all right so far => handle truncation

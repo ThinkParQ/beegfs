@@ -6,7 +6,6 @@
 #include <rdma/rdma_cm.h>
 #include <rdma/ib_cm.h>
 #include <common/net/sock/RDMASocket.h>
-#include <common/net/sock/ibv/IBVSocket.h>
 #include "Nvfs.h"
 #include "RdmaInfo.h"
 
@@ -302,9 +301,10 @@ static RdmaInfo * RdmaInfo_map(const struct iov_iter *iter, Socket *socket,
    // Coalesce the scatterlist.
    //
    dma_count = RdmaInfo_coalesceSglist(sglist, dmalist, count);
-   if (unlikely(dma_count >= RDMA_MAX_DMA_COUNT))
+   if (unlikely(dma_count > RDMA_MAX_DMA_COUNT))
    {
-      printk_fhgfs(KERN_ERR, "%s: too many DMA elements\n", __func__);
+      printk_fhgfs(KERN_ERR, "%s: too many DMA elements count=%d max=%d\n", __func__,
+         dma_count, RDMA_MAX_DMA_COUNT);
       status = -EIO;
       goto error_return;
    }

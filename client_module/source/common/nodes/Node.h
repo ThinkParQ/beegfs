@@ -22,9 +22,11 @@ typedef struct Node Node;
 
 
 extern void Node_init(Node* this, struct App* app, const char* nodeID, NumNodeID nodeNumID,
-   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList);
+   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList,
+   NicAddressList* localRdmaNicList);
 extern Node* Node_construct(struct App* app, const char* nodeID, NumNodeID nodeNumID,
-   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList);
+   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList,
+   NicAddressList* localRdmaNicList);
 extern void Node_uninit(Node* this);
 extern void __Node_destruct(Node* this);
 
@@ -41,7 +43,9 @@ extern const char* Node_nodeTypeToStr(NodeType nodeType);
 static inline char* Node_getID(Node* this);
 static inline NumNodeID Node_getNumID(Node* this);
 static inline void Node_setNumID(Node* this, const NumNodeID numID);
-static inline NicAddressList* Node_getNicList(Node* this);
+static inline void Node_cloneNicList(Node* this, NicAddressList* nicList);
+static inline void Node_updateLocalInterfaces(Node* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps, NicAddressList* localRdmaNicList);
 static inline NodeConnPool* Node_getConnPool(Node* this);
 static inline void Node_setIsActive(Node* this, bool isActive);
 static inline bool Node_getIsActive(Node* this);
@@ -114,9 +118,26 @@ void Node_setNumID(Node* this, const NumNodeID numID)
    this->numID = numID;
 }
 
-NicAddressList* Node_getNicList(Node* this)
+/**
+ * Retrieve NICs for the node.
+ *
+ * @param nicList an uninitialized NicAddressList. Caller is responsible for
+ *        memory management.
+ */
+void Node_cloneNicList(Node* this, NicAddressList* nicList)
 {
-   return NodeConnPool_getNicList(this->connPool);
+   NodeConnPool_cloneNicList(this->connPool, nicList);
+}
+
+/**
+ * @param localNicList copied
+ * @param localNicCaps copied
+ * @param localRdmaNicList copied
+ */
+void Node_updateLocalInterfaces(Node* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps, NicAddressList* localRdmaNicList)
+{
+   NodeConnPool_updateLocalInterfaces(this->connPool, localNicList, localNicCaps, localRdmaNicList);
 }
 
 NodeConnPool* Node_getConnPool(Node* this)

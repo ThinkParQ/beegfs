@@ -47,7 +47,7 @@ bool __LockGrantedMsgEx_processIncoming(NetMessage* this, struct App* app,
       const char* peer;
 
       peer = fromAddr ?
-         SocketTk_ipaddrToStr(&fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
+         SocketTk_ipaddrToStr(fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
       LOG_DEBUG_FORMATTED(log, Log_DEBUG, logContext, "Received a AckMsg from: %s", peer);
 
       kfree(peer);

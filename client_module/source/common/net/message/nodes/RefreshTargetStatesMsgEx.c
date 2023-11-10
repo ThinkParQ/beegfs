@@ -38,7 +38,7 @@ bool __RefreshTargetStatesMsgEx_processIncoming(NetMessage* this, struct App* ap
    InternodeSyncer_setForceTargetStatesUpdate(internodeSyncer);
 
    peer = fromAddr ?
-      SocketTk_ipaddrToStr(&fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
+      SocketTk_ipaddrToStr(fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
    LOG_DEBUG_FORMATTED(log, 4, logContext, "Received a RefreshTargetStatesMsg from: %s", peer);
    kfree(peer);
 

@@ -5,9 +5,11 @@
  * @param portUDP value 0 if undefined
  * @param portTCP value 0 if undefined
  * @param nicList an internal copy will be created
+ * @param localRdmaNicList an internal copy will be created
  */
 void Node_init(Node* this, struct App* app, const char* nodeID, NumNodeID nodeNumID,
-   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList)
+   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList,
+   NicAddressList* localRdmaNicList)
 {
    Mutex_init(&this->mutex);
    Condition_init(&this->changeCond);
@@ -23,18 +25,20 @@ void Node_init(Node* this, struct App* app, const char* nodeID, NumNodeID nodeNu
 
    this->portUDP = portUDP;
 
-   this->connPool = NodeConnPool_construct(app, this, portTCP, nicList);
+   this->connPool = NodeConnPool_construct(app, this, portTCP, nicList, localRdmaNicList);
 }
 
 /**
  * @param nicList an internal copy will be created
+ * @param localRdmaNicList an internal copy will be created
  */
 Node* Node_construct(struct App* app, const char* nodeID, NumNodeID nodeNumID,
-   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList)
+   unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList,
+   NicAddressList* localRdmaNicList)
 {
    Node* this = (Node*)os_kmalloc(sizeof(*this) );
 
-   Node_init(this, app, nodeID, nodeNumID, portUDP, portTCP, nicList);
+   Node_init(this, app, nodeID, nodeNumID, portUDP, portTCP, nicList, localRdmaNicList);
 
    return this;
 }

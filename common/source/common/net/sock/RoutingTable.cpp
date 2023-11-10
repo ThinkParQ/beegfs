@@ -293,7 +293,7 @@ bool RoutingTable::findSource(const Destnet* dn, const NicAddressList& nicList, 
    //log.log(Log_DEBUG, dn->dump());
    for (auto& s : nicList)
    {
-      //log.log(Log_ERR, std::string("try ") + Socket::ipaddrToStr(&s.ipAddr));
+      //log.log(Log_ERR, std::string("try ") + Socket::ipaddrToStr(s.ipAddr));
       if (dn->hasSource(s.ipAddr))
       {
          addr = s.ipAddr;

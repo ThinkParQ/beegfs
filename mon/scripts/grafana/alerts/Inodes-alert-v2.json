@@ -1,0 +1,125 @@
+{
+  "id": 4,
+  "uid": "be096d59-9dc4-4821-9530-8447e7261d9c",
+  "orgID": 1,
+  "folderUID": "beegfsalertfolder",
+  "ruleGroup": "evaluate",
+  "title": "Inodes Alert",
+  "condition": "C",
+  "data": [
+    {
+      "refId": "A",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "${DS_UID}",
+      "model": {
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "query": "from(bucket: \"${BUCKET}\")\r\n |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n |> filter(fn: (r) => r[\"_measurement\"] == \"storageTargets\")\r\n |> filter(fn: (r) =>    r._field == \"inodesTotal\" or r._field == \"inodesFree\")\r\n |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n |> map(fn: (r) => ({ r with _value:(r.inodesFree/ r.inodesTotal) * 100.0 }))\r\n |> rename(columns: {_value: \"InodesFreePercent\"})\r\n |> drop(columns:[\"_start\",\"_stop\",\"_measurement\",\"inodesFree\",\"inodesTotal\"])",
+        "refId": "A"
+      }
+    },
+    {
+      "refId": "B",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "B"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "A",
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "reducer": "last",
+        "refId": "B",
+        "type": "reduce"
+      }
+    },
+    {
+      "refId": "C",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                0,
+                0
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": []
+            },
+            "reducer": {
+              "params": [],
+              "type": "avg"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "name": "Expression",
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "$B < 20",
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "refId": "C",
+        "type": "math"
+      }
+    }
+  ],
+  "updated": "2023-10-16T18:16:45Z",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "for": "10m",
+  "annotations": {
+    "description": "Please check, as the free inodes for Storage Target ID '{{ $labels.storageTargetID }}' are only at {{ humanize $values.B.Value }}%.",
+    "summary": "BeeGFS Storage Target Inodes are below the threshold."
+  },
+  "labels": {
+    "inodes": "free"
+  },
+  "isPaused": true
+}

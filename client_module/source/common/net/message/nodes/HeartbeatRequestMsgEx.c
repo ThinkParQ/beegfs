@@ -23,15 +23,15 @@ bool __HeartbeatRequestMsgEx_processIncoming(NetMessage* this, struct App* app,
    Node* localNode = App_getLocalNode(app);
    const char* localNodeID = Node_getID(localNode);
    NumNodeID localNodeNumID = Node_getNumID(localNode);
-   NicAddressList* nicList = Node_getNicList(localNode);
+   NicAddressList nicList;
 
    HeartbeatMsgEx hbMsg;
    unsigned respLen;
    bool serializeRes;
    ssize_t sendRes;
 
-
-   HeartbeatMsgEx_initFromNodeData(&hbMsg, localNodeID, localNodeNumID, NODETYPE_Client, nicList);
+   Node_cloneNicList(localNode, &nicList);
+   HeartbeatMsgEx_initFromNodeData(&hbMsg, localNodeID, localNodeNumID, NODETYPE_Client, &nicList);
    HeartbeatMsgEx_setPorts(&hbMsg, Config_getConnClientPortUDP(cfg), 0);
 
    respLen = NetMessage_getMsgLength( (NetMessage*)&hbMsg);
@@ -54,6 +54,10 @@ bool __HeartbeatRequestMsgEx_processIncoming(NetMessage* this, struct App* app,
       Logger_logErrFormatted(log, logContext, "Send error. ErrCode: %lld", (long long)sendRes);
 
 err_uninit:
+
+   ListTk_kfreeNicAddressListElems(&nicList);
+   NicAddressList_uninit(&nicList);
+
    return true;
 }
 

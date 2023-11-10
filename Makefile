@@ -3,9 +3,14 @@ export BEEGFS_DEBUG
 export USER_CXXFLAGS
 export USER_LDFLAGS
 export BEEGFS_DEBUG_RDMA
+export BEEGFS_DEBUG_IP
 
 export KDIR
 export KSRCDIR
+
+# Tell makefiles that this is a development build. Don't use config files in /etc/beegfs.
+BEEGFS_DEV_BUILD=1
+export BEEGFS_DEV_BUILD
 
 BEEGFS_THIRDPARTY_OPTIONAL =
 export BEEGFS_THIRDPARTY_OPTIONAL

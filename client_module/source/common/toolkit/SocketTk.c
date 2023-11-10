@@ -221,44 +221,46 @@ struct in_addr SocketTk_in_aton(const char* hostAddr)
 }
 
 /**
- * @return string is kalloced and needs to be kfreed
+ * @param buf the buffer to which <IP> should be written.
  */
-char* SocketTk_ipaddrToStr(struct in_addr* ipaddress)
+void SocketTk_ipaddrToStrNoAlloc(struct in_addr ipaddress, char* ipStr, size_t ipStrLen)
 {
-   u8* charIP = (u8*)&ipaddress->s_addr;
-
-   const size_t ipStrLen = 16;
-   char* ipStr = (char*)os_kmalloc(ipStrLen);
-
-   sprintf(ipStr, "%u.%u.%u.%u", charIP[0], charIP[1], charIP[2], charIP[3]);
-
-   return ipStr;
+   int printRes = snprintf(ipStr, ipStrLen, "%pI4", &ipaddress);
+   if(unlikely( (size_t)printRes >= ipStrLen) )
+      ipStr[ipStrLen-1] = 0; // ipStrLen exceeded => zero-terminate result
 }
 
 /**
  * @return string is kalloced and needs to be kfreed
  */
-char* SocketTk_endpointAddrToString(struct in_addr* ipaddress, unsigned short port)
+char* SocketTk_ipaddrToStr(struct in_addr ipaddress)
 {
-   char* endpointStr = (char*)os_kmalloc(SOCKETTK_ENDPOINTSTR_LEN);
-
-   SocketTk_endpointAddrToStringNoAlloc(endpointStr, SOCKETTK_ENDPOINTSTR_LEN, ipaddress, port);
-
-   return endpointStr;
+   char* ipStr = os_kmalloc(SOCKETTK_IPADDRSTR_LEN);
+   if (likely(ipStr != NULL))
+      SocketTk_ipaddrToStrNoAlloc(ipaddress, ipStr, SOCKETTK_IPADDRSTR_LEN);
+   return ipStr;
 }
 
 /**
  * @param buf the buffer to which <IP>:<port> should be written.
  */
-void SocketTk_endpointAddrToStringNoAlloc(char* buf, unsigned bufLen, struct in_addr* ipaddress,
+void SocketTk_endpointAddrToStrNoAlloc(char* buf, size_t bufLen, struct in_addr ipaddress,
    unsigned short port)
 {
-   u8* charIP = (u8*)&ipaddress->s_addr;
-
-   int printRes = snprintf(buf, bufLen, "%u.%u.%u.%u:%u",
-      charIP[0], charIP[1], charIP[2], charIP[3], port);
-
+   int printRes = snprintf(buf, bufLen, "%pI4:%u", &ipaddress, port);
    if(unlikely( (unsigned)printRes >= bufLen) )
       buf[bufLen-1] = 0; // bufLen exceeded => zero-terminate result
 }
+
+/**
+ * @return string is kalloced and needs to be kfreed
+ */
+char* SocketTk_endpointAddrToStr(struct in_addr ipaddress, unsigned short port)
+{
+   char* endpointStr = os_kmalloc(SOCKETTK_ENDPOINTSTR_LEN);
+   if (likely(endpointStr != NULL))
+      SocketTk_endpointAddrToStrNoAlloc(endpointStr, SOCKETTK_ENDPOINTSTR_LEN, ipaddress, port);
+   return endpointStr;
+}
+
 

@@ -30,9 +30,9 @@ typedef struct NodeConnPool NodeConnPool;
 
 
 extern void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentNode,
-   unsigned short streamPort, NicAddressList* nicList);
+   unsigned short streamPort, NicAddressList* nicList, NicAddressList* localRdmaNicList);
 extern NodeConnPool* NodeConnPool_construct(struct App* app, struct Node* parentNode,
-   unsigned short streamPort, NicAddressList* nicList);
+   unsigned short streamPort, NicAddressList* nicList, NicAddressList* localRdmaNicList);
 extern void NodeConnPool_uninit(NodeConnPool* this);
 extern void NodeConnPool_destruct(NodeConnPool* this);
 
@@ -72,8 +72,26 @@ extern void NodeConnPool_getStats(NodeConnPool* this, NodeConnPoolStats* outStat
 extern unsigned NodeConnPool_getFirstPeerName(NodeConnPool* this, NicAddrType_t nicType,
    ssize_t outBufLen, char* outBuf, bool* outIsNonPrimary);
 
+/**
+ * @param localNicList copied
+ * @param localNicCaps copied
+ * @param localRdmaNicList copied
+ */
+extern void NodeConnPool_updateLocalInterfaces(NodeConnPool* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps, NicAddressList* localRdmaNicList);
+
 // getters & setters
-static inline NicAddressList* NodeConnPool_getNicList(NodeConnPool* this);
+/**
+ * Called to lock the internal mute when accessing resources that may be
+ * modified by other threads. Case in point: NodeConnPool_getNicListLocked.
+ */
+static inline void NodeConnPool_lock(NodeConnPool* this);
+/**
+ * Release the lock acquired by NodeConnPool_lock.
+ */
+static inline void NodeConnPool_unlock(NodeConnPool* this);
+static inline void NodeConnPool_cloneNicList(NodeConnPool* this, NicAddressList* nicList);
+static inline NicAddressList* NodeConnPool_getNicListLocked(NodeConnPool* this);
 static inline void NodeConnPool_setLocalNicCaps(NodeConnPool* this,
    NicListCapabilities* localNicCaps);
 static inline unsigned short NodeConnPool_getStreamPort(NodeConnPool* this);
@@ -111,8 +129,8 @@ struct NodeConnPool
 
    NicAddressList nicList;
 
+   NicAddressList localRdmaNicList;
    NicAddressStatsList rdmaNicStatsList;
-   NicAddressStatsList rdmaNicStatsRetryList;
 
    ConnectionList connList;
 
@@ -138,10 +156,35 @@ struct NodeConnPool
    struct semaphore connSemaphore;
 };
 
+void NodeConnPool_lock(NodeConnPool* this)
+{
+   Mutex_lock(&this->mutex); // L O C K
+}
 
-NicAddressList* NodeConnPool_getNicList(NodeConnPool* this)
+void NodeConnPool_unlock(NodeConnPool* this)
+{
+   Mutex_unlock(&this->mutex); // U N L O C K
+}
+
+/**
+ * Mutex lock must be held while using the returned pointer.
+ */
+NicAddressList* NodeConnPool_getNicListLocked(NodeConnPool* this)
 {
    return &this->nicList;
+}
+
+/**
+ * Retrieve NICs for the connection pool.
+ *
+ * @param nicList an uninitialized NicAddressList. Caller is responsible for
+ *        memory management.
+ */
+void NodeConnPool_cloneNicList(NodeConnPool* this, NicAddressList* nicList)
+{
+   Mutex_lock(&this->mutex); // L O C K
+   ListTk_cloneNicAddressList(&this->nicList, nicList, true);
+   Mutex_unlock(&this->mutex); // U N L O C K
 }
 
 /**
@@ -149,7 +192,9 @@ NicAddressList* NodeConnPool_getNicList(NodeConnPool* this)
  */
 void NodeConnPool_setLocalNicCaps(NodeConnPool* this, NicListCapabilities* localNicCaps)
 {
+   Mutex_lock(&this->mutex); // L O C K
    this->localNicCaps = *localNicCaps;
+   Mutex_unlock(&this->mutex); // U N L O C K
 }
 
 unsigned short NodeConnPool_getStreamPort(NodeConnPool* this)

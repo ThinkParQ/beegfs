@@ -23,7 +23,7 @@
  * @param nicList an internal copy will be created.
  */
 void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentNode,
-   unsigned short streamPort, NicAddressList* nicList)
+   unsigned short streamPort, NicAddressList* nicList, NicAddressList* localRdmaNicList)
 {
    Config* cfg = App_getConfig(app);
 
@@ -35,6 +35,10 @@ void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentN
    ConnectionList_init(&this->connList, true);
 
    ListTk_cloneNicAddressList(nicList, &this->nicList, true);
+   if (localRdmaNicList)
+      ListTk_cloneNicAddressList(localRdmaNicList, &this->localRdmaNicList, true);
+   else
+      NicAddressList_init(&this->localRdmaNicList);
 
    this->establishedConns = 0;
    this->availableConns = 0;
@@ -55,54 +59,109 @@ void NodeConnPool_init(NodeConnPool* this, struct App* app, struct Node* parentN
    // parentNode "type" isn't yet known. Initialize elements in the first call to
    // acquireStreamSocketEx per NodeConnPool instance.
    NicAddressStatsList_init(&this->rdmaNicStatsList);
-   NicAddressStatsList_init(&this->rdmaNicStatsRetryList);
    this->rdmaNicCount = -1;
    this->logConnErrors = true;
    this->enableTCPFallback = Config_getConnTCPFallbackEnabled(cfg);
 }
 
-static void NodeConnPool_loadRdmaNicStatsList(NodeConnPool* this)
+static bool NodeConnPool_loadRdmaNicStatsList(NodeConnPool* this)
 {
-   NodeType nodeType;
    NicAddressListIter nicIter;
+   NicAddressStatsList statsList;
+   NicAddressStatsListIter stIter;
+   NicAddressStatsListIter srcIter;
+   NicAddress* nic;
+   NicAddressStats* st;
+   NicAddressStats* cur;
+   int rdmaNicCount = 0;
+   int nodeType;
 
+   // indicate that this function has been called at least once
    this->rdmaNicCount = 0;
    nodeType = Node_getNodeType(this->parentNode);
    if (nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage)
    {
-      NicAddressListIter_init(&nicIter, App_getRDMANicList(this->app));
+
+      // Construct temporary list of stat per RDMA NIC. Search for existing
+      // stat by interface name and use that if it exists. Remove
+      // matching stats from this->rdmaNicStatsList.
+
+      NicAddressStatsList_init(&statsList);
+      NicAddressListIter_init(&nicIter, &this->localRdmaNicList);
       for ( ; !NicAddressListIter_end(&nicIter); NicAddressListIter_next(&nicIter) )
       {
-         NicAddressStats* st = (NicAddressStats*)os_kmalloc(sizeof(NicAddressStats));
+         nic = NicAddressListIter_value(&nicIter);
+         st = NULL;
+         NicAddressStatsListIter_init(&srcIter, &this->rdmaNicStatsList);
+         while (!NicAddressStatsListIter_end(&srcIter))
+         {
+            cur = NicAddressStatsListIter_value(&srcIter);
+            if (!strncmp(cur->nic.name, nic->name, sizeof(nic->name)))
+            {
+               NicAddressStatsListIter_remove(&srcIter);
+               st = cur;
+               NicAddressStats_setValid(cur, nic);
+               break;
+            }
+            NicAddressStatsListIter_next(&srcIter);
+         }
+
          if (st == NULL)
          {
-            printk_fhgfs(KERN_ERR, "%s:%d: failed to allocate NicAddressStats, size=%ld\n",
-               __func__, __LINE__, sizeof(NicAddressStats));
-            while (NicAddressStatsList_length(&this->rdmaNicStatsList) > 0)
-            {
-               NicAddressStatsListIter ni;
-               NicAddressStatsListIter_init(&ni, &this->rdmaNicStatsList);
-               st = NicAddressStatsListIter_value(&ni);
-               NicAddressStatsListIter_remove(&ni);
-               NicAddressStats_uninit(st);
-               kfree(st);
-            }
-            this->rdmaNicCount = 0;
-            break;
+            st = (NicAddressStats*)os_kmalloc(sizeof(NicAddressStats));
+            NicAddressStats_init(st, nic);
          }
-         NicAddressStats_init(st, NicAddressListIter_value(&nicIter));
-         NicAddressStatsList_append(&this->rdmaNicStatsList, st);
-         this->rdmaNicCount++;
+
+         NicAddressStatsList_append(&statsList, st);
+         rdmaNicCount++;
+      }
+
+      // Add any remaining stats from the this->rdmaNicStatsList. These were not removed
+      // during the iteration of RDMA NICs, so they are stats for devices that have disappeared.
+      // They have to be kept around because there may be IBVSocket instances that still
+      // point to the memory.
+
+      NicAddressStatsListIter_init(&stIter, &this->rdmaNicStatsList);
+      while (!NicAddressStatsListIter_end(&stIter))
+      {
+         st = NicAddressStatsListIter_value(&stIter);
+         NicAddressStats_invalidate(st);
+         NicAddressStatsList_append(&statsList, st);
+         stIter = NicAddressStatsListIter_remove(&stIter);
+      }
+
+      NicAddressStatsList_uninit(&this->rdmaNicStatsList);
+      this->rdmaNicStatsList = statsList;
+      this->rdmaNicCount = rdmaNicCount;
+   }
+
+#ifdef BEEGFS_DEBUG
+   {
+      const char* logContext = "NodeConn (load RDMA NIC stats)";
+      Logger* log = App_getLogger(this->app);
+      Logger_logFormatted(log, Log_DEBUG, logContext, "%d RDMA NICs", this->rdmaNicCount);
+      NicAddressStatsListIter_init(&stIter, &this->rdmaNicStatsList);
+      for(; !NicAddressStatsListIter_end(&stIter); NicAddressStatsListIter_next(&stIter))
+      {
+         char* addr;
+         st = NicAddressStatsListIter_value(&stIter);
+         addr = SocketTk_ipaddrToStr(st->nic.ipAddr);
+         Logger_logFormatted(log, Log_DEBUG, logContext, "NIC: %s Addr: %s nicValid=%d established=%d available=%d",
+            st->nic.name, addr, st->nicValid, st->established, st->available);
+         kfree(addr);
       }
    }
+#endif
+
+   return true;
 }
 
 NodeConnPool* NodeConnPool_construct(struct App* app, struct Node* parentNode,
-   unsigned short streamPort, NicAddressList* nicList)
+   unsigned short streamPort, NicAddressList* nicList, NicAddressList* localRdmaNicList)
 {
    NodeConnPool* this = (NodeConnPool*)os_kmalloc(sizeof(*this) );
 
-   NodeConnPool_init(this, app, parentNode, streamPort, nicList);
+   NodeConnPool_init(this, app, parentNode, streamPort, nicList, localRdmaNicList);
 
    return this;
 }
@@ -135,13 +194,13 @@ void NodeConnPool_uninit(NodeConnPool* this)
 
    // delete nicList elems
    ListTk_kfreeNicAddressListElems(&this->nicList);
+   ListTk_kfreeNicAddressListElems(&this->localRdmaNicList);
    ListTk_kfreeNicAddressStatsListElems(&this->rdmaNicStatsList);
-   ListTk_kfreeNicAddressStatsListElems(&this->rdmaNicStatsRetryList);
 
    // normal clean-up
    NicAddressList_uninit(&this->nicList);
+   NicAddressList_uninit(&this->localRdmaNicList);
    NicAddressStatsList_uninit(&this->rdmaNicStatsList);
-   NicAddressStatsList_uninit(&this->rdmaNicStatsRetryList);
 
    Mutex_uninit(&this->mutex);
 }
@@ -160,6 +219,7 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
    NicAddressStatsListIter statsIter;
    bool skipped;
    int numa;
+   Time now;
 
 #ifdef BEEGFS_NVFS
    int minNvfsPrio = INT_MAX;
@@ -167,21 +227,30 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
    numa = cpu_to_node(current->cpu);
 #endif
 
+   if (this->rdmaNicCount < 1)
+      return NULL;
+
 #ifdef KERNEL_HAS_CPU_IN_THREAD_INFO
    numa = cpu_to_node(task_thread_info(current)->cpu);
 #else
    numa = cpu_to_node(current->cpu);
 #endif
 
-   if (NicAddressStatsList_length(&this->rdmaNicStatsList) < 1)
-      return NULL;
+   Time_init(&now);
 
    NicAddressStatsListIter_init(&statsIter, &this->rdmaNicStatsList);
    for (; !NicAddressStatsListIter_end(&statsIter); NicAddressStatsListIter_next(&statsIter))
    {
-      skipped = false;
       cur = NicAddressStatsListIter_value(&statsIter);
+      // elements with nicValid == false are at the end of the list
+      if (!cur->nicValid)
+         break;
+
+      skipped = false;
+
       if (!NicAddressStats_usable(cur, ctx->maxConns))
+         skipped = true;
+      else if (!NicAddressStats_lastErrorExpired(cur, &now, this->fallbackExpirationSecs))
          skipped = true;
       else
       {
@@ -225,51 +294,6 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
 #endif
 
    return min;
-}
-
-static inline void NodeConnPool_moveNicAddressStatsToRetry(NodeConnPool *this, NicAddressStats *srcRdma)
-{
-   NicAddressStatsListIter ni;
-
-   NicAddressStatsListIter_init(&ni, &this->rdmaNicStatsList);
-   for ( ; ! NicAddressStatsListIter_end(&ni); NicAddressStatsListIter_next(&ni))
-   {
-      if (srcRdma == NicAddressStatsListIter_value(&ni))
-      {
-         NicAddressStatsListIter_remove(&ni);
-         NicAddressStats_updateLastError(srcRdma);
-         NicAddressStatsList_append(&this->rdmaNicStatsRetryList, srcRdma);
-         break;
-      }
-   }
-}
-
-static inline bool NodeConnPool_updateRdmaNicStatsRetry(NodeConnPool *this)
-{
-   bool updated = false;
-   int rl = NicAddressStatsList_length(&this->rdmaNicStatsRetryList);
-   if (rl > 0)
-   {
-      NicAddressStatsListIter stIter;
-      NicAddressStats *st;
-      Time now;
-
-      Time_init(&now);
-      NicAddressStatsListIter_init(&stIter, &this->rdmaNicStatsRetryList);
-      while (! NicAddressStatsListIter_end(&stIter))
-      {
-         st = NicAddressStatsListIter_value(&stIter);
-         if (NicAddressStats_lastErrorExpired(st, &now, this->fallbackExpirationSecs))
-         {
-            NicAddressStatsList_append(&this->rdmaNicStatsList, st);
-            stIter = NicAddressStatsListIter_remove(&stIter);
-            updated = true;
-         }
-         else
-            NicAddressStatsListIter_next(&stIter);
-      }
-   }
-   return updated;
 }
 
 /**
@@ -361,7 +385,6 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       if (dpc)
       {
          dpc->maxConns = this->maxConns / this->rdmaNicCount;
-         NodeConnPool_updateRdmaNicStatsRetry(this);
          srcRdma = NodeConnPool_rdmaNicPriority(this, dpc);
 #ifdef BEEGFS_DEBUG
          Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
@@ -444,25 +467,28 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
          NetFilter_isContained(tcpOnlyFilter, nicAddr->ipAddr) )
          continue;
 
-      endpointStr = SocketTk_endpointAddrToString(&nicAddr->ipAddr, port);
+      endpointStr = SocketTk_endpointAddrToStr(nicAddr->ipAddr, port);
 
       switch(nicAddr->nicType)
       {
          case NICADDRTYPE_RDMA:
          { // RDMA
             char from[NICADDRESS_IP_STR_LEN];
-            struct in_addr *srcAddr = NULL;
+            struct in_addr srcAddr;
 
             if(!this->localNicCaps.supportsRDMA)
                goto continue_clean_endpointStr;
 
             if (srcRdma)
             {
-               srcAddr = &srcRdma->nic.ipAddr;
-               NicAddress_ipToStr(*srcAddr, from);
+               srcAddr = srcRdma->nic.ipAddr;
+               NicAddress_ipToStr(srcAddr, from);
             }
             else
+            {
+               srcAddr.s_addr = 0;
                strncpy(from, "any", sizeof(from));
+            }
 
             Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
                "Establishing new RDMA connection from %s to: %s@%s", from, nodeTypeStr, endpointStr);
@@ -506,7 +532,7 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       // the actual connection attempt
       __NodeConnPool_applySocketOptionsPreConnect(this, sock);
 
-      connectRes = sock->ops->connectByIP(sock, &nicAddr->ipAddr, port);
+      connectRes = sock->ops->connectByIP(sock, nicAddr->ipAddr, port);
 
       if(connectRes)
       { // connected
@@ -587,7 +613,7 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       {
          srcRdma->established--;
          if (!rdmaConnectInterrupted)
-            NodeConnPool_moveNicAddressStatsToRetry(this, srcRdma);
+            NicAddressStats_updateLastError(srcRdma);
       }
 
       ConnectionList_append(&this->connList, pooledSock);
@@ -603,7 +629,7 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       {
          srcRdma->established--;
          if (!rdmaConnectInterrupted)
-            NodeConnPool_moveNicAddressStatsToRetry(this, srcRdma);
+            NicAddressStats_updateLastError(srcRdma);
       }
       // connect may be interrupted by signals. return no connection without setting up alternate
       // routes or other error handling in that case.
@@ -647,7 +673,7 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
 
    // mark the socket as available
 
-   Mutex_lock(&this->mutex);
+   Mutex_lock(&this->mutex); // L O C K
 
    if (unlikely(PooledSocket_getPool(pooledSock) != &this->connList))
    {
@@ -670,7 +696,7 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
    Condition_signal(&this->changeCond);
 
 exit:
-   Mutex_unlock(&this->mutex);
+   Mutex_unlock(&this->mutex); // U N L O C K
 }
 
 void NodeConnPool_invalidateStreamSocket(NodeConnPool* this, Socket* sock)
@@ -894,8 +920,12 @@ bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* soc
    if(sockType == NICADDRTYPE_RDMA)
    {
       RDMASocket* rdmaSock = (RDMASocket*)sock;
-      RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
-         Config_getConnRDMABufSize(cfg) );
+      if (Node_getNodeType(this->parentNode) == NODETYPE_Meta)
+         RDMASocket_setBuffers(rdmaSock, Config_getConnRDMAMetaBufNum(cfg),
+            Config_getConnRDMAMetaBufSize(cfg), Config_getConnRDMAMetaFragmentSize(cfg));
+      else
+         RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
+            Config_getConnRDMABufSize(cfg), Config_getConnRDMAFragmentSize(cfg));
       RDMASocket_setTimeouts(rdmaSock, Config_getConnRDMATimeoutConnect(cfg),
          Config_getConnRDMATimeoutCompletion(cfg), Config_getConnRDMATimeoutFlowSend(cfg),
          Config_getConnRDMATimeoutFlowRecv(cfg), Config_getConnRDMATimeoutPoll(cfg));
@@ -1027,11 +1057,11 @@ bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock
 
 void NodeConnPool_getStats(NodeConnPool* this, NodeConnPoolStats* outStats)
 {
-   Mutex_lock(&this->mutex);
+   Mutex_lock(&this->mutex); // L O C K
 
    *outStats = this->stats;
 
-   Mutex_unlock(&this->mutex);
+   Mutex_unlock(&this->mutex); // U N L O C K
 }
 
 /**
@@ -1050,7 +1080,7 @@ unsigned NodeConnPool_getFirstPeerName(NodeConnPool* this, NicAddrType_t nicType
    ConnectionListIter connIter;
    bool foundMatch = false;
 
-   Mutex_lock(&this->mutex);
+   Mutex_lock(&this->mutex); // L O C K
 
    ConnectionListIter_init(&connIter, &this->connList);
 
@@ -1078,7 +1108,7 @@ unsigned NodeConnPool_getFirstPeerName(NodeConnPool* this, NicAddrType_t nicType
       *outIsNonPrimary = false;
    }
 
-   Mutex_unlock(&this->mutex);
+   Mutex_unlock(&this->mutex);  // U N L O C K
 
    return numWritten;
 }
@@ -1233,4 +1263,30 @@ bool __NodeConnPool_shouldPrintConnectFailedLogMsg(NodeConnPool* this, struct in
    return (!this->errState.wasLastTimeCompleteFail &&
       (!__NodeConnPool_isLastSuccessInitialized(this) ||
          __NodeConnPool_equalsLastSuccess(this, currentPeerIP, currentNicType) ) );
+}
+
+void NodeConnPool_updateLocalInterfaces(NodeConnPool* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps, NicAddressList* localRdmaNicList)
+{
+   Logger* log = App_getLogger(this->app);
+   const char* logContext = "NodeConn (update local NIC list)";
+   unsigned numInvalidated;
+
+   Mutex_lock(&this->mutex); // L O C K
+   this->localNicCaps = *localNicCaps;
+   if (localRdmaNicList)
+   {
+      ListTk_kfreeNicAddressListElems(&this->localRdmaNicList);
+      NicAddressList_uninit(&this->localRdmaNicList);
+      ListTk_cloneNicAddressList(localRdmaNicList, &this->localRdmaNicList, true);
+      NodeConnPool_loadRdmaNicStatsList(this);
+   }
+   Mutex_unlock(&this->mutex); // U N L O C K
+
+   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false, true);
+   if(numInvalidated)
+   {
+      Logger_logFormatted(log, Log_DEBUG, logContext,
+         "Invalidated %u pooled connections (due to local interface change)", numInvalidated);
+   }
 }

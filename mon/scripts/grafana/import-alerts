@@ -1,0 +1,163 @@
+#!/bin/bash
+
+function addAlert() {
+   alert_json=$(cat "$1")
+   modified_json=$(echo "$alert_json" | sed -e "s/\${DS_UID}/$DATASOURCE_UID/g")
+   curl -s -X POST "$HOST/api/v1/provisioning/alert-rules"  \
+      --header "Content-type: application/json" \
+      --header "X-Disable-Provenance;" \
+      --data "$modified_json"
+}
+
+function addAlertV2() {
+   alert_json=$(cat "$1")
+   modified_json=$(echo "$alert_json" | sed -e "s/\${DS_UID}/$DATASOURCE_UID/g; s/\${BUCKET}/$BUCKET_NAME/g")
+   curl -s -X POST "$HOST/api/v1/provisioning/alert-rules"  \
+      --header "Content-type: application/json" \
+      --header "X-Disable-Provenance;" \
+      --data "$modified_json"
+}
+
+function addDashboard() {
+   echo -e "{\"dashboard\": $(cat $1), \"folderUid\": \"beegfsalertfolder\"}" | \
+   sed -e "s,\${DS_BEEGFS_MON_INFLUXDB},$DATASOURCE_NAME,g" | \
+   curl -s -X POST "$HOST/api/dashboards/db"  \
+      --header "Content-type: application/json" \
+      --data @-
+}
+
+function addFolder() {
+   curl -s -X POST "$HOST/api/folders" \
+      --header "Content-type: application/json" \
+      --data '{"uid": "beegfsalertfolder", "title": "BeeGFS-Alert"}'
+}
+
+function addTemplate() {
+   curl -s -X PUT "$HOST/api/v1/provisioning/templates/BeeGFS-Email-Template" \
+      --header "X-Disable-Provenance;" \
+      --header "Content-Type: application/json" \
+      --data "@$alert_path/email-template.json"
+}
+
+function addContactPoint() {
+   curl -s -X POST "$HOST/api/v1/provisioning/contact-points" \
+      --header "X-Disable-Provenance;" \
+      --header "Content-Type: application/json" \
+      --data "@$alert_path/contact-point.json"
+}
+
+function addPolicies() {
+   update_policies=$(cat $1)
+   curl -s -X PUT "$HOST/api/v1/provisioning/policies" \
+      --header "X-Disable-Provenance;" \
+      --header "Content-Type: application/json" \
+      --data "$update_policies"
+}
+
+HOST="http://admin:admin@localhost:3000"
+
+if  [[ $1 != "default" ]] && [[ ! $# -eq 1 ]]; then
+   echo "This script imports the default beegfs-mon Alerts into Grafana using its HTTP API."
+   echo ""
+   echo "Usage: "
+   echo "Default installation to localhost: $(basename "$0") default"
+   echo "Custom installation: $(basename "$0") <grafana url>"
+   echo ""
+   echo "Default:"
+   echo "$(basename "$0") $HOST"
+   exit 0
+fi
+
+command -v curl > /dev/null 2>&1 || \
+{
+   echo "This script requires curl, but it doesn't seem to be installed. Aborting."
+   exit 1
+}
+
+if [[ $1 != "default" ]]; then
+   HOST="$1"
+fi
+
+echo "Select an option:"
+echo "1. Using BeeGFS Monitoring with Telegraf"
+echo "2. Using BeeGFS Monitoring without Telegraf"
+
+read -p "Enter your Option: " option
+
+if [[ "$option" == "1" ]]; then
+      monType="wtelegraf"
+elif [[ "$option" == "2" ]]; then
+      monType="wotelegraf"
+else
+      echo "*** Please select correct option ***"
+      exit 1
+fi
+
+echo "Select an option:"
+echo "Please select influxdb version:"
+echo "1) Influxdb 1.x"
+echo "2) Influxdb 2.x"
+
+read -p "Enter your influxdb Verion: " influxdb_version
+
+DATASOURCE_UID=$(curl -s "$HOST/api/datasources/name/beegfs_mon_influxdb" | grep -o '"uid": *"[^"]*"' | cut -d'"' -f4)
+DATASOURCE_NAME=$(curl -s "$HOST/api/datasources/name/beegfs_mon_influxdb" | grep -o '"name": *"[^"]*"' | cut -d'"' -f4)
+
+if [[ "$influxdb_version" == "2" ]]; then
+   BUCKET_NAME=$(curl -s "$HOST/api/datasources/name/beegfs_mon_influxdb" | grep -o '"defaultBucket": *"[^"]*"' | cut -d'"' -f4)
+fi
+
+ALERT_DIR=$(dirname "$0")
+alert_path="$ALERT_DIR/alerts"
+addFolder
+
+
+if [[ "$influxdb_version" == "1" ]] && [[ "$monType" == "wtelegraf" ]]; then
+
+   for alert_file in "$alert_path"/*-v1.json; do
+      if [ -f "$alert_file" ]; then
+         addAlert "$alert_file"
+      fi
+   done
+
+elif [[ "$influxdb_version" == "2" ]] && [[ "$monType" == "wtelegraf" ]] ; then
+
+   for alert_file in "$alert_path"/*-v2.json; do
+      if [ -f "$alert_file" ]; then
+         addAlertV2 "$alert_file"
+      fi
+   done
+
+elif [[ "$influxdb_version" == "1" ]] && [[ "$monType" == "wotelegraf" ]] ; then
+
+   addAlert $alert_path/Disk-alert-v1.json
+   addAlert $alert_path/Inodes-alert-v1.json
+   addAlert $alert_path/MetaQueuedrequest-alert-v1.json
+   addAlert $alert_path/StorageQueuedrequest-alert-v1.json
+
+elif [[ "$influxdb_version" == "2" ]] && [[ "$monType" == "wotelegraf" ]] ; then
+
+   addAlertV2 $alert_path/Disk-alert-v2.json
+   addAlertV2 $alert_path/Inodes-alert-v2.json
+   addAlertV2 $alert_path/MetaQueuedrequest-alert-v2.json
+   addAlertV2 $alert_path/StorageQueuedrequest-alert-v2.json
+
+else
+   echo "*** Please select correct version of InfluxDB ***"
+   exit 1
+
+fi
+
+addDashboard "$alert_path/alert-dashboard.json"
+addTemplate
+addContactPoint
+
+if [[ "$monType" == "wotelegraf" ]]; then
+   addPolicies "$alert_path/policies.json"
+elif [[ "$monType" == "wtelegraf" ]] ; then
+   addPolicies "$alert_path/policies-telegraf.json"
+else
+  echo "*** Please notification policies ***"
+fi
+
+echo -e "\n\n\n######### Alert is configured. Next step: update email address in contact point of beegfs-email. #########" 

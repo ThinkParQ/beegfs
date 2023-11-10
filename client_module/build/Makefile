@@ -13,6 +13,10 @@ export TARGET
 export OFED_INCLUDE_PATH
 export BEEGFS_NO_RDMA
 
+ifeq ($(BEEGFS_DEV_BUILD),)
+-include /etc/beegfs/beegfs-client-build.mk
+endif
+
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
 else
@@ -89,7 +93,6 @@ KSRCDIR_PRUNED_HEAD := $(firstword $(KSRCDIR_PRUNED) )
 
 ifeq ($(BEEGFS_NO_RDMA),)
 # OFED
--include /etc/beegfs/beegfs-client-build.mk
 ifneq ($(OFED_INCLUDE_PATH),)
 
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)

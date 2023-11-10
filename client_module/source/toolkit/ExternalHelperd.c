@@ -63,7 +63,7 @@ void ExternalHelperd_initHelperdNode(App* app, Config* cfg, const char* nodeID, 
    NicAddressList_append(&helperdNicList, &nicAddress);
 
    *outNode = Node_construct(app,
-      nodeID, (NumNodeID){0}, 0, helperdPortTCP, &helperdNicList); // (node copies the NicList)
+      nodeID, (NumNodeID){0}, 0, helperdPortTCP, &helperdNicList, NULL); // (node copies the NicList)
 
    Node_setNodeType(*outNode, NODETYPE_Helperd);
    NodeConnPool_setLogConnErrors(Node_getConnPool(*outNode), false); // disable error logging

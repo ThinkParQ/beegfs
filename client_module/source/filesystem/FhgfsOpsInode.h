@@ -16,6 +16,10 @@
 #include <linux/vfs.h>
 
 
+#if (defined(KERNEL_HAS_POSIX_GET_ACL) || defined(KERNEL_HAS_GET_INODE_ACL))
+#define KERNEL_HAS_GET_ACL 1
+#endif
+
 // forward declaration
 struct App;
 
@@ -62,15 +66,14 @@ extern int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* 
 extern int FhgfsOps_removexattr(struct dentry* dentry, const char* name);
 extern int FhgfsOps_removexattrInode(struct inode* inode, const char* name);
 
-
-#ifdef KERNEL_HAS_POSIX_GET_ACL
-#ifdef KERNEL_POSIX_GET_ACL_HAS_RCU
+#ifdef KERNEL_HAS_GET_ACL
+#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
 extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rcu);
-#else // KERNEL_POSIX_GET_ACL_HAS_RCU
+#else
 extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type);
 #endif // KERNEL_POSIX_GET_ACL_HAS_RCU
 int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry);
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif
 
 #if defined(KERNEL_HAS_SET_ACL)
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
@@ -79,6 +82,9 @@ extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* ino
 #else // KERNEL_HAS_IDMAPPED_MOUNTS
 extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type);
 #endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#elif defined(KERNEL_HAS_SET_DENTRY_ACL)
+extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct dentry* dentry,
+   struct posix_acl* acl, int type);
 #endif // KERNEL_HAS_SET_ACL
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)

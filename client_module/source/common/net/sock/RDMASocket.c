@@ -5,11 +5,16 @@
 #include <linux/poll.h>
 
 
-// Note: Good tradeoff between throughput and mem usage (for SDR IB):
+// Note: These are historical defaults designed for SDR IB and do not provide
+//    the best performance for current IB fabrics. Ideally, buf_size should be
+//    configured as the largest chunksize used by the filesystem and buf_num
+//    will be 3. It would be ideal to take buf_num down to 1, but the current
+//    protocol requires at least 3 buffers.
 //    buf_num=64; buf_size=4*1024 (=> 512kB per socket for send and recv)
 
 #define RDMASOCKET_DEFAULT_BUF_NUM                    (128) // moved to config
 #define RDMASOCKET_DEFAULT_BUF_SIZE                   (4*1024) // moved to config
+#define RDMASOCKET_DEFAULT_FRAGMENT_SIZE              RDMASOCKET_DEFAULT_BUF_SIZE // moved to config
 
 static const struct SocketOps rdmaOps = {
    .uninit = _RDMASocket_uninit,
@@ -24,7 +29,7 @@ static const struct SocketOps rdmaOps = {
    .recvT = _RDMASocket_recvT,
 };
 
-bool RDMASocket_init(RDMASocket* this, struct in_addr* src, NicAddressStats* nicStats)
+bool RDMASocket_init(RDMASocket* this, struct in_addr src, NicAddressStats* nicStats)
 {
    Socket* thisBase = (Socket*)this;
 
@@ -39,6 +44,7 @@ bool RDMASocket_init(RDMASocket* this, struct in_addr* src, NicAddressStats* nic
 
    this->commCfg.bufNum = RDMASOCKET_DEFAULT_BUF_NUM;
    this->commCfg.bufSize = RDMASOCKET_DEFAULT_BUF_SIZE;
+   this->commCfg.fragmentSize = RDMASOCKET_DEFAULT_FRAGMENT_SIZE;
 
    if(!IBVSocket_init(&this->ibvsock, src, nicStats) )
       goto err_ibv;
@@ -50,7 +56,7 @@ err_ibv:
    return false;
 }
 
-RDMASocket* RDMASocket_construct(struct in_addr* src, NicAddressStats *nicStats)
+RDMASocket* RDMASocket_construct(struct in_addr src, NicAddressStats *nicStats)
 {
    RDMASocket* this = kmalloc(sizeof(*this), GFP_NOFS);
 
@@ -81,7 +87,7 @@ bool RDMASocket_rdmaDevicesExist(void)
 #endif
 }
 
-bool _RDMASocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned short port)
+bool _RDMASocket_connectByIP(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
    // note: does not set the family type to the one of this socket.
 
@@ -107,14 +113,14 @@ bool _RDMASocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned s
    // set peername if not done so already (e.g. by connect(hostname) )
    if(!this->peername[0])
    {
-      SocketTk_endpointAddrToStringNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
-      this->peerIP = *ipaddress;
+      SocketTk_endpointAddrToStrNoAlloc(this->peername, SOCKET_PEERNAME_LEN, ipaddress, port);
+      this->peerIP = ipaddress;
    }
 
    return true;
 }
 
-bool _RDMASocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigned short port)
+bool _RDMASocket_bindToAddr(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
    RDMASocket* thisCast = (RDMASocket*)this;
 

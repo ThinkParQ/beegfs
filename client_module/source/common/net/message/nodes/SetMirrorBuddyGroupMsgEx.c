@@ -93,7 +93,7 @@ bool __SetMirrorBuddyGroupMsgEx_processIncoming(NetMessage* this, struct App* ap
             FhgfsOpsErr_toErrString(addGroupResult) );
 
    peer = fromAddr ?
-      SocketTk_ipaddrToStr(&fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
+      SocketTk_ipaddrToStr(fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
 
    // send Ack
    MsgHelperAck_respondToAckRequest(app, SetMirrorBuddyGroupMsgEx_getAckID(thisCast), fromAddr,

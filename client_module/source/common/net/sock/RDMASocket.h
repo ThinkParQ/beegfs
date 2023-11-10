@@ -15,15 +15,15 @@ struct NicAddressStats;
 typedef struct NicAddressStats NicAddressStats;
 
 
-extern __must_check bool RDMASocket_init(RDMASocket* this, struct in_addr* srcIpAddr, NicAddressStats* nicStats);
-extern RDMASocket* RDMASocket_construct(struct in_addr* srcIpAddr, NicAddressStats* nicStats);
+extern __must_check bool RDMASocket_init(RDMASocket* this, struct in_addr srcIpAddr, NicAddressStats* nicStats);
+extern RDMASocket* RDMASocket_construct(struct in_addr srcIpAddr, NicAddressStats* nicStats);
 extern void _RDMASocket_uninit(Socket* this);
 
 extern bool RDMASocket_rdmaDevicesExist(void);
 
-extern bool _RDMASocket_connectByIP(Socket* this, struct in_addr* ipaddress,
+extern bool _RDMASocket_connectByIP(Socket* this, struct in_addr ipaddress,
    unsigned short port);
-extern bool _RDMASocket_bindToAddr(Socket* this, struct in_addr* ipaddress,
+extern bool _RDMASocket_bindToAddr(Socket* this, struct in_addr ipaddress,
    unsigned short port);
 extern bool _RDMASocket_listen(Socket* this);
 extern bool _RDMASocket_shutdown(Socket* this);
@@ -43,7 +43,8 @@ static inline struct ib_device *RDMASocket_getDevice(RDMASocket* this);
 static inline unsigned RDMASocket_getKey(RDMASocket* this);
 #endif
 
-static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize);
+static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
+   unsigned fragmentSize);
 static inline void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
    int completionMS, int flowSendMS, int flowRecvMS, int pollMS);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
@@ -77,10 +78,12 @@ struct ib_device* RDMASocket_getDevice(RDMASocket *this)
 /**
  * Note: Only has an effect for unconnected sockets.
  */
-void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize)
+void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
+   unsigned fragmentSize)
 {
    this->commCfg.bufNum = bufNum;
    this->commCfg.bufSize = bufSize;
+   this->commCfg.fragmentSize = fragmentSize;
 }
 
 void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,

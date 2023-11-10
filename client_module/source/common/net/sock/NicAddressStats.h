@@ -12,6 +12,16 @@ typedef struct NicAddressStats NicAddressStats;
 
 static inline void NicAddressStats_init(NicAddressStats* this, NicAddress* nic);
 static inline void NicAddressStats_uninit(NicAddressStats* this);
+/**
+ * Called when an associated NIC has gone down. This indicates
+ * that this particular statistic should not be considered for load balancing.
+ */
+static inline void NicAddressStats_invalidate(NicAddressStats* this);
+/**
+ * Called when an associated NIC has come online. This updates the internal NicAddress
+ * and indicates that this particular statistic should be considered for load balancing.
+ */
+static inline void NicAddressStats_setValid(NicAddressStats* this, NicAddress* nic);
 static inline int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o,
    int numa);
 static inline void NicAddressStats_updateUsed(NicAddressStats* this);
@@ -27,6 +37,11 @@ struct NicAddressStats
    int        available;
    Time       used;
    Time       lastError;
+   /**
+    * nicValid indicates if the NicAddress can be used for connections.
+    * This may be tracking stats for a device that has gone offline.
+    */
+   bool       nicValid;
 };
 
 void NicAddressStats_init(NicAddressStats* this, NicAddress* nic)
@@ -34,12 +49,27 @@ void NicAddressStats_init(NicAddressStats* this, NicAddress* nic)
    this->nic = *nic;
    this->established = 0;
    this->available = 0;
+   this->nicValid = true;
    Time_initZero(&this->used);
    Time_initZero(&this->lastError);
 }
 
 void NicAddressStats_uninit(NicAddressStats* this)
 {
+}
+
+void NicAddressStats_invalidate(NicAddressStats* this)
+{
+   this->nicValid = false;
+#ifdef BEEGFS_RDMA
+   this->nic.ibdev = NULL;
+#endif
+}
+
+void NicAddressStats_setValid(NicAddressStats* this, NicAddress* nic)
+{
+   this->nicValid = true;
+   this->nic = *nic;
 }
 
 /*

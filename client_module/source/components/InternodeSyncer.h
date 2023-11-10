@@ -96,6 +96,7 @@ extern unsigned __InternodeSyncer_dropIdleConnsByStore(InternodeSyncer* this, No
 
 extern void __InternodeSyncer_updateTargetStatesAndBuddyGroups(InternodeSyncer* this,
    NodeType nodeType);
+extern bool __InternodeSyncer_checkNetwork(InternodeSyncer* this);
 
 // getters & setters
 static inline void InternodeSyncer_setForceTargetStatesUpdate(InternodeSyncer* this);

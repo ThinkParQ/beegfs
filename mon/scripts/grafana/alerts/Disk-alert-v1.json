@@ -1,0 +1,156 @@
+{
+    "id": 3,
+    "uid": "af36a69e-fd32-4ebc-94cd-474ea6c9edb2",
+    "orgID": 1,
+    "folderUID": "beegfsalertfolder",
+    "ruleGroup": "evaluate",
+    "title": "Disk Alert",
+    "condition": "C",
+    "data": [
+        {
+            "refId": "A",
+            "queryType": "",
+            "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+            },
+            "datasourceUid": "${DS_UID}",
+            "model": {
+                "groupBy": [
+                    {
+                        "params": [
+                            "storageTargetID::tag"
+                        ],
+                        "type": "tag"
+                    }
+                ],
+                "hide": false,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "measurement": "storageTargets",
+                "orderByTime": "ASC",
+                "policy": "auto",
+                "query": "SELECT (diskSpaceFree / diskSpaceTotal) * 100 FROM \"auto\".\"storageTargets\" WHERE $timeFilter GROUP BY \"storageTargetID\"::tag",
+                "rawQuery": true,
+                "refId": "A",
+                "resultFormat": "time_series",
+                "select": [
+                    [
+                        {
+                            "params": [
+                                "diskSpaceFree"
+                            ],
+                            "type": "field"
+                        },
+                        {
+                            "params": [
+                                " / "
+                            ],
+                            "type": "math"
+                        }
+                    ]
+                ],
+                "tags": []
+            }
+        },
+        {
+            "refId": "B",
+            "queryType": "",
+            "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+            },
+            "datasourceUid": "__expr__",
+            "model": {
+                "conditions": [
+                    {
+                        "evaluator": {
+                            "params": [
+                                0,
+                                0
+                            ],
+                            "type": "gt"
+                        },
+                        "operator": {
+                            "type": "and"
+                        },
+                        "query": {
+                            "params": []
+                        },
+                        "reducer": {
+                            "params": [],
+                            "type": "avg"
+                        },
+                        "type": "query"
+                    }
+                ],
+                "datasource": {
+                    "name": "Expression",
+                    "type": "__expr__",
+                    "uid": "__expr__"
+                },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "reducer": "last",
+                "refId": "B",
+                "type": "reduce"
+            }
+        },
+        {
+            "refId": "C",
+            "queryType": "",
+            "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+            },
+            "datasourceUid": "__expr__",
+            "model": {
+                "conditions": [
+                    {
+                        "evaluator": {
+                            "params": [
+                                0,
+                                0
+                            ],
+                            "type": "gt"
+                        },
+                        "operator": {
+                            "type": "and"
+                        },
+                        "query": {
+                            "params": []
+                        },
+                        "reducer": {
+                            "params": [],
+                            "type": "avg"
+                        },
+                        "type": "query"
+                    }
+                ],
+                "datasource": {
+                    "name": "Expression",
+                    "type": "__expr__",
+                    "uid": "__expr__"
+                },
+                "expression": "$B < 30",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "C",
+                "type": "math"
+            }
+        }
+    ],
+    "updated": "2023-10-10T16:06:31+05:30",
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "10m",
+    "annotations": {
+        "description": "Please check, as the Disk Space for Storage Target ID '{{ $labels.storageTargetID }}' is only {{ humanize $values.B.Value }}%.",
+        "summary": "BeeGFS Storage Target disk space is low"
+    },
+    "labels": {
+        "disk-severity": "{{if lt $values.B.Value 20.0}}critical{{else if lt $values.B.Value 30.0}}warning{{else}}info{{end}}"
+    },
+    "isPaused": true
+}
