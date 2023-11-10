@@ -175,6 +175,7 @@ struct IBVSocket
    unsigned                      connectionRejectionCount;
 
    IBVTimeoutConfig              timeoutCfg;
+   struct in_addr                bindIP;
 };
 
 

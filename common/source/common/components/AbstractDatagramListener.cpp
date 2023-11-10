@@ -66,7 +66,7 @@ void AbstractDatagramListener::configSocket(StandardSocket* s, NicAddress* nicAd
 
    std::string ifname;
    if (nicAddr)
-      ifname = Socket::ipaddrToStr(&nicAddr->ipAddr);
+      ifname = Socket::ipaddrToStr(nicAddr->ipAddr);
    else
       ifname = "any";
 
@@ -181,7 +181,7 @@ std::shared_ptr<StandardSocket> AbstractDatagramListener::findSenderSockUnlocked
             {
                k.s_addr = 0;
                // addr may have come from whoever sent a message, so this is a warning
-               LOG(COMMUNICATION, WARNING, "No routes found.", ("addr", Socket::ipaddrToStr(&addr)));
+               LOG(COMMUNICATION, WARNING, "No routes found.", ("addr", Socket::ipaddrToStr(addr)));
             }
             ipSrcMap[addr] = k;
          }
@@ -251,7 +251,7 @@ void AbstractDatagramListener::listenLoop()
                || msg->getSequenceNumberDone() != 0)
          {
             LOG(COMMUNICATION, NOTICE, "Received invalid message from peer",
-                  ("peer", Socket::ipaddrToStr(&fromAddr.sin_addr)));
+                  ("peer", Socket::ipaddrToStr(fromAddr.sin_addr)));
          }
          else
          {

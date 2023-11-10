@@ -28,6 +28,9 @@
 #define IBVSOCKET_POLL_TIMEOUT_MS                 10000
 #define IBVSOCKET_FLOWCONTROL_MSG_LEN                 1
 #define IBVSOCKET_STALE_RETRIES_NUM                 128
+#define IBVSOCKET_MIN_SGE                             1
+#define IBVSOCKET_MIN_WR                              1
+
 /**
  * IBVSOCKET_RECVT_INFINITE_TIMEOUT_MS is used by IBVSocket_recvT when timeoutMS
  * is passed as < 0, which indicates that __IBVSocket_receiveCheck should be
@@ -145,7 +148,7 @@ bool __IBVSocket_createNewID(IBVSocket* _this)
    return true;
 }
 
-bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned short port,
+bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned short port,
    IBVCommConfig* commCfg)
 {
    struct sockaddr_in sin;
@@ -177,7 +180,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
       // resolve IP address ...
       // (async event handler also automatically resolves route on success)
 
-      sin.sin_addr.s_addr = ipaddress->s_addr;
+      sin.sin_addr.s_addr = ipaddress.s_addr;
       sin.sin_family = AF_INET;
       sin.sin_port = htons(port);
 
@@ -286,12 +289,12 @@ err_invalidateSock:
 
 
 
-bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr* ipAddr, unsigned short port)
+bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr ipAddr, unsigned short port)
 {
    struct sockaddr_in bindAddr;
 
    bindAddr.sin_family = AF_INET;
-   bindAddr.sin_addr = *ipAddr;
+   bindAddr.sin_addr = ipAddr;
    bindAddr.sin_port = htons(port);
 
    if(rdma_bind_addr(_this->cm_id, (struct sockaddr*)&bindAddr) )
@@ -574,11 +577,14 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    struct ib_qp_init_attr qpInitAttr;
    int qpRes;
    unsigned i;
+   unsigned fragmentSize;
+   unsigned maxSge;
+   unsigned maxWr;
 
    commContext = kzalloc(sizeof(*commContext), GFP_KERNEL);
    if(!commContext)
       goto err_cleanup;
-   ibv_print_info_debug("Alloc CommContext @ %px\n", commContext);
+   ibv_print_info_debug("Alloc CommContext @ %p\n", commContext);
 
    // prepare recv and send event notification
 
@@ -635,7 +641,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    for(i=0; i < commCfg->bufNum; i++)
    {
       if(!IBVBuffer_init(&commContext->recvBufs[i], commContext, commCfg->bufSize,
-            DMA_FROM_DEVICE) )
+            commCfg->fragmentSize, DMA_FROM_DEVICE) )
       {
          ibv_print_info("couldn't prepare recvBuf #%d\n", i + 1);
          goto err_cleanup;
@@ -652,7 +658,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    for(i=0; i < commCfg->bufNum; i++)
    {
       if(!IBVBuffer_init(&commContext->sendBufs[i], commContext, commCfg->bufSize,
-            DMA_TO_DEVICE) )
+            commCfg->fragmentSize, DMA_TO_DEVICE) )
       {
          ibv_print_info("couldn't prepare sendBuf #%d\n", i + 1);
          goto err_cleanup;
@@ -660,7 +666,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    }
 
    if(!IBVBuffer_init(&commContext->checkConBuffer, commContext, sizeof(u64),
-         DMA_FROM_DEVICE) )
+         commCfg->fragmentSize, DMA_FROM_DEVICE) )
    {
       ibv_print_info("couldn't alloc dma control memory region\n");
       goto err_cleanup;
@@ -698,6 +704,12 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       goto err_cleanup;
    }
 
+   fragmentSize = commCfg->fragmentSize;
+   if (fragmentSize == 0)
+      fragmentSize = commCfg->bufSize;
+   maxSge = MAX(IBVSOCKET_MIN_SGE, commCfg->bufSize / fragmentSize + 1);
+   maxWr = MAX(IBVSOCKET_MIN_WR, commCfg->bufNum + 1);
+
    // note: 1+commCfg->bufNum here for the checkConnection() RDMA read
    memset(&qpInitAttr, 0, sizeof(qpInitAttr) );
 
@@ -706,10 +718,10 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    qpInitAttr.recv_cq = commContext->recvCQ;
    qpInitAttr.qp_type = IB_QPT_RC;
    qpInitAttr.sq_sig_type = IB_SIGNAL_REQ_WR;
-   qpInitAttr.cap.max_send_wr = 1+commCfg->bufNum;
-   qpInitAttr.cap.max_recv_wr = commCfg->bufNum;
-   qpInitAttr.cap.max_send_sge = commCfg->bufSize / IBV_FRAGMENT_SIZE + 1;
-   qpInitAttr.cap.max_recv_sge = commCfg->bufSize / IBV_FRAGMENT_SIZE + 1;
+   qpInitAttr.cap.max_send_wr = maxWr;
+   qpInitAttr.cap.max_recv_wr = maxWr;
+   qpInitAttr.cap.max_send_sge = maxSge;
+   qpInitAttr.cap.max_recv_sge = maxSge;
    qpInitAttr.cap.max_inline_data = 0;
 
    qpRes = rdma_create_qp(cm_id, commContext->pd, &qpInitAttr);
@@ -765,6 +777,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
    unsigned i;
    struct ib_device* dev;
 
+   ibv_print_info_debug("Free CommContext @ %p\n", commContext);
 
    if(!commContext)
       return;
@@ -828,10 +841,7 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
    if(commContext->pd)
       ib_dealloc_pd(commContext->pd);
 
-
 cleanup_no_dev:
-
-   ibv_print_info_debug("Free CommContext @ %px\n", commContext);
    kfree(commContext);
 }
 
@@ -1680,9 +1690,9 @@ unsigned long IBVSocket_poll(IBVSocket* _this, short events, bool finishPoll)
 
 
 /**
- * Handle connection manager event callbacks from interrupt handler.
+ * Handle connection manager event callbacks.
  *
- * Note: Sleeping (e.g. mutex locking) is not allowed in callbacks like this one!
+ * Locking of mutexes and sleeping is permitted.
  *
  * @return negative Linux error code on error, 0 otherwise; in case of return!=0, rdma_cm will
  * automatically call rdma_destroy_id().
@@ -1694,11 +1704,11 @@ int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event
 
    if(unlikely(!_this) )
    {
-      ibv_print_info_ir_debug("cm_id is being torn down. Event: %d\n", event->event);
+      ibv_print_info_debug("cm_id is being torn down. Event: %d\n", event->event);
       return (event->event == RDMA_CM_EVENT_CONNECT_REQUEST) ? -EINVAL : 0;
    }
 
-   ibv_print_info_ir_debug("rdma event: %i, status: %i\n", event->event, event->status);
+   ibv_print_info_debug("rdma event: %i, status: %i\n", event->event, event->status);
 
    switch(event->event)
    {
@@ -1747,15 +1757,21 @@ int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event
          break;
 
       case RDMA_CM_EVENT_DEVICE_REMOVAL:
-         // note: all associated ressources have to be released here immediately
-         __IBVSocket_cleanupCommContext(cm_id, _this->commContext);
-         _this->commContext = NULL;
-         _this->cm_id = NULL;
-         retVal = -ENETRESET;
-         goto exit;
+         /**
+          * Sigh... what to do? There were previous attempts to perform cleanup of the
+          * IBVCommContext and return -ENETRESET when this event is encountered.
+          * Returning a nonzero value causes RDMA CM to destroy the cm_id and anything
+          * belonging to that cm_id must be destroyed here before returning nonzero. There
+          * are a lot of race conditions with the worker thread and attempting to implement
+          * a locking scheme would require significant redesign due to the use of
+          * blocking calls to ib_poll_cq. Ignoring the event appears to allow normal
+          * cleanup of resources after the RDMA routines return an error to the caller.
+          */
+         ibv_print_info("Device has been removed: %s\n", cm_id->device->name);
+         break;
 
       default:
-         ibv_print_info_ir_debug("Ignoring RDMA_CMA event: %d\n", event->event);
+         ibv_print_info_debug("Ignoring RDMA_CMA event: %d\n", event->event);
          break;
    }
 
@@ -1772,7 +1788,6 @@ int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event
       retVal = 0;
    }
 
-exit:
    wake_up(&_this->eventWaitQ);
    return retVal;
 }
@@ -1782,7 +1797,7 @@ exit:
  */
 void __IBVSocket_cqSendEventHandler(struct ib_event *event, void *data)
 {
-   ibv_print_info_ir_debug("called. event type: %d (not handled)\n", event->event);
+   ibv_print_info_debug("called. event type: %d (not handled)\n", event->event);
 }
 
 /**
@@ -1800,7 +1815,7 @@ void __IBVSocket_sendCompletionHandler(struct ib_cq *cq, void *cq_context)
 
    reqNotifySendRes = ib_req_notify_cq(commContext->sendCQ, IB_CQ_NEXT_COMP);
    if(unlikely(reqNotifySendRes) )
-      ibv_print_info_ir("Couldn't request CQ notification\n");
+      ibv_print_info("Couldn't request CQ notification\n");
 
    wake_up(&commContext->sendCompWaitQ);
 }
@@ -1810,7 +1825,7 @@ void __IBVSocket_sendCompletionHandler(struct ib_cq *cq, void *cq_context)
  */
 void __IBVSocket_cqRecvEventHandler(struct ib_event *event, void *data)
 {
-   ibv_print_info_ir_debug("called. event type: %d (not handled)\n", event->event);
+   ibv_print_info_debug("called. event type: %d (not handled)\n", event->event);
 }
 
 /**
@@ -1828,14 +1843,14 @@ void __IBVSocket_recvCompletionHandler(struct ib_cq *cq, void *cq_context)
 
    reqNotifyRecvRes = ib_req_notify_cq(commContext->recvCQ, IB_CQ_NEXT_COMP);
    if(unlikely(reqNotifyRecvRes) )
-      ibv_print_info_ir("Couldn't request CQ notification\n");
+      ibv_print_info("Couldn't request CQ notification\n");
 
    wake_up(&commContext->recvCompWaitQ);
 }
 
 void __IBVSocket_qpEventHandler(struct ib_event *event, void *data)
 {
-   ibv_print_info_ir_debug("called. event type: %d (not handled)\n", event->event);
+   ibv_print_info_debug("called. event type: %d (not handled)\n", event->event);
 }
 
 int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
@@ -1848,7 +1863,7 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
       &_this->commContext);
    if(!createContextRes)
    {
-      ibv_print_info_ir("creation of CommContext failed\n");
+      ibv_print_info("creation of CommContext failed\n");
       _this->errState = -1;
 
       return -EPERM;
@@ -1892,7 +1907,7 @@ int __IBVSocket_connectedHandler(IBVSocket* _this, struct rdma_cm_event* event)
       private_data, private_data_len, &_this->remoteDest);
    if(!parseCommDestRes)
    {
-      ibv_print_info_ir("bad private data received. len: %d\n", private_data_len);
+      ibv_print_info("bad private data received. len: %d\n", private_data_len);
 
       retVal = -EOPNOTSUPP;
       goto err_invalidateSock;

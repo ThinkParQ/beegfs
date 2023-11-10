@@ -69,6 +69,8 @@ define HELP_ARGS_GENERIC
 	@echo  '  BEEGFS_DEBUG=1             Enables debug information and symbols'
 	@echo  '  BEEGFS_DEBUG_OPT=1         Enables internal debug code, but compiled'
 	@echo  '                             with optimizations'
+	@echo  '  BEEGFS_DEBUG_IP=1          Enables low-level debug of network sendto'
+	@echo  '                             and recvfrom'
 	@echo  '  CXX=<compiler>             Specifies a c++ compiler'
 	@echo  '  DISTCC=distcc              Enables the usage of distcc'
 	@echo  '  V=1                        Print command lines of tool invocations'
@@ -161,6 +163,9 @@ endif
 
 CXXFLAGS += -DBEEGFS_VERSION="\"$(BEEGFS_VERSION)\""
 
+ifneq ($(BEEGFS_DEBUG_IP),)
+CXXFLAGS += -DBEEGFS_DEBUG_IP
+endif
 
 ###### KNOWN LIBRARIES
 #

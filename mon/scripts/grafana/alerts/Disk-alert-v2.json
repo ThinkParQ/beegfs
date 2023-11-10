@@ -1,0 +1,125 @@
+{
+  "id": 3,
+  "uid": "c0008edf-2473-47be-b0ff-ab50bad831c5",
+  "orgID": 1,
+  "folderUID": "beegfsalertfolder",
+  "ruleGroup": "evaluate",
+  "title": "Disk Alert",
+  "condition": "C",
+  "data": [
+    {
+      "refId": "A",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "${DS_UID}",
+      "model": {
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "query": "from(bucket: \"${BUCKET}\")\r\n |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n |> filter(fn: (r) => r[\"_measurement\"] == \"storageTargets\")\r\n |> filter(fn: (r) =>    r._field == \"diskSpaceTotal\" or r._field == \"diskSpaceFree\")\r\n |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n |> map(fn: (r) => ({ r with _value:(r.diskSpaceFree/ r.diskSpaceTotal) * 100.0 }))\r\n |> rename(columns: {_value: \"DiskFreePercent\"})\r\n |> drop(columns:[\"_start\",\"_stop\",\"_measurement\",\"diskSpaceTotal\",\"diskSpaceFree\"])\r\n",
+        "refId": "A"
+      }
+    },
+    {
+      "refId": "B",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "B"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "A",
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "reducer": "last",
+        "refId": "B",
+        "type": "reduce"
+      }
+    },
+    {
+      "refId": "C",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                0,
+                0
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": []
+            },
+            "reducer": {
+              "params": [],
+              "type": "avg"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "name": "Expression",
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "$B < 30",
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "refId": "C",
+        "type": "math"
+      }
+    }
+  ],
+  "updated": "2023-10-16T18:16:45Z",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "for": "10m",
+  "annotations": {
+    "description": "Please check, as the Disk Space for Storage Target ID '{{ $labels.storageTargetID }}' is only {{ humanize $values.B.Value }}%.",
+    "summary": "BeeGFS Storage Target disk space is low"
+  },
+  "labels": {
+    "disk-severity": "{{if lt $values.B.Value 20.0}}critical{{else if lt $values.B.Value 30.0}}warning{{else}}info{{end}}"
+  },
+  "isPaused": true
+}

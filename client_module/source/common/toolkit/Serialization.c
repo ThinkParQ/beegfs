@@ -374,7 +374,10 @@ void Serialization_deserializeNodeList(App* app, const RawList* inList, NodeList
       Serialization_deserializeChar(&ctx, &nodeType);
 
       {// construct node
-         Node* node = Node_construct(app, nodeID, nodeNumID, portUDP, portTCP, &nicList);
+         Node* node;
+         App_lockNicList(app);
+         node = Node_construct(app, nodeID, nodeNumID, portUDP, portTCP, &nicList);
+         App_unlockNicList(app);
 
          Node_setNodeType(node, (NodeType)nodeType);
 

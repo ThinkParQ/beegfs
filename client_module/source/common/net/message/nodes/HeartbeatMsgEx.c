@@ -115,11 +115,12 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
    Node* node;
    NodeConnPool* connPool;
    Node* localNode;
-   NicAddressList* localNicList;
+   NicAddressList localNicList;
    NicListCapabilities localNicCaps;
    NodeStoreEx* nodes = NULL;
    bool isNodeNew;
    NumNodeID nodeNumID;
+   int nodeType;
 
    // check if nodeNumID is set
    nodeNumID = HeartbeatMsgEx_getNodeNumID(thisCast);
@@ -135,7 +136,8 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
 
    // find the corresponding node store for this node type
 
-   switch(HeartbeatMsgEx_getNodeType(thisCast) )
+   nodeType = HeartbeatMsgEx_getNodeType(thisCast);
+   switch(nodeType)
    {
       case NODETYPE_Meta:
          nodes = App_getMetaNodes(app); break;
@@ -148,7 +150,6 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
 
       default:
       {
-         int nodeType = HeartbeatMsgEx_getNodeType(thisCast);
          const char* nodeID = HeartbeatMsgEx_getNodeID(thisCast);
 
          Logger_logErrFormatted(log, logContext, "Invalid node type: %d (%s); ID: %s",
@@ -164,20 +165,22 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
 
    HeartbeatMsgEx_parseNicList(thisCast, &nicList);
 
+   App_lockNicList(app);
    node = Node_construct(app,
       HeartbeatMsgEx_getNodeID(thisCast), HeartbeatMsgEx_getNodeNumID(thisCast),
       HeartbeatMsgEx_getPortUDP(thisCast), HeartbeatMsgEx_getPortTCP(thisCast), &nicList);
       // (will belong to the NodeStore => no destruct() required)
+   App_unlockNicList(app);
 
-   Node_setNodeType(node, HeartbeatMsgEx_getNodeType(thisCast) );
+   Node_setNodeType(node, nodeType);
 
    // set local nic capabilities
 
    localNode = App_getLocalNode(app);
-   localNicList = Node_getNicList(localNode);
+   Node_cloneNicList(localNode, &localNicList);
    connPool = Node_getConnPool(node);
 
-   NIC_supportedCapabilities(localNicList, &localNicCaps);
+   NIC_supportedCapabilities(&localNicList, &localNicCaps);
    NodeConnPool_setLocalNicCaps(connPool, &localNicCaps);
 
    // add node to store (or update it)
@@ -190,7 +193,7 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
 
       Logger_logFormatted(log, Log_WARNING, logContext,
          "New node: %s %s [ID: %hu]; %s%s",
-         Node_nodeTypeToStr(HeartbeatMsgEx_getNodeType(thisCast) ),
+         Node_nodeTypeToStr(nodeType),
          HeartbeatMsgEx_getNodeID(thisCast),
          HeartbeatMsgEx_getNodeNumID(thisCast).value,
          (supportsSDP ? "SDP; " : ""),
@@ -207,6 +210,8 @@ ack_resp:
    // clean-up
    ListTk_kfreeNicAddressListElems(&nicList);
    NicAddressList_uninit(&nicList);
+   ListTk_kfreeNicAddressListElems(&localNicList);
+   NicAddressList_uninit(&localNicList);
 
    return true;
 }

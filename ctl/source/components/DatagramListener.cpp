@@ -46,7 +46,7 @@ void DatagramListener::handleIncomingMsg(struct sockaddr_in* fromAddr, NetMessag
       { // valid, but not within this context
          log.logErr(
             "Received a message that is invalid within the current context "
-            "from: " + Socket::ipaddrToStr(&fromAddr->sin_addr) + "; "
+            "from: " + Socket::ipaddrToStr(fromAddr->sin_addr) + "; "
             "type: " + messageType );
       } break;
    };

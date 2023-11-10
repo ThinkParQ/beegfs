@@ -25,7 +25,7 @@ extern void _Socket_init(Socket* this);
 extern void _Socket_uninit(Socket* this);
 
 extern bool Socket_bind(Socket* this, unsigned short port);
-extern bool Socket_bindToAddr(Socket* this, struct in_addr* ipAddr, unsigned short port);
+extern bool Socket_bindToAddr(Socket* this, struct in_addr ipAddr, unsigned short port);
 
 // getters & setters
 static inline NicAddrType_t Socket_getSockType(Socket* this);
@@ -46,8 +46,8 @@ struct SocketOps
 {
    void (*uninit)(Socket* this);
 
-   bool (*connectByIP)(Socket* this, struct in_addr* ipaddress, unsigned short port);
-   bool (*bindToAddr)(Socket* this, struct in_addr* ipaddress, unsigned short port);
+   bool (*connectByIP)(Socket* this, struct in_addr ipaddress, unsigned short port);
+   bool (*bindToAddr)(Socket* this, struct in_addr ipaddress, unsigned short port);
    bool (*listen)(Socket* this);
    bool (*shutdown)(Socket* this);
    bool (*shutdownAndRecvDisconnect)(Socket* this, int timeoutMS);

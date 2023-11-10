@@ -186,7 +186,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
          // socketOptions without runtime type info)
 
       std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
-         Socket::endpointAddrToString(&iter->ipAddr, port);
+         Socket::endpointAddrToStr(iter->ipAddr, port);
 
       struct in_addr srcIp = {
          .s_addr = 0
@@ -199,7 +199,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
             log.log(Log_DEBUG, "Skip NIC, no route for " + endpointStr);
             continue;
          }
-         log.log(Log_DEBUG, std::string("Use ") + Socket::ipaddrToStr(&srcIp) + " for " + endpointStr);
+         log.log(Log_DEBUG, std::string("Use ") + Socket::ipaddrToStr(srcIp) + " for " + endpointStr);
       }
 
       if(!app->getNetFilter()->isAllowed(iter->ipAddr.s_addr) )

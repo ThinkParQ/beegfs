@@ -19,9 +19,9 @@ extern void _RDMASocket_uninit(Socket* this);
 
 extern bool RDMASocket_rdmaDevicesExist(void);
 
-extern bool _RDMASocket_connectByIP(Socket* this, struct in_addr* ipaddress,
+extern bool _RDMASocket_connectByIP(Socket* this, struct in_addr ipaddress,
    unsigned short port);
-extern bool _RDMASocket_bindToAddr(Socket* this, struct in_addr* ipaddress,
+extern bool _RDMASocket_bindToAddr(Socket* this, struct in_addr ipaddress,
    unsigned short port);
 extern bool _RDMASocket_listen(Socket* this);
 extern bool _RDMASocket_shutdown(Socket* this);
@@ -35,7 +35,8 @@ extern ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags
 extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finishPoll);
 
 // inliners
-static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize);
+static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
+   unsigned fragmentSize);
 static inline void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
    int completionMS, int flowSendMS, int flowRecvMS, int pollMS);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
@@ -53,10 +54,12 @@ struct RDMASocket
 /**
  * Note: Only has an effect for unconnected sockets.
  */
-void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize)
+void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
+   unsigned fragmentSize)
 {
    this->commCfg.bufNum = bufNum;
    this->commCfg.bufSize = bufSize;
+   this->commCfg.fragmentSize = fragmentSize;
 }
 
 void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,

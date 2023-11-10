@@ -66,7 +66,7 @@ bool __RemoveNodeMsgEx_processIncoming(NetMessage* this, struct App* app,
    ssize_t sendRes;
 
    peer = fromAddr ?
-      SocketTk_ipaddrToStr(&fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
+      SocketTk_ipaddrToStr(fromAddr->addr) : StringTk_strDup(Socket_getPeername(sock) );
    LOG_DEBUG_FORMATTED(log, Log_DEBUG, logContext,
       "Received a RemoveNodeMsg from: %s; Node: %s %hu",
       peer, Node_nodeTypeToStr(nodeType), nodeID.value);

@@ -41,7 +41,9 @@ extern const char* Node_nodeTypeToStr(NodeType nodeType);
 static inline char* Node_getID(Node* this);
 static inline NumNodeID Node_getNumID(Node* this);
 static inline void Node_setNumID(Node* this, const NumNodeID numID);
-static inline NicAddressList* Node_getNicList(Node* this);
+static inline void Node_cloneNicList(Node* this, NicAddressList* nicList);
+static inline void Node_updateLocalInterfaces(Node* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps);
 static inline NodeConnPool* Node_getConnPool(Node* this);
 static inline void Node_setIsActive(Node* this, bool isActive);
 static inline bool Node_getIsActive(Node* this);
@@ -114,9 +116,25 @@ void Node_setNumID(Node* this, const NumNodeID numID)
    this->numID = numID;
 }
 
-NicAddressList* Node_getNicList(Node* this)
+/**
+ * Retrieve NICs for the node.
+ *
+ * @param nicList an uninitialized NicAddressList. Caller is responsible for
+ *        memory management.
+ */
+void Node_cloneNicList(Node* this, NicAddressList* nicList)
 {
-   return NodeConnPool_getNicList(this->connPool);
+   NodeConnPool_cloneNicList(this->connPool, nicList);
+}
+
+/**
+ * @param localNicList copied
+ * @param localNicCaps copied
+ */
+void Node_updateLocalInterfaces(Node* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps)
+{
+   NodeConnPool_updateLocalInterfaces(this->connPool, localNicList, localNicCaps);
 }
 
 NodeConnPool* Node_getConnPool(Node* this)

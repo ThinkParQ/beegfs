@@ -19,7 +19,7 @@ bool IBVSocket_rdmaDevicesExist(void)
 }
 
 
-bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned short port,
+bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned short port,
    IBVCommConfig* commCfg)
 {
    printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__);
@@ -27,7 +27,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned
 }
 
 
-bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr* ipAddr, unsigned short port)
+bool IBVSocket_bindToAddr(IBVSocket* _this, struct in_addr ipAddr, unsigned short port)
 {
    printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__);
    return false;

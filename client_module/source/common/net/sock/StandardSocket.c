@@ -437,7 +437,7 @@ bool StandardSocket_setTcpCork(StandardSocket* this, bool enable)
    return true;
 }
 
-bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsigned short port)
+bool _StandardSocket_connectByIP(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
    // note: does not set the family type to the one of this socket (would lead to problems with SDP)
 
@@ -456,7 +456,7 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
    struct sockaddr_in serveraddr =
    {
       .sin_family = AF_INET,
-      .sin_addr = *ipaddress,
+      .sin_addr = ipaddress,
       .sin_port = htons(port),
    };
 
@@ -496,8 +496,8 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
 
             if(!this->peername)
             {
-               this->peername = SocketTk_endpointAddrToString(ipaddress, port);
-               this->peerIP = *ipaddress;
+               this->peername = SocketTk_endpointAddrToStr(ipaddress, port);
+               this->peerIP = ipaddress;
             }
 
             return true;
@@ -516,8 +516,8 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
       // set peername if not done so already (e.g. by connect(hostname) )
       if(!this->peername)
       {
-         this->peername = SocketTk_endpointAddrToString(ipaddress, port);
-         this->peerIP = *ipaddress;
+         this->peername = SocketTk_endpointAddrToStr(ipaddress, port);
+         this->peerIP = ipaddress;
       }
 
       return true;
@@ -527,7 +527,7 @@ bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress, unsign
 }
 
 
-bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigned short port)
+bool _StandardSocket_bindToAddr(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
    StandardSocket* thisCast = (StandardSocket*)this;
 
@@ -537,7 +537,7 @@ bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress, unsigne
    size_t peernameLen;
 
    bindAddr.sin_family = thisCast->sockDomain;
-   bindAddr.sin_addr = *ipaddress;
+   bindAddr.sin_addr = ipaddress;
    bindAddr.sin_port = htons(port);
 
    bindRes = thisCast->sock->ops->bind(

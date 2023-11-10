@@ -5,12 +5,15 @@
 #ifdef BEEGFS_RDMA
 
 bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen,
-    enum dma_data_direction dma_dir)
+   size_t fragmentLen, enum dma_data_direction dma_dir)
 {
-   unsigned count = (bufLen + IBV_FRAGMENT_SIZE - 1) / IBV_FRAGMENT_SIZE;
+   unsigned count;
    unsigned i;
 
-   bufLen = MIN(IBV_FRAGMENT_SIZE, bufLen);
+   if (fragmentLen == 0)
+      fragmentLen = bufLen;
+   count = (bufLen + fragmentLen - 1) / fragmentLen;
+   bufLen = MIN(fragmentLen, bufLen);
 
    buffer->dma_dir = dma_dir;
    buffer->buffers = kzalloc(count * sizeof(*buffer->buffers), GFP_KERNEL);

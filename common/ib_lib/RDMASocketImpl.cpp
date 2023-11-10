@@ -95,9 +95,9 @@ void RDMASocketImpl::connect(const struct sockaddr* serv_addr, socklen_t addrlen
    // set peername if not done so already (e.g. by connect(hostname) )
 
    if(peername.empty() )
-      peername = Socket::ipaddrToStr(&peerIP) + ":" + StringTk::intToStr(peerPort);
+      peername = Socket::endpointAddrToStr(peerIP, peerPort);
 
-   bool connRes = IBVSocket_connectByIP(ibvsock, &peerIP, peerPort, &commCfg);
+   bool connRes = IBVSocket_connectByIP(ibvsock, peerIP, peerPort, &commCfg);
    if(!connRes)
       throw SocketConnectException(
          std::string("RDMASocket unable to connect to: ") + std::string(peername) );
@@ -152,7 +152,7 @@ Socket* RDMASocketImpl::accept(struct sockaddr *addr, socklen_t *addrlen)
    struct in_addr acceptIP = ( (struct sockaddr_in*)addr)->sin_addr;
    unsigned short acceptPort = ntohs( ( (struct sockaddr_in*)addr)->sin_port);
 
-   std::string acceptPeername = endpointAddrToString(&acceptIP, acceptPort);
+   std::string acceptPeername = endpointAddrToStr(acceptIP, acceptPort);
 
    Socket* acceptedSock = new RDMASocketImpl(acceptedIBVSocket, acceptIP, acceptPeername);
 

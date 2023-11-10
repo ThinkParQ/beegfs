@@ -27,11 +27,9 @@ extern bool StandardSocket_setSoRcvBuf(StandardSocket* this, int size);
 extern bool StandardSocket_setTcpNoDelay(StandardSocket* this, bool enable);
 extern bool StandardSocket_setTcpCork(StandardSocket* this, bool enable);
 
-//extern bool StandardSocket_connectByName(StandardSocket* this, const char* hostname,
-//   unsigned short port, ExternalHelperd* helperd);
-extern bool _StandardSocket_connectByIP(Socket* this, struct in_addr* ipaddress,
+extern bool _StandardSocket_connectByIP(Socket* this, struct in_addr ipaddress,
    unsigned short port);
-extern bool _StandardSocket_bindToAddr(Socket* this, struct in_addr* ipaddress,
+extern bool _StandardSocket_bindToAddr(Socket* this, struct in_addr ipaddress,
    unsigned short port);
 extern bool _StandardSocket_listen(Socket* this);
 extern bool _StandardSocket_shutdown(Socket* this);

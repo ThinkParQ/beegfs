@@ -254,7 +254,7 @@ install -D -m644 mon/build/dist/usr/lib/systemd/system/beegfs-mon@.service \
 	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-mon@.service
 
 install -D mon/build/dist/etc/default/beegfs-mon ${RPM_BUILD_ROOT}/etc/default/beegfs-mon
-install -D mon/scripts/grafana/* ${RPM_BUILD_ROOT}/opt/beegfs/scripts/grafana
+cp -a mon/scripts/grafana/* ${RPM_BUILD_ROOT}/opt/beegfs/scripts/grafana/
 
 ##########
 ########## utils

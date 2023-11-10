@@ -143,16 +143,14 @@ void StandardSocket::connect(const char* hostname, unsigned short port)
 void StandardSocket::connect(const struct sockaddr* serv_addr, socklen_t addrlen)
 {
    const int timeoutMS = STANDARDSOCKET_CONNECT_TIMEOUT_MS;
+   std::string peerAddr = Socket::endpointAddrToStr((const struct sockaddr_in*)serv_addr);
 
-   unsigned short peerPort = ntohs(( (struct sockaddr_in*)serv_addr)->sin_port);
+   LOG(SOCKLIB, DEBUG, "Connect StandardSocket", ("socket", this), ("addr", peerAddr),
+      ("bindIP", Socket::ipaddrToStr(bindIP)));
 
-   this->peerIP = ( (struct sockaddr_in*)serv_addr)->sin_addr;
-#ifdef BEEGFS_DEBUG_IP
-   LOG(SOCKLIB, DEBUG, "Connect StandardSocket", ("socket", this), ("ipAddr", Socket::ipaddrToStr(&peerIP)), ("port", peerPort));
-#endif
    // set peername if not done so already (e.g. by connect(hostname) )
    if(peername.empty() )
-      peername = Socket::ipaddrToStr(&peerIP) + ":" + StringTk::intToStr(peerPort);
+      peername = peerAddr;
 
    int flagsOrig = fcntl(sock, F_GETFL, 0);
    fcntl(sock, F_SETFL, flagsOrig | O_NONBLOCK); // make the socket nonblocking
@@ -215,9 +213,8 @@ void StandardSocket::bindToAddr(in_addr_t ipAddr, unsigned short port)
    localaddr_in.sin_addr.s_addr = ipAddr;
    localaddr_in.sin_port = htons(port);
 
-#ifdef BEEGFS_DEBUG_IP
    LOG(SOCKLIB, DEBUG, "Bind StandardSocket", ("socket", this), ("ipAddr", Socket::ipaddrToStr(ipAddr)), ("port", port));
-#endif
+
    int bindRes = ::bind(sock, (struct sockaddr *)&localaddr_in, sizeof(localaddr_in) );
    if (bindRes == -1)
       throw SocketException("Unable to bind to port: " + StringTk::uintToStr(port) +
@@ -271,7 +268,7 @@ Socket* StandardSocket::accept(struct sockaddr *addr, socklen_t *addrlen)
    struct in_addr acceptIP = ( (struct sockaddr_in*)addr)->sin_addr;
    unsigned short acceptPort = ntohs( ( (struct sockaddr_in*)addr)->sin_port);
 
-   std::string acceptPeername = endpointAddrToString(&acceptIP, acceptPort);
+   std::string acceptPeername = endpointAddrToStr(acceptIP, acceptPort);
 
    try
    {
@@ -370,8 +367,8 @@ ssize_t StandardSocket::sendto(const void *buf, size_t len, int flags,
 #ifdef BEEGFS_DEBUG_IP
       if (to != NULL)
          LOG(COMMUNICATION, DEBUG, std::string("sendto"),
-            ("addr", Socket::ipaddrToStr(&((const struct sockaddr_in*) to)->sin_addr) +
-               ":" + StringTk::intToStr(ntohs(((const struct sockaddr_in*) to)->sin_port))),
+            ("addr", Socket::endpointAddrToStr((const struct sockaddr_in*) to)),
+            ("bindIP", Socket::ipaddrToStr(bindIP)),
             ("len", len));
 #endif
       ssize_t sendRes = ::sendto(sock, buf, len, flags | MSG_NOSIGNAL, to, tolen);
@@ -421,9 +418,7 @@ ssize_t StandardSocket::sendto(const void *buf, size_t len, int flags,
    std::string toStr;
    if(to)
    {
-      struct sockaddr_in* toInet = (struct sockaddr_in*)to;
-      toStr = Socket::ipaddrToStr(&toInet->sin_addr) + ":" +
-         StringTk::uintToStr(ntohs(toInet->sin_port) );
+      toStr = Socket::endpointAddrToStr((struct sockaddr_in*)to);
    }
 
    if(errCode == ENETUNREACH)
@@ -541,8 +536,8 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
 #ifdef BEEGFS_DEBUG_IP
    if (isDgramSocket && from)
          LOG(COMMUNICATION, DEBUG, std::string("recvfrom"),
-            ("addr", Socket::ipaddrToStr(&((const struct sockaddr_in*) from)->sin_addr) +
-               ":" + StringTk::intToStr(ntohs(((const struct sockaddr_in*) from)->sin_port))),
+            ("addr", Socket::endpointAddrToStr((const struct sockaddr_in*) from)),
+            ("bindIP", Socket::ipaddrToStr(bindIP)),
             ("recvRes", recvRes));
 #endif
    if(recvRes > 0)
@@ -557,8 +552,7 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
       {
          struct sockaddr_in* sin = (struct sockaddr_in*)from;
          LOG(COMMUNICATION, NOTICE, "Received empty UDP datagram.", peername,
-            ("IP", (sin? Socket::ipaddrToStr(&sin->sin_addr) : std::string("null"))),
-            ("port", (sin? ntohs(sin->sin_port) : (uint16_t) 0)));
+            ("addr", (sin? Socket::endpointAddrToStr(sin) : std::string("null"))));
          return 0;
       }
       else

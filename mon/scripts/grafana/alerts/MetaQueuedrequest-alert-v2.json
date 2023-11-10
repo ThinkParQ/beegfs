@@ -1,0 +1,126 @@
+{
+  "id": 5,
+  "uid": "a5a9072e-a8c2-46c1-b3a0-88608956e83e",
+  "orgID": 1,
+  "folderUID": "beegfsalertfolder",
+  "ruleGroup": "evaluate",
+  "title": "Meta Queued Request Alert",
+  "condition": "C",
+  "data": [
+    {
+      "refId": "A",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "${DS_UID}",
+      "model": {
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "query": "from(bucket: \"${BUCKET}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) =>    r._measurement == \"highResMeta\" and    r._field == \"queuedRequests\")  \r\n|> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  \r\n|> yield(name: \"max\")",
+        "refId": "A"
+      }
+    },
+    {
+      "refId": "B",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "B"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "A",
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "reducer": "last",
+        "refId": "B",
+        "type": "reduce"
+      }
+    },
+    {
+      "refId": "C",
+      "queryType": "",
+      "relativeTimeRange": {
+        "from": 600,
+        "to": 0
+      },
+      "datasourceUid": "__expr__",
+      "model": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                50
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "C"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "datasource": {
+          "type": "__expr__",
+          "uid": "__expr__"
+        },
+        "expression": "B",
+        "hide": false,
+        "intervalMs": 1000,
+        "maxDataPoints": 43200,
+        "refId": "C",
+        "type": "threshold"
+      }
+    }
+  ],
+  "updated": "2023-10-16T18:16:45Z",
+  "noDataState": "OK",
+  "execErrState": "Error",
+  "for": "2m",
+  "annotations": {
+    "description": "Queued requests of BeeGFS meta server with nodeID - \"{{ $labels.nodeID }}\" is  {{ $values.B }}",
+    "summary": "Meta server queued requests is above threshold"
+  },
+  "labels": {
+    "queued": "request"
+  },
+  "isPaused": true
+}

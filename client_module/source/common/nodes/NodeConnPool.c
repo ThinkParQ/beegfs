@@ -93,6 +93,7 @@ void NodeConnPool_uninit(NodeConnPool* this)
 
    // normal clean-up
    NicAddressList_uninit(&this->nicList);
+
    Mutex_uninit(&this->mutex);
 }
 
@@ -161,7 +162,6 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       }
    }
 
-
    if(likely(this->availableConns) )
    { // established connection available => grab it
       PooledSocket* pooledSock;
@@ -217,7 +217,7 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
          NetFilter_isContained(tcpOnlyFilter, nicAddr->ipAddr) )
          continue;
 
-      endpointStr = SocketTk_endpointAddrToString(&nicAddr->ipAddr, port);
+      endpointStr = SocketTk_endpointAddrToStr(nicAddr->ipAddr, port);
 
       switch(nicAddr->nicType)
       {
@@ -268,7 +268,7 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       // the actual connection attempt
       __NodeConnPool_applySocketOptionsPreConnect(this, sock);
 
-      connectRes = sock->ops->connectByIP(sock, &nicAddr->ipAddr, port);
+      connectRes = sock->ops->connectByIP(sock, nicAddr->ipAddr, port);
 
       if(connectRes)
       { // connected
@@ -352,7 +352,6 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
    { // absolutely unable to connect
       sock = NULL;
       this->establishedConns--;
-
       // connect may be interrupted by signals. return no connection without setting up alternate
       // routes or other error handling in that case.
       if (!fatal_signal_pending(current))
@@ -395,7 +394,7 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
 
    // mark the socket as available
 
-   Mutex_lock(&this->mutex);
+   Mutex_lock(&this->mutex); // L O C K
 
    this->availableConns++;
 
@@ -403,7 +402,7 @@ void NodeConnPool_releaseStreamSocket(NodeConnPool* this, Socket* sock)
 
    Condition_signal(&this->changeCond);
 
-   Mutex_unlock(&this->mutex);
+   Mutex_unlock(&this->mutex); // U N L O C K
 }
 
 void NodeConnPool_invalidateStreamSocket(NodeConnPool* this, Socket* sock)
@@ -624,8 +623,12 @@ bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* soc
    if(sockType == NICADDRTYPE_RDMA)
    {
       RDMASocket* rdmaSock = (RDMASocket*)sock;
-      RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
-         Config_getConnRDMABufSize(cfg) );
+      if (Node_getNodeType(this->parentNode) == NODETYPE_Meta)
+         RDMASocket_setBuffers(rdmaSock, Config_getConnRDMAMetaBufNum(cfg),
+            Config_getConnRDMAMetaBufSize(cfg), Config_getConnRDMAMetaFragmentSize(cfg));
+      else
+         RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
+            Config_getConnRDMABufSize(cfg), Config_getConnRDMAFragmentSize(cfg));
       RDMASocket_setTimeouts(rdmaSock, Config_getConnRDMATimeoutConnect(cfg),
          Config_getConnRDMATimeoutCompletion(cfg), Config_getConnRDMATimeoutFlowSend(cfg),
          Config_getConnRDMATimeoutFlowRecv(cfg), Config_getConnRDMATimeoutPoll(cfg));
@@ -757,11 +760,11 @@ bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock
 
 void NodeConnPool_getStats(NodeConnPool* this, NodeConnPoolStats* outStats)
 {
-   Mutex_lock(&this->mutex);
+   Mutex_lock(&this->mutex); // L O C K
 
    *outStats = this->stats;
 
-   Mutex_unlock(&this->mutex);
+   Mutex_unlock(&this->mutex); // U N L O C K
 }
 
 /**
@@ -780,7 +783,7 @@ unsigned NodeConnPool_getFirstPeerName(NodeConnPool* this, NicAddrType_t nicType
    ConnectionListIter connIter;
    bool foundMatch = false;
 
-   Mutex_lock(&this->mutex);
+   Mutex_lock(&this->mutex); // L O C K
 
    ConnectionListIter_init(&connIter, &this->connList);
 
@@ -808,7 +811,7 @@ unsigned NodeConnPool_getFirstPeerName(NodeConnPool* this, NicAddrType_t nicType
       *outIsNonPrimary = false;
    }
 
-   Mutex_unlock(&this->mutex);
+   Mutex_unlock(&this->mutex);  // U N L O C K
 
    return numWritten;
 }
@@ -963,4 +966,23 @@ bool __NodeConnPool_shouldPrintConnectFailedLogMsg(NodeConnPool* this, struct in
    return (!this->errState.wasLastTimeCompleteFail &&
       (!__NodeConnPool_isLastSuccessInitialized(this) ||
          __NodeConnPool_equalsLastSuccess(this, currentPeerIP, currentNicType) ) );
+}
+
+void NodeConnPool_updateLocalInterfaces(NodeConnPool* this, NicAddressList* localNicList,
+   NicListCapabilities* localNicCaps)
+{
+   Logger* log = App_getLogger(this->app);
+   const char* logContext = "NodeConn (update local NIC list)";
+   unsigned numInvalidated;
+
+   Mutex_lock(&this->mutex); // L O C K
+   this->localNicCaps = *localNicCaps;
+   Mutex_unlock(&this->mutex); // U N L O C K
+
+   numInvalidated = __NodeConnPool_invalidateAvailableStreams(this, false, true);
+   if(numInvalidated)
+   {
+      Logger_logFormatted(log, Log_DEBUG, logContext,
+         "Invalidated %u pooled connections (due to local interface change)", numInvalidated);
+   }
 }

@@ -49,7 +49,7 @@ void __DatagramListener_listenLoop(DatagramListener* this)
       else
       if(recvRes == 0)
       {
-         char* fromIP = SocketTk_ipaddrToStr(&fromAddr.addr);
+         char* fromIP = SocketTk_ipaddrToStr(fromAddr.addr);
          Logger_logFormatted(log, Log_NOTICE, logContext,
             "Received an empty datagram. IP: %s; port: %d",
             fromIP, fromAddr.port);
@@ -80,7 +80,7 @@ void __DatagramListener_listenLoop(DatagramListener* this)
             || msg->msgHeader.msgSequence != 0
             || msg->msgHeader.msgSequenceDone != 0)
       {
-         char* ipStr = SocketTk_ipaddrToStr(&fromAddr.addr);
+         char* ipStr = SocketTk_ipaddrToStr(fromAddr.addr);
 
          Logger_logFormatted(this->app->logger, Log_NOTICE, logContext,
                "Received invalid message from peer %s", ipStr);
@@ -124,7 +124,7 @@ void _DatagramListener_handleIncomingMsg(DatagramListener* this,
 
       default:
       { // valid fhgfs message, but not allowed within this context
-         char* ipStr = SocketTk_ipaddrToStr(&fromAddr->addr);
+         char* ipStr = SocketTk_ipaddrToStr(fromAddr->addr);
          Logger_logErrFormatted(log, logContext, "Received a message of type %d "
             "that is invalid within the current context from: %s",
             NetMessage_getMsgType(msg), ipStr);
@@ -202,10 +202,12 @@ void DatagramListener_sendBufToNode(DatagramListener* this, Node* node,
    char* buf, size_t bufLen)
 {
    NodeConnPool* connPool = Node_getConnPool(node);
-   NicAddressList* nicList = NodeConnPool_getNicList(connPool);
+   NicAddressList* nicList;
    unsigned short port = Node_getPortUDP(node);
    NicAddressListIter iter;
 
+   NodeConnPool_lock(connPool);
+   nicList = NodeConnPool_getNicListLocked(connPool);
    NicAddressListIter_init(&iter, nicList);
 
    for( ; !NicAddressListIter_end(&iter); NicAddressListIter_next(&iter) )
@@ -220,6 +222,7 @@ void DatagramListener_sendBufToNode(DatagramListener* this, Node* node,
 
       DatagramListener_sendtoIP(this, buf, bufLen, 0, nicAddr->ipAddr, port);
    }
+   NodeConnPool_unlock(connPool);
 }
 
 /**
@@ -238,15 +241,23 @@ void DatagramListener_sendMsgToNode(DatagramListener* this, Node* node, NetMessa
 bool __DatagramListener_isDGramFromLocalhost(DatagramListener* this,
    fhgfs_sockaddr_in* fromAddr)
 {
+   NodeConnPool* connPool;
    NicAddressList* nicList;
    NicAddressListIter iter;
    int nicListSize;
    int i;
+   bool result = false;
 
    if(fromAddr->port != this->udpPortNetByteOrder)
       return false;
 
-   nicList = Node_getNicList(this->localNode);
+   // (inaddr_loopback is in host byte order)
+   if(ntohl(INADDR_LOOPBACK) == fromAddr->addr.s_addr)
+      return true;
+
+   connPool = Node_getConnPool(this->localNode);
+   NodeConnPool_lock(connPool);
+   nicList = NodeConnPool_getNicListLocked(connPool);
 
    NicAddressListIter_init(&iter, nicList);
    nicListSize = NicAddressList_length(nicList);
@@ -256,13 +267,12 @@ bool __DatagramListener_isDGramFromLocalhost(DatagramListener* this,
       NicAddress* nicAddr = NicAddressListIter_value(&iter);
 
       if(nicAddr->ipAddr.s_addr == fromAddr->addr.s_addr)
-         return true;
+      {
+         result = true;
+         break;
+      }
    }
 
-   if(ntohl(INADDR_LOOPBACK) == fromAddr->addr.s_addr)
-      return true;
-
-   // (inaddr_loopback is in host byte order)
-
-   return false;
+   NodeConnPool_unlock(connPool);
+   return result;
 }

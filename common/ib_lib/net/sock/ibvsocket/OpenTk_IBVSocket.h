@@ -34,7 +34,7 @@ extern void IBVSocket_fork_init_once(void);
 // methods
 extern bool IBVSocket_connectByName(IBVSocket* _this, const char* hostname, unsigned short port,
    IBVCommConfig* commCfg);
-extern bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr* ipaddress, unsigned short port,
+extern bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned short port,
    IBVCommConfig* commCfg);
 extern bool IBVSocket_bind(IBVSocket* _this, unsigned short port);
 extern bool IBVSocket_bindToAddr(IBVSocket* _this, in_addr_t ipAddr, unsigned short port);
