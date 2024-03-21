@@ -8,7 +8,6 @@
 #include <session/EntryLock.h>
 #include <storage/MetaStore.h>
 
-//class MoveFileInodeMsgEx : public MirroredMessage<MoveFileInodeMsg, HashDirLock>
 class MoveFileInodeMsgEx : public MirroredMessage<MoveFileInodeMsg,
    std::tuple<FileIDLock, ParentNameLock, FileIDLock>>
 {
@@ -20,9 +19,7 @@ class MoveFileInodeMsgEx : public MirroredMessage<MoveFileInodeMsg,
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 
-      //HashDirLock lock(EntryLockStore& store) override;
       std::tuple<FileIDLock, ParentNameLock, FileIDLock> lock(EntryLockStore& store) override;
-
       bool isMirrored() override { return getFromFileEntryInfo()->getIsBuddyMirrored(); }
 
    private:

@@ -8,7 +8,10 @@
 #include <common/net/sock/ibv/IBVSocket.h>
 #include <common/net/sock/PooledSocket.h>
 #include <common/net/sock/NicAddressStats.h>
+#include <app/config/Config.h>
 
+struct ib_device;
+struct ib_mr;
 struct RDMASocket;
 typedef struct RDMASocket RDMASocket;
 struct NicAddressStats;
@@ -37,18 +40,18 @@ extern ssize_t _RDMASocket_sendto(Socket* this, struct iov_iter* iter, int flags
 extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finishPoll);
 
 // inliners
-#ifdef BEEGFS_NVFS
-struct ib_device;
-static inline struct ib_device *RDMASocket_getDevice(RDMASocket* this);
-static inline unsigned RDMASocket_getKey(RDMASocket* this);
-#endif
+static inline struct ib_device* RDMASocket_getDevice(RDMASocket* this);
+static inline unsigned RDMASocket_getRkey(RDMASocket* this);
+static inline bool RDMASocket_isRkeyGlobal(RDMASocket* this);
 
 static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
-   unsigned fragmentSize);
+   unsigned fragmentSize, RDMAKeyType keyType);
 static inline void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
    int completionMS, int flowSendMS, int flowRecvMS, int pollMS);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
 static inline void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value);
+static inline bool RDMASocket_registerMr(RDMASocket* this, struct ib_mr* mr, int access);
+static inline IBVSocketKeyType RDMASocket_toIBVSocketKeyType(RDMAKeyType keyType);
 
 struct RDMASocket
 {
@@ -59,31 +62,44 @@ struct RDMASocket
    IBVCommConfig commCfg;
 };
 
-#ifdef BEEGFS_NVFS
-unsigned RDMASocket_getKey(RDMASocket *this)
+unsigned RDMASocket_getRkey(RDMASocket *this)
 {
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
-   return this->ibvsock.commContext->dmaMR->lkey;
-#else
-   return this->ibvsock.commContext->pd->unsafe_global_rkey;
-#endif
+   return IBVSocket_getRkey(&this->ibvsock);
+}
+
+bool RDMASocket_isRkeyGlobal(RDMASocket* this)
+{
+   return this->commCfg.keyType != IBVSOCKETKEYTYPE_Register;
 }
 
 struct ib_device* RDMASocket_getDevice(RDMASocket *this)
 {
-   return this->ibvsock.commContext->pd->device;
+   return IBVSocket_getDevice(&this->ibvsock);
 }
-#endif /* BEEGFS_NVFS */
+
+IBVSocketKeyType RDMASocket_toIBVSocketKeyType(RDMAKeyType keyType)
+{
+   switch (keyType)
+   {
+   case RDMAKEYTYPE_UnsafeDMA:
+      return IBVSOCKETKEYTYPE_UnsafeDMA;
+   case RDMAKEYTYPE_Register:
+      return IBVSOCKETKEYTYPE_Register;
+   default:
+      return IBVSOCKETKEYTYPE_UnsafeGlobal;
+   }
+}
 
 /**
  * Note: Only has an effect for unconnected sockets.
  */
 void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
-   unsigned fragmentSize)
+   unsigned fragmentSize, RDMAKeyType keyType)
 {
    this->commCfg.bufNum = bufNum;
    this->commCfg.bufSize = bufSize;
    this->commCfg.fragmentSize = fragmentSize;
+   this->commCfg.keyType = RDMASocket_toIBVSocketKeyType(keyType);
 }
 
 void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
@@ -107,6 +123,11 @@ void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService)
 void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value)
 {
    IBVSocket_setConnectionFailureStatus(&this->ibvsock, value);
+}
+
+bool RDMASocket_registerMr(RDMASocket* this, struct ib_mr* mr, int access)
+{
+   return !IBVSocket_registerMr(&this->ibvsock, mr, access);
 }
 
 #endif /*OPEN_RDMASOCKET_H_*/

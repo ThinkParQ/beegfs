@@ -7,8 +7,7 @@
 
 #define STATMSG_FLAG_GET_PARENTINFO 1 // caller wants to have parentOwnerNodeID and parentEntryID
 
-
-class StatMsg : public NetMessageSerdes<StatMsg>
+class StatMsg : public MirroredMessageBase<StatMsg>
 {
    friend class AbstractNetMessageFactory;
 
@@ -38,6 +37,8 @@ class StatMsg : public NetMessageSerdes<StatMsg>
       {
          return STATMSG_FLAG_GET_PARENTINFO;
       }
+
+      bool supportsMirroring() const { return true; }
 
    private:
 

@@ -49,7 +49,7 @@ int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
    const struct iov_iter *iter)
 {
    struct page     *page = NULL;
-   struct iov_iter   iter_copy = *iter;
+   struct iov_iter  iter_copy = *iter;
    size_t           page_offset = 0;
    int              status = 0;
    bool             is_gpu = false;
@@ -69,7 +69,7 @@ int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
    // At this point, the request did come in through nvidia_fs.
    // nvfs_is_gpu_page() will return false if RDMA write support
    // is disabled in user space.
-   // TBD: if a GPU page, keep the retrieved page for a future
+   // TODO: if a GPU page, keep the retrieved page for a future
    // RDMA map operation instead of calling put_page()
    if (nvfs_ops->nvfs_is_gpu_page(page))
    {
@@ -117,7 +117,7 @@ static int RdmaInfo_iovToSglist(const struct iov_iter *iter,
    struct page        **pages = NULL;
    struct scatterlist  *sg = NULL;
    struct scatterlist  *sg_prev = NULL;
-   struct iov_iter       iter_copy = *iter;
+   struct iov_iter      iter_copy = *iter;
    int                  sg_count = 0;
    size_t               page_length = 0;
    size_t               page_offset = 0;
@@ -176,6 +176,9 @@ static int RdmaInfo_coalesceSglist(struct scatterlist *sglist,
    dma_addr_t dma_ba = 0, dma_la = 0;
    dma_addr_t sg_ba = 0, sg_la = 0;
    int i = 0;
+#ifdef BEEGFS_DEBUG
+   size_t len = sg_dma_len(sgp);
+#endif
 
    //
    // Load the first range.
@@ -186,6 +189,9 @@ static int RdmaInfo_coalesceSglist(struct scatterlist *sglist,
    {
       for_each_sg(&sglist[1], sgp, count-1, i)
       {
+#ifdef BEEGFS_DEBUG
+         len += sg_dma_len(sgp);
+#endif
          sg_to_ba_la(sgp, sg_ba, sg_la);
 
          //
@@ -208,15 +214,16 @@ static int RdmaInfo_coalesceSglist(struct scatterlist *sglist,
          }
       }
    }
-
    //
    // Set the last range.
    //
    ba_la_to_sg(dmap, dma_ba, dma_la);
    sg_mark_end(dmap);
 
-   count = 1 + dmap - dmalist;
-   return count;
+#ifdef BEEGFS_DEBUG
+   printk_fhgfs(KERN_INFO, "%s len=%zu count=%d return=%d\n", __func__, len, count, (int)(1 + dmap - dmalist));
+#endif
+   return 1 + dmap - dmalist;
 }
 
 /*
@@ -229,19 +236,27 @@ static int RdmaInfo_coalesceSglist(struct scatterlist *sglist,
 static RdmaInfo * RdmaInfo_map(const struct iov_iter *iter, Socket *socket,
    enum dma_data_direction dma_dir)
 {
-   RdmaInfo           *rdmap = NULL;
-   struct ib_device   *device = NULL;
-   struct scatterlist *sglist = NULL;
-   struct scatterlist *dmalist = NULL;
+   RdmaInfo           *rdmap;
+   RDMASocket         *rs;
+   struct ib_device   *device;
+   struct scatterlist *sglist;
+   struct scatterlist *dmalist;
    int         status = 0;
-   int         sg_count = 0;
-   int         dma_count = 0;
-   int         count = 0;
-   unsigned    npages = 0;
-   unsigned    key = 0;
+   int         sg_count;
+   int         dma_count;
+   int         count;
+   unsigned    npages;
+   unsigned    key;
 
    if (Socket_getSockType(socket) != NICADDRTYPE_RDMA)
       return ERR_PTR(-EINVAL);
+
+   rs = (RDMASocket*) socket;
+   if (!RDMASocket_isRkeyGlobal(rs))
+   {
+      printk_fhgfs(KERN_ERR, "ERROR: rkey type is not compatible with GDS\n");
+      return ERR_PTR(-EINVAL);
+   }
 
    npages = 1 + iov_iter_npages(iter, INT_MAX);
 
@@ -272,8 +287,8 @@ static RdmaInfo * RdmaInfo_map(const struct iov_iter *iter, Socket *socket,
    //
    // DMA map all of the pages.
    //
-   device = RDMASocket_getDevice((RDMASocket*) socket);
-   key = RDMASocket_getKey((RDMASocket*) socket);
+   device = RDMASocket_getDevice(rs);
+   key = RDMASocket_getRkey(rs);
 
    count = nvfs_ops->nvfs_dma_map_sg_attrs(device->dma_device, sglist, sg_count,
       dma_dir, DMA_ATTR_NO_WARN);
@@ -329,14 +344,14 @@ static RdmaInfo * RdmaInfo_map(const struct iov_iter *iter, Socket *socket,
    return rdmap;
 
 error_return:
-   if (likely(sglist))
+   if (sglist)
    {
       RdmaInfo_putPages(sglist, sg_count);
       kfree(sglist);
    }
-   if (likely(dmalist))
+   if (dmalist)
       kfree(dmalist);
-   if (likely(rdmap))
+   if (rdmap)
       kfree(rdmap);
    return (status == 0) ? NULL : ERR_PTR(status);
 }

@@ -104,6 +104,7 @@ BEEGFS_FSCK_PATH               ?= $(root_dir)/fsck
 BEEGFS_EVENT_LISTENER_PATH     ?= $(root_dir)/event_listener
 BEEGFS_DEVEL_INCLUDE_PATH      ?= $(root_dir)/client_devel/include
 BEEGFS_JAVA_LIB_PATH           ?= $(root_dir)/java_lib
+BEEGFS_CLIENT_PATH             ?= $(root_dir)/client_module/include
 
 BOOST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/boost
 NU_INC_PATH       ?= $(BEEGFS_THIRDPARTY_PATH)/source/nu/include
@@ -249,7 +250,8 @@ ifeq ($(strip $(MAKECMDGOALS)),clean)
    resolve-dep-deps :=
 else
    $(call define-dep-lib, common,\
-      -I $(BEEGFS_COMMON_PATH)/source,\
+      -I $(BEEGFS_COMMON_PATH)/source \
+      -I $(BEEGFS_CLIENT_PATH), \
       -ldl $(BEEGFS_COMMON_PATH)/build/libbeegfs-common.a)
 
    $(call define-dep-lib, client-devel,\

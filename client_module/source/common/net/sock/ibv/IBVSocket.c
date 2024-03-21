@@ -18,7 +18,6 @@
 #include <rdma/rdma_cm.h>
 #include <rdma/ib_cm.h>
 
-
 #define IBVSOCKET_CONN_TIMEOUT_MS                  5000
  /* this also includes send completion wait times */
 #define IBVSOCKET_COMPLETION_TIMEOUT_MS          300000
@@ -49,8 +48,7 @@
 #define ibv_print_info_debug(str, ...) printk_fhgfs_debug(KERN_INFO, "%s:%d: " str, __func__, \
    __LINE__, ##__VA_ARGS__)
 #define ibv_print_info_ir_debug(str, ...) printk_fhgfs_ir_debug(KERN_INFO, "%s:%d: " str, \
-   __func__, __LINE__, ##__VA_ARGS__)
-
+      __func__, __LINE__, ##__VA_ARGS__)
 
 /* 4.19 added const qualifiers to ib_post_send and ib_post_recv. */
 typedef __typeof__(
@@ -110,6 +108,15 @@ bool IBVSocket_rdmaDevicesExist()
    return true;
 }
 
+unsigned IBVSocket_getRkey(IBVSocket *_this)
+{
+   return _this->commContext->checkConnRkey;
+}
+
+struct ib_device* IBVSocket_getDevice(IBVSocket* _this)
+{
+   return _this->commContext->pd->device;
+}
 
 
 /**
@@ -587,16 +594,19 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    IBVCommConfig* commCfg, IBVCommContext** outCommContext)
 {
    IBVCommContext* commContext;
+   struct ib_device* dev = cm_id->device;
    struct ib_qp_init_attr qpInitAttr;
    int qpRes;
    unsigned i;
    unsigned fragmentSize;
    unsigned maxSge;
    unsigned maxWr;
+   bool globalRkey = (commCfg->keyType == IBVSOCKETKEYTYPE_UnsafeGlobal);
 
    commContext = kzalloc(sizeof(*commContext), GFP_KERNEL);
    if(!commContext)
       goto err_cleanup;
+
    ibv_print_info_debug("Alloc CommContext @ %p\n", commContext);
 
    // prepare recv and send event notification
@@ -608,11 +618,18 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    atomic_set(&commContext->sendCompEventCount, 0);
 
    // protection domain...
-
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
-   commContext->pd = ib_alloc_pd(cm_id->device);
+   // IB_PD_UNSAFE_GLOBAL_RKEY is still present as of kernel 6.3.
+#ifdef OFED_UNSAFE_GLOBAL_RKEY
+   commContext->pd = ib_alloc_pd(dev, globalRkey? IB_PD_UNSAFE_GLOBAL_RKEY : 0);
+   if (globalRkey)
+      commContext->checkConnRkey = commContext->pd->unsafe_global_rkey;
 #else
-   commContext->pd = ib_alloc_pd(cm_id->device, IB_PD_UNSAFE_GLOBAL_RKEY);
+   if (globalRkey)
+   {
+      ibv_print_info("Unsafe global rkey not supported on this platform.");
+      goto err_cleanup;
+   }
+   commContext->pd = ib_alloc_pd(dev, 0);
 #endif
    if(IS_ERR(commContext->pd) )
    {
@@ -622,22 +639,36 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       goto err_cleanup;
    }
 
-   // DMA system mem region...
-
-   // (Note: IB spec says:
-   //    "The consumer is not allowed to assign remote-write (or remote-atomic) to
-   //    a memory region that has not been assigned local-write.")
-
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
-   commContext->dmaMR = ib_get_dma_mr(commContext->pd,
-      IB_ACCESS_LOCAL_WRITE| IB_ACCESS_REMOTE_READ| IB_ACCESS_REMOTE_WRITE);
-   if(IS_ERR(commContext->dmaMR) )
+   if (commCfg->keyType == IBVSOCKETKEYTYPE_UnsafeDMA)
    {
-      ibv_print_info("ib_get_dma_mr failed. ErrCode: %ld\n", PTR_ERR(commContext->dmaMR) );
+      // DMA system mem region...
 
-      commContext->dmaMR = NULL;
+      // (Note: IB spec says:
+      //    "The consumer is not allowed to assign remote-write (or remote-atomic) to
+      //    a memory region that has not been assigned local-write.")
+
+      // ib_get_dma_mr() goes away in kernel 4.9. Is is still present in MOFED 5.9.
+      // If not using the global rkey, then either ib_get_dmr_mr() or an allocated ib_mr
+      // needs to be used.
+#ifdef OFED_IB_GET_DMA_MR
+      commContext->dmaMR = ib_get_dma_mr(commContext->pd,
+         IB_ACCESS_LOCAL_WRITE| IB_ACCESS_REMOTE_READ| IB_ACCESS_REMOTE_WRITE);
+      if(IS_ERR_OR_NULL(commContext->dmaMR) )
+      {
+         ibv_print_info("ib_get_dma_mr failed. ErrCode: %ld\n", PTR_ERR(commContext->dmaMR) );
+         commContext->dmaMR = NULL;
+         goto err_cleanup;
+      }
+      commContext->checkConnRkey = commContext->dmaMR->rkey;
+#else
+      ibv_print_info("RDMA keyType is dma and ib_get_dma_mr() not supported on this platform.\n");
       goto err_cleanup;
+#endif
+
    }
+
+#ifdef BEEGFS_DEBUG
+   ibv_print_info("%s: checkConnRkey = %u\n", __func__, commContext->checkConnRkey);
 #endif
 
    // alloc and register buffers...
@@ -679,7 +710,7 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    }
 
    if(!IBVBuffer_init(&commContext->checkConBuffer, commContext, sizeof(u64),
-         commCfg->fragmentSize, DMA_FROM_DEVICE) )
+         0, DMA_TO_DEVICE) )
    {
       ibv_print_info("couldn't alloc dma control memory region\n");
       goto err_cleanup;
@@ -745,17 +776,6 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    }
 
    commContext->qp = cm_id->qp;
-
-   // post initial recv buffers...
-
-   for(i=0; i < commCfg->bufNum; i++)
-   {
-      if(__IBVSocket_postRecv(_this, commContext, i) )
-      {
-         ibv_print_info("couldn't post recv buffer with index %d\n", i);
-         goto err_cleanup;
-      }
-   }
 
    // prepare event notification...
 
@@ -846,11 +866,8 @@ void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* co
    SAFE_KFREE(commContext->recvBufs);
    SAFE_KFREE(commContext->sendBufs);
 
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
    if(commContext->dmaMR)
       ib_dereg_mr(commContext->dmaMR);
-#endif
-
    if(commContext->pd)
       ib_dealloc_pd(commContext->pd);
 
@@ -861,18 +878,18 @@ cleanup_no_dev:
 /**
  * Initializes a (local) IBVCommDest.
  */
-void __IBVSocket_initCommDest(IBVCommContext* commContext, IBVCommDest* outDest)
+bool __IBVSocket_initCommDest(IBVCommContext* commContext, IBVCommDest* outDest)
 {
    memcpy(outDest->verificationStr, IBVSOCKET_PRIVATEDATA_STR, IBVSOCKET_PRIVATEDATA_STR_LEN);
    outDest->protocolVersion = cpu_to_le64(IBVSOCKET_PRIVATEDATA_PROTOCOL_VER);
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
-   outDest->rkey = cpu_to_le32(commContext->dmaMR->rkey);
-#else
-   outDest->rkey = cpu_to_le32(commContext->pd->unsafe_global_rkey);
-#endif
+   outDest->rkey = cpu_to_le32(commContext->checkConnRkey);
    outDest->vaddr = cpu_to_le64(commContext->checkConBuffer.lists[0].addr);
    outDest->recvBufNum = cpu_to_le32(commContext->commCfg.bufNum);
    outDest->recvBufSize = cpu_to_le32(commContext->commCfg.bufSize);
+#ifdef BEEGFS_DEBUG
+   ibv_print_info("%s: rkey=%u vaddr=%llu", __func__, outDest->rkey, outDest->vaddr);
+#endif
+   return true;
 }
 
 /**
@@ -994,6 +1011,7 @@ int IBVSocket_checkConnection(IBVSocket* _this)
 
    waitRes = __IBVSocket_waitForTotalSendCompletion(_this,
       &commContext->incompleteSend.numAvailable, &numWaitWrites, &numWaitReads, timeoutMS);
+
    if(unlikely(waitRes <= 0) )
       goto error;
 
@@ -1871,7 +1889,6 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
 {
    bool createContextRes;
    struct rdma_conn_param conn_param;
-
    createContextRes = __IBVSocket_createCommContext(_this, _this->cm_id, commCfg,
       &_this->commContext);
    if(!createContextRes)
@@ -1883,8 +1900,23 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
    }
 
    // establish connection...
+   if (_this->commContext->checkConnRkey == 0)
+   {
+      if (!IBVBuffer_initRegistration(&_this->commContext->checkConBuffer, _this->commContext))
+      {
+         _this->errState = -1;
+         return -EPERM;
+      }
+      _this->commContext->checkConnRkey = _this->commContext->checkConBuffer.mr->rkey;
+   }
 
-   __IBVSocket_initCommDest(_this->commContext, &_this->localDest);
+   if (!__IBVSocket_initCommDest(_this->commContext, &_this->localDest))
+   {
+      ibv_print_info_ir("creation of CommDest failed\n");
+      _this->errState = -1;
+
+      return -EPERM;
+   }
 
    memset(&conn_param, 0, sizeof(conn_param) );
 #ifdef BEEGFS_NVFS
@@ -1907,11 +1939,33 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
 
 int __IBVSocket_connectedHandler(IBVSocket* _this, struct rdma_cm_event* event)
 {
+   IBVCommContext* commContext = _this->commContext;
+   IBVCommConfig* commCfg = &commContext->commCfg;
    int retVal = 0;
    bool parseCommDestRes;
-
    const void* private_data;
    u8 private_data_len;
+   int i;
+
+   if (_this->commContext->commCfg.keyType == IBVSOCKETKEYTYPE_Register)
+   {
+      if(IBVSocket_registerMr(_this, _this->commContext->checkConBuffer.mr, IB_ACCESS_REMOTE_READ))
+      {
+         ibv_print_info("register buffer failed\n");
+         _this->errState = -1;
+         return -EPERM;
+      }
+   }
+
+   // post initial recv buffers...
+   for(i=0; i < commCfg->bufNum; i++)
+   {
+      if(__IBVSocket_postRecv(_this, commContext, i) )
+      {
+         ibv_print_info("couldn't post recv buffer with index %d\n", i);
+         goto err_invalidateSock;
+      }
+   }
 
 #if defined BEEGFS_OFED_1_2_API && (BEEGFS_OFED_1_2_API == 1)
    private_data = event->private_data;
@@ -1981,6 +2035,27 @@ const char* __IBVSocket_wcStatusStr(int wcStatusCode)
       default:
          return "<undefined>";
    }
+}
+
+int IBVSocket_registerMr(IBVSocket* _this, struct ib_mr* mr, int access)
+{
+   struct ib_reg_wr wr;
+   int res;
+
+   memset(&wr, 0, sizeof(wr));
+   wr.wr.opcode = IB_WR_REG_MR;
+   wr.mr = mr;
+   wr.key = mr->rkey;
+   wr.access = IB_ACCESS_LOCAL_WRITE | access;
+
+   res = ib_post_send(_this->commContext->qp, &wr.wr, NULL);
+   if (unlikely(res))
+   {
+      printk_fhgfs(KERN_ERR, "Failed to post IB_WR_REG_MR res=%d\n", res);
+      return -1;
+   }
+
+   return 0;
 }
 
 struct in_addr IBVSocket_getSrcIpAddr(IBVSocket* _this)

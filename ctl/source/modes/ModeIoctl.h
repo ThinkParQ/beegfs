@@ -29,6 +29,7 @@ class ModeIoctl : public Mode
       int ioctlMkFileWithStripeHints();
       int ioctlGetInodeID();
       int ioctlGetEntryInfo(IoctlTk& ioctlTk);
+      int ioctlPingNode();
 
 };
 

@@ -289,6 +289,18 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
    {
       lookupRes1 = FhgfsOpsErr_SUCCESS;
       outInodeDataOutdated = true;
+
+      // If the file inode is not inlined and the intent includes the creation flag,
+      // we need to use a different overload of getEntryData() to correctly retrieve the
+      // inode disk data for non-inlined inode(s) and prevent potential crashes due to
+      // race conditions between create and hardlink creation.
+      int createFlag = getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE;
+      if (!outEntryInfo->getIsInlined() && createFlag)
+      {
+         FhgfsOpsErr res = metaStore->getEntryData(outEntryInfo, outInodeStoreData);
+         if (res != FhgfsOpsErr_SUCCESS)
+            lookupRes1 = res;
+      }
    }
 
    metaStore->releaseDir(parentEntryID);

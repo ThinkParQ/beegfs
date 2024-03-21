@@ -4,6 +4,7 @@
 #ifdef BEEGFS_NVFS
 #include <common/net/message/session/rw/WriteLocalFileRDMAMsg.h>
 #include <common/net/message/session/rw/WriteLocalFileRDMARespMsg.h>
+#include <common/components/worker/Worker.h>
 #include <session/SessionLocalFile.h>
 #include <common/storage/StorageErrors.h>
 #include "WriteLocalFileMsgEx.h"
@@ -57,8 +58,14 @@ class WriteLocalFileRDMAMsgSender : public WriteLocalFileRDMAMsg
 
       inline ssize_t writeStateRecvData(ResponseContext& ctx, WriteState& ws)
       {
-         ws.recvLength = BEEGFS_MIN(ws.exactStaticRecvSize, ws.toBeReceived);
-         ws.recvLength = BEEGFS_MIN(ws.recvLength, (ssize_t)(ws.rLen - ws.rOff));
+         // Cannot RDMA anything larger than WORKER_BUFIN_SIZE in a single operation
+         // because that is the size of the buffer passed in by the Worker.
+         // TODO: pass around a Buffer with a length instead of unqualified char*.
+         ws.recvLength = BEEGFS_MIN(
+            BEEGFS_MIN(
+               BEEGFS_MIN(ws.exactStaticRecvSize, ws.toBeReceived),
+               (ssize_t)(ws.rLen - ws.rOff)),
+            WORKER_BUFIN_SIZE);
          return ctx.getSocket()->read(ctx.getBuffer(), ws.recvLength, 0, ws.rBuf + ws.rOff, ws.rdma->key);
       }
 

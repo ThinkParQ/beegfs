@@ -2,7 +2,7 @@
 #define OPENTK_IBVSOCKET_H_
 
 #include <common/Common.h>
-
+#include <common/toolkit/Random.h>
 #include <linux/in.h>
 #include <linux/inet.h>
 #include <linux/sched.h>
@@ -18,6 +18,8 @@
 #define IBVSOCKET_PRIVATEDATA_STR_LEN        8
 #define IBVSOCKET_PRIVATEDATA_PROTOCOL_VER   1
 
+struct ib_device;
+struct ib_mr;
 
 struct IBVIncompleteRecv;
 typedef struct IBVIncompleteRecv IBVIncompleteRecv;
@@ -41,6 +43,14 @@ typedef struct IBVCommConfig IBVCommConfig;
 
 struct NicAddressStats;
 typedef struct NicAddressStats NicAddressStats;
+
+enum IBVSocketKeyType
+{
+   IBVSOCKETKEYTYPE_UnsafeGlobal = 0,
+   IBVSOCKETKEYTYPE_UnsafeDMA,
+   IBVSOCKETKEYTYPE_Register
+};
+typedef enum IBVSocketKeyType IBVSocketKeyType;
 
 // construction/destruction
 extern __must_check bool IBVSocket_init(IBVSocket* _this, struct in_addr srcIpAddr, NicAddressStats* nicStats);
@@ -76,6 +86,10 @@ extern struct in_addr IBVSocket_getSrcIpAddr(IBVSocket* _this);
 // OK to access "nic" without holding mutex.
 extern NicAddressStats* IBVSocket_getNicStats(IBVSocket* _this);
 
+extern unsigned IBVSocket_getRkey(IBVSocket* _this);
+extern struct ib_device* IBVSocket_getDevice(IBVSocket* _this);
+extern int IBVSocket_registerMr(IBVSocket* _this, struct ib_mr* mr, int access);
+
 struct IBVTimeoutConfig
 {
    int connectMS;
@@ -96,11 +110,10 @@ struct IBVCommConfig
     * buffer should not be fragmented.
     */
    unsigned fragmentSize; // size of buffer fragments
+   IBVSocketKeyType keyType; // Which type of rkey for RDMA
 };
 
-
 #ifdef BEEGFS_RDMA
-
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
 #include <rdma/ib_cm.h>
@@ -116,7 +129,7 @@ extern bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* c
    IBVCommConfig* commCfg, IBVCommContext** outCommContext);
 extern void __IBVSocket_cleanupCommContext(struct rdma_cm_id* cm_id, IBVCommContext* commContext);
 
-extern void __IBVSocket_initCommDest(IBVCommContext* commContext, IBVCommDest* outDest);
+extern bool __IBVSocket_initCommDest(IBVCommContext* commContext, IBVCommDest* outDest);
 extern bool __IBVSocket_parseCommDest(const void* buf, size_t bufLen, IBVCommDest** outDest);
 
 extern int __IBVSocket_receiveCheck(IBVSocket* _this, int timeoutMS);
@@ -149,11 +162,11 @@ extern int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id*
    IBVCommConfig* commCfg, IBVCommContext** outCommContext);
 extern int __IBVSocket_connectedHandler(IBVSocket* _this, struct rdma_cm_event *event);
 
-struct ib_cq* __IBVSocket_createCompletionQueue(struct ib_device* device,
+extern struct ib_cq* __IBVSocket_createCompletionQueue(struct ib_device* device,
             ib_comp_handler comp_handler, void (*event_handler)(struct ib_event *, void *),
             void* cq_context, int cqe);
 
-const char* __IBVSocket_wcStatusStr(int wcStatusCode);
+extern const char* __IBVSocket_wcStatusStr(int wcStatusCode);
 
 
 enum IBVSocketConnState
@@ -186,10 +199,7 @@ struct IBVIncompleteSend
 struct IBVCommContext
 {
    struct ib_pd*             pd; // protection domain
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
-   struct ib_mr*             dmaMR; // dma mem region keys
-#endif
-
+   struct ib_mr*             dmaMR; // system DMA MR. Not supported on all platforms.
    atomic_t                  recvCompEventCount; // incremented on incoming event notification
    wait_queue_head_t         recvCompWaitQ; // for recvCompEvents
    wait_queue_t              recvWait;
@@ -212,6 +222,7 @@ struct IBVCommContext
 
    IBVIncompleteRecv         incompleteRecv;
    IBVIncompleteSend         incompleteSend;
+   u32                       checkConnRkey;
 };
 
 #pragma pack(push, 1)

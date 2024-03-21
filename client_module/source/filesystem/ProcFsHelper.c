@@ -49,6 +49,8 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "connRDMAMetaBufSize",
    "connRDMAMetaFragmentSize",
    "connRDMAMetaBufNum",
+   "connRDMATypeOfService",
+   "connRDMAKeyType",
    "connCommRetrySecs",
    "connNumCommRetries",
    "connUnmountRetries",
@@ -125,6 +127,9 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connRDMAMetaBufSize = %u\n", Config_getConnRDMAMetaBufSize(cfg) );
    seq_printf(file, "connRDMAMetaFragmentSize = %u\n", Config_getConnRDMAMetaFragmentSize(cfg) );
    seq_printf(file, "connRDMAMetaBufNum = %u\n", Config_getConnRDMAMetaBufNum(cfg) );
+   seq_printf(file, "connRDMATypeOfService = %d\n", Config_getConnRDMATypeOfService(cfg) );
+   seq_printf(file, "connRDMAKeyType = %s\n",
+      Config_rdmaKeyTypeNumToStr(Config_getConnRDMAKeyTypeNum(cfg)) );
    seq_printf(file, "connCommRetrySecs = %u\n", Config_getConnCommRetrySecs(cfg) );
    seq_printf(file, "connNumCommRetries = %u\n", Config_getConnNumCommRetries(cfg) );
    seq_printf(file, "connUnmountRetries = %d\n", (int)Config_getConnUnmountRetries(cfg) );
@@ -261,6 +266,13 @@ int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, in
    else
    if(!strcmp(currentKey, "connRDMAMetaBufNum") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaBufNum(cfg) );
+   else
+   if(!strcmp(currentKey, "connRDMATypeOfService") )
+      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getConnRDMATypeOfService(cfg) );
+   else
+   if(!strcmp(currentKey, "connRDMAKeyType") )
+      count = scnprintf(buf, size, "%s = %s\n", currentKey,
+         Config_rdmaKeyTypeNumToStr(Config_getConnRDMAKeyTypeNum(cfg) ) );
    else
    if(!strcmp(currentKey, "connCommRetrySecs") )
       count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnCommRetrySecs(cfg) );

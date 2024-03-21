@@ -59,7 +59,7 @@ class MetaStore
          const CharVector& accessACLXAttr);
       FhgfsOpsErr removeDirInode(const std::string& entryID, bool isBuddyMirrored);
       FhgfsOpsErr unlinkInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode);
-      FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID);
+      FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID, bool isBuddyMirrored);
       FhgfsOpsErr unlinkFile(DirInode& dir, const std::string& fileName,
          EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outInode);
       FhgfsOpsErr unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<FileInode>* outInode);
@@ -95,10 +95,12 @@ class MetaStore
 
       FhgfsOpsErr getEntryData(DirInode *dirInode, const std::string& entryName,
          EntryInfo* outInfo, FileInodeStoreData* outInodeMetaData);
+      FhgfsOpsErr getEntryData(EntryInfo* inEntryInfo, FileInodeStoreData* outInodeMetaData);
 
       FhgfsOpsErr linkInSameDir(DirInode& parentDir, EntryInfo* fromFileInfo,
          const std::string& fromName, const std::string& toName);
 
+      FhgfsOpsErr makeNewHardlink(EntryInfo* fromFileInfo);
       FhgfsOpsErr verifyAndMoveFileInode(DirInode& parentDir, EntryInfo* fileInfo,
          FileInodeMode moveMode);
       FhgfsOpsErr checkAndRepairDupFileInode(DirInode& parentDir, EntryInfo* entryInfo);
@@ -155,6 +157,9 @@ class MetaStore
       bool releaseFileUnlocked(const std::string& parentEntryID, MetaFileHandle& inode);
       bool releaseFileUnlocked(DirInode& subDir, MetaFileHandle& inode);
 
+      MetaFileHandle tryReferenceFileWriteLocked(EntryInfo* entryInfo);
+      FhgfsOpsErr tryOpenFileWriteLocked(EntryInfo* entryInfo, unsigned accessFlags, MetaFileHandle& outInode);
+
       bool moveReferenceToMetaFileStoreUnlocked(const std::string& parentEntryID,
          bool parentIsBuddyMirrored, const std::string& entryID);
 
@@ -167,6 +172,8 @@ class MetaStore
          SettableFileAttribs* attribs);
       FhgfsOpsErr incDecLinkCountUnlocked(EntryInfo* entryInfo, int value);
 
+      FhgfsOpsErr verifyAndMoveFileInodeUnlocked(DirInode& parentDir, EntryInfo* fileInfo,
+         FileInodeMode moveMode);
       FhgfsOpsErr deinlineFileInode(DirInode& parentDir, EntryInfo* entryInfo,
          DirEntry& dentry, const std::string& dirEntryPath);
       FhgfsOpsErr reinlineFileInode(DirInode& parentDir, EntryInfo* entryInfo,

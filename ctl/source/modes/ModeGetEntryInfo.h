@@ -37,6 +37,7 @@ class ModeGetEntryInfo : public Mode
       void printPattern(StripePattern* pattern, DirEntryType entryType);
       void printTargetMapping(uint16_t targetID);
       void getPathFromStdin();
+      void printMetaNodeInfo(EntryInfo* entryInfo, NodeHandle& ownerNode);
 };
 
 #endif /*MODEGETENTRYINFO_H_*/

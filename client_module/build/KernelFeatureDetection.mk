@@ -67,6 +67,11 @@ KERNEL_FEATURE_DETECTION += $(shell \
       && echo "-DOFED_UNSAFE_GLOBAL_RKEY")
 
 KERNEL_FEATURE_DETECTION += $(shell \
+   grep -qs -F "ib_get_dma_mr" \
+      ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
+      && echo "-DOFED_IB_GET_DMA_MR")
+
+KERNEL_FEATURE_DETECTION += $(shell \
    grep -qs -F "static inline void ib_destroy_cq" \
       ${OFED_DETECTION_PATH}/rdma/ib_verbs.h \
       && echo "-DOFED_IB_DESTROY_CQ_IS_VOID")

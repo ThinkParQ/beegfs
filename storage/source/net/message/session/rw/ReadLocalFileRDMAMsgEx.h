@@ -6,6 +6,7 @@
 #include <typeinfo>
 #include <common/net/message/session/rw/ReadLocalFileRDMAMsg.h>
 #include <common/storage/StorageErrors.h>
+#include <common/components/worker/Worker.h>
 #include <session/SessionLocalFileStore.h>
 #include "ReadLocalFileV2MsgEx.h"
 
@@ -68,7 +69,10 @@ class ReadLocalFileRDMAMsgSender : public ReadLocalFileRDMAMsg
 
       inline ssize_t getReadLength(ReadState& rs, ssize_t len)
       {
-         return BEEGFS_MIN(len, ssize_t(rs.rLen - rs.rOff));
+         // Cannot RDMA anything larger than WORKER_BUFOUT_SIZE in a single operation
+         // because that is the size of the buffer passed in by the Worker.
+         // TODO: pass around a Buffer with a length instead of unqualified char*.
+         return BEEGFS_MIN(BEEGFS_MIN(len, ssize_t(rs.rLen - rs.rOff)), WORKER_BUFOUT_SIZE);
       }
 
       inline bool readStateInit(ReadState& rs)

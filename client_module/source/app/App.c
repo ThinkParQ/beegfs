@@ -148,9 +148,13 @@ void App_uninit(App* this)
 int App_run(App* this)
 {
 
+   printk_fhgfs(KERN_INFO, "Built "
 #ifdef BEEGFS_NVFS
-   printk_fhgfs(KERN_INFO, "Built with NVFS RDMA support.\n");
+      "with"
+#else
+      "without"
 #endif
+      " NVFS RDMA support.\n");
 
 // init data objects & storage
 

@@ -9,9 +9,11 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
    public:
       /**
        * @param entryInfo just a reference, so do not free it as long as you use this object!
+       * @param createLink If True then also increment link count after deinlining inode
        */
-      MoveFileInodeMsg(EntryInfo* fromFileInfo, FileInodeMode mode) :
-            BaseType(NETMSGTYPE_MoveFileInode), moveMode(mode), fromFileInfoPtr(fromFileInfo)
+      MoveFileInodeMsg(EntryInfo* fromFileInfo, FileInodeMode mode, bool createLink = false) :
+            BaseType(NETMSGTYPE_MoveFileInode), moveMode(mode), createHardlink(createLink),
+            fromFileInfoPtr(fromFileInfo)
       {
       }
 
@@ -29,6 +31,7 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
       static void serialize(This obj, Ctx& ctx)
       {
          ctx % obj->moveMode;
+         ctx % obj->createHardlink;
          ctx
             % serdes::backedPtr(obj->fromFileInfoPtr, obj->fromFileInfo);
       }
@@ -36,7 +39,8 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
       bool supportsMirroring() const { return true; }
 
    private:
-      int32_t moveMode; // specify what kind of operation needed
+      int32_t moveMode;    // specify what kind of move operation is needed
+      bool createHardlink; // specify whether new hardlink should be created or not
 
       // for serialization
       EntryInfo* fromFileInfoPtr;
@@ -49,6 +53,11 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
       FileInodeMode getMode() const
       {
          return static_cast<FileInodeMode>(this->moveMode);
+      }
+
+      bool getCreateHardlink() const
+      {
+         return this->createHardlink;
       }
 
       EntryInfo* getFromFileEntryInfo()

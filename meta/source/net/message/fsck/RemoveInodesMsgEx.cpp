@@ -31,7 +31,7 @@ bool RemoveInodesMsgEx::processIncoming(ResponseContext& ctx)
       else
       {
          fileLock = {entryLockStore, entryID, true};
-         rmRes = metaStore->fsckUnlinkFileInode(entryID);
+         rmRes = metaStore->fsckUnlinkFileInode(entryID, isBuddyMirrored);
       }
 
       if (rmRes != FhgfsOpsErr_SUCCESS)

@@ -107,18 +107,7 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
    if(ifr.ifr_flags & IFF_LOOPBACK)
       return false; // loopback interface => skip
 
-   if(!dev->dev_addr)
-   { // should probably never happen
-      printk_fhgfs(KERN_NOTICE, "found interface without dev_addr: %s\n", dev->name);
-      return false;
-   }
-
-   // SIOCGIFHWADDR:
-   // get hardware address (MAC)
-   memcpy(ifr.ifr_hwaddr.sa_data, dev->dev_addr, (size_t) dev->addr_len);
-
    ifr.ifr_hwaddr.sa_family = dev->type;
-
 
    // select which hardware types to process
    // (on Linux see /usr/include/linux/if_arp.h for the whole list)

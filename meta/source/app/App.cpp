@@ -245,9 +245,13 @@ void App::runNormal()
    if(cfg->getRunDaemonized() )
       daemonize();
 
+   log->log(Log_NOTICE, "Built "
 #ifdef BEEGFS_NVFS
-   log->log(Log_NOTICE, "Built with NVFS RDMA support.");
+      "with"
+#else
+      "without"
 #endif
+      " NVFS RDMA support.");
 
    // find RDMA interfaces (based on TCP/IP interfaces)
 

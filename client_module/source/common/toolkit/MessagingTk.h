@@ -14,13 +14,15 @@
 #include <common/Common.h>
 #include <net/message/NetMessageFactory.h>
 
+struct Socket;
 
-extern FhgfsOpsErr MessagingTk_requestResponseWithRRArgs(App* app,
-   RequestResponseArgs* rrArgs);
+extern FhgfsOpsErr MessagingTk_requestResponseWithRRArgsSock(App* app,
+   RequestResponseArgs* rrArgs, Socket* sock);
 extern FhgfsOpsErr MessagingTk_requestResponseKMalloc(App* app, Node* node,
    NetMessage* requestMsg, unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg);
-extern FhgfsOpsErr MessagingTk_requestResponse(App* app, Node* node,
-   NetMessage* requestMsg, unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg);
+extern FhgfsOpsErr MessagingTk_requestResponseSock(App* app, Node* node,
+   NetMessage* requestMsg, unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg,
+   Socket* sock);
 
 extern FhgfsOpsErr MessagingTk_requestResponseRetry(App* app, Node* node,
    NetMessage* requestMsg, unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg);
@@ -33,7 +35,7 @@ extern FhgfsOpsErr MessagingTk_requestResponseNodeRetryAutoIntr(App* app,
 // private
 
 extern FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
-   RequestResponseArgs* rrArgs, MirrorBuddyGroup* group, bool* wasIndirectCommErr);
+   RequestResponseArgs* rrArgs, MirrorBuddyGroup* group, bool* wasIndirectCommErr, Socket* sock);
 extern FhgfsOpsErr __MessagingTk_handleGenericResponse(App* app, RequestResponseArgs* rrArgs,
    MirrorBuddyGroup* group, bool* wasIndirectCommErr);
 
@@ -47,6 +49,10 @@ static inline ssize_t MessagingTk_recvMsgBuf(App* app, Socket* sock, char* bufIn
 
 static inline void MessagingTk_waitBeforeRetry(unsigned currentNumRetry);
 static inline int MessagingTk_getRetryWaitMS(unsigned currentNumRetry);
+static inline FhgfsOpsErr MessagingTk_requestResponseWithRRArgs(App* app,
+   RequestResponseArgs* rrArgs);
+static inline FhgfsOpsErr MessagingTk_requestResponse(App* app, Node* node,
+   NetMessage* requestMsg, unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg);
 
 
 
@@ -176,6 +182,27 @@ int MessagingTk_getRetryWaitMS(unsigned currentNumRetry)
    }
 
    return retryWaitMS;
+}
+
+/**
+ * Note: rrArgs->outRespBuf must be returned/freed by the caller (depending on respBufType)
+ */
+FhgfsOpsErr MessagingTk_requestResponseWithRRArgs(App* app, RequestResponseArgs* rrArgs)
+{
+   return MessagingTk_requestResponseWithRRArgsSock(app, rrArgs, NULL);
+}
+
+/**
+ * Note: Allows only a single retry. (One retry allowed because we might have gotten an already
+ * broken connection from the conn pool.)
+ *
+ * @param outRespBuf must be returned to the store - not freed!
+ */
+FhgfsOpsErr MessagingTk_requestResponse(App* app, Node* node, NetMessage* requestMsg,
+   unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg)
+{
+   return MessagingTk_requestResponseSock(app, node, requestMsg, respMsgType,
+      outRespBuf, outRespMsg, NULL);
 }
 
 #endif /*MESSAGINGTK_H_*/

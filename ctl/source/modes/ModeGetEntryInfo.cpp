@@ -83,19 +83,19 @@ int ModeGetEntryInfo::execute()
    {
       EntryInfo entryInfo;
       NodeHandle ownerNode;
-      int isFile;
+      bool isFile;
       PathInfo pathInfo;
       bool getInfoRes;
 
       Path path(cfgPathStr);
 
-      if(!ModeHelper::getEntryAndOwnerFromPath(path, cfgUseMountedPath,
+      if (!ModeHelper::getEntryAndOwnerFromPath(path, cfgUseMountedPath,
             *metaNodes, app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
             entryInfo, ownerNode))
       {
          retVal = APPCODE_RUNTIME_ERROR;
 
-         if(!cfgReadFromStdin)
+         if (!cfgReadFromStdin)
             break;
 
          goto finish_this_entry;
@@ -110,13 +110,16 @@ int ModeGetEntryInfo::execute()
       if (!isFile && this->cfgVerbose)
          std::cout << "ParentID: " << entryInfo.getParentEntryID() << std::endl;
 
-      if (entryInfo.getIsBuddyMirrored())
+      if (!this->cfgVerbose)
       {
-         std::cout << "Metadata buddy group: " << entryInfo.getOwnerNodeID() << std::endl;
-         std::cout << "Current primary metadata node: " << ownerNode->getTypedNodeID() << std::endl;
+         if (entryInfo.getIsBuddyMirrored())
+         {
+            std::cout << "Metadata buddy group: " << entryInfo.getOwnerNodeID() << std::endl;
+            std::cout << "Current primary metadata node: " << ownerNode->getTypedNodeID() << std::endl;
+         }
+         else
+            std::cout << "Metadata node: " << ownerNode->getTypedNodeID() << std::endl;
       }
-      else
-         std::cout << "Metadata node: " << ownerNode->getTypedNodeID() << std::endl;
 
       // request and print entry info
       getInfoRes = getAndPrintEntryInfo(*ownerNode, &entryInfo, &pathInfo);
@@ -125,33 +128,51 @@ int ModeGetEntryInfo::execute()
 
       if (this->cfgVerbose)
       {
-
-         bool printInodeHashPath = false;
-
-         std::string hashPath = MetaStorageTk::getMetaInodePath("", entryInfo.getEntryID());
-
          if (isFile)
          {
-            std::string dentryPath = MetaStorageTk::getMetaDirEntryPath("",
-               entryInfo.getParentEntryID() );
-
             std::string chunkPath =
                StorageTk::getFileChunkPath(&pathInfo, entryInfo.getEntryID() );
 
             std::cout << "Chunk path: " << chunkPath << std::endl;
-
-            if (entryInfo.getIsInlined())
-               std::cout << "Dentry path: " << dentryPath.substr(1) + '/' << std::endl;
-            else
-               printInodeHashPath = true;
          }
-         else
+
+         std::cout << "Inlined inode: " << (entryInfo.getIsInlined() ? "yes" : "no") << std::endl;
+
+         // compute and print dentry info for files and directories (except root dir)
+         if (entryInfo.getEntryID() != "root")
          {
-            printInodeHashPath = true;
+            EntryInfo parentEntryInfo;
+            NodeHandle parentOwnerNode;
+
+            Path parentDirPath = path.dirname();
+            if (!ModeHelper::getEntryAndOwnerFromPath(parentDirPath, cfgUseMountedPath,
+                  *metaNodes, app->getMetaRoot(), *app->getMetaMirrorBuddyGroupMapper(),
+                  parentEntryInfo, parentOwnerNode))
+            {
+               retVal = APPCODE_RUNTIME_ERROR;
+
+               if (!cfgReadFromStdin)
+                  break;
+
+               goto finish_this_entry;
+            }
+
+            std::string dentryPath = MetaStorageTk::getMetaDirEntryPath("", parentEntryInfo.getEntryID());
+
+            std::cout << "Dentry info:" << std::endl;
+            std::cout << " + Path: " << dentryPath.substr(1) << "/" << std::endl;
+            this->printMetaNodeInfo(&parentEntryInfo, parentOwnerNode);
          }
 
-         if (printInodeHashPath)
-            std::cout << "Inode hash path: " << hashPath.substr(1) << std::endl;
+         // print inode info for non-inlined inode(s)
+         if (!entryInfo.getIsInlined())
+         {
+            std::string hashPath = MetaStorageTk::getMetaInodePath("", entryInfo.getEntryID());
+
+            std::cout << "Inode info:" << std::endl;
+            std::cout << " + Path: " << hashPath.substr(1) << std::endl;
+            this->printMetaNodeInfo(&entryInfo, ownerNode);
+         }
       }
 
       // cleanup
@@ -385,4 +406,17 @@ void ModeGetEntryInfo::getPathFromStdin()
       getline(std::cin, this->cfgPathStr, '\0');
    else
       getline(std::cin, this->cfgPathStr);
+}
+
+void ModeGetEntryInfo::printMetaNodeInfo(EntryInfo* entryInfo, NodeHandle& ownerNode)
+{
+   if (entryInfo->getIsBuddyMirrored())
+   {
+      std::cout << " + Metadata buddy group: " << entryInfo->getOwnerNodeID().str() << std::endl;
+      std::cout << " + Current primary metadata node: " << ownerNode->getTypedNodeID() << std::endl;
+   }
+   else
+   {
+      std::cout << " + Metadata node: " << ownerNode->getTypedNodeID() << std::endl;
+   }
 }

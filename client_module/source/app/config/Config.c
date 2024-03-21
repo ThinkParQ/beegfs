@@ -31,7 +31,6 @@
 #define EVENTLOGMASK_LINK_OP "link-op"
 #define EVENTLOGMASK_READ "read"
 
-#define RDMA_BUFNUM_MIN 3
 
 #define IGNORE_CONFIG_VALUE(compareStr) /* to be used in applyConfigMap() */ \
    if(!strcmp(keyStr, compareStr) ) \
@@ -94,6 +93,7 @@ bool Config_init(Config* this, MountConfig* mountConfig)
    this->sysMgmtdHost = NULL;
    this->sysInodeIDStyle = NULL;
    this->connInterfacesList = NULL;
+   this->connRDMAKeyType = NULL;
 
    return _Config_initConfig(this, mountConfig, true);
 }
@@ -130,6 +130,7 @@ void Config_uninit(Config* this)
    SAFE_KFREE(this->sysMgmtdHost);
    SAFE_KFREE(this->sysInodeIDStyle);
    SAFE_KFREE(this->connInterfacesList);
+   SAFE_KFREE(this->connRDMAKeyType);
 
    StrCpyMap_uninit(&this->configMap);
 }
@@ -234,6 +235,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connRDMAMetaFragmentSize",         "4096");
    _Config_configMapRedefine(this, "connRDMAMetaBufNum",               "0");
    _Config_configMapRedefine(this, "connRDMATypeOfService",            "0");
+   _Config_configMapRedefine(this, "connRDMAKeyType",                  RDMAKEYTYPE_UNSAFE_GLOBAL_STR);
    _Config_configMapRedefine(this, "connNetFilterFile",                "");
    _Config_configMapRedefine(this, "connMaxConcurrentAttempts",        "0");
    _Config_configMapRedefine(this, "connAuthFile",                     "");
@@ -430,6 +432,12 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       else
       if(!strcmp(keyStr, "connRDMAMetaBufNum") )
          this->connRDMAMetaBufNum = StringTk_strToUInt(valueStr);
+      else
+      if(!strcmp(keyStr, "connRDMAKeyType") )
+      {
+         SAFE_KFREE(this->connRDMAKeyType);
+         this->connRDMAKeyType = StringTk_strDup(valueStr);
+      }
       else
       if(!strcmp(keyStr, "connNetFilterFile") )
       {
@@ -1104,6 +1112,7 @@ bool __Config_initImplicitVals(Config* this)
    __Config_initTuneFileCacheTypeNum(this);
    __Config_initSysInodeIDStyleNum(this);
    __Config_initLogTypeNum(this);
+   __Config_initConnRDMAKeyTypeNum(this);
 
    // tuneMsgBufNum
    if(!this->tuneMsgBufNum)
@@ -1121,10 +1130,10 @@ bool __Config_initImplicitVals(Config* this)
    if(!this->tuneUseGlobalAppendLocks)
       this->tuneUseBufferedAppend = false;
 
-   if (this->connRDMABufNum < RDMA_BUFNUM_MIN)
+   if (this->connRDMABufNum < CONFIG_CONN_RDMA_BUFNUM_MIN)
    {
-      printk_fhgfs(KERN_WARNING, "connRDAMBufNum is too low, setting to %d\n", RDMA_BUFNUM_MIN);
-      this->connRDMABufNum = RDMA_BUFNUM_MIN;
+      printk_fhgfs(KERN_WARNING, "connRDAMBufNum is too low, setting to %d\n", CONFIG_CONN_RDMA_BUFNUM_MIN);
+      this->connRDMABufNum = CONFIG_CONN_RDMA_BUFNUM_MIN;
    }
 
    if (this->connRDMAFragmentSize == 0)
@@ -1351,6 +1360,31 @@ const char* Config_eventLogMaskToStr(enum EventLogMask mask)
       return EVENTLOGMASK_NONE;
    else
       return ELM_PART_LINK_OP("") + 1;
+}
+
+void __Config_initConnRDMAKeyTypeNum(Config* this)
+{
+   const char* valueStr = this->connRDMAKeyType;
+
+   if(!strcasecmp(valueStr, RDMAKEYTYPE_UNSAFE_DMA_STR))
+      this->connRDMAKeyTypeNum = RDMAKEYTYPE_UnsafeDMA;
+   else if(!strcasecmp(valueStr, RDMAKEYTYPE_REGISTER_STR))
+      this->connRDMAKeyTypeNum = RDMAKEYTYPE_Register;
+   else
+      this->connRDMAKeyTypeNum = RDMAKEYTYPE_UnsafeGlobal;
+}
+
+const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType)
+{
+   switch(keyType)
+   {
+      case RDMAKEYTYPE_Register:
+         return RDMAKEYTYPE_REGISTER_STR;
+      case RDMAKEYTYPE_UnsafeDMA:
+         return RDMAKEYTYPE_UNSAFE_DMA_STR;
+      default:
+         return RDMAKEYTYPE_UNSAFE_GLOBAL_STR;
+   }
 }
 
 /**

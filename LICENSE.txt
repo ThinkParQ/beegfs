@@ -1,7 +1,7 @@
 BeeGFS (formerly known as FhGFS) END USER LICENSE AGREEMENT
 ===========================================================
 
-March 02, 2016
+February 10, 2023
 
 
 PLEASE READ THIS LICENSE AGREEMENT CAREFULLY. BY USING THE SOFTWARE BEEGFS YOU
@@ -11,10 +11,8 @@ THIS LICENSE, DO NOT INSTALL, COPY, OR USE THE SOFTWARE.
 
 1.) DEFINITIONS
 
-1.1) LICENSOR: Fraunhofer Gesellschaft zur Foerderung der angewandten Forschung
-e.V., Hansastr. 27c, 80686 Muenchen, Germany, as legal entity of Fraunhofer-
-Institut fuer Techno- und Wirtschaftsmathematik, Fraunhofer-Platz 1,
-67663 Kaiserslautern, Germany.
+1.1) LICENSOR: ThinkParQ GmbH, Trippstadter Strasse 113, 67663 Kaiserslautern,
+Germany.
 
 1.2) LICENSEE: The user of BEEGFS under this License Agreement.
 
@@ -65,8 +63,11 @@ LICENSEE may not:
 3.4) As of software version 2015.03-r1, the following optional features of the
 LICENSED SOFTWARE are declared as enterprise features:
   - Mirroring
-  - Access Control Lists (ACLs)
+  - High Availability
   - Quota Enforcement
+  - Access Control Lists (ACLs)
+  - Storage Pool
+
 All enterprise features are disabled by default.
 
 3.4.1) LICENSEE may enable and use the enterprise features for a trial period of

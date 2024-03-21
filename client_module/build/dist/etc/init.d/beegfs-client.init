@@ -124,8 +124,9 @@ build_beegfs()
 
           set -e
 
-          make -C ${dir}/build auto_rebuild_configured ${TARGET_PARAM} --silent
-          make -C ${dir}/build clean --silent # always clean up
+          MAKE_ARGS="KMOD_INST_DIR=/lib/modules/$(uname -r)/updates/fs/beegfs_autobuild"
+          make -C ${dir}/build auto_rebuild_configured ${MAKE_ARGS} ${TARGET_PARAM} --silent
+          make -C ${dir}/build clean ${MAKE_ARGS} --silent # always clean up
 
       done
 

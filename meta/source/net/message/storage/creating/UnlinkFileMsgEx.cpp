@@ -76,12 +76,16 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
    // reference parent dir
    DirInode* dir = metaStore->referenceDir(getParentInfo()->getEntryID(),
       getParentInfo()->getIsBuddyMirrored(), true);
+
    if (!dir)
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
    DirEntry dentryToRemove(getDelFileName());
    if (!dir->getFileDentry(getDelFileName(), dentryToRemove))
+   {
+      metaStore->releaseDir(dir->getID());
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+   }
 
    // get entryInfo
    dentryToRemove.getEntryInfo(getParentInfo()->getEntryID(), 0, &delFileInfo);
@@ -128,6 +132,7 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
 
          RequestResponseArgs rrArgs(NULL, &unlinkInodeMsg, NETMSGTYPE_UnlinkLocalFileInodeResp);
          RequestResponseNode rrNode(ownerNodeID, app->getMetaNodes());
+         rrNode.setTargetStates(app->getMetaStateStore());
 
          if (fileInfo.getIsBuddyMirrored())
          {

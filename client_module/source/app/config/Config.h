@@ -22,6 +22,9 @@ typedef enum InodeIDStyle InodeIDStyle;
 enum LogType;
 typedef enum LogType LogType;
 
+enum RDMAKeyType;
+typedef enum RDMAKeyType RDMAKeyType;
+
 enum EventLogMask
 {
    EventLogMask_NONE = 0,
@@ -60,12 +63,14 @@ extern void __Config_initTuneFileCacheTypeNum(Config* this);
 void __Config_initSysInodeIDStyleNum(Config* this);
 void __Config_initLogTypeNum(Config* this);
 bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outConnAuthHash);
+void __Config_initConnRDMAKeyTypeNum(Config* this);
 
 // conversion
 const char* Config_fileCacheTypeNumToStr(FileCacheType cacheType);
 const char* Config_inodeIDStyleNumToStr(InodeIDStyle inodeIDStyle);
 const char* Config_logTypeNumToStr(LogType logType);
 const char* Config_eventLogMaskToStr(enum EventLogMask mask);
+const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType);
 
 // getters & setters
 static inline char* Config_getCfgFile(Config* this);
@@ -96,6 +101,8 @@ static inline unsigned Config_getConnRDMABufNum(Config* this);
 static inline unsigned Config_getConnRDMAMetaBufSize(Config* this);
 static inline unsigned Config_getConnRDMAMetaBufNum(Config* this);
 static inline unsigned Config_getConnRDMAMetaFragmentSize(Config* this);
+static inline char* Config_getConnRDMAKeyType(Config* this);
+static inline RDMAKeyType Config_getConnRDMAKeyTypeNum(Config* this);
 static inline int Config_getConnRDMATypeOfService(Config* this);
 static inline unsigned Config_getRemapConnectionFailureStatus(Config* this);
 static inline void Config_setRemapConnectionFailureStatus(Config* this, unsigned status);
@@ -179,6 +186,17 @@ enum InodeIDStyle
 enum LogType
    {LOGTYPE_Helperd = 0, LOGTYPE_Syslog = 1};
 
+#define RDMAKEYTYPE_UNSAFE_GLOBAL_STR   "global"
+#define RDMAKEYTYPE_UNSAFE_DMA_STR      "dma"
+#define RDMAKEYTYPE_REGISTER_STR        "register"
+
+enum RDMAKeyType
+{
+   RDMAKEYTYPE_UnsafeGlobal = 0,
+   RDMAKEYTYPE_UnsafeDMA,
+   RDMAKEYTYPE_Register
+};
+
 struct Config
 {
    // configurables
@@ -214,6 +232,8 @@ struct Config
    unsigned       connRDMAMetaFragmentSize;
    unsigned       connRDMAMetaBufNum;
    int            connRDMATypeOfService;
+   char*          connRDMAKeyType;
+   RDMAKeyType    connRDMAKeyTypeNum;
    char*          connNetFilterFile; // allowed IP addresses (all IPs allowed, if empty)
    unsigned       connMaxConcurrentAttempts;
    char*          connAuthFile;
@@ -440,6 +460,16 @@ unsigned Config_getConnRDMAMetaBufNum(Config* this)
 int Config_getConnRDMATypeOfService(Config* this)
 {
    return this->connRDMATypeOfService;
+}
+
+char* Config_getConnRDMAKeyType(Config* this)
+{
+   return this->connRDMAKeyType;
+}
+
+RDMAKeyType Config_getConnRDMAKeyTypeNum(Config* this)
+{
+   return this->connRDMAKeyTypeNum;
 }
 
 unsigned Config_getRemapConnectionFailureStatus(Config* this)

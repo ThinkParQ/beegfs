@@ -94,17 +94,11 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
       return boost::make_unique<ResponseState>(setAttrRes);
    }
 
-   // we need to reference the inode first, as we want to use it several times
-   MetaFileHandle inode = metaStore->referenceFile(entryInfo);
-   if (!inode)
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
-
    // update nlink count if requested by caller
    if (isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) &&
       isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_DECR_NLINKCNT))
    {
       // error: both increase and decrease of nlink count was requested
-      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
       return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
    }
    else if (isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) ||
@@ -112,10 +106,13 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
    {
       int val = isMsgHeaderFeatureFlagSet(SETATTRMSG_FLAG_INCR_NLINKCNT) ? 1 : -1;
       setAttrRes = metaStore->incDecLinkCount(entryInfo, val);
-
-      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
       return boost::make_unique<ResponseState>(setAttrRes);
    }
+
+   // we need to reference the inode first, as we want to use it several times
+   MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+   if (!inode)
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
    // in the following we need to distinguish between several cases.
    // 1. if times shall be updated we need to send the update to the storage servers first

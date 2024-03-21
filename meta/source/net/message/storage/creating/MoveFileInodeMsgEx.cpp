@@ -1,7 +1,6 @@
 #include <common/net/message/storage/creating/MoveFileInodeRespMsg.h>
 #include "MoveFileInodeMsgEx.h"
 
-//HashDirLock MoveFileInodeMsgEx::lock(EntryLockStore& store)
 std::tuple<FileIDLock, ParentNameLock, FileIDLock> MoveFileInodeMsgEx::lock(EntryLockStore& store)
 {
    EntryInfo* fileInfo = getFromFileEntryInfo();
@@ -27,21 +26,33 @@ std::unique_ptr<MirroredMessageResponseState> MoveFileInodeMsgEx::executeLocally
 {
    App* app = Program::getApp();
    MetaStore* metaStore = app->getMetaStore();
-
-   EntryInfo* fromFileInfo = getFromFileEntryInfo();
-   DirInode* parentDir = app->getMetaStore()->referenceDir(
-            fromFileInfo->getParentEntryID(), fromFileInfo->getIsBuddyMirrored(), true);
+   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
    if (getMode() == FileInodeMode::MODE_INVALID)
    {
       // invalid operation requested
-      metaStore->releaseDir(parentDir->getID());
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
+      return boost::make_unique<ResponseState>(retVal);
    }
 
-   FhgfsOpsErr retVal = metaStore->verifyAndMoveFileInode(*parentDir, fromFileInfo, getMode());
+   EntryInfo* fromFileInfo = getFromFileEntryInfo();
+   if (getCreateHardlink())
+   {
+      retVal = metaStore->makeNewHardlink(fromFileInfo);
+   }
+   else
+   {
+      DirInode* parentDir = metaStore->referenceDir(
+         fromFileInfo->getParentEntryID(), fromFileInfo->getIsBuddyMirrored(), true);
 
-   metaStore->releaseDir(parentDir->getID());
+      if (likely(parentDir))
+      {
+         retVal = metaStore->verifyAndMoveFileInode(*parentDir, fromFileInfo, getMode());
+         metaStore->releaseDir(parentDir->getID());
+      }
+      else
+         retVal = FhgfsOpsErr_PATHNOTEXISTS;
+   }
+
    return boost::make_unique<ResponseState>(retVal);
 }
 

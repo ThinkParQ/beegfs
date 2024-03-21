@@ -31,19 +31,17 @@ bool UnlinkLocalFileInodeMsgEx::processIncoming(ResponseContext& ctx)
 std::unique_ptr<MirroredMessageResponseState> UnlinkLocalFileInodeMsgEx::executeLocally(ResponseContext& ctx,
    bool isSecondary)
 {
-   App* app = Program::getApp();
-   MetaStore* metaStore = app->getMetaStore();
-   EntryInfo* delFileInfo = getDelEntryInfo();
-
-   MetaFileHandle inode = metaStore->referenceFile(delFileInfo);
-
-   if  (!inode)
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
-
-   metaStore->releaseFile(delFileInfo->getParentEntryID(), inode);
+   // Create a copy of the passed-in entryInfo and use it!
+   // Reason:
+   // Some fields of EntryInfo, such as parentEntryID and isInlined, can be modified
+   // by MetaStore::unlinkInodeLater() during unlink processing. Using a copy ensures
+   // that the original (and unmodified) entryInfo is forwarded to the secondary buddy
+   // to avoid different states on meta-buddies.
+   EntryInfo entryInfo;
+   entryInfo.set(getDelEntryInfo());
 
    std::unique_ptr<FileInode> unlinkedInode;
-   FhgfsOpsErr unlinkInodeRes = MsgHelperUnlink::unlinkFileInode(delFileInfo, &unlinkedInode);
+   FhgfsOpsErr unlinkInodeRes = MsgHelperUnlink::unlinkFileInode(&entryInfo, &unlinkedInode);
 
    if ((unlinkInodeRes == FhgfsOpsErr_SUCCESS) && unlinkedInode && !isSecondary)
    {

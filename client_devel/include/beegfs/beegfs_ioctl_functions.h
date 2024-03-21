@@ -18,7 +18,6 @@
 
 #define beegfs_api_version_check() { return beegfs_checkApiVersion(); } // backward compatibility
 
-
 static inline bool beegfs_getConfigFile(int fd, char** outCfgFile);
 static inline bool beegfs_getRuntimeConfigFile(int fd, char** outCfgFile);
 static inline bool beegfs_testIsBeeGFS(int fd);
@@ -36,6 +35,7 @@ static inline bool beegfs_getEntryInfo(int fd, uint32_t* ownerID, char* parentEn
       char* entryID, int* entryType, int* featureFlags);
 static inline bool beegfs_checkApiVersion(const unsigned required_major_version,
    const unsigned required_minor_version);
+static inline bool beegfs_pingNode(int fd, struct BeegfsIoctl_PingNode_Arg* ping);
 
 
 /**
@@ -318,6 +318,16 @@ bool beegfs_checkApiVersion(const unsigned required_major_version,
 
    if(required_minor_version > BEEGFS_API_MINOR_VERSION)
       return false;
+
+   return true;
+}
+
+static inline bool beegfs_pingNode(int fd, struct BeegfsIoctl_PingNode_Arg* inoutPing)
+{
+   if(ioctl(fd, BEEGFS_IOC_PINGNODE, inoutPing))
+   {
+      return false;
+   }
 
    return true;
 }

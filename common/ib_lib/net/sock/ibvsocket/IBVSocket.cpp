@@ -1465,6 +1465,11 @@ static bool __IBVSocket_getBufferKey(IBVCommContext *commContext, char *buffer, 
 
    if (iter == commContext->workerMRs->end())
    {
+      // It is assumed that buffer came from a Worker and is WORKER_BUFOUT_SIZE.
+      // TODO: pass around a Buffer with a length instead of unqualified char*.
+      // This cache of ibv_mr will potentially grow to Workers * Targets
+      // and the ibv_mr instances hang around until the IBVSocket is destroyed.
+      // That is probably something to look into...
       if (unlikely(__IBVSocket_registerBuf(commContext, buffer, WORKER_BUFOUT_SIZE, &mr)))
       {
          LOG(SOCKLIB, WARNING, "ibv_postWrite(): failed to register buffer.");
