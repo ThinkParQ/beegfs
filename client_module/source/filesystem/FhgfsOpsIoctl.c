@@ -2,10 +2,13 @@
 #include <app/config/Config.h>
 #include <common/nodes/Node.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
+#include <common/net/message/nodes/HeartbeatMsgEx.h>
+#include <common/net/message/nodes/HeartbeatRequestMsgEx.h>
 #include <common/toolkit/MathTk.h>
 #include <filesystem/helper/IoctlHelper.h>
 #include <filesystem/FhgfsOpsFile.h>
 #include <os/OsCompat.h>
+#include <linux/delay.h>
 #include "FhgfsOpsSuper.h"
 #include "FhgfsOpsHelper.h"
 #include "FhgfsOpsIoctl.h"
@@ -23,6 +26,13 @@
 #define TCGETS   0x5401
 #endif
 
+/* define these strings here so the IOCTL interface doesn't depend upon privately known ints */
+#define FHGFSOPSIOCTL_NODETYPE_STORAGE    "storage"
+#define FHGFSOPSIOCTL_NODETYPE_META       "meta"
+#define FHGFSOPSIOCTL_NODETYPE_METADATA   "metadata"
+#define FHGFSOPSIOCTL_NODETYPE_MGMT       "mgmt"
+#define FHGFSOPSIOCTL_NODETYPE_MANAGEMENT "management"
+
 static long FhgfsOpsIoctl_getCfgFile(struct file *file, void __user *argp);
 static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp);
 static long FhgfsOpsIoctl_testIsFhGFS(struct file *file, void __user *argp);
@@ -34,7 +44,20 @@ static long FhgfsOpsIoctl_getStripeTargetV2(struct file *file, void __user *argp
 static long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp);
 static long FhgfsOpsIoctl_getInodeID(struct file *file, void __user *argp);
 static long FhgfsOpsIoctl_getEntryInfo(struct file *file, void __user *argp);
+static long FhgfsOpsIoctl_pingNode(struct file *file, void __user *argp);
 
+static NodeType FhgfsOpsIoctl_strToNodeType(const char* str, size_t len)
+{
+   if (!strncmp(FHGFSOPSIOCTL_NODETYPE_META, str, len) ||
+      !strncmp(FHGFSOPSIOCTL_NODETYPE_METADATA, str, len))
+      return NODETYPE_Meta;
+   if (!strncmp(FHGFSOPSIOCTL_NODETYPE_STORAGE, str, len))
+      return NODETYPE_Storage;
+   if (!strncmp(FHGFSOPSIOCTL_NODETYPE_MGMT, str, len) ||
+      !strncmp(FHGFSOPSIOCTL_NODETYPE_MANAGEMENT, str, len))
+      return NODETYPE_Mgmt;
+   return NODETYPE_Invalid;
+}
 
 /**
  * Execute FhGFS IOCTLs.
@@ -123,6 +146,11 @@ long FhgfsOpsIoctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
       case BEEGFS_IOC_GETENTRYINFO:
       { // return BeeGFS internal path to file
          return FhgfsOpsIoctl_getEntryInfo(file, (void __user *) arg);
+      }
+
+      case BEEGFS_IOC_PINGNODE:
+      {
+         return FhgfsOpsIoctl_pingNode(file, (void __user *) arg);
       }
 
       case TCGETS:
@@ -720,6 +748,7 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
    const int umask = current_umask();
+   StoragePoolId storagePoolId;
 
    EntryInfo parentInfo;
    struct BeegfsIoctl_MkFileV3_Arg fileInfo;
@@ -777,7 +806,8 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
    CreateInfo_init(app, inode, fileInfo.entryName, fileInfo.mode, umask, true, eventSent,
       &createInfo);
 
-   CreateInfo_setStoragePoolId(&createInfo, fileInfo.storagePoolId);
+   StoragePoolId_set(&storagePoolId, fileInfo.storagePoolId);
+   CreateInfo_setStoragePoolId(&createInfo, storagePoolId);
 
    retVal = IoctlHelper_ioctlCreateFileTargetsToList(app, &fileInfo, &createInfo); // target list
    if (retVal)
@@ -793,13 +823,17 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
    }
 
    if (fileInfo.parentIsBuddyMirrored)
-      EntryInfo_init(&parentInfo, NodeOrGroup_fromGroup(fileInfo.ownerNodeID.value),
+      EntryInfo_init(&parentInfo, NodeOrGroup_fromGroup(fileInfo.ownerNodeID),
             fileInfo.parentParentEntryID, fileInfo.parentEntryID, fileInfo.parentName,
             DirEntryType_DIRECTORY, STATFLAG_HINT_INLINE);
    else
-      EntryInfo_init(&parentInfo, NodeOrGroup_fromNode(fileInfo.ownerNodeID),
+   {
+      NumNodeID nodeID;
+      NumNodeID_set(&nodeID, fileInfo.ownerNodeID);
+      EntryInfo_init(&parentInfo, NodeOrGroup_fromNode(nodeID),
             fileInfo.parentParentEntryID, fileInfo.parentEntryID, fileInfo.parentName,
             DirEntryType_DIRECTORY, STATFLAG_HINT_INLINE);
+   }
 
    switch (fileInfo.fileType)
    {
@@ -926,6 +960,177 @@ static long FhgfsOpsIoctl_getInodeID(struct file *file, void __user *argp)
    }
 
    return 0;
+}
+
+static long FhgfsOpsIoctl_pingNode(struct file *file, void __user *argp)
+{
+   struct super_block* superBlock = file_dentry(file)->d_sb;
+   App* app = FhgfsOps_getApp(superBlock);
+   Logger* log = App_getLogger(app);
+   NoAllocBufferStore* bufStore = App_getMsgBufStore(app);
+   NodeStoreEx* nodeStore;
+   Node* node;
+   NodeConnPool* connPool;
+   Socket* sock = NULL;
+   struct BeegfsIoctl_PingNode_Arg __user *pingArg = argp;
+   struct BeegfsIoctl_PingNode_Arg ping;
+   NumNodeID nodeId;
+   long rc;
+   int i;
+   NodeType nodeType;
+
+   if (copy_from_user(&ping.params, &pingArg->params, sizeof(ping.params)))
+   {
+      Logger_logFormatted(log, Log_ERR, __func__,
+            "Copying ping arguments from userspace memory failed.");
+      return -EFAULT;
+   }
+
+   ping.params.nodeType[BEEGFS_IOCTL_NODETYPE_BUFLEN - 1] = 0;
+   Logger_logFormatted(log, Log_DEBUG, __func__, "nodeId: %u nodeType: %s count=%u",
+      ping.params.nodeId, ping.params.nodeType, ping.params.count);
+
+   memset(&ping.results, 0, sizeof(ping.results));
+
+   if (ping.params.count > BEEGFS_IOCTL_PING_MAX_COUNT)
+   {
+      Logger_logFormatted(log, Log_ERR, __func__,
+         "count too high, max is %d", BEEGFS_IOCTL_PING_MAX_COUNT);
+      return -EINVAL;
+   }
+
+   if (ping.params.interval > BEEGFS_IOCTL_PING_MAX_INTERVAL)
+   {
+      Logger_logFormatted(log, Log_ERR, __func__,
+         "interval too high, max is %d", BEEGFS_IOCTL_PING_MAX_INTERVAL);
+      return -EINVAL;
+   }
+
+   NumNodeID_set(&nodeId, ping.params.nodeId);
+   nodeType = FhgfsOpsIoctl_strToNodeType(ping.params.nodeType, sizeof(ping.params.nodeType));
+   switch (nodeType)
+   {
+   case NODETYPE_Meta:
+      nodeStore = App_getMetaNodes(app);
+      break;
+   case NODETYPE_Storage:
+      nodeStore = App_getStorageNodes(app);
+      break;
+   case NODETYPE_Mgmt:
+      nodeStore = App_getMgmtNodes(app);
+      break;
+   default:
+      Logger_logFormatted(log, Log_ERR, __func__,
+         "Invalid nodetype: %s", ping.params.nodeType);
+      return -EINVAL;
+   }
+
+   node = NodeStoreEx_referenceNode(nodeStore, nodeId);
+   if (node == NULL)
+   {
+      Logger_logFormatted(log, Log_ERR, __func__,
+         "Node not found. nodeId: %u nodeType: %s", ping.params.nodeId, ping.params.nodeType);
+      return -EINVAL;
+   }
+
+   StringTk_strncpyTerminated(ping.results.outNode, Node_getID(node), sizeof(ping.results.outNode));
+
+   connPool = Node_getConnPool(node);
+
+   rc = 0;
+
+   for (i = 0; i <= ping.params.count; ++i)
+   {
+      HeartbeatMsgEx* rspMsgEx;
+      char* respBuf = NULL;
+      NetMessage* respMsg = NULL;
+      HeartbeatRequestMsgEx msg;
+      FhgfsOpsErr requestRes;
+      Time startTime;
+      Time endTime;
+      NumNodeID resNodeID;
+      int resNodeType;
+
+      if (i > 0)
+         msleep(ping.params.interval);
+
+      if (sock == NULL)
+      {
+         sock = NodeConnPool_acquireStreamSocket(connPool);
+         if (sock == NULL)
+         {
+            Logger_logFormatted(log, Log_ERR, __func__,
+               "Null socket from connPool");
+            rc = -EINVAL;
+            goto next_iter;
+         }
+      }
+
+      HeartbeatRequestMsgEx_init(&msg);
+      Time_init(&startTime);
+      requestRes = MessagingTk_requestResponseSock(app, node, (NetMessage*)&msg, NETMSGTYPE_Heartbeat, &respBuf, &respMsg, sock);
+      Time_init(&endTime);
+
+      if (requestRes != FhgfsOpsErr_SUCCESS)
+      {
+         NodeConnPool_invalidateStreamSocket(connPool, sock);
+         sock = NULL;
+         ping.results.outErrors++;
+         goto next_iter;
+      }
+
+      // Skip the first one because it may have connection overhead.
+      if (i == 0)
+         goto next_iter;
+
+
+      rspMsgEx = (HeartbeatMsgEx*) respMsg;
+      resNodeID = HeartbeatMsgEx_getNodeNumID(rspMsgEx);
+      resNodeType = HeartbeatMsgEx_getNodeType(rspMsgEx);
+
+      if (!NumNodeID_compare(&resNodeID, &nodeId))
+      {
+         Logger_logFormatted(log, Log_ERR, __func__,
+            "Wrong node ID returned from heartbeat: %s",  NumNodeID_str(&resNodeID));
+         rc = -EPROTO;
+      }
+      else if (resNodeType != (int) nodeType)
+      {
+         Logger_logFormatted(log, Log_ERR, __func__,
+            "Wrong node type returned from heartbeat: %d", resNodeType);
+         rc = -EPROTO;
+      }
+      else
+      {
+         unsigned elapsed = Time_elapsedSinceNS(&endTime, &startTime);
+         ping.results.outSuccess++;
+         ping.results.outPingTime[i - 1] = elapsed;
+         ping.results.outTotalTime += elapsed;
+         StringTk_strncpyTerminated(ping.results.outPingType[i - 1],
+            NIC_nicTypeToString(Socket_getSockType(sock)),
+            sizeof(ping.results.outPingType[i - 1]));
+      }
+
+   next_iter:
+      if (respMsg)
+         NETMESSAGE_FREE(respMsg);
+      if (respBuf)
+         NoAllocBufferStore_addBuf(bufStore, respBuf);
+
+      if (rc != 0)
+         break;
+   }
+   if (sock != NULL)
+      NodeConnPool_releaseStreamSocket(connPool, sock);
+   Node_put(node);
+   if (copy_to_user(&pingArg->results, &ping.results, sizeof(ping.results)))
+   {
+      Logger_logFormatted(log, Log_ERR, __func__,
+            "Copying ping results to userspace memory failed.");
+      rc = -EFAULT;
+   }
+
+   return rc;
 }
 
 /**

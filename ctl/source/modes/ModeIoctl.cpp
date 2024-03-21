@@ -17,6 +17,7 @@
 #define MODEIOCTL_ARG_IOCTLTYPE_MKFILE             "mkfile"
 #define MODEIOCTL_ARG_IOCTLTYPE_GETINODEID         "getinodeid"
 #define MODEIOCTL_ARG_IOCTLTYPE_GETENTRYINFO       "getentryinfo"
+#define MODEIOCTL_ARG_IOCTLTYPE_PINGNODE           "ping"
 
 #define MODEIOCTL_ARG_MKFILE_MODE                  "--mode"
 #define MODEIOCTL_ARG_MKFILE_NUMTARGETS            "--numtargets"
@@ -25,6 +26,15 @@
 
 #define MODEIOCTL_ARG_GETINODEID_ENTRYID           "--entryid"
 
+#define MODEIOCTL_ARG_PINGNODE_NODEID              "--nodeid"
+#define MODEIOCTL_ARG_PINGNODE_NODETYPE            "--nodetype"
+#define MODEIOCTL_ARG_PINGNODE_COUNT               "--count"
+#define MODEIOCTL_ARG_PINGNODE_INTERVAL            "--interval"
+
+#define MODEIOCTL_ARG_PINGNODE_INTERVAL_DEFAULT     1000
+#define MODEIOCTL_ARG_PINGNODE_COUNT_DEFAULT        1
+
+#define MODEIOCTL_OUTPUT_REAL_PRECISION             3
 
 int ModeIoctl::execute()
 {
@@ -56,6 +66,10 @@ int ModeIoctl::execute()
    else if (ioctlTypeStr == MODEIOCTL_ARG_IOCTLTYPE_GETINODEID)
    {
       return ioctlGetInodeID();
+   }
+   else if (ioctlTypeStr == MODEIOCTL_ARG_IOCTLTYPE_PINGNODE)
+   {
+      return ioctlPingNode();
    }
 
    // here we have the generic/simple ioctls, which take no extra arguments...
@@ -128,7 +142,20 @@ void ModeIoctl::printHelp()
    std::cout << "  --type=<type>          Type of ioctl to use with the given path." << std::endl;
    std::cout << "                         (Types: getconfigfile, getruntimeconfigfile," << std::endl;
    std::cout << "                         getmountid, testisbeegfs, getstripeinfo," << std::endl;
-   std::cout << "                         getstripetargets)" << std::endl;
+   std::cout << "                         getstripetargets,ping)" << std::endl;
+   std::cout << std::endl;
+   std::cout << "MODE ARGUMENTS:" << std::endl;
+   std::cout << std::endl;
+   std::cout << "PING ARGUMENTS:" << std::endl;
+   std::cout << " Mandatory:" << std::endl;
+   std::cout << "  --nodetype=<nodetype>  The node type (management, metadata," << std::endl;
+   std::cout << "                         storage)." << std::endl;
+   std::cout << "  --nodeid=<id>          The numeric node ID to ping." << std::endl;
+   std::cout << " Optional:" << std::endl;
+   std::cout << "  --count                Quantity of pings to issue." << std::endl;
+   std::cout << "                         (Default: 1)" << std::endl;
+   std::cout << "  --interval             Interval in milliseconds to wait between pings." << std::endl;
+   std::cout << "                         (Default: 1000)" << std::endl;
    std::cout << std::endl;
    std::cout << "USAGE EXAMPLE" << std::endl;
    std::cout << "=============" << std::endl;
@@ -423,4 +450,128 @@ int ModeIoctl::ioctlGetEntryInfo(IoctlTk& ioctlTk)
    std::cout << "FeatureFlags: " << entryInfo.getFeatureFlags() << std::endl;
 
    return APPCODE_NO_ERROR;
+}
+
+int ModeIoctl::ioctlPingNode()
+{
+   struct BeegfsIoctl_PingNode_Arg ping;
+   App* app = Program::getApp();
+   StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
+   StringMapIter iter; // config iterator
+
+   memset(&ping, 0, sizeof(ping));
+
+   iter = cfg->find(MODEIOCTL_ARG_PINGNODE_NODEID);
+   if(iter != cfg->end() )
+   {
+      ping.params.nodeId = StringTk::strToUInt(iter->second);
+      cfg->erase(iter);
+   }
+   else
+   {
+      std::cerr << "No nodeid given." << std::endl;
+      return APPCODE_INVALID_CONFIG;
+   }
+
+   iter = cfg->find(MODEIOCTL_ARG_PINGNODE_NODETYPE);
+   if(iter != cfg->end() )
+   {
+      StringTk::strncpyTerminated(ping.params.nodeType, iter->second.c_str(),
+         sizeof(ping.params.nodeType));
+      cfg->erase(iter);
+   }
+   else
+   {
+      std::cerr << "No nodetype given." << std::endl;
+      return APPCODE_INVALID_CONFIG;
+   }
+
+   iter = cfg->find(MODEIOCTL_ARG_PINGNODE_COUNT);
+   if(iter != cfg->end() )
+   {
+      ping.params.count = StringTk::strToUInt(iter->second);
+      cfg->erase(iter);
+   }
+   else
+   {
+      ping.params.count = MODEIOCTL_ARG_PINGNODE_COUNT_DEFAULT;
+   }
+
+   iter = cfg->find(MODEIOCTL_ARG_PINGNODE_INTERVAL);
+   if(iter != cfg->end() )
+   {
+      ping.params.interval = StringTk::strToUInt(iter->second);
+      cfg->erase(iter);
+   }
+   else
+   {
+      ping.params.interval = MODEIOCTL_ARG_PINGNODE_INTERVAL_DEFAULT;
+   }
+
+   std::string pathStr = cfg->begin()->first;
+
+   cfg->erase(cfg->begin() );
+
+   // check remaining invalid arguments
+   if (ModeHelper::checkInvalidArgs(cfg))
+      return APPCODE_INVALID_CONFIG;
+
+   IoctlTk ioctlTk(pathStr);
+
+   std::cout << "Ping node " << ping.params.nodeType << " id=" << ping.params.nodeId << " for "
+             << ping.params.count << " iterations, interval "
+             << ping.params.interval << "ms ..." << std::endl;
+
+   if(!ioctlTk.pingNode(&ping))
+   {
+      ioctlTk.printErrMsg();
+      return APPCODE_RUNTIME_ERROR;
+   }
+
+   const char* units = " µs";
+
+   std::cout << "Node: " << ping.results.outNode << std::endl;
+   std::cout << "Success: " << ping.results.outSuccess << std::endl;
+   std::cout << "Error: " << ping.results.outErrors << std::endl;
+
+   std::vector<unsigned> times;
+   unsigned minTime = UINT_MAX;
+   unsigned maxTime = 0;
+   double conv = 1000.0;
+
+   for (int i = 0; i < (int) (ping.results.outSuccess + ping.results.outErrors); ++i)
+   {
+      unsigned t = ping.results.outPingTime[i];
+      std::string tv;
+      if (t == 0)
+      {
+         tv = "ERROR";
+      }
+      else
+      {
+         tv  = StringTk::doubleToStr(t / conv, MODEIOCTL_OUTPUT_REAL_PRECISION)  + units;
+         times.push_back(t);
+         minTime = BEEGFS_MIN(minTime, t);
+         maxTime = BEEGFS_MAX(maxTime, t);
+      }
+      std::cout << "Ping " << (i+1) << " " << ping.results.outPingType[i]
+                << " : " << tv << std::endl;
+   }
+
+   std::string none("None");
+   std::sort(times.begin(), times.end());
+   auto const median = MathTk::medianOfSorted(times);
+
+   std::cout << std::endl;
+   std::cout << "Total Time: " << StringTk::doubleToStr(ping.results.outTotalTime / conv, MODEIOCTL_OUTPUT_REAL_PRECISION)
+             << units << std::endl;
+   std::cout << "Min Time: " << (!times.empty()?
+      (StringTk::doubleToStr(minTime / conv, MODEIOCTL_OUTPUT_REAL_PRECISION) + units) : none) << std::endl;
+   std::cout << "Max Time: " << (!times.empty()?
+      (StringTk::doubleToStr(maxTime / conv, MODEIOCTL_OUTPUT_REAL_PRECISION) + units) : none) << std::endl;
+   std::cout << "Mean Time: " << (!times.empty()?
+      (StringTk::doubleToStr(ping.results.outTotalTime / conv / ping.results.outSuccess, MODEIOCTL_OUTPUT_REAL_PRECISION) + units) : none) << std::endl;
+   std::cout << "Median Time: " << (median? (StringTk::doubleToStr(*median / conv, MODEIOCTL_OUTPUT_REAL_PRECISION) + units) : none) << std::endl;
+
+   return ping.results.outErrors == 0 ? APPCODE_NO_ERROR : APPCODE_RUNTIME_ERROR;
 }

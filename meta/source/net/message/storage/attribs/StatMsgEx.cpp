@@ -11,13 +11,23 @@ bool StatMsgEx::processIncoming(ResponseContext& ctx)
    const char* logContext = "StatMsgEx incoming";
 #endif // BEEGFS_DEBUG
 
-   App* app = Program::getApp();
-   EntryInfo* entryInfo = this->getEntryInfo();
+   LOG_DEBUG(logContext, 5, "ParentID: " + getEntryInfo()->getParentEntryID() +
+      "; EntryID: " + getEntryInfo()->getEntryID() +
+      "; EntryType: " + StringTk::intToStr(getEntryInfo()->getEntryType() ) +
+      "; isBuddyMirrored: " + StringTk::intToStr(getEntryInfo()->getIsBuddyMirrored()));
 
-   LOG_DEBUG(logContext, 5, "ParentID: " + entryInfo->getParentEntryID() +
-      "; EntryID: " + entryInfo->getEntryID() +
-      "; EntryType: " + StringTk::intToStr(entryInfo->getEntryType() ) +
-      "; isBuddyMirrored: " + StringTk::intToStr(entryInfo->getIsBuddyMirrored() ) );
+   return BaseType::processIncoming(ctx);
+}
+
+FileIDLock StatMsgEx::lock(EntryLockStore& store)
+{
+   return {&store, getEntryInfo()->getEntryID(), false};
+}
+
+std::unique_ptr<MirroredMessageResponseState> StatMsgEx::executeLocally(ResponseContext& ctx,
+   bool isSecondary)
+{
+   StatMsgResponseState resp;
 
    StatData statData;
    FhgfsOpsErr statRes;
@@ -25,7 +35,9 @@ bool StatMsgEx::processIncoming(ResponseContext& ctx)
    NumNodeID parentNodeID;
    std::string parentEntryID;
 
-   if(entryInfo->getParentEntryID().empty() || (entryInfo->getEntryID() == META_ROOTDIR_ID_STR) )
+   EntryInfo* entryInfo = this->getEntryInfo();
+
+   if (entryInfo->getParentEntryID().empty() || (entryInfo->getEntryID() == META_ROOTDIR_ID_STR) )
    { // special case: stat for root directory
       statRes = statRoot(statData);
    }
@@ -37,17 +49,15 @@ bool StatMsgEx::processIncoming(ResponseContext& ctx)
 
    LOG_DBG(GENERAL, DEBUG, "", statRes);
 
-   StatRespMsg respMsg(statRes, statData);
+   resp.setStatResult(statRes);
+   resp.setStatData(statData);
 
-   if(isMsgHeaderFeatureFlagSet(STATMSG_FLAG_GET_PARENTINFO) && parentNodeID)
-      respMsg.addParentInfo(parentNodeID, parentEntryID);
+   if (isMsgHeaderFeatureFlagSet(STATMSG_FLAG_GET_PARENTINFO) && parentNodeID)
+      resp.setParentInfo(parentNodeID, parentEntryID);
 
-   ctx.sendResponse(respMsg);
+   updateNodeOp(ctx, MetaOpCounter_STAT);
 
-   app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_STAT,
-      getMsgHeaderUserID() );
-
-   return true;
+   return boost::make_unique<ResponseState>(std::move(resp));
 }
 
 FhgfsOpsErr StatMsgEx::statRoot(StatData& outStatData)
@@ -70,7 +80,6 @@ FhgfsOpsErr StatMsgEx::statRoot(StatData& outStatData)
    }
 
    rootDir->getStatData(outStatData);
-
 
    return FhgfsOpsErr_SUCCESS;
 }

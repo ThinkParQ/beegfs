@@ -125,7 +125,7 @@ void ModeHelperGetNodes::pingNodes(NodeType nodeType, const std::vector<NodeHand
                << std::endl;
 
          if(numPingsDone)
-         { // first ping is ignored because of connection establishment overhead
+         {  // First ping is ignored because of connection establishment overhead.
             pingTimes.emplace_back(duration);
          }
       }

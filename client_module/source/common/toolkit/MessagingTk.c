@@ -16,9 +16,10 @@
 
 /**
  * Note: rrArgs->outRespBuf must be returned/freed by the caller (depending on respBufType)
+ * @param sock socket to use. If null, one will be pulled from Node's pool
  */
-FhgfsOpsErr MessagingTk_requestResponseWithRRArgs(App* app,
-   RequestResponseArgs* rrArgs)
+FhgfsOpsErr MessagingTk_requestResponseWithRRArgsSock(App* app,
+   RequestResponseArgs* rrArgs, Socket* sock)
 {
    Logger* log = App_getLogger(app);
    const char* logContext = "Messaging (RPC)";
@@ -33,7 +34,7 @@ FhgfsOpsErr MessagingTk_requestResponseWithRRArgs(App* app,
    {
       App_incNumRPCs(app);
 
-      commRes = __MessagingTk_requestResponseWithRRArgsComm(app, rrArgs, NULL, &wasIndirectCommErr);
+      commRes = __MessagingTk_requestResponseWithRRArgsComm(app, rrArgs, NULL, &wasIndirectCommErr, sock);
       if(likely(commRes == FhgfsOpsErr_SUCCESS) )
          return FhgfsOpsErr_SUCCESS;
       else
@@ -120,16 +121,17 @@ FhgfsOpsErr MessagingTk_requestResponseKMalloc(App* app, Node* node, NetMessage*
  * broken connection from the conn pool.)
  *
  * @param outRespBuf must be returned to the store - not freed!
+ * @param sock socket to use. If null, one will be pulled from Node's pool
  */
-FhgfsOpsErr MessagingTk_requestResponse(App* app, Node* node, NetMessage* requestMsg,
-   unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg)
+FhgfsOpsErr MessagingTk_requestResponseSock(App* app, Node* node, NetMessage* requestMsg,
+   unsigned respMsgType, char** outRespBuf, NetMessage** outRespMsg, Socket* sock)
 {
    RequestResponseArgs rrArgs;
    FhgfsOpsErr rrRes;
 
    RequestResponseArgs_prepare(&rrArgs, node, requestMsg, respMsgType);
 
-   rrRes = MessagingTk_requestResponseWithRRArgs(app, &rrArgs);
+   rrRes = MessagingTk_requestResponseWithRRArgsSock(app, &rrArgs, sock);
 
    *outRespBuf = rrArgs.outRespBuf;
    *outRespMsg = rrArgs.outRespMsg;
@@ -385,7 +387,7 @@ FhgfsOpsErr __MessagingTk_requestResponseNodeRetry(App* app, RequestResponseNode
       // communicate
 
       commRes = __MessagingTk_requestResponseWithRRArgsComm(app, rrArgs, group,
-            &wasIndirectCommErr);
+         &wasIndirectCommErr, NULL);
 
       if(likely(commRes == FhgfsOpsErr_SUCCESS) )
          goto release_node_and_break;
@@ -494,12 +496,14 @@ exit:
  * .respMsgType expected response message type;
  * .outRespBuf response buffer if successful (must be returned to store by the caller);
  * .outRespMsg response message if successful (must be deleted by the caller);
+ * @param sock socket to use. If NULL, one will be pulled from Node's pool
  * @return FhgfsOpsErr_COMMUNICATION on comm error, FhgfsOpsErr_WOULDBLOCK if remote side
  *    encountered an indirect comm error and suggests not to try again, FhgfsOpsErr_AGAIN if other
  *    side is suggesting infinite retries.
  */
 FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
-   RequestResponseArgs* rrArgs, MirrorBuddyGroup* group, bool* wasIndirectCommErr)
+   RequestResponseArgs* rrArgs, MirrorBuddyGroup* group, bool* wasIndirectCommErr,
+   Socket* sock)
 {
    /* note: keep in mind that there are multiple alternative response buf alloc types avilable,
       e.g. "kmalloc" or "get from store". */
@@ -517,14 +521,15 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
    ssize_t sendRes;
 
    // cleanup init
-   Socket* sock = NULL;
+   bool releaseSock = sock == NULL;
    rrArgs->outRespBuf = NULL;
    rrArgs->outRespMsg = NULL;
 
    // connect
    // note: acquireStreamSocket() will fail immediately if a signal is pending
 
-   sock = NodeConnPool_acquireStreamSocket(connPool);
+   if (sock == NULL)
+      sock = NodeConnPool_acquireStreamSocket(connPool);
    if(unlikely(!sock) )
    { // not connected
       if(!(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_CONNESTABLISHFAILED) &&
@@ -635,7 +640,8 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
       retVal = __MessagingTk_handleGenericResponse(app, rrArgs, group, wasIndirectCommErr);
       if(retVal != FhgfsOpsErr_INTERNAL)
       { // we can re-use the connection
-         NodeConnPool_releaseStreamSocket(connPool, sock);
+         if (releaseSock)
+            NodeConnPool_releaseStreamSocket(connPool, sock);
          goto cleanup_no_socket;
       }
 
@@ -655,7 +661,8 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
 
    // correct response => return it (through rrArgs)
 
-   NodeConnPool_releaseStreamSocket(connPool, sock);
+   if (releaseSock)
+      NodeConnPool_releaseStreamSocket(connPool, sock);
 
    return FhgfsOpsErr_SUCCESS;
 
@@ -677,6 +684,7 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
    }
 
    socket_invalidate:
+   if (releaseSock)
    {
       NodeConnPool_invalidateStreamSocket(connPool, sock);
    }

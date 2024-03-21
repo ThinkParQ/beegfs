@@ -95,7 +95,7 @@ module_init(init_fhgfs_client)
 module_exit(exit_fhgfs_client)
 
 MODULE_LICENSE(BEEGFS_LICENSE);
-MODULE_DESCRIPTION("BeeGFS parallel file system client (http://www.beegfs.com)");
-MODULE_AUTHOR("Fraunhofer ITWM, CC-HPC");
+MODULE_DESCRIPTION("BeeGFS parallel file system client (https://www.beegfs.io)");
+MODULE_AUTHOR("ThinkParQ GmbH");
 MODULE_ALIAS("fs-" BEEGFS_MODULE_NAME_STR);
 MODULE_VERSION(BEEGFS_VERSION);

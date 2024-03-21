@@ -169,3 +169,14 @@ bool IoctlTk::getEntryInfo(EntryInfo& outEntryInfo)
    return true;
 }
 
+bool IoctlTk::pingNode(BeegfsIoctl_PingNode_Arg* inoutPing)
+{
+   bool res = beegfs_pingNode(fd, inoutPing);
+   if(!res)
+   {
+      this->errorMsg = strerror(errno);
+      return false;
+   }
+   return true;
+}
+

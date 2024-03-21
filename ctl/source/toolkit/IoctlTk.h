@@ -9,7 +9,7 @@
 
 
 struct BeegfsIoctl_MkFile_Arg; // forward declaration
-
+struct BeegfsIoctl_PingNode_Arg;
 
 class IoctlTk
 {
@@ -58,6 +58,7 @@ class IoctlTk
          unsigned chunksize);
       bool getInodeID(const std::string& entryID, uint64_t& outInodeID);
       bool getEntryInfo(EntryInfo& outEntryInfo);
+      bool pingNode(BeegfsIoctl_PingNode_Arg* inoutPing);
 
 
    private:

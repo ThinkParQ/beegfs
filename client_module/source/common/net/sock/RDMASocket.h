@@ -7,8 +7,10 @@
 #include <common/Common.h>
 #include <common/net/sock/ibv/IBVSocket.h>
 #include <common/net/sock/PooledSocket.h>
-
-
+#include <app/config/Config.h>
+ 
+struct ib_device;
+struct ib_mr;
 struct RDMASocket;
 typedef struct RDMASocket RDMASocket;
 
@@ -36,11 +38,12 @@ extern unsigned long RDMASocket_poll(RDMASocket* this, short events, bool finish
 
 // inliners
 static inline void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
-   unsigned fragmentSize);
+   unsigned fragmentSize, RDMAKeyType keyType);
 static inline void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
    int completionMS, int flowSendMS, int flowRecvMS, int pollMS);
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
 static inline void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value);
+static inline bool RDMASocket_registerMr(RDMASocket* this, struct ib_mr* mr, int access);
 
 struct RDMASocket
 {
@@ -55,11 +58,23 @@ struct RDMASocket
  * Note: Only has an effect for unconnected sockets.
  */
 void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
-   unsigned fragmentSize)
+   unsigned fragmentSize, RDMAKeyType keyType)
 {
    this->commCfg.bufNum = bufNum;
    this->commCfg.bufSize = bufSize;
    this->commCfg.fragmentSize = fragmentSize;
+   switch (keyType)
+   {
+   case RDMAKEYTYPE_UnsafeDMA:
+      this->commCfg.keyType = IBVSOCKETKEYTYPE_UnsafeDMA;
+      break;
+   case RDMAKEYTYPE_Register:
+      this->commCfg.keyType = IBVSOCKETKEYTYPE_Register;
+      break;
+   default:
+      this->commCfg.keyType = IBVSOCKETKEYTYPE_UnsafeGlobal;
+      break;
+   }
 }
 
 void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
@@ -83,6 +98,11 @@ void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService)
 void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value)
 {
    IBVSocket_setConnectionFailureStatus(&this->ibvsock, value);
+}
+
+bool RDMASocket_registerMr(RDMASocket* this, struct ib_mr* mr, int access)
+{
+   return !IBVSocket_registerMr(&this->ibvsock, mr, access);
 }
 
 #endif /*OPEN_RDMASOCKET_H_*/

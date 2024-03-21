@@ -12,9 +12,15 @@ export TARGET
 export OFED_INCLUDE_PATH
 export BEEGFS_NO_RDMA
 
-ifeq ($(BEEGFS_DEV_BUILD),)
+BEEGFS_DKMS_BUILD=0
+ifdef KERNELRELEASE
+BEEGFS_DKMS_BUILD=1
+endif
+
+ifeq ($(BEEGFS_DKMS_BUILD),1)
 -include /etc/beegfs/beegfs-client-build.mk
 endif
+-include Version.mk
 
 ifeq ($(obj),)
 BEEGFS_BUILDDIR := $(shell pwd)
@@ -102,7 +108,7 @@ endif
 # Include kernel feature auto-detectors
 include KernelFeatureDetection.mk
 
-KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(KRELEASE)/updates/fs/beegfs
+KMOD_INST_DIR ?= $(DESTDIR)/lib/modules/$(KRELEASE)/updates/fs/beegfs
 
 # Prepare CFLAGS:
 # (Note: "-Wsign-compare" included in "-Wextra", but must be explicit here,
@@ -111,6 +117,7 @@ KMOD_INST_DIR=$(DESTDIR)/lib/modules/$(KRELEASE)/updates/fs/beegfs
 # includes.)
 BEEGFS_CFLAGS  :=  $(BUILD_ARCH) $(KERNEL_FEATURE_DETECTION) \
 	-I$(BEEGFS_BUILDDIR)/../source \
+	-I$(BEEGFS_BUILDDIR)/../include \
 	-Wextra -Wno-unused-parameter -Wno-missing-field-initializers \
 	-DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
 
@@ -128,12 +135,6 @@ BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_RELEASE)
 else
 BEEGFS_CFLAGS += $(BEEGFS_CFLAGS_DEBUG)
 endif
-
-# OFED API version
-ifneq ($(BEEGFS_OFED_1_2_API),)
-BEEGFS_CFLAGS += "-DBEEGFS_OFED_1_2_API=$(BEEGFS_OFED_1_2_API)"
-endif
-
 
 # if path to strip command was not given, use default
 # (alternative strip is important when cross-compiling)
@@ -153,20 +154,21 @@ all: module
 	@ /bin/true
 
 module: $(TARGET_ALL_DEPS)
-	@if [ -z "$(KDIR_PRUNED_HEAD)" ]; then \
-		echo "*** ERROR: Linux kernel build directory not found. Please check if" \
-		"the kernel module development packages are installed for the current kernel" \
-		"version. (RHEL: kernel-devel; SLES: kernel-source; Debian: linux-headers)"; \
-		false; \
-	fi >&2
+ifeq ($(KDIR_PRUNED_HEAD),)
+	$(error Linux kernel build directory not found. Please check if\
+	the kernel module development packages are installed for the current kernel\
+	version. (RHEL: kernel-devel; SLES: linux-kernel-headers, kernel-source;\
+	Debian: linux-headers))
+endif
 
-	@if [ -z "$(KSRCDIR_PRUNED_HEAD)" ]; then \
-		echo "*** ERROR: Linux kernel source directory not found. Please check if" \
-		"the kernel module development packages are installed for the current kernel" \
-		"version. (RHEL: kernel-devel; SLES: kernel-source; Debian: linux-headers)"; \
-		false; \
-	fi >&2
+ifeq ($(KSRCDIR_PRUNED_HEAD),)
+	$(error Linux kernel source directory not found. Please check if\
+	the kernel module development packages are installed for the current kernel\
+	version. (RHEL: kernel-devel; SLES: linux-kernel-headers, kernel-source;\
+	Debian: linux-headers))
+endif
 
+	@echo "Building beegfs client module"
 	$(MAKE) -C $(KDIR_PRUNED_HEAD) "M=$(BEEGFS_BUILDDIR)/../source" \
 	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)"  modules
 
@@ -181,24 +183,21 @@ coccicheck:
 
 include AutoRebuild.mk # adds auto_rebuild targets
 
-
 prepare_release:
 ifeq ($(RELEASE_PATH),)
 	$(error RELEASE_PATH not defined)
 endif
 
-ifeq ($(BEEGFS_VERSION),)
-	$(error BEEGFS_VERSION not defined)
-endif
-
 	@ echo "Creating release directory:" $(RELEASE_PATH_CLIENT)
-	mkdir --parents $(RELEASE_PATH_CLIENT)/build $(RELEASE_PATH_CLIENT)/source
+	mkdir --parents $(RELEASE_PATH_CLIENT)/build \
+		$(RELEASE_PATH_CLIENT)/source \
+		$(RELEASE_PATH_CLIENT)/include
 
 	@ echo "Storing beegfs version:" $(BEEGFS_VERSION)
 	echo "BEEGFS_VERSION =" $(BEEGFS_VERSION) > $(RELEASE_PATH_CLIENT)/build/Version.mk
 
 	@ echo "Copying beegfs client release files to" $(RELEASE_PATH_CLIENT) "..."
-	cp Release.mk $(RELEASE_PATH_CLIENT)/build/Makefile
+	cp Makefile $(RELEASE_PATH_CLIENT)/build/Makefile
 	cp KernelFeatureDetection.mk $(RELEASE_PATH_CLIENT)/build/
 	cp AutoRebuild.mk $(RELEASE_PATH_CLIENT)/build/
 	cp feature-detect.sh $(RELEASE_PATH_CLIENT)/build/
@@ -207,6 +206,8 @@ endif
 	find ../source -mount -name '*.h' -type f | \
 		xargs -I ’{}’ cp --parents ’{}’ $(RELEASE_PATH_CLIENT)/build
 	find ../source -mount -name '*.c' -type f | \
+		xargs -I ’{}’ cp --parents ’{}’ $(RELEASE_PATH_CLIENT)/build
+	find ../include -mount -name '*.h' -type f | \
 		xargs -I ’{}’ cp --parents ’{}’ $(RELEASE_PATH_CLIENT)/build
 
 install:
@@ -217,6 +218,7 @@ clean:
 	rm -f *~ .${TARGET}??*
 	rm -f .*.cmd *.mod.c *.mod.o *.o *.ko *.ko.unsigned
 	rm -f ../source/Module*.symvers ../source/modules.order ../source/Module.markers
+	rm -f Module*.symvers modules.order Module.markers
 	rm -f $(AUTO_REBUILD_KVER_FILE)
 	rm -rf .tmp_versions/
 	find ../source/ -mount -name '*.o' -type f -delete
@@ -250,9 +252,6 @@ help:
 	@echo '     Path to OpenFabrics Enterpise Distribution kernel include directory, e.g.'
 	@echo '     "/usr/src/openib/include". (If not defined, the standard kernel headers'
 	@echo '      will be used.)'
-	@echo '   BEEGFS_OFED_1_2_API={1,2}:'
-	@echo '     Defining one of these legacy modes enables OFED 1.2.0 ibverbs API'
-	@echo '     compatibility. (If not defined, OFED 1.2.5 or higher API will be used.)'
 	@echo ''
 	@echo 'Targets:'
 	@echo '   all (default)     - build only'

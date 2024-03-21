@@ -18,6 +18,7 @@ static inline void Time_setZero(Time* this);
 static inline bool Time_getIsZero(Time* this);
 
 static inline unsigned Time_elapsedSinceMS(Time* this, Time* earlierT);
+static inline unsigned long long Time_elapsedSinceNS(Time* this, Time* earlierT);
 static inline unsigned Time_elapsedMS(Time* this);
 
 /**
@@ -70,6 +71,15 @@ unsigned Time_elapsedSinceMS(Time* this, Time* earlierT)
                                                                           so this must be signed */
 
    return secs + micros;
+}
+
+unsigned long long Time_elapsedSinceNS(Time* this, Time* earlierT)
+{
+   unsigned long long secs = (this->now.tv_sec - earlierT->now.tv_sec) * 1000000000ull;
+   long nanos = (this->now.tv_nsec - earlierT->now.tv_nsec); /* can also be negative,
+                                                                so this must be signed */
+
+   return secs + nanos;
 }
 
 unsigned Time_elapsedMS(Time* this)

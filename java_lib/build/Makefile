@@ -2,7 +2,7 @@ LIB_NAME = jbeegfs
 JAR_NAME = jbeegfs
 
 SOURCEDIR = ../source
-BEEGFS_INCLUDE = ../../client_devel/include/
+BEEGFS_INCLUDE = -I../../client_devel/include -I../../client_module/include
 
 SOURCES = $(shell find $(SOURCEDIR)/ -name '*.java')
 
@@ -68,7 +68,7 @@ $(CPP_BUILD_DIR)/jni_md.h: | $(CPP_BUILD_DIR)
 	cp $(JAVA_HOME)/include/linux/jni_md.h $@
 
 $(CPP_BUILD_DIR)/lib$(LIB_NAME).so: $(SOURCEDIR)/jbeegfs.cpp cppheaders | $(CPP_BUILD_DIR)
-	g++ -shared -fpic -o $(CPP_BUILD_DIR)/lib$(LIB_NAME).so -I$(BEEGFS_INCLUDE) \
+	g++ -shared -fpic -o $(CPP_BUILD_DIR)/lib$(LIB_NAME).so $(BEEGFS_INCLUDE) \
 			-I$(CPP_BUILD_DIR) $(SOURCEDIR)/jbeegfs.cpp
 
 compile: $(CLASSFILES)

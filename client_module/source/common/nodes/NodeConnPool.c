@@ -625,10 +625,12 @@ bool __NodeConnPool_applySocketOptionsPreConnect(NodeConnPool* this, Socket* soc
       RDMASocket* rdmaSock = (RDMASocket*)sock;
       if (Node_getNodeType(this->parentNode) == NODETYPE_Meta)
          RDMASocket_setBuffers(rdmaSock, Config_getConnRDMAMetaBufNum(cfg),
-            Config_getConnRDMAMetaBufSize(cfg), Config_getConnRDMAMetaFragmentSize(cfg));
+            Config_getConnRDMAMetaBufSize(cfg), Config_getConnRDMAMetaFragmentSize(cfg),
+            Config_getConnRDMAKeyTypeNum(cfg));
       else
          RDMASocket_setBuffers(rdmaSock, Config_getConnRDMABufNum(cfg),
-            Config_getConnRDMABufSize(cfg), Config_getConnRDMAFragmentSize(cfg));
+            Config_getConnRDMABufSize(cfg), Config_getConnRDMAFragmentSize(cfg),
+            Config_getConnRDMAKeyTypeNum(cfg));
       RDMASocket_setTimeouts(rdmaSock, Config_getConnRDMATimeoutConnect(cfg),
          Config_getConnRDMATimeoutCompletion(cfg), Config_getConnRDMATimeoutFlowSend(cfg),
          Config_getConnRDMATimeoutFlowRecv(cfg), Config_getConnRDMATimeoutPoll(cfg));

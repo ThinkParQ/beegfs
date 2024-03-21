@@ -3,6 +3,8 @@
 #include "IBVBuffer.h"
 #include "IBVSocket.h"
 #ifdef BEEGFS_RDMA
+#include <rdma/ib_verbs.h>
+
 
 bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen,
    size_t fragmentLen, enum dma_data_direction dma_dir)
@@ -23,11 +25,7 @@ bool IBVBuffer_init(IBVBuffer* buffer, IBVCommContext* ctx, size_t bufLen,
 
    for(i = 0; i < count; i++)
    {
-#ifndef OFED_UNSAFE_GLOBAL_RKEY
-      buffer->lists[i].lkey = ctx->dmaMR->lkey;
-#else
       buffer->lists[i].lkey = ctx->pd->local_dma_lkey;
-#endif
       buffer->lists[i].length = bufLen;
       buffer->buffers[i] = kmalloc(bufLen, GFP_KERNEL);
       if(unlikely(!buffer->buffers[i]))
@@ -56,6 +54,54 @@ fail:
    return false;
 }
 
+
+bool IBVBuffer_initRegistration(IBVBuffer* buffer, IBVCommContext* ctx)
+{
+   struct scatterlist* sg;
+   int res;
+   int i;
+
+   buffer->mr = ib_alloc_mr(ctx->pd, IB_MR_TYPE_MEM_REG, buffer->bufferCount);
+   if (IS_ERR(buffer->mr))
+   {
+      printk_fhgfs(KERN_ERR, "Failed to alloc mr, errCode=%ld\n", PTR_ERR(buffer->mr));
+      buffer->mr = NULL;
+      goto fail;
+   }
+
+   sg = kzalloc(buffer->bufferCount * sizeof(struct scatterlist), GFP_KERNEL);
+   if (sg == NULL)
+   {
+      printk_fhgfs(KERN_ERR, "Failed to alloc sg\n");
+      goto fail;
+   }
+
+   for (i = 0; i < buffer->bufferCount; ++i)
+   {
+      sg_dma_address(&sg[i]) = buffer->lists[i].addr;
+      sg_dma_len(&sg[i]) = buffer->lists[i].length;
+   }
+
+   res = ib_map_mr_sg(buffer->mr, sg, buffer->bufferCount, NULL, PAGE_SIZE);
+   kfree(sg);
+   if (res < 0)
+   {
+      printk_fhgfs(KERN_ERR, "Failed to map mr res=%d\n", res);
+      goto fail;
+   }
+
+   return true;
+
+fail:
+   if (buffer->mr)
+   {
+      ib_dereg_mr(buffer->mr);
+      buffer->mr = NULL;
+   }
+   return false;
+}
+
+
 void IBVBuffer_free(IBVBuffer* buffer, IBVCommContext* ctx)
 {
    if(buffer->buffers && buffer->lists)
@@ -66,10 +112,14 @@ void IBVBuffer_free(IBVBuffer* buffer, IBVCommContext* ctx)
          if (buffer->lists[i].addr)
             ib_dma_unmap_single(ctx->pd->device, buffer->lists[i].addr,
                buffer->bufferSize, buffer->dma_dir);
+
          if (buffer->buffers[i])
             kfree(buffer->buffers[i]);
       }
    }
+
+   if (buffer->mr)
+      ib_dereg_mr(buffer->mr);
 
    if (buffer->buffers)
       kfree(buffer->buffers);

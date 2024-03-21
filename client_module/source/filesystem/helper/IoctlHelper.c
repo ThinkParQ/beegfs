@@ -42,7 +42,7 @@ long IoctlHelper_ioctlCreateFileCopyFromUser(App* app, void __user *argp,
 
    /* we cannot simply do: outFileInfo = userFileInfo, as that would overwrite all NULL pointers
     * and we use those NULL pointers to simplify free(), so we copy integers one by one */
-   outFileInfo->ownerNodeID.value      = userFileInfo.ownerNodeID;
+   outFileInfo->ownerNodeID            = userFileInfo.ownerNodeID;
    outFileInfo->parentParentEntryIDLen = userFileInfo.parentParentEntryIDLen;
    outFileInfo->parentEntryIDLen       = userFileInfo.parentEntryIDLen;
    outFileInfo->parentNameLen          = userFileInfo.parentNameLen;
@@ -55,8 +55,7 @@ long IoctlHelper_ioctlCreateFileCopyFromUser(App* app, void __user *argp,
    outFileInfo->prefTargetsLen         = userFileInfo.prefTargetsLen;
    outFileInfo->fileType               = userFileInfo.fileType;
    outFileInfo->parentIsBuddyMirrored  = false;
-
-   StoragePoolId_set(&(outFileInfo->storagePoolId), STORAGEPOOLID_INVALIDPOOLID);
+   outFileInfo->storagePoolId = STORAGEPOOLID_INVALIDPOOLID;
 
    /* Now copy and alloc all char* to kernel space */
 
@@ -140,7 +139,7 @@ long IoctlHelper_ioctlCreateFileCopyFromUserV2(App* app, void __user *argp,
    outFileInfo->prefTargetsLen         = userFileInfo.prefTargetsLen;
    outFileInfo->fileType               = userFileInfo.fileType;
    outFileInfo->parentIsBuddyMirrored  = userFileInfo.parentIsBuddyMirrored;
-   StoragePoolId_set(&(outFileInfo->storagePoolId), STORAGEPOOLID_INVALIDPOOLID);
+   outFileInfo->storagePoolId = STORAGEPOOLID_INVALIDPOOLID;
 
    /* Now copy and alloc all char* to kernel space */
 

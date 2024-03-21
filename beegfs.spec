@@ -58,7 +58,7 @@ Version: %{VER}
 Release: %{RELEASE}
 URL: http://www.beegfs.com
 Source: beegfs-%{BEEGFS_VERSION}.tar
-Vendor: Fraunhofer ITWM
+Vendor: ThinkParQ GmbH
 BuildRoot: %{_tmppath}/beegfs-root
 Epoch: %{EPOCH}
 
@@ -343,6 +343,7 @@ mkdir -p ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
 
 cp -r client_module/build ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
 cp -r client_module/source ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
+cp -r client_module/include ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}
 
 rm -Rf ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}/build/dist
 
@@ -360,6 +361,10 @@ sed -e 's/__VERSION__/%{VER}/g' -e 's/__NAME__/beegfs/g' -e 's/__MODNAME__/beegf
 
 cp -a client_devel/include/beegfs \
    ${RPM_BUILD_ROOT}/usr/include/
+cp -a client_module/include/uapi/* \
+   ${RPM_BUILD_ROOT}/usr/include/beegfs/
+sed -i '~s~uapi/beegfs_client~beegfs/beegfs_client~g' \
+   ${RPM_BUILD_ROOT}/usr/include/beegfs/*.h
 cp -a client_devel/build/dist/usr/share/doc/beegfs-client-devel/examples/* \
    ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-devel/examples/
 
@@ -671,6 +676,8 @@ touch /var/lib/beegfs/client/force-auto-build
 /usr/lib/systemd/system/beegfs-client@.service
 %{CLIENT_DIR}
 
+%postun client
+/usr/bin/rm -rf /lib/modules/*/updates/fs/beegfs_autobuild
 
 
 %package client-dkms
@@ -732,6 +739,7 @@ This package contains BeeGFS client development files.
 %defattr(-,root,root)
 %dir /usr/include/beegfs
 /usr/include/beegfs/beegfs.h
+/usr/include/beegfs/beegfs_client.h
 /usr/include/beegfs/beegfs_ioctl.h
 /usr/include/beegfs/beegfs_ioctl_functions.h
 /usr/share/doc/beegfs-client-devel/examples/createFileWithStripePattern.cpp
