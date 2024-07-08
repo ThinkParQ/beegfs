@@ -186,6 +186,7 @@ class App : public AbstractApp
       bool openLibZfs();
       bool closeLibZfs();
 
+      bool checkEnterpriseFeatureUsage();
 
    public:
       /**

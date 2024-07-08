@@ -17,6 +17,8 @@ int ModeRemoveBuddyGroup::execute()
    App* app = Program::getApp();
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    if (!ModeHelper::checkRootPrivileges())
       return APPCODE_RUNTIME_ERROR;
 

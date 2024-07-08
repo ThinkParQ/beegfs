@@ -128,7 +128,7 @@ std::string Socket::endpointAddrToStr(const char* hostname, unsigned short port)
 
 std::string Socket::endpointAddrToStr(const struct sockaddr_in* sin)
 {
-   return Socket::endpointAddrToStr(sin->sin_addr, sin->sin_port);
+   return Socket::endpointAddrToStr(sin->sin_addr, ntohs(sin->sin_port));
 }
 
 

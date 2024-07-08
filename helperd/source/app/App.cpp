@@ -120,10 +120,6 @@ void App::runNormal()
    logInfos();
 
    // detach process
-   // prepare ibverbs for forking
-   RDMASocket::rdmaForkInitOnce();
-
-   // detach process
    try
    {
       if ( this->cfg->getRunDaemonized() )

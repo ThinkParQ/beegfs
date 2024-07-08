@@ -215,11 +215,13 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_StorageResyncStarted: { msg = new StorageResyncStartedMsgEx(); } break;
       case NETMSGTYPE_StorageResyncStartedResp: { msg = new StorageResyncStartedRespMsg(); } break;
       case NETMSGTYPE_GetXAttr: { msg = new GetXAttrMsgEx(); } break;
+      case NETMSGTYPE_GetXAttrResp: { msg = new GetXAttrRespMsg(); } break;
       case NETMSGTYPE_Hardlink: { msg = new HardlinkMsgEx(); } break;
       case NETMSGTYPE_HardlinkResp: { msg = new HardlinkRespMsg(); } break;
       case NETMSGTYPE_ListDirFromOffset: { msg = new ListDirFromOffsetMsgEx(); } break;
       case NETMSGTYPE_ListDirFromOffsetResp: { msg = new ListDirFromOffsetRespMsg(); } break;
       case NETMSGTYPE_ListXAttr: { msg = new ListXAttrMsgEx(); } break;
+      case NETMSGTYPE_ListXAttrResp: { msg = new ListXAttrRespMsg(); } break;
       case NETMSGTYPE_LookupIntent: { msg = new LookupIntentMsgEx(); } break;
       case NETMSGTYPE_LookupIntentResp: { msg = new LookupIntentRespMsg(); } break;
       case NETMSGTYPE_MkDir: { msg = new MkDirMsgEx(); } break;
@@ -283,11 +285,13 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_WriteLocalFileResp: { msg = new WriteLocalFileRespMsg(); } break;
       case NETMSGTYPE_FSyncLocalFileResp: { msg = new FSyncLocalFileRespMsg(); } break;
       case NETMSGTYPE_FLockAppend: { msg = new FLockAppendMsgEx(); } break;
+      case NETMSGTYPE_FLockAppendResp: { msg = new FLockAppendRespMsg(); } break;
       case NETMSGTYPE_FLockEntry: { msg = new FLockEntryMsgEx(); } break;
       case NETMSGTYPE_FLockEntryResp: { msg = new FLockEntryRespMsg(); } break;
       case NETMSGTYPE_FLockRange: { msg = new FLockRangeMsgEx(); } break;
       case NETMSGTYPE_FLockRangeResp: { msg = new FLockRangeRespMsg(); } break;
       case NETMSGTYPE_GetFileVersion: { msg = new GetFileVersionMsgEx(); } break;
+      case NETMSGTYPE_GetFileVersionResp: { msg = new GetFileVersionRespMsg(); } break;
       case NETMSGTYPE_AckNotify: { msg = new AckNotifiyMsgEx(); } break;
       case NETMSGTYPE_AckNotifyResp: { msg = new AckNotifiyRespMsg(); } break;
 

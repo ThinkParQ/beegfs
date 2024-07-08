@@ -206,10 +206,6 @@ void App::runNormal()
 
    registerSignalHandler();
 
-
-   // prepare ibverbs for forking
-   RDMASocket::rdmaForkInitOnce();
-
    // detach process
    if(cfg->getRunDaemonized() )
       daemonize();
@@ -269,6 +265,9 @@ void App::runNormal()
       appResult = APPCODE_INITIALIZATION_ERROR;
       return;
    }
+
+   // check and log if enterprise features are used
+   checkEnterpriseFeatureUsage();
 
    // init components
 
@@ -1527,13 +1526,13 @@ void App::checkTargetsUUIDs()
             throw InvalidConfigException("Could not open /proc/self/mountinfo");
          }
 
+         auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);         
+
          std::string line, device_path, device_majmin;
          while (std::getline(mountInfo, line)) {
             std::istringstream is(line);
             std::string dummy;
             is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;
-
-            auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);
 
             if (majmin_f.str() == device_majmin)
                break;
@@ -1542,7 +1541,7 @@ void App::checkTargetsUUIDs()
          }
 
          if (device_path.empty()) {
-            throw InvalidConfigException("Could not find a device path that belongs to device " + device_majmin);
+            throw InvalidConfigException("Determined the underlying device for target directory " +  path->str() + " is " + majmin_f.str() + " but could not find that device in /proc/self/mountinfo");
          }
 
          // Lookup the fs UUID
@@ -1550,7 +1549,7 @@ void App::checkTargetsUUIDs()
                probe(blkid_new_probe_from_filename(device_path.data()), blkid_free_probe);
 
          if (!probe) {
-            throw InvalidConfigException("Failed to open device for probing: " + device_path);
+            throw InvalidConfigException("Failed to open device for probing: " + device_path + " (check BeeGFS is running with root or sufficient privileges)");
          }
 
          if (blkid_probe_enable_superblocks(probe.get(), 1) < 0) {
@@ -1585,4 +1584,32 @@ void App::checkTargetsUUIDs()
             "the appropriate UUIDs.");
    }
 
+}
+
+/**
+ * Creates a list of Enterprise Features that are in use. This list is passed to logEULAMsg.
+ */
+bool App::checkEnterpriseFeatureUsage()
+{
+   std::string enabledFeatures;
+
+   if (this->mirrorBuddyGroupMapper->getSize() > 0)
+      enabledFeatures.append("Mirroring, ");
+
+   if (this->cfg->getQuotaEnableEnforcement())
+      enabledFeatures.append("Quotas, ");
+
+   if (this->storagePoolStore->getSize() > 1)
+      enabledFeatures.append("Storage Pools, ");
+
+   // Remove ", " from end of string
+   if (enabledFeatures.length() > 2)
+      enabledFeatures.resize(enabledFeatures.size() - 2);
+
+   logEULAMsg(enabledFeatures);
+
+   if (!enabledFeatures.empty())
+      return true;
+
+   return false;
 }

@@ -22,6 +22,8 @@ int ModeSetState::execute()
 
    TargetConsistencyState cfgState;
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    if (!ModeHelper::checkRootPrivileges())
       return APPCODE_RUNTIME_ERROR;
 

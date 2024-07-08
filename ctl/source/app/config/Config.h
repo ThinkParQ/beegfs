@@ -47,6 +47,8 @@ class Config : public AbstractConfig
 
       bool        runDaemonized;
 
+      bool        sysNoEnterpriseFeatureMsg;
+
       // internals
 
       virtual void loadDefaults(bool addDashes) override;
@@ -95,6 +97,11 @@ class Config : public AbstractConfig
       bool getRunDaemonized() const
       {
          return runDaemonized;
+      }
+
+      bool getSysNoEnterpriseFeatureMsg() const
+      {
+         return sysNoEnterpriseFeatureMsg;
       }
 };
 

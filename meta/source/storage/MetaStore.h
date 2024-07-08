@@ -58,7 +58,7 @@ class MetaStore
          const CharVector& accessACLXAttr);
       FhgfsOpsErr removeDirInode(const std::string& entryID, bool isBuddyMirrored);
       FhgfsOpsErr unlinkInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode);
-      FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID);
+      FhgfsOpsErr fsckUnlinkFileInode(const std::string& entryID, bool isBuddyMirrored);
       FhgfsOpsErr unlinkFile(DirInode& dir, const std::string& fileName,
          EntryInfo* outEntryInfo, std::unique_ptr<FileInode>* outInode);
 

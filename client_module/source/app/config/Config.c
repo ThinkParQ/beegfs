@@ -13,7 +13,12 @@
 #define CONFIG_ERR_BUF_LENGTH          1024
 #define CONFIG_AUTHFILE_READSIZE       1024 // max amount of data that we read from auth file
 #define CONFIG_AUTHFILE_MINSIZE        4 // at least 2, because we compute two 32bit hashes
+
 #define CONFIG_CONN_RDMA_BUFNUM_MIN    3 // required by the IBVSocket logic and protocol
+#define CONFIG_CONN_RDMA_NONE_STR      "none"
+#define CONFIG_CONN_RDMA_DEFAULT_STR   "default"
+#define CONFIG_CONN_RDMA_PAGE_STR      "page"
+#define CONFIG_CONN_RDMA_DEFAULT       -1
 
 #define FILECACHETYPE_NONE_STR      "none"
 #define FILECACHETYPE_BUFFERED_STR  "buffered"
@@ -30,7 +35,6 @@
 #define EVENTLOGMASK_CLOSE "close"
 #define EVENTLOGMASK_LINK_OP "link-op"
 #define EVENTLOGMASK_READ "read"
-
 
 #define IGNORE_CONFIG_VALUE(compareStr) /* to be used in applyConfigMap() */ \
    if(!strcmp(keyStr, compareStr) ) \
@@ -224,11 +228,11 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "connCommRetrySecs",                "600");
    _Config_configMapRedefine(this, "connUnmountRetries",               "true");
    _Config_configMapRedefine(this, "connRDMABufSize",                  "8192");
-   _Config_configMapRedefine(this, "connRDMAFragmentSize",             "4096");
+   _Config_configMapRedefine(this, "connRDMAFragmentSize",             CONFIG_CONN_RDMA_PAGE_STR);
    _Config_configMapRedefine(this, "connRDMABufNum",                   "70");
-   _Config_configMapRedefine(this, "connRDMAMetaBufSize",              "0");
-   _Config_configMapRedefine(this, "connRDMAMetaFragmentSize",         "4096");
-   _Config_configMapRedefine(this, "connRDMAMetaBufNum",               "0");
+   _Config_configMapRedefine(this, "connRDMAMetaBufSize",              CONFIG_CONN_RDMA_DEFAULT_STR);
+   _Config_configMapRedefine(this, "connRDMAMetaFragmentSize",         CONFIG_CONN_RDMA_DEFAULT_STR);
+   _Config_configMapRedefine(this, "connRDMAMetaBufNum",               CONFIG_CONN_RDMA_DEFAULT_STR);
    _Config_configMapRedefine(this, "connRDMATypeOfService",            "0");
    _Config_configMapRedefine(this, "connRDMAKeyType",                  RDMAKEYTYPE_UNSAFE_GLOBAL_STR);
    _Config_configMapRedefine(this, "connNetFilterFile",                "");
@@ -282,6 +286,7 @@ void _Config_loadDefaults(Config* this)
    // but the client only needs to fetch the states once during that period.
 
    _Config_configMapRedefine(this, "sysXAttrsEnabled",                 "false");
+   _Config_configMapRedefine(this, "sysXAttrsCheckCapabilities",       "never");
    _Config_configMapRedefine(this, "sysACLsEnabled",                   "false");
 
    _Config_configMapRedefine(this, "quotaEnabled",                     "false");
@@ -399,19 +404,45 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          this->connRDMABufSize = StringTk_strToUInt(valueStr);
       else
       if(!strcmp(keyStr, "connRDMAFragmentSize") )
-         this->connRDMAFragmentSize = StringTk_strToUInt(valueStr);
+      {
+         if (!strcmp(valueStr, CONFIG_CONN_RDMA_PAGE_STR))
+            this->connRDMAFragmentSize = PAGE_SIZE;
+         else if (!strcmp(valueStr, CONFIG_CONN_RDMA_NONE_STR))
+            this->connRDMAFragmentSize = 0;
+         else
+            this->connRDMAFragmentSize = StringTk_strToUInt(valueStr);
+      }
       else
       if(!strcmp(keyStr, "connRDMABufNum") )
          this->connRDMABufNum = StringTk_strToUInt(valueStr);
       else
       if(!strcmp(keyStr, "connRDMAMetaBufSize") )
-         this->connRDMAMetaBufSize = StringTk_strToUInt(valueStr);
+      {
+         if (!strcmp(valueStr, CONFIG_CONN_RDMA_DEFAULT_STR))
+            this->connRDMAMetaBufSize = CONFIG_CONN_RDMA_DEFAULT;
+         else
+            this->connRDMAMetaBufSize = StringTk_strToInt(valueStr);
+      }
       else
       if(!strcmp(keyStr, "connRDMAMetaFragmentSize") )
-         this->connRDMAMetaFragmentSize = StringTk_strToUInt(valueStr);
+      {
+         if (!strcmp(valueStr, CONFIG_CONN_RDMA_PAGE_STR))
+            this->connRDMAMetaFragmentSize = PAGE_SIZE;
+         else if (!strcmp(valueStr, CONFIG_CONN_RDMA_NONE_STR))
+            this->connRDMAMetaFragmentSize = 0;
+         else if (!strcmp(valueStr, CONFIG_CONN_RDMA_DEFAULT_STR))
+            this->connRDMAMetaFragmentSize = CONFIG_CONN_RDMA_DEFAULT;
+         else
+            this->connRDMAMetaFragmentSize = StringTk_strToInt(valueStr);
+      }
       else
       if(!strcmp(keyStr, "connRDMAMetaBufNum") )
-         this->connRDMAMetaBufNum = StringTk_strToUInt(valueStr);
+      {
+         if (!strcmp(valueStr, CONFIG_CONN_RDMA_DEFAULT_STR))
+            this->connRDMAMetaBufNum = CONFIG_CONN_RDMA_DEFAULT;
+         else
+            this->connRDMAMetaBufNum = StringTk_strToUInt(valueStr);
+      }
       else
       if(!strcmp(keyStr, "connRDMAKeyType") )
       {
@@ -654,6 +685,16 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "sysXAttrsEnabled") )
          this->sysXAttrsEnabled = StringTk_strToBool(valueStr);
       else
+      if(!strcmp(keyStr, "sysXAttrsCheckCapabilities") )
+      {
+         if (!strcmp(valueStr, CHECKCAPABILITIES_ALWAYS_STR))
+            this->sysXAttrsCheckCapabilities = CHECKCAPABILITIES_Always;
+         else if (!strcmp(valueStr, CHECKCAPABILITIES_CACHE_STR))
+            this->sysXAttrsCheckCapabilities = CHECKCAPABILITIES_Cache;
+         else if (!strcmp(valueStr, CHECKCAPABILITIES_NEVER_STR))
+            this->sysXAttrsCheckCapabilities = CHECKCAPABILITIES_Never;
+      }
+      else
       if(!strcmp(keyStr, "sysACLsEnabled") )
          this->sysACLsEnabled = StringTk_strToBool(valueStr);
       else
@@ -706,6 +747,7 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       else if(!strcmp(keyStr, "remapConnectionFailureStatus"))
          this->remapConnectionFailureStatus = StringTk_strToUInt(valueStr);
       else
+      IGNORE_CONFIG_VALUE("sysNoEnterpriseFeatureMsg") // Only relevant for ctl
       { // unknown element occurred
 bad_config_elem:
          unknownElement = true;
@@ -1084,6 +1126,32 @@ bool __Config_readLineFromFile(struct file* cfgFile,
 
 }
 
+/*
+ * Set val to defVal if val == condVal.
+ * return true if val was assigned
+ */
+static bool __Config_setIfEqualInt(int* val, int condVal, int defVal)
+{
+   if (*val == condVal)
+   {
+      *val = defVal;
+      return true;
+   }
+   return false;
+}
+
+/*
+ * Ensure val is at least minVal.
+ */
+static void __Config_ensureMinInt(int* val, int minVal, const char* name)
+{
+   if (*val < minVal)
+   {
+      *val = minVal;
+      printk_fhgfs(KERN_WARNING, "%s is too low, setting to %d\n", name, minVal);
+   }
+}
+
 /**
  * Init values that are not directly set by the user, but computed from values that the user
  * has set.
@@ -1112,51 +1180,20 @@ bool __Config_initImplicitVals(Config* this)
    if(!this->tuneUseGlobalAppendLocks)
       this->tuneUseBufferedAppend = false;
 
-   if (this->connRDMABufNum < CONFIG_CONN_RDMA_BUFNUM_MIN)
-   {
-      printk_fhgfs(KERN_WARNING, "connRDAMBufNum is too low, setting to %d\n", CONFIG_CONN_RDMA_BUFNUM_MIN);
-      this->connRDMABufNum = CONFIG_CONN_RDMA_BUFNUM_MIN;
-   }
+   __Config_ensureMinInt(&this->connRDMABufNum, CONFIG_CONN_RDMA_BUFNUM_MIN, "connRDMABufNum");
+   __Config_ensureMinInt(&this->connRDMABufSize, PAGE_SIZE, "connRDMABufSize");
+   if (!__Config_setIfEqualInt(&this->connRDMAFragmentSize, 0, this->connRDMABufSize))
+      __Config_ensureMinInt(&this->connRDMAFragmentSize, PAGE_SIZE, "connRDMAFragmentSize");
 
-   if (this->connRDMAFragmentSize == 0)
-   {
-      /* 0 indicates that the fragment size is the same as the buffer size.
-         Thus, there will be no buffer fragmentation.
-      */
-      this->connRDMAFragmentSize = this->connRDMABufSize;
-   }
+   if (!__Config_setIfEqualInt(&this->connRDMAMetaBufNum, CONFIG_CONN_RDMA_DEFAULT, this->connRDMABufNum))
+      __Config_ensureMinInt(&this->connRDMAMetaBufNum, CONFIG_CONN_RDMA_BUFNUM_MIN, "connRDMAMetaBufNum");
 
-   if (this->connRDMABufNum < CONFIG_CONN_RDMA_BUFNUM_MIN)
-   {
-      printk_fhgfs(KERN_WARNING, "connRDMABufNum %u is too low, using %d\n",
-         this->connRDMABufNum, CONFIG_CONN_RDMA_BUFNUM_MIN);
-      this->connRDMABufNum = CONFIG_CONN_RDMA_BUFNUM_MIN;
-   }
+   if (!__Config_setIfEqualInt(&this->connRDMAMetaBufSize, CONFIG_CONN_RDMA_DEFAULT, this->connRDMABufSize))
+      __Config_ensureMinInt(&this->connRDMAMetaBufSize, PAGE_SIZE, "connRDMAMetaBufSize");
 
-   if (this->connRDMAMetaBufSize == 0)
-   {
-      this->connRDMAMetaBufSize = this->connRDMABufSize;
-   }
-
-   if (this->connRDMAMetaBufNum == 0)
-   {
-      this->connRDMAMetaBufNum = this->connRDMABufNum;
-   }
-
-   if (this->connRDMAMetaBufNum < CONFIG_CONN_RDMA_BUFNUM_MIN)
-   {
-      printk_fhgfs(KERN_WARNING, "connRDMAMetaBufNum value %u is too low, using %d\n",
-         this->connRDMAMetaBufNum, CONFIG_CONN_RDMA_BUFNUM_MIN);
-      this->connRDMAMetaBufNum = CONFIG_CONN_RDMA_BUFNUM_MIN;
-   }
-
-   if (this->connRDMAMetaFragmentSize == 0)
-   {
-      /* 0 indicates that the fragment size is the same as the buffer size.
-         Thus, there will be no buffer fragmentation.
-      */
-      this->connRDMAMetaFragmentSize = this->connRDMAMetaBufSize;
-   }
+   if (!__Config_setIfEqualInt(&this->connRDMAMetaFragmentSize, 0, this->connRDMAMetaBufSize))
+      if (!__Config_setIfEqualInt(&this->connRDMAMetaFragmentSize, CONFIG_CONN_RDMA_DEFAULT, this->connRDMAFragmentSize))
+         __Config_ensureMinInt(&this->connRDMAMetaFragmentSize, PAGE_SIZE, "connRDMAMetaFragmentSize");
 
    // Automatically enable XAttrs if ACLs have been enabled
    if (this->sysACLsEnabled && !this->sysXAttrsEnabled)
@@ -1352,6 +1389,19 @@ const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType)
          return RDMAKEYTYPE_UNSAFE_DMA_STR;
       default:
          return RDMAKEYTYPE_UNSAFE_GLOBAL_STR;
+   }
+}
+
+const char* Config_checkCapabilitiesTypeToStr(CheckCapabilities checkCapabilities)
+{
+   switch(checkCapabilities)
+   {
+      case CHECKCAPABILITIES_Cache:
+         return CHECKCAPABILITIES_CACHE_STR;
+      case CHECKCAPABILITIES_Never:
+         return CHECKCAPABILITIES_NEVER_STR;
+      default:
+         return CHECKCAPABILITIES_ALWAYS_STR;
    }
 }
 

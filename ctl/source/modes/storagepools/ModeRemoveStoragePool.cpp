@@ -8,6 +8,8 @@
 
 int ModeRemoveStoragePool::execute()
 {
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )
       return APPCODE_RUNTIME_ERROR;

@@ -10,6 +10,7 @@
 #include <common/system/System.h>
 #include <program/Program.h>
 #include "ModeSetQuota.h"
+#include "modes/modehelpers/ModeHelper.h"
 
 
 
@@ -39,6 +40,8 @@ int ModeSetQuota::execute()
    App* app = Program::getApp();
    NodeStoreServers* mgmtNodes = app->getMgmtNodes();
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
+
+   ModeHelper::printEnterpriseFeatureMsg();
 
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )

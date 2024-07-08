@@ -38,21 +38,8 @@ std::tuple<FileIDLock, ParentNameLock, ParentNameLock, FileIDLock> HardlinkMsgEx
       fromLock = {&store, getFromDirInfo()->getEntryID(), getFromName()};
    }
 
-   // hardlinking modifies the file inode link count, so we have to lock the file. if we can't
-   // reference the directory, or if the file does not exist, we can continue - the directory is
-   // locked, so the file cannot suddenly appear after we return here.
-   auto dir = Program::getApp()->getMetaStore()->referenceDir(getFromDirInfo()->getEntryID(),
-         getFromInfo()->getIsBuddyMirrored(), true);
-   if (dir)
-   {
-      EntryInfo fromInfo;
-
-      dir->getFileEntryInfo(getFromName(), fromInfo);
-      if (DirEntryType_ISFILE(fromInfo.getEntryType()))
-         fileLock = {&store, fromInfo.getEntryID(), true};
-
-      Program::getApp()->getMetaStore()->releaseDir(dir->getID());
-   }
+   // Acquire the inode lock because hardlinking modifies the link count.
+   fileLock = {&store, getFromInfo()->getEntryID(), true};
 
    return std::make_tuple(
          std::move(dirLock),

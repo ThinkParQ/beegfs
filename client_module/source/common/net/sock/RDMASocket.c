@@ -15,7 +15,7 @@
 #define RDMASOCKET_DEFAULT_BUF_NUM                    (128) // moved to config
 #define RDMASOCKET_DEFAULT_BUF_SIZE                   (4*1024) // moved to config
 #define RDMASOCKET_DEFAULT_FRAGMENT_SIZE              RDMASOCKET_DEFAULT_BUF_SIZE // moved to config
-#define RDMASOCKET_DEFAULT_KEY_TYPE                   RDMAKEYTYPE_UnsafeGlobal;
+#define RDMASOCKET_DEFAULT_KEY_TYPE                   RDMAKEYTYPE_UnsafeGlobal
 
 static const struct SocketOps rdmaOps = {
    .uninit = _RDMASocket_uninit,
@@ -46,7 +46,7 @@ bool RDMASocket_init(RDMASocket* this)
    this->commCfg.bufNum = RDMASOCKET_DEFAULT_BUF_NUM;
    this->commCfg.bufSize = RDMASOCKET_DEFAULT_BUF_SIZE;
    this->commCfg.fragmentSize = RDMASOCKET_DEFAULT_FRAGMENT_SIZE;
-   this->commCfg.keyType = RDMASOCKET_DEFAULT_KEY_TYPE;
+   this->commCfg.keyType = RDMASocket_toIBVSocketKeyType(RDMASOCKET_DEFAULT_KEY_TYPE);
 
    if(!IBVSocket_init(&this->ibvsock) )
       goto err_ibv;

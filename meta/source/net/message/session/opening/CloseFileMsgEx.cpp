@@ -148,6 +148,15 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
 std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFileSecondary(
    ResponseContext& ctx)
 {
+   if (isMsgHeaderFeatureFlagSet(CLOSEFILEMSG_FLAG_CANCELAPPENDLOCKS))
+   {
+      // client requests cleanup of granted or pending locks for this handle
+      unsigned ownerFD = SessionTk::ownerFDFromHandleID(getFileHandleID() );
+      EntryLockDetails lockDetails(getClientNumID(), 0, 0, "", ENTRYLOCKTYPE_CANCEL);
+
+      MsgHelperLocking::flockAppend(getEntryInfo(), ownerFD, lockDetails);
+   }
+
    // on secondary we only need to close the session and the meta file, because the chunk files
    // will be closed by primary
 

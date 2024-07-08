@@ -301,6 +301,12 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
 #endif
    }
 #endif // KERNEL_HAS_POSIX_GET_ACL
+   if (Config_getSysXAttrsCheckCapabilities(cfg) != CHECKCAPABILITIES_Always)
+   #if defined(SB_NOSEC)
+      sb->s_flags |= SB_NOSEC;
+   #else
+      sb->s_flags |= MS_NOSEC;
+   #endif
 
    /* MS_ACTIVE is rather important as it marks the super block being successfully initialized and
     * allows the vfs to keep important inodes in the cache. However, it seems it is already

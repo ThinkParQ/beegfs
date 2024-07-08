@@ -72,7 +72,6 @@ class App : public AbstractApp
 
       void handleNetworkInterfacesChanged(NicAddressList nicList);
 
-
    private:
       int appResult;
       int argc;
@@ -201,6 +200,7 @@ class App : public AbstractApp
       bool storeSessions();
       bool deleteSessionFiles();
 
+      bool checkEnterpriseFeatureUsage();
 
    public:
       // inliners

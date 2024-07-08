@@ -1270,7 +1270,6 @@ ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    Config* cfg = App_getConfig(app);
 
-   int writeCheckRes;
    struct inode* inode = file->f_mapping->host;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(file);
@@ -1287,9 +1286,16 @@ ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
    FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "(offset: %lld; size: %lld)",
       (long long)*offsetPointer, (long long)size);
 
-   writeCheckRes = os_generic_write_checks(file, offsetPointer, &size, S_ISBLK(inode->i_mode) );
-   if(unlikely(writeCheckRes) )
-      return writeCheckRes;
+   inode_lock(inode);
+   {
+      writeRes = os_generic_write_checks(file, offsetPointer, &size, S_ISBLK(inode->i_mode) );
+      if (likely(! writeRes))  // success
+         writeRes = file_remove_privs(file);
+   }
+   inode_unlock(inode);
+
+   if (unlikely(writeRes))
+      return writeRes;
 
    if (app->cfg->tuneCoherentBuffers)
    {

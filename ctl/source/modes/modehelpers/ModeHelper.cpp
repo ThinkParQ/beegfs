@@ -465,3 +465,33 @@ bool ModeHelper::getEntryAndOwnerFromPath(Path& path, bool useMountedPath,
 
    return true;
 }
+
+void ModeHelper::printEnterpriseFeatureMsg()
+{
+   App* app = Program::getApp();
+   Config* cfg = app->getConfig();
+   
+   if (cfg->getSysNoEnterpriseFeatureMsg())
+      return;
+
+   std::cerr << "--------------------------------------------------------------------------------" << std::endl;
+   std::cerr << "| BeeGFS Enterprise Feature                                                    |" << std::endl;
+   std::cerr << "|                                                                              |" << std::endl;
+   std::cerr << "| This beegfs-ctl mode configures a BeeGFS Enterprise Feature.                 |" << std::endl;
+   std::cerr << "|                                                                              |" << std::endl;
+   std::cerr << "| By downloading and/or installing BeeGFS, you have agreed to the EULA of      |" << std::endl;
+   std::cerr << "| BeeGFS: https://www.beegfs.io/docs/BeeGFS_EULA.txt                           |" << std::endl;
+   std::cerr << "|                                                                              |" << std::endl;
+   std::cerr << "| Please note that any use of Enterprise Features of BeeGFS for longer than    |" << std::endl;
+   std::cerr << "| the trial period of 60 (sixty) days requires a valid License & Support       |" << std::endl;
+   std::cerr << "| Agreement with the licensor of BeeGFS \"ThinkParQ GmbH\".                      |" << std::endl;
+   std::cerr << "|                                                                              |" << std::endl;
+   std::cerr << "| Contact: sales@thinkparq.com                                                 |" << std::endl;
+   std::cerr << "| Thank you for supporting BeeGFS development!                                 |" << std::endl;
+   std::cerr << "|                                                                              |" << std::endl;
+   std::cerr << "| If you are using BeeGFS in conformity with the EULA and do not wish to see   |" << std::endl;
+   std::cerr << "| this message in the future, you can set sysNoEnterpriseFeatureMsg to true in |" << std::endl;
+   std::cerr << "| beegfs-client.conf to disable it.                                            |" << std::endl;
+   std::cerr << "--------------------------------------------------------------------------------" << std::endl;
+   std::cerr << std::endl;
+}

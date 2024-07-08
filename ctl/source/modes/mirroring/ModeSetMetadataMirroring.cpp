@@ -26,6 +26,8 @@ int ModeSetMetadataMirroring::execute()
 
    StringMapIter iter;
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )
       return APPCODE_RUNTIME_ERROR;

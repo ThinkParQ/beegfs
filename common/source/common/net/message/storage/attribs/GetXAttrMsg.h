@@ -4,7 +4,7 @@
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
 
-class GetXAttrMsg : public NetMessageSerdes<GetXAttrMsg>
+class GetXAttrMsg : public MirroredMessageBase<GetXAttrMsg>
 {
    friend class AbstractNetMessageFactory;
 
@@ -31,6 +31,8 @@ class GetXAttrMsg : public NetMessageSerdes<GetXAttrMsg>
             % obj->name
             % obj->size;
       }
+
+      bool supportsMirroring() const { return true; }
 
    private:
 

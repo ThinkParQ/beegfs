@@ -85,6 +85,8 @@ class AbstractApp : public PThread
 
       bool initNoDefaultRouteList(NetVector* outNets);
 
+      void logEULAMsg(std::string);
+
    private:
       static bool basicInitializations();
       bool basicDestructions();

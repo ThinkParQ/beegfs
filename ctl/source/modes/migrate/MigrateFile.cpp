@@ -20,6 +20,43 @@
 RandomReentrant MigrateFile::randomGen;
 
 /**
+* Retrieves a map that associates file types as defined in dirent.h with textual
+* representations of these types. This should only be used to "pretty print" the 
+* types for logging, and the authoritative source is the enum in dirent.h.
+*/
+const std::map<int, std::string>& getFileTypeMap()
+{
+    static const std::map<int, std::string> fileTypeMap = {
+        {DT_UNKNOWN, "DT_UNKNOWN"},
+        {DT_FIFO,    "DT_FIFO"},
+        {DT_CHR,     "DT_CHR"},
+        {DT_DIR,     "DT_DIR"},
+        {DT_BLK,     "DT_BLK"},
+        {DT_REG,     "DT_REG"},
+        {DT_LNK,     "DT_LNK"},
+        {DT_SOCK,    "DT_SOCK"},
+        {DT_WHT,     "DT_WHT"}
+    };
+
+    return fileTypeMap;
+}
+
+/**
+ * Converts a file type integer to its string representation. Used to pretty
+ * print types in errors, for example if we are provided an unsupported type.
+*/
+std::string convertFileTypeToString(int type)
+{
+    const auto& map = getFileTypeMap();
+    auto it = map.find(type);
+    if (it != map.end()) {
+        return it->second;
+    } else {
+        return "Unknown file type (" + std::to_string(type) + ") ";
+    }
+}
+
+/**
  * Start the migration of the MigrateFile object here.
  */
 bool MigrateFile::doMigrate()
@@ -38,7 +75,8 @@ bool MigrateFile::doMigrate()
          // migrate symlink
          return migrateSymLink();
       default:
-         return true; // silently ignore,
+         std::cerr << "Unable to migrate file type (manually migrate if necessary): " << convertFileTypeToString(this->fileType) << std::endl;
+         return false; // we no longer silently ignore unknown file types
    }
 
    return false;

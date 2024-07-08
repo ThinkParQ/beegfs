@@ -16,6 +16,12 @@
 // (see common/toolkit/StorageTk.h)
 #define BEEGFS_IOCTL_ENTRYID_MAXLEN     26
 
+// stripe pattern types
+#define BEEGFS_STRIPEPATTERN_INVALID      0
+#define BEEGFS_STRIPEPATTERN_RAID0        1
+#define BEEGFS_STRIPEPATTERN_RAID10       2
+#define BEEGFS_STRIPEPATTERN_BUDDYMIRROR  3
+
 #define BEEGFS_IOCTL_PING_MAX_COUNT       10
 #define BEEGFS_IOCTL_PING_MAX_INTERVAL    2000
 #define BEEGFS_IOCTL_PING_NODE_BUFLEN     64
@@ -200,7 +206,7 @@ struct BeegfsIoctl_MkFileV3_Arg
    uint16_t storagePoolId; // if set, this is used to override the pool id of the parent dir
 };
 
-/* uset to get the stripe info of a file */
+/* used to get the stripe info of a file */
 struct BeegfsIoctl_GetStripeInfo_Arg
 {
    unsigned outPatternType; // (out-value) stripe pattern type (STRIPEPATTERN_...)
@@ -208,7 +214,7 @@ struct BeegfsIoctl_GetStripeInfo_Arg
    uint16_t outNumTargets; // (out-value) number of stripe targets of given file
 };
 
-/* uset to get the stripe target of a file */
+/* used to get the stripe target of a file */
 struct BeegfsIoctl_GetStripeTarget_Arg
 {
    uint16_t targetIndex; // index of the target that should be queried (0-based)

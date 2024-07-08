@@ -816,7 +816,7 @@ FhgfsOpsErr MetaStore::removeDirInode(const std::string& entryID, bool isBuddyMi
  *
  * Note: Specialy case without an entryInfo, for fsck only!
  */
-FhgfsOpsErr MetaStore::fsckUnlinkFileInode(const std::string& entryID)
+FhgfsOpsErr MetaStore::fsckUnlinkFileInode(const std::string& entryID, bool isBuddyMirrored)
 {
    UniqueRWLock lock(rwlock, SafeRWLock_READ);
 
@@ -828,6 +828,9 @@ FhgfsOpsErr MetaStore::fsckUnlinkFileInode(const std::string& entryID)
    int flags = 0;
 
    EntryInfo entryInfo(ownerNodeID, parentEntryID, entryID, fileName, entryType, flags);
+
+   if (isBuddyMirrored)
+      entryInfo.setBuddyMirroredFlag(true);
 
    return this->fileStore.unlinkFileInode(&entryInfo, NULL);
 }

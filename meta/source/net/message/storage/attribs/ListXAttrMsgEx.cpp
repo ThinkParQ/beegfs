@@ -3,16 +3,31 @@
 #include <net/msghelpers/MsgHelperXAttr.h>
 #include "ListXAttrMsgEx.h"
 
-
 bool ListXAttrMsgEx::processIncoming(ResponseContext& ctx)
 {
+   #ifdef BEEGFS_DEBUG
+      const char* logContext = "ListXAttrMsg incoming";
+   #endif // BEEGFS_DEBUG
+
+   LOG_DEBUG(logContext, Log_DEBUG, "size: " + StringTk::intToStr(this->getSize()) + ";");
+   return BaseType::processIncoming(ctx);
+}
+
+FileIDLock ListXAttrMsgEx::lock(EntryLockStore& store)
+{
+   return {&store, getEntryInfo()->getEntryID(), false};
+}
+
+std::unique_ptr<MirroredMessageResponseState> ListXAttrMsgEx::executeLocally(ResponseContext& ctx,
+   bool isSecondary)
+{
+   const char* logContext = "List XAttr Msg";
+   ListXAttrMsgResponseState resp;
+
    App* app = Program::getApp();
-   const char* logContext = "ListXAttrMsg incoming";
    Config* config = app->getConfig();
    EntryInfo* entryInfo = this->getEntryInfo();
    size_t listSize = 0;
-
-   LOG_DEBUG(logContext, Log_DEBUG, "size: " + StringTk::intToStr(this->getSize()) + ";");
 
    StringVector xAttrVec;
    FhgfsOpsErr listXAttrRes;
@@ -46,10 +61,12 @@ bool ListXAttrMsgEx::processIncoming(ResponseContext& ctx)
    }
 
 resp:
-   ctx.sendResponse(ListXAttrRespMsg(xAttrVec, listSize, listXAttrRes) );
+   resp.setListXAttrValue(xAttrVec);
+   resp.setSize(listSize);
+   resp.setListXAttrResult(listXAttrRes);
 
    app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_LISTXATTR,
          getMsgHeaderUserID() );
 
-   return true;
+   return boost::make_unique<ResponseState>(std::move(resp));
 }

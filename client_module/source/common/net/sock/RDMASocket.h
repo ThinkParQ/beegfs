@@ -8,7 +8,7 @@
 #include <common/net/sock/ibv/IBVSocket.h>
 #include <common/net/sock/PooledSocket.h>
 #include <app/config/Config.h>
- 
+
 struct ib_device;
 struct ib_mr;
 struct RDMASocket;
@@ -44,6 +44,7 @@ static inline void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,
 static inline void RDMASocket_setTypeOfService(RDMASocket* this, int typeOfService);
 static inline void RDMASocket_setConnectionFailureStatus(RDMASocket* this, unsigned value);
 static inline bool RDMASocket_registerMr(RDMASocket* this, struct ib_mr* mr, int access);
+static inline IBVSocketKeyType RDMASocket_toIBVSocketKeyType(RDMAKeyType keyType);
 
 struct RDMASocket
 {
@@ -54,6 +55,19 @@ struct RDMASocket
    IBVCommConfig commCfg;
 };
 
+IBVSocketKeyType RDMASocket_toIBVSocketKeyType(RDMAKeyType keyType)
+{
+   switch (keyType)
+   {
+   case RDMAKEYTYPE_UnsafeDMA:
+      return IBVSOCKETKEYTYPE_UnsafeDMA;
+   case RDMAKEYTYPE_Register:
+      return IBVSOCKETKEYTYPE_Register;
+   default:
+      return IBVSOCKETKEYTYPE_UnsafeGlobal;
+   }
+}
+
 /**
  * Note: Only has an effect for unconnected sockets.
  */
@@ -63,18 +77,7 @@ void RDMASocket_setBuffers(RDMASocket* this, unsigned bufNum, unsigned bufSize,
    this->commCfg.bufNum = bufNum;
    this->commCfg.bufSize = bufSize;
    this->commCfg.fragmentSize = fragmentSize;
-   switch (keyType)
-   {
-   case RDMAKEYTYPE_UnsafeDMA:
-      this->commCfg.keyType = IBVSOCKETKEYTYPE_UnsafeDMA;
-      break;
-   case RDMAKEYTYPE_Register:
-      this->commCfg.keyType = IBVSOCKETKEYTYPE_Register;
-      break;
-   default:
-      this->commCfg.keyType = IBVSOCKETKEYTYPE_UnsafeGlobal;
-      break;
-   }
+   this->commCfg.keyType = RDMASocket_toIBVSocketKeyType(keyType);
 }
 
 void RDMASocket_setTimeouts(RDMASocket* this, int connectMS,

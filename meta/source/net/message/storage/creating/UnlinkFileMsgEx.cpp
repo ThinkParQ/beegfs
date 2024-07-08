@@ -21,7 +21,8 @@ std::tuple<FileIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLo
 
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
-   auto dir = metaStore->referenceDir(getParentInfo()->getEntryID(), true, false);
+   auto dir = metaStore->referenceDir(getParentInfo()->getEntryID(),
+               getParentInfo()->getIsBuddyMirrored(), false);
 
    DirEntry dentry(getDelFileName());
    if (dir->getFileDentry(getDelFileName(), dentry))
