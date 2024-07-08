@@ -646,7 +646,12 @@ Summary: BeeGFS client kernel module
 License: GPL v2
 Group: Software/Other
 BuildArch: noarch
-requires: make, gcc, gcc-c++
+%if %is_sles
+requires: make, gcc, kernel-default-devel, elfutils
+%else
+requires: make, gcc
+recommends: kernel-devel, elfutils-libelf-devel
+%endif
 conflicts: beegfs-client-dkms
 
 %description client
@@ -687,7 +692,12 @@ Summary: BeeGFS client kernel module (DKMS version)
 License: GPL v2
 Group: Software/Other
 BuildArch: noarch
+%if %is_sles
+requires: make, dkms, kernel-default-devel, elfutils
+%else
 requires: make, dkms
+recommends: kernel-devel, elfutils-libelf-devel
+%endif
 conflicts: beegfs-client
 provides: beegfs-client
 
@@ -714,7 +724,12 @@ dkms remove beegfs/%{VER} --all
 Summary: BeeGFS client compat module, allows to run two different client versions.
 License: GPL v2
 Group: Software/Other
-requires: make, gcc, gcc-c++
+%if %is_sles
+requires: make, gcc, kernel-default-devel, elfutils
+%else
+requires: make, gcc
+recommends: kernel-devel, elfutils-libelf-devel
+%endif
 BuildArch: noarch
 
 %description client-compat

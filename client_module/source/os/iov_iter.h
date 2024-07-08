@@ -27,8 +27,15 @@
 #error iter_is_iovec() is a required feature
 #endif
 
-#ifndef KERNEL_HAS_IOV_ITER_IOVEC
-#error iov_iter_iovec() is a required feature
+/*
+ * In kernels 3.15 to 6.3 there was iov_iter_iovec(), returning the first iovec
+ * in an iov_iter of type ITER_IOVEC.
+ * 6.4 removes and started using macro iter_iov_addr & iter_iov_len.
+ * Using those now and providing a shim for older kernels.
+ */
+#if !defined(KERNEL_HAS_ITER_IOV_ADDR)
+#define iter_iov_addr(iter)     (iter_iov(iter)->iov_base + (iter)->iov_offset)
+#define iter_iov_len(iter)      (iter_iov(iter)->iov_len - (iter)->iov_offset)
 #endif
 
 #ifndef KERNEL_HAS_IOV_ITER_INIT_DIR
@@ -78,14 +85,12 @@ static inline void beegfs_iov_iter_clear(struct iov_iter *iter)
    iter->count = 0;
 }
 
+#ifdef KERNEL_HAS_ITER_PIPE
 static inline bool beegfs_is_pipe_iter(struct iov_iter * iter)
 {
-#ifdef KERNEL_HAS_ITER_PIPE
    return iov_iter_type(iter) == ITER_PIPE;
-#else
-   return false;
-#endif
 }
+#endif
 
 #define BEEGFS_IOV_ITER_INIT iov_iter_init
 

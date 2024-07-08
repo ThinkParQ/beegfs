@@ -20,6 +20,8 @@ int ModeResyncStats::execute()
    uint16_t cfgNodeID = 0;
    uint16_t cfgBuddyID = 0;
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )
       return APPCODE_RUNTIME_ERROR;

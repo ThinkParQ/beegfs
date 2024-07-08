@@ -4,8 +4,7 @@
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
 
-
-class GetEntryInfoMsg : public NetMessageSerdes<GetEntryInfoMsg>
+class GetEntryInfoMsg : public MirroredMessageBase<GetEntryInfoMsg>
 {
    friend class AbstractNetMessageFactory;
 
@@ -37,19 +36,12 @@ class GetEntryInfoMsg : public NetMessageSerdes<GetEntryInfoMsg>
       // for deserialization
       EntryInfo entryInfo;
 
-
    public:
-
-      // inliners
-
       // getters & setters
-
       EntryInfo* getEntryInfo(void)
       {
          return &this->entryInfo;
       }
-
 };
-
 
 #endif /*GETENTRYINFOMSG_H_*/

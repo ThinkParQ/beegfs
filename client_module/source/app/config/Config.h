@@ -25,6 +25,9 @@ typedef enum LogType LogType;
 enum RDMAKeyType;
 typedef enum RDMAKeyType RDMAKeyType;
 
+enum CheckCapabilities;
+typedef enum CheckCapabilities CheckCapabilities;
+
 enum EventLogMask
 {
    EventLogMask_NONE = 0,
@@ -71,6 +74,7 @@ const char* Config_inodeIDStyleNumToStr(InodeIDStyle inodeIDStyle);
 const char* Config_logTypeNumToStr(LogType logType);
 const char* Config_eventLogMaskToStr(enum EventLogMask mask);
 const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType);
+const char* Config_checkCapabilitiesTypeToStr(CheckCapabilities checkCapabilities);
 
 // getters & setters
 static inline char* Config_getCfgFile(Config* this);
@@ -149,6 +153,7 @@ static inline bool Config_getSysSessionChecksEnabled(Config* this);
 static inline unsigned Config_getSysUpdateTargetStatesSecs(Config* this);
 static inline unsigned Config_getSysTargetOfflineTimeoutSecs(Config* this);
 static inline bool Config_getSysXAttrsEnabled(Config* this);
+static inline CheckCapabilities Config_getSysXAttrsCheckCapabilities (Config* this);
 static inline bool Config_getSysACLsEnabled(Config* this);
 static inline bool Config_getSysXAttrsImplicitlyEnabled(Config* this);
 
@@ -197,6 +202,17 @@ enum RDMAKeyType
    RDMAKEYTYPE_Register
 };
 
+#define CHECKCAPABILITIES_ALWAYS_STR    "always"
+#define CHECKCAPABILITIES_CACHE_STR     "cache"
+#define CHECKCAPABILITIES_NEVER_STR     "never"
+
+enum CheckCapabilities
+{
+   CHECKCAPABILITIES_Always = 0,
+   CHECKCAPABILITIES_Cache,
+   CHECKCAPABILITIES_Never
+};
+
 struct Config
 {
    // configurables
@@ -225,12 +241,12 @@ struct Config
    bool     connUnmountRetries;
    int            connTCPRcvBufSize;
    int            connUDPRcvBufSize;
-   unsigned       connRDMABufSize;
-   unsigned       connRDMAFragmentSize;
-   unsigned       connRDMABufNum;
-   unsigned       connRDMAMetaBufSize;
-   unsigned       connRDMAMetaFragmentSize;
-   unsigned       connRDMAMetaBufNum;
+   int            connRDMABufSize;
+   int            connRDMAFragmentSize;
+   int            connRDMABufNum;
+   int            connRDMAMetaBufSize;
+   int            connRDMAMetaFragmentSize;
+   int            connRDMAMetaBufNum;
    int            connRDMATypeOfService;
    char*          connRDMAKeyType;
    RDMAKeyType    connRDMAKeyTypeNum;
@@ -293,6 +309,7 @@ struct Config
    unsigned       sysTargetOfflineTimeoutSecs;
 
    bool     sysXAttrsEnabled;
+   CheckCapabilities   sysXAttrsCheckCapabilities;
    bool     sysACLsEnabled;
    bool     sysXAttrsImplicitlyEnabled; // True when XAttrs have not been enabled in the config file
                                         // but have been enabled by __Config_initImplicitVals
@@ -429,32 +446,32 @@ int Config_getConnUDPRcvBufSize(Config* this)
 
 unsigned Config_getConnRDMABufSize(Config* this)
 {
-   return this->connRDMABufSize;
+   return (unsigned) this->connRDMABufSize;
 }
 
 unsigned Config_getConnRDMAFragmentSize(Config* this)
 {
-   return this->connRDMAFragmentSize;
+   return (unsigned) this->connRDMAFragmentSize;
 }
 
 unsigned Config_getConnRDMABufNum(Config* this)
 {
-   return this->connRDMABufNum;
+   return (unsigned) this->connRDMABufNum;
 }
 
 unsigned Config_getConnRDMAMetaBufSize(Config* this)
 {
-   return this->connRDMAMetaBufSize;
+   return (unsigned) this->connRDMAMetaBufSize;
 }
 
 unsigned Config_getConnRDMAMetaFragmentSize(Config* this)
 {
-   return this->connRDMAMetaFragmentSize;
+   return (unsigned) this->connRDMAMetaFragmentSize;
 }
 
 unsigned Config_getConnRDMAMetaBufNum(Config* this)
 {
-   return this->connRDMAMetaBufNum;
+   return (unsigned) this->connRDMAMetaBufNum;
 }
 
 int Config_getConnRDMATypeOfService(Config* this)
@@ -700,6 +717,11 @@ unsigned Config_getSysTargetOfflineTimeoutSecs(Config* this)
 bool Config_getSysXAttrsEnabled(Config* this)
 {
    return this->sysXAttrsEnabled;
+}
+
+CheckCapabilities Config_getSysXAttrsCheckCapabilities(Config* this)
+{
+   return this->sysXAttrsCheckCapabilities;
 }
 
 bool Config_getSysACLsEnabled(Config* this)

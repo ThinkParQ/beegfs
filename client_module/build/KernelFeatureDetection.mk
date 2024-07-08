@@ -124,11 +124,6 @@ $(call define_if_matches, KERNEL_HAS_ATOMIC_OPEN, "atomic_open", fs.h)
 # Note: added to 3.3
 $(call define_if_matches, KERNEL_HAS_UMODE_T, -E "(\*mkdir).*umode_t", fs.h)
 
-# Find out if the kernel has an iov_iter arg for the direct_IO method.
-#
-# Note: Added to vanilla 3.16, but backported e.g. to Oracle uek 3.8
-$(call define_if_matches, KERNEL_HAS_DIRECT_IO_ITER, -E "(\*direct_IO).*struct iov_iter", fs.h)
-
 # Find out if the kernel has a file_inode() method.
 $(call define_if_matches, KERNEL_HAS_FILE_INODE, " file_inode(.*)", fs.h)
 
@@ -185,10 +180,6 @@ $(call define_if_matches, KERNEL_HAS_I_MMAP_RBTREE, -P "struct rb_root\s+i_mmap"
 $(call define_if_matches, KERNEL_HAS_I_MMAP_CACHED_RBTREE, -P "struct rb_root_cached\s+i_mmap", fs.h)
 $(call define_if_matches, KERNEL_HAS_I_MMAP_NONLINEAR, -F "i_mmap_nonlinear", fs.h)
 
-$(call define_if_matches, KERNEL_HAS_LONG_IOV_DIO, \
-   -F "ssize_t (*direct_IO)(struct kiocb *, struct iov_iter *iter, loff_t offset);", fs.h)
-$(call define_if_matches, KERNEL_HAS_IOV_DIO, \
-   -F "ssize_t (*direct_IO)(struct kiocb *, struct iov_iter *iter);", fs.h)
 $(call define_if_matches, KERNEL_HAS_INODE_LOCK, "static inline void inode_lock", fs.h)
 
 #<linuy-4.8
@@ -215,7 +206,6 @@ $(call define_if_matches, KERNEL_HAS_FAULTATTR_DNAME, -F "struct dentry *dname",
 $(call define_if_matches, KERNEL_HAS_SYSTEM_UTSNAME, "system_utsname", utsname.h)
 $(call define_if_matches, KERNEL_HAS_SOCK_CREATE_KERN_NS, "sock_create_kern.struct net", net.h)
 $(call define_if_matches, KERNEL_HAS_SOCK_SENDMSG_NOLEN, "sock_sendmsg.*msg.;", net.h)
-$(call define_if_matches, KERNEL_HAS_MSGHDR_ITER, "msg_iter", socket.h)
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_INIT_DIR, "iov_iter_init.*direction", uio.h)
 $(call define_if_matches, KERNEL_HAS_ITER_KVEC, "ITER_KVEC", uio.h)
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_TYPE, "iov_iter_type", uio.h)
@@ -224,6 +214,8 @@ $(call define_if_matches, KERNEL_HAS_ITER_PIPE, "ITER_PIPE", uio.h)
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_IS_PIPE, "iov_iter_is_pipe", uio.h)
 $(call define_if_matches, KERNEL_HAS_ITER_IS_IOVEC, "iter_is_iovec", uio.h)
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_IOVEC, "iov_iter_iovec", uio.h)
+# iov_iter_iovec removed from 6.4 kernel and used iter_iov_addr & iter_iov_len macro's
+$(call define_if_matches, KERNEL_HAS_ITER_IOV_ADDR, "iter_iov_addr", uio.h)
 $(call define_if_matches, KERNEL_HAS_GET_SB_NODEV, "get_sb_nodev", fs.h)
 $(call define_if_matches, KERNEL_HAS_GENERIC_FILE_LLSEEK_UNLOCKED, "generic_file_llseek_unlocked", \
    fs.h)
@@ -242,9 +234,6 @@ $(call define_if_matches, KERNEL_HAS_POSIX_ACL_XATTR_USERNS_ARG, \
 $(call define_if_matches, KERNEL_HAS_D_MAKE_ROOT, d_make_root, dcache.h)
 $(call define_if_matches, KERNEL_HAS_GENERIC_WRITE_CHECKS_ITER, \
    -P "generic_write_checks.*iov_iter", fs.h)
-$(call define_if_matches, KERNEL_HAS_WRITE_ITER, -F "ssize_t (*write_iter)", fs.h)
-$(call define_if_matches, KERNEL_HAS_AIO_WRITE_BUF, \
-   -P "ssize_t \(\*aio_write\).*const char", fs.h)
 $(call define_if_matches, KERNEL_HAS_INVALIDATEPAGE_RANGE, \
    -P "void \(\*invalidatepage\) \(struct page \*. unsigned int. unsigned int\);", fs.h)
 $(call define_if_matches, KERNEL_HAS_PERMISSION_2, \
@@ -274,12 +263,6 @@ KERNEL_FEATURE_DETECTION += $(shell \
    grep -sFA20 "struct address_space {" ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
       | grep -qsP "struct backing_dev_info *backing_dev_info;" \
       && echo "-DKERNEL_HAS_ADDRESS_SPACE_BDI")
-$(call define_if_matches, KERNEL_HAS_IOCB_DIRECT, "IOCB_DIRECT", fs.h)
-KERNEL_FEATURE_DETECTION += $(shell \
-   grep -sPA1 "generic_file_direct_write.*,$$" \
-         ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
-      | grep -qsF "loff_t *" \
-      && echo "-DKERNEL_HAS_GENERIC_FILE_DIRECT_WRITE_POSP")
 $(call define_if_matches, KERNEL_HAS_COPY_FROM_ITER, "copy_from_iter", uio.h)
 $(call define_if_matches, KERNEL_HAS_ALLOC_WORKQUEUE, "alloc_workqueue", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)

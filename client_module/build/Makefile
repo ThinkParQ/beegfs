@@ -187,15 +187,13 @@ module: $(TARGET_ALL_DEPS)
 ifeq ($(KDIR_PRUNED_HEAD),)
 	$(error Linux kernel build directory not found. Please check if\
 	the kernel module development packages are installed for the current kernel\
-	version. (RHEL: kernel-devel; SLES: linux-kernel-headers, kernel-source;\
-	Debian: linux-headers))
+	version. (RHEL: kernel-devel; SLES: kernel-default-devel; Debian: linux-headers))
 endif
 
 ifeq ($(KSRCDIR_PRUNED_HEAD),)
 	$(error Linux kernel source directory not found. Please check if\
 	the kernel module development packages are installed for the current kernel\
-	version. (RHEL: kernel-devel; SLES: linux-kernel-headers, kernel-source;\
-	Debian: linux-headers))
+	version. (RHEL: kernel-devel; SLES: kernel-default-devel; Debian: linux-headers))
 endif
 
 	@echo "Building beegfs client module"

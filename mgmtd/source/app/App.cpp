@@ -161,6 +161,8 @@ void App::runNormal()
       return;
    }
 
+   // check and log if enterprise features are used
+   checkEnterpriseFeatureUsage();
 
    // log system and configuration info
 
@@ -952,4 +954,32 @@ void App::setPrimariesPOffline()
 
    for (auto it = metaPrimaries.begin(); it != metaPrimaries.end(); ++it)
       metaStateStore->setReachabilityState(*it, TargetReachabilityState_POFFLINE);
+}
+
+/**
+ * Creates a list of Enterprise Features that are in use. This list is passed to logEULAMsg.
+ */
+bool App::checkEnterpriseFeatureUsage()
+{
+   std::string enabledFeatures;
+
+   if (this->storageBuddyGroupMapper->getSize() > 0 || this->metaBuddyGroupMapper->getSize() > 0)
+      enabledFeatures.append("Mirroring, ");
+
+   if (this->cfg->getQuotaEnableEnforcement())
+      enabledFeatures.append("Quotas, ");
+
+   if (this->storagePoolStore->getSize() > 1)
+      enabledFeatures.append("Storage Pools, ");
+
+   // Remove ", " from end of string
+   if (enabledFeatures.length() > 2)
+      enabledFeatures.resize(enabledFeatures.size() - 2);
+ 
+   logEULAMsg(enabledFeatures);
+
+   if (!enabledFeatures.empty())
+      return true;
+
+   return false;
 }

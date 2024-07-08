@@ -11,6 +11,8 @@
 
 int ModeListStoragePools::execute()
 {
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check arguments
    StringMap* cfg = Program::getApp()->getConfig()->getUnknownConfigArgs();
 

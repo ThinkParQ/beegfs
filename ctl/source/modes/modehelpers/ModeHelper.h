@@ -47,6 +47,8 @@ class ModeHelper
             MirrorBuddyGroupMapper& metaBuddyGroupMapper,
             EntryInfo& outEntryInfo, NodeHandle& outOwnerHandle);
 
+      static void printEnterpriseFeatureMsg();
+
    private:
       ModeHelper() {};
 };

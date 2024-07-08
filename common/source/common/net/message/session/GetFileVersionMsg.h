@@ -4,7 +4,7 @@
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
 
-class GetFileVersionMsg : public NetMessageSerdes<GetFileVersionMsg>
+class GetFileVersionMsg : public MirroredMessageBase<GetFileVersionMsg>
 {
    public:
       GetFileVersionMsg(EntryInfo& entryInfo) :
@@ -20,6 +20,8 @@ class GetFileVersionMsg : public NetMessageSerdes<GetFileVersionMsg>
       {
          ctx % serdes::backedPtr(obj->entryInfo, obj->parsed.entryInfo);
       }
+
+      bool supportsMirroring() const { return true; }
 
    private:
       EntryInfo* entryInfo;

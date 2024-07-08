@@ -12,20 +12,31 @@ bool GetEntryInfoMsgEx::processIncoming(ResponseContext& ctx)
    const char* logContext = "GetEntryInfoMsg incoming";
 #endif // BEEGFS_DEBUG
 
-   EntryInfo* entryInfo = this->getEntryInfo();
-
    LOG_DEBUG(logContext, Log_SPAM,
-      "ParentEntryID: " + entryInfo->getParentEntryID() + "; "
-      "entryID: " + entryInfo->getParentEntryID() );
+      "ParentEntryID: " + this->getEntryInfo()->getParentEntryID() + "; "
+      "entryID: " + this->getEntryInfo()->getParentEntryID() );
 
+   return BaseType::processIncoming(ctx);
+}
+
+FileIDLock GetEntryInfoMsgEx::lock(EntryLockStore& store)
+{
+   return {&store, getEntryInfo()->getEntryID(), false};
+}
+
+std::unique_ptr<MirroredMessageResponseState> GetEntryInfoMsgEx::executeLocally(ResponseContext& ctx,
+   bool isSecondary)
+{
+   GetEntryInfoMsgResponseState resp;
+
+   EntryInfo* entryInfo = this->getEntryInfo();
    StripePattern* pattern = NULL;
    FhgfsOpsErr getInfoRes;
    PathInfo pathInfo;
 
-
-   if(entryInfo->getParentEntryID().empty() )
-   { // special case: get info for root directory
-
+   if (entryInfo->getParentEntryID().empty())
+   {
+      // special case: get info for root directory
       // no pathInfo here, as this is currently only used for fileInodes
       getInfoRes = getRootInfo(&pattern);
    }
@@ -35,22 +46,21 @@ bool GetEntryInfoMsgEx::processIncoming(ResponseContext& ctx)
    }
 
 
-   if(getInfoRes != FhgfsOpsErr_SUCCESS)
+   if (getInfoRes != FhgfsOpsErr_SUCCESS)
    { // error occurred => create a dummy pattern
       UInt16Vector dummyStripeNodes;
       pattern = new Raid0Pattern(1, dummyStripeNodes);
    }
 
-   ctx.sendResponse(GetEntryInfoRespMsg(getInfoRes, pattern, 0, &pathInfo) );
-
-   // cleanup
-   delete(pattern);
+   resp.setGetEntryInfoResult(getInfoRes);
+   resp.setStripePattern(pattern);
+   resp.setPathInfo(pathInfo);
 
    App* app = Program::getApp();
    app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_GETENTRYINFO,
       getMsgHeaderUserID() );
 
-   return true;
+   return boost::make_unique<ResponseState>(std::move(resp));
 }
 
 

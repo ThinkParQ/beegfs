@@ -264,38 +264,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
       return false;
    }
 
-   if (Config_getConnUseRDMA(this->cfg))
-   {
-      unsigned bufSize = Config_getConnRDMABufSize(this->cfg);
-      unsigned fragmentSize = Config_getConnRDMAFragmentSize(this->cfg);
-
-      if (fragmentSize != 0)
-      {
-         if (fragmentSize > bufSize)
-         {
-            printk_fhgfs(KERN_WARNING, "RDMA fragment size must be <= buffer size\n");
-            return false;
-         }
-         if (fragmentSize < PAGE_SIZE)
-         {
-            printk_fhgfs(KERN_WARNING, "RDMA fragment size must be >= %zu\n", PAGE_SIZE);
-            return false;
-         }
-         if (fragmentSize % PAGE_SIZE != 0)
-         {
-            printk_fhgfs(KERN_WARNING, "RDMA fragment size must be a multiple of %zu\n", PAGE_SIZE);
-            return false;
-         }
-         if (bufSize % fragmentSize != 0)
-         {
-            // Technically, it would be a good idea for bufSize to be a multiple of
-            // fragment size but we've never enforced that in the past. Warn but don't
-            // fail.
-            printk_fhgfs(KERN_WARNING, "RDMA buffer size is not a multiple of fragment size\n");
-         }
-      }
-   }
-
    { // load net filter (required before any connection can be made, incl. local conns)
       const char* netFilterFile = Config_getConnNetFilterFile(this->cfg);
 

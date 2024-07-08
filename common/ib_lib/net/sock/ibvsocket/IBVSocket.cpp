@@ -152,7 +152,8 @@ bool IBVSocket_rdmaDevicesExist()
 }
 
 /**
- * Prepare ibverbs for multi-threading.
+ * Prepare ibverbs for forking a child process. This is only required if the parent process
+ * has mapped memory for RDMA.
  * Call this only once in your program.
  *
  * Note: There is no corresponding uninit-method that needs to be called.

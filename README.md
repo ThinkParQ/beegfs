@@ -14,15 +14,15 @@ Before building BeeGFS, install the following dependency packages:
 ### Red Hat / CentOS
 ```
 $ yum install libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config \
-  rpm-build xfsprogs-devel zlib-devel ant gcc-c++ gcc \
-  redhat-lsb-core java-devel unzip libcurl-devel elfutils-libelf-devel kernel-devel 
+  rpm-build xfsprogs-devel zlib-devel gcc-c++ gcc \
+  redhat-lsb-core java-devel unzip libcurl-devel elfutils-libelf-devel kernel-devel \
   libblkid-devel libnl3-devel
 ```
 
 The `elfutils-libelf-devel` and `kernel-devel` packages can be omitted if you don't intend to
 build the client module.
 
-The additional `devtoolset-7` package is also required,
+On RHEL releases older than 8, the additional `devtoolset-7` package is also required,
 which provides a newer compiler version. The installation steps are outlined here.
 Please consult the documentation of your distribution for details.
 
@@ -46,18 +46,32 @@ Please consult the documentation of your distribution for details.
      ```
   4. Follow the instructions below to build BeeGFS.
 
-### Debian
-On Debian or Ubuntu based systems run this command to install the required packages:
+### Debian and Ubuntu
+
+#### Option 1: Semi-automatic installation of build dependencies
+
+Install required utilities:
+```
+$ apt install --no-install-recommends devscripts equivs
+```
+Automatically install build dependencies:
+```
+$ mk-build-deps --install debian/control
+```
+
+#### Option 2: Manual installation of build dependencies
+
+Run this command to install the required packages:
 ```
 $ sudo apt install build-essential autoconf automake pkg-config devscripts debhelper \
   libtool libattr1-dev xfslibs-dev lsb-release kmod librdmacm-dev libibverbs-dev \
-  default-jdk ant dh-systemd zlib1g-dev libssl-dev libcurl4-openssl-dev libblkid-dev uuid-dev \
-  libnl-3-200 libnl-3-dev libnl-genl-3-200 libnl-route-3-200 libnl-route-3-dev
+  default-jdk zlib1g-dev libssl-dev libcurl4-openssl-dev libblkid-dev uuid-dev \
+  libnl-3-200 libnl-3-dev libnl-genl-3-200 libnl-route-3-200 libnl-route-3-dev dh-dkms
 ```
-Note: If you have an older Debian system you might have to install the
-`module-init-tools` package instead of `kmod`.
-You also have the choice between
-the openssl, nss, or gnutls version of `libcurl-dev`. Choose the one you prefer.
+Note: If you have an older Debian system you might have to install the `module-init-tools`
+package instead of `kmod`.  You also have the choice between the openssl, nss, or gnutls version
+of `libcurl-dev`. Choose the one you prefer. On Debian versions older than 12, replace `dh-dkms`
+by `dkms`.
 
 ## Building Packages
 

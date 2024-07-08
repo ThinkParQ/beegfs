@@ -342,40 +342,15 @@ static int beegfs_release(struct inode* inode, struct file* filp)
    return FhgfsOps_release(inode, filp);
 }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-static ssize_t beegfs_file_write_iter(struct kiocb* iocb, struct iov_iter* from)
-{
-   struct iovec iov = iov_iter_iovec(from);
-
-   return generic_file_aio_write(iocb, iov.iov_base, iov.iov_len, iocb->ki_pos);
-}
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t beegfs_file_write_iter(struct kiocb* iocb, struct iov_iter* from)
-{
-   struct iovec iov = iov_iter_iovec(from);
-
-   if (from->iov_offset == 0)
-      return generic_file_aio_write(iocb, from->iov, from->nr_segs, iocb->ki_pos);
-   else
-      return generic_file_aio_write(iocb, &iov, 1, iocb->ki_pos);
-}
-#else
 static ssize_t beegfs_file_write_iter(struct kiocb* iocb, struct iov_iter* from)
 {
    return generic_file_write_iter(iocb, from);
 }
-#endif
 
 static ssize_t beegfs_write_iter_direct(struct kiocb* iocb, struct iov_iter* from)
 {
-#ifdef KERNEL_HAS_IOCB_DIRECT
-
-      iocb->ki_flags |= IOCB_DIRECT;
-      return generic_file_write_iter(iocb, from);
-
-#else
-   #error IOCB_DIRECT feature required.
-#endif
+   iocb->ki_flags |= IOCB_DIRECT;
+   return generic_file_write_iter(iocb, from);
 }
 
 static ssize_t beegfs_write_iter_locked_append(struct kiocb* iocb, struct iov_iter* from)
@@ -435,57 +410,11 @@ static ssize_t beegfs_write_iter(struct kiocb* iocb, struct iov_iter* from)
    return beegfs_file_write_iter(iocb, from);
 }
 
-#if !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t beegfs_aio_write_iov(struct kiocb* iocb, const struct iovec* iov,
-   unsigned long nr_segs, loff_t pos)
-{
-   size_t count = iov_length(iov, nr_segs);
-   struct iov_iter iter;
 
-   BEEGFS_IOV_ITER_INIT(&iter, WRITE, iov, nr_segs, count);
-
-   return beegfs_write_iter(iocb, beegfs_get_iovec_iov_iter(&iter));
-}
-
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-static ssize_t beegfs_aio_write(struct kiocb* iocb, const char __user* buf, size_t count,
-   loff_t pos)
-{
-   struct iovec iov = {
-      .iov_base = (char*) buf,
-      .iov_len = count,
-   };
-
-   return beegfs_aio_write_iov(iocb, &iov, 1, pos);
-}
-#else
-static ssize_t beegfs_aio_write(struct kiocb* iocb, const struct iovec* iov,
-   unsigned long nr_segs, loff_t pos)
-{
-   return beegfs_aio_write_iov(iocb, iov, nr_segs, pos);
-}
-#endif
-#endif
-
-
-#ifdef KERNEL_HAS_AIO_WRITE_BUF
-static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* to)
-{
-   struct iovec iov = iov_iter_iovec(to);
-
-   return generic_file_aio_read(iocb, iov.iov_base, iov.iov_len, iocb->ki_pos);
-}
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* to)
-{
-   return generic_file_aio_read(iocb, to->iov, to->nr_segs, iocb->ki_pos);
-}
-#else
 static ssize_t beegfs_file_read_iter(struct kiocb* iocb, struct iov_iter* to)
 {
    return generic_file_read_iter(iocb, to);
 }
-#endif
 
 
 /* like with write_iter, this is basically the O_DIRECT generic_file_read_iter. */
@@ -535,38 +464,6 @@ static ssize_t beegfs_read_iter(struct kiocb* iocb, struct iov_iter* to)
    else
       return beegfs_file_read_iter(iocb, to);
 }
-
-#ifndef KERNEL_HAS_WRITE_ITER
-static ssize_t beegfs_aio_read_iov(struct kiocb* iocb, const struct iovec* iov,
-   unsigned long nr_segs, loff_t pos)
-{
-   size_t count = iov_length(iov, nr_segs);
-   struct iov_iter iter;
-
-   BEEGFS_IOV_ITER_INIT(&iter, READ, iov, nr_segs, count);
-
-   return beegfs_read_iter(iocb, beegfs_get_iovec_iov_iter(&iter));
-}
-
-#ifdef KERNEL_HAS_AIO_WRITE_BUF
-static ssize_t beegfs_aio_read(struct kiocb* iocb, char __user* buf, size_t count,
-   loff_t pos)
-{
-   struct iovec iov = {
-      .iov_base = buf,
-      .iov_len = count,
-   };
-
-   return beegfs_aio_read_iov(iocb, &iov, 1, pos);
-}
-#else
-static ssize_t beegfs_aio_read(struct kiocb* iocb, const struct iovec* iov,
-   unsigned long nr_segs, loff_t pos)
-{
-   return beegfs_aio_read_iov(iocb, iov, nr_segs, pos);
-}
-#endif
-#endif
 
 
 static int __beegfs_fsync(struct file* filp, loff_t start, loff_t end, int datasync)
@@ -725,21 +622,13 @@ const struct file_operations fhgfs_file_native_ops = {
    .compat_ioctl     = FhgfsOpsIoctl_compatIoctl,
 #endif
 
-#if !defined(KERNEL_HAS_WRITE_ITER)
-   .read = do_sync_read,
-   .write = do_sync_write,
-   .aio_read = beegfs_aio_read,
-   .aio_write = beegfs_aio_write,
-#else
    .read_iter = beegfs_read_iter,
    .write_iter = beegfs_write_iter,
-#endif
 
-#if defined(KERNEL_HAS_WRITE_ITER)
    .splice_read  = generic_file_splice_read,
+#if defined(KERNEL_HAS_ITER_FILE_SPLICE_WRITE)
    .splice_write = iter_file_splice_write,
 #else
-   .splice_read  = generic_file_splice_read,
    .splice_write = generic_file_splice_write,
 #endif
 };
@@ -1764,32 +1653,10 @@ static ssize_t __beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* i
    }
 }
 
-#if defined(KERNEL_HAS_IOV_DIO)
 static ssize_t beegfs_direct_IO(struct kiocb* iocb, struct iov_iter* iter)
 {
    return __beegfs_direct_IO(iov_iter_rw(iter), iocb, iter, iocb->ki_pos);
 }
-#elif defined(KERNEL_HAS_LONG_IOV_DIO)
-static ssize_t beegfs_direct_IO(struct kiocb* iocb, struct iov_iter* iter, loff_t offset)
-{
-   return __beegfs_direct_IO(iov_iter_rw(iter), iocb, iter, offset);
-}
-#elif defined(KERNEL_HAS_DIRECT_IO_ITER)
-static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, struct iov_iter* iter, loff_t offset)
-{
-   return __beegfs_direct_IO(rw, iocb, iter, offset);
-}
-#else
-static ssize_t beegfs_direct_IO(int rw, struct kiocb* iocb, const struct iovec* iov, loff_t pos,
-      unsigned long nr_segs)
-{
-   struct iov_iter iter;
-
-   BEEGFS_IOV_ITER_INIT(&iter, rw & RW_MASK, iov, nr_segs, iov_length(iov, nr_segs) );
-
-   return __beegfs_direct_IO(rw, iocb, beegfs_get_iovec_iov_iter(&iter), pos);
-}
-#endif
 
 #ifdef KERNEL_HAS_FOLIO
 static int beegfs_launder_folio(struct folio *folio)

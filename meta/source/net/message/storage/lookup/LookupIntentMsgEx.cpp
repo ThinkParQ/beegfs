@@ -351,6 +351,15 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
       pattern = dir->createFileStripePattern(&getPreferredTargets(), 0, 0, StoragePoolId(0));
    }
 
+   if (!pattern)
+   {
+      LogContext("Lookup Create").logErr(
+         "StripePattern is NULL. Can't proceed. Filename: " + getEntryName());
+
+      res = FhgfsOpsErr_INTERNAL;
+      goto releasedir_and_return;
+   }
+
    if (isMsgHeaderFeatureFlagSet(LOOKUPINTENTMSG_FLAG_USE_QUOTA) &&
          Program::getApp()->getConfig()->getQuotaEnableEnforcement())
    {

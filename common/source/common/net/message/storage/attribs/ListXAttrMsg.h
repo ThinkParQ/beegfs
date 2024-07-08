@@ -4,7 +4,7 @@
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
 
-class ListXAttrMsg : public NetMessageSerdes<ListXAttrMsg>
+class ListXAttrMsg : public MirroredMessageBase<ListXAttrMsg>
 {
    friend class AbstractNetMessageFactory;
 
@@ -29,6 +29,8 @@ class ListXAttrMsg : public NetMessageSerdes<ListXAttrMsg>
             % serdes::backedPtr(obj->entryInfoPtr, obj->entryInfo)
             % obj->size;
       }
+
+      bool supportsMirroring() const { return true; }
 
    private:
 

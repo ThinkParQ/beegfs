@@ -31,20 +31,8 @@
 #include <asm/compat.h>
 #endif // CONFIG_COMPAT
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
-      loff_t pos);
-static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
-      loff_t pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iovec *iov,
-      unsigned long nr_segs, loff_t pos);
-static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec *iov,
-      unsigned long nr_segs, loff_t pos);
-#else
 static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter *from);
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to);
-#endif // LINUX_VERSION_CODE
 
 #ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
 int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
@@ -86,15 +74,8 @@ struct file_operations fhgfs_file_buffered_ops =
    .splice_write = generic_file_splice_write,
 #endif // LINUX_VERSION_CODE
 
-#if defined(KERNEL_HAS_WRITE_ITER)
    .read_iter           = FhgfsOps_buffered_read_iter,
    .write_iter          = FhgfsOps_buffered_write_iter, // replacement for aio_write
-#else
-   .read                = FhgfsOps_read,
-   .write               = FhgfsOps_write,
-   .aio_read            = FhgfsOps_buffered_aio_read,
-   .aio_write           = FhgfsOps_buffered_aio_write,
-#endif // LINUX_VERSION_CODE
 
 #ifdef KERNEL_HAS_GENERIC_FILE_SENDFILE
    .sendfile   = generic_file_sendfile, // removed in 2.6.23 (now handled via splice)
@@ -108,14 +89,8 @@ struct file_operations fhgfs_file_pagecache_ops =
 {
    .open                = FhgfsOps_open,
    .release             = FhgfsOps_release,
-#if defined(KERNEL_HAS_WRITE_ITER)
-   .read_iter           = FhgfsOps_read_iter, // replacement for aio_read
-   .write_iter          = FhgfsOps_write_iter, // replacement for aio_write
-#else
-   .write               = do_sync_write, // (calls aio_write() )
-   .aio_read            = FhgfsOps_aio_read,
-   .aio_write           = FhgfsOps_aio_write,
-#endif // LINUX_VERSION_CODE
+   .read_iter           = FhgfsOps_read_iter,
+   .write_iter          = FhgfsOps_write_iter,
    .fsync               = FhgfsOps_fsync,
    .flush               = FhgfsOps_flush,
    .llseek              = FhgfsOps_llseek,
@@ -1014,13 +989,6 @@ static ssize_t read_common(struct file *file, struct iov_iter *iter, size_t size
 }
 
 
-
-ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size, loff_t *offsetPointer)
-{
-   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, READ);
-   return read_common(file, iter, size, offsetPointer);
-}
-
 /**
  * Special reading mode that is slower (e.g. not parallel) but compatible with sparse files.
  *
@@ -1067,26 +1035,10 @@ ssize_t __FhgfsOps_readSparse(struct file* file, struct iov_iter *iter, size_t s
 }
 
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-
-ssize_t FhgfsOps_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
-{
-
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-
-ssize_t FhgfsOps_aio_read(struct kiocb *iocb, const struct iovec *iov, unsigned long nr_segs,
-   loff_t pos)
-{
-   size_t count = iov_length(iov, nr_segs);
-
-#else // LINUX_VERSION_CODE
-
 ssize_t FhgfsOps_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
    size_t count = iov_iter_count(to);
    loff_t pos = iocb->ki_pos;
-
-#endif // LINUX_VERSION_CODE
 
    struct file* file = iocb->ki_filp;
    struct address_space* mapping = file->f_mapping;
@@ -1108,77 +1060,19 @@ ssize_t FhgfsOps_read_iter(struct kiocb *iocb, struct iov_iter *to)
       return retVal;
    }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-   retVal = generic_file_aio_read(iocb, buf, count, pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-   retVal = generic_file_aio_read(iocb, iov, nr_segs, pos);
-#else // LINUX_VERSION_CODE
-   retVal = generic_file_read_iter(iocb, to);
-#endif // LINUX_VERSION_CODE
-
-   return retVal;
+   return generic_file_read_iter(iocb, to);
 }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, char __user *buf, size_t count,
-      loff_t pos)
-{
-   App* app = FhgfsOps_getApp(iocb->ki_filp->f_mapping->host->i_sb);
-
-   (void) app;
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; count: %lld)", (long long)pos, (long long)count);
-
-   return FhgfsOps_read(iocb->ki_filp, buf, count, &iocb->ki_pos);
-}
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t FhgfsOps_buffered_aio_read(struct kiocb *iocb, const struct iovec *iov,
-      unsigned long nr_segs, loff_t pos)
-{
-   App* app = FhgfsOps_getApp(iocb->ki_filp->f_mapping->host->i_sb);
-   size_t totalReadRes = 0;
-   unsigned long curSeg;
-
-   (void) app;
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; nr_segs: %lld)", (long long)pos, (long long)nr_segs);
-
-   for (curSeg = 0; curSeg < nr_segs; curSeg++)
-   {
-      void* base = iov[curSeg].iov_base;
-      size_t len = iov[curSeg].iov_len;
-      ssize_t readRes;
-
-      if (totalReadRes + len >= (2<<30) || totalReadRes + len < totalReadRes)
-         len = (2<<30) - totalReadRes;
-
-      readRes = FhgfsOps_read(iocb->ki_filp, base, len, &iocb->ki_pos);
-      if (readRes < 0 && totalReadRes == 0)
-         return readRes;
-
-      if (readRes < 0)
-         break;
-
-      totalReadRes += readRes;
-      if (readRes < len)
-         break;
-   }
-
-   return totalReadRes;
-}
-#else // LINUX_VERSION_CODE
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to)
 {
    return read_common(iocb->ki_filp, to, iov_iter_count(to), &iocb->ki_pos);
 }
-#endif // LINUX_VERSION_CODE
 
 static ssize_t write_common(struct file *file, struct iov_iter *from, size_t size, loff_t *offsetPointer)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
    Config* cfg = App_getConfig(app);
 
-   int writeCheckRes;
    struct inode* inode = file->f_mapping->host;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(file);
@@ -1195,9 +1089,16 @@ static ssize_t write_common(struct file *file, struct iov_iter *from, size_t siz
    FhgfsOpsHelper_logOpDebug(app, file_dentry(file), inode, __func__, "(offset: %lld; size: %lld)",
       (long long)*offsetPointer, (long long)size);
 
-   writeCheckRes = os_generic_write_checks(file, offsetPointer, &size, S_ISBLK(inode->i_mode) );
-   if(unlikely(writeCheckRes) )
-      return writeCheckRes;
+   inode_lock(inode);
+   {
+      writeRes = os_generic_write_checks(file, offsetPointer, &size, S_ISBLK(inode->i_mode) );
+      if (likely(! writeRes))  // success
+         writeRes = file_remove_privs(file);
+   }
+   inode_unlock(inode);
+
+   if (unlikely(writeRes))
+      return writeRes;
 
    if (app->cfg->tuneCoherentBuffers)
    {
@@ -1294,33 +1195,10 @@ unlockappend_and_exit:
    return writeRes;
 }
 
-ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
-   loff_t* offsetPointer)
-{
-   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, WRITE);
-   return write_common(file, iter, size, offsetPointer);
-}
-
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-
-ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
-{
-
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-
-ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const struct iovec *iov, unsigned long nr_segs,
-   loff_t pos)
-{
-   size_t count = iov_length(iov, nr_segs);
-
-#else
-
 ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
    size_t count = iov_iter_count(from);
    loff_t pos = iocb->ki_pos;
-
-#endif // LINUX_VERSION_CODE
 
    struct file* file = iocb->ki_filp;
    struct dentry* dentry = file_dentry(file);
@@ -1369,15 +1247,9 @@ ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from)
       iocb->ki_pos = pos;
    }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-   retVal = generic_file_aio_write(iocb, buf, count, pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-   retVal = generic_file_aio_write(iocb, iov, nr_segs, pos);
-#else
    iov_iter_truncate(from, count);
 
    retVal = generic_file_write_iter(iocb, from);
-#endif // LINUX_VERSION_CODE
 
    if( (retVal >= 0)
       && ( (IS_SYNC(inode) || (iocb->ki_filp->f_flags & O_SYNC) )
@@ -1405,59 +1277,10 @@ ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from)
    return retVal;
 }
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
-      loff_t pos)
-{
-   App* app = FhgfsOps_getApp(iocb->ki_filp->f_mapping->host->i_sb);
-
-   (void) app;
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; count: %lld)", (long long)pos, (long long)count);
-
-   return FhgfsOps_write(iocb->ki_filp, buf, count, &iocb->ki_pos);
-}
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-static ssize_t FhgfsOps_buffered_aio_write(struct kiocb *iocb, const struct iovec *iov,
-      unsigned long nr_segs, loff_t pos)
-{
-   App* app = FhgfsOps_getApp(iocb->ki_filp->f_mapping->host->i_sb);
-   size_t totalWriteRes = 0;
-   unsigned long curSeg;
-
-   (void) app;
-   FhgfsOpsHelper_logOpDebug(app, file_dentry(iocb->ki_filp), iocb->ki_filp->f_mapping->host,
-         __func__, "(offset: %lld; nr_segs: %lld)", (long long)pos, (long long)nr_segs);
-
-   for (curSeg = 0; curSeg < nr_segs; curSeg++)
-   {
-      void* base = iov[curSeg].iov_base;
-      size_t len = iov[curSeg].iov_len;
-      ssize_t writeRes;
-
-      if (totalWriteRes + len >= (2<<30) || totalWriteRes + len < totalWriteRes)
-         len = (2<<30) - totalWriteRes;
-
-      writeRes = FhgfsOps_write(iocb->ki_filp, base, len, &iocb->ki_pos);
-      if (writeRes < 0 && totalWriteRes == 0)
-         return writeRes;
-
-      if (writeRes < 0)
-         break;
-
-      totalWriteRes += writeRes;
-      if (writeRes < len)
-         break;
-   }
-
-   return totalWriteRes;
-}
-#else // LINUX_VERSION_CODE
 static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
    return write_common(iocb->ki_filp, from, iov_iter_count(from), &iocb->ki_pos);
 }
-#endif // LINUX_VERSION_CODE
 
 
 #ifdef KERNEL_HAS_FSYNC_RANGE /* added in vanilla 3.1 */
@@ -1940,36 +1763,9 @@ ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *
  * @param pos file offset
  * @param nr_segs length of iov array
  */
-#if defined(KERNEL_HAS_IOV_DIO)
 ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter)
 {
    int rw = iov_iter_rw(iter);
    loff_t pos = iocb->ki_pos;
    return __FhgfsOps_directIO_common(rw, iocb, iter, pos);
 }
-
-#elif defined(KERNEL_HAS_LONG_IOV_DIO)
-ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
-{
-   int rw = iov_iter_rw(iter);
-   return __FhgfsOps_directIO_common(rw, iocb, iter, pos);
-}
-
-#elif defined(KERNEL_HAS_DIRECT_IO_ITER)
-
-ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
-{
-   return __FhgfsOps_directIO_common(rw, iocb, iter, pos);
-}
-
-#else // KERNEL_HAS_DIRECT_IO_ITER
-
-ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, const struct iovec *iov, loff_t pos,
-   unsigned long nr_segs)
-{
-   struct iov_iter iter;
-   BEEGFS_IOV_ITER_INIT(&iter, rw, iov, 1, iov->iov_len);
-   return __FhgfsOps_directIO_common(rw, iocb, &iter, pos);
-}
-
-#endif // KERNEL_HAS_DIRECT_IO_ITER

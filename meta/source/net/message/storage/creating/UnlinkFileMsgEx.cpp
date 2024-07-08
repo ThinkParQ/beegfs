@@ -87,6 +87,21 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
    }
 
+   // On meta-mirrored setup, ensure the dentry we just loaded i.e. 'dentryToRemove' has the same entryID as 'fileInfo'.
+   // This check is crucial to detect a very rare race condition where dentry gets unlinked
+   // because the parent directory was not locked during UnlinkFileMsgEx::lock(),
+   // and then reappears because the same file is being created again. If the entryIDs
+   // don't match, it means the dentry has changed, and the exclusive lock taken on the
+   // entryID before won't be effective in preventing future races of ongoing unlink
+   // operation with other filesystem operations (e.g. close()) which might happen on this file.
+   // Therefore, we release the directory from the meta store and return an error saying path
+   // not exists.
+   if (isMirrored() && (dentryToRemove.getEntryID() != this->fileInfo.getEntryID()))
+   {
+      metaStore->releaseDir(dir->getID());
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+   }
+
    // get entryInfo
    dentryToRemove.getEntryInfo(getParentInfo()->getEntryID(), 0, &delFileInfo);
 

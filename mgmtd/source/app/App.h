@@ -149,6 +149,8 @@ class App : public AbstractApp
       void notifyWorkers();
       void setPrimariesPOffline();
 
+      bool checkEnterpriseFeatureUsage();
+
    public:
       // inliners
 

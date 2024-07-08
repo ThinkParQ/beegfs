@@ -39,6 +39,8 @@ int ModeGetQuotaInfo::execute()
    App* app = Program::getApp();
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    storageNodes = app->getStorageNodes();
    mgmtNodes = app->getMgmtNodes();
    targetMapper = app->getTargetMapper();

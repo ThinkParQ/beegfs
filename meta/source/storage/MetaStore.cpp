@@ -1181,7 +1181,8 @@ FhgfsOpsErr MetaStore::unlinkFileInode(EntryInfo* delFileInfo, std::unique_ptr<F
       FileInode* inode = this->fileStore.referenceLoadedFile(delFileInfo->getEntryID());
       if (unlikely(!inode))
       {
-         LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it");
+         LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it."
+            " EntryID: " + delFileInfo->getEntryID());
          return FhgfsOpsErr_INTERNAL;
       }
 
@@ -1303,7 +1304,8 @@ FhgfsOpsErr MetaStore::unlinkDirEntryWithInlinedInodeUnlocked(const std::string&
       MetaFileHandle inode = referenceLoadedFileUnlocked(subDir, dirEntry->getEntryID() );
       if (!inode)
       {
-         LogContext(logContext).logErr("Bug: Busy inode found, but failed to reference it");
+         LogContext(logContext).logErr("Bug: Busy inode found, but failed to reference it."
+            "FileName: " + entryName + ", EntryID: " + dirEntry->getEntryID());
          return FhgfsOpsErr_INTERNAL;
       }
 
@@ -1339,7 +1341,7 @@ FhgfsOpsErr MetaStore::unlinkDirEntryWithInlinedInodeUnlocked(const std::string&
             LogContext(logContext).logErr("Failed to decrease the link count!"
                " parentID: "      + entryInfo.getParentEntryID() +
                " entryID: "       + entryInfo.getEntryID()       +
-               " entryNameName: " + entryName);
+               " fileName: "      + entryName);
          }
       }
 
@@ -1430,7 +1432,8 @@ FhgfsOpsErr MetaStore::unlinkDentryAndInodeUnlocked(const std::string& fileName,
       MetaFileHandle inode = referenceLoadedFileUnlocked(subdir, dirEntry->getEntryID());
       if (unlikely(!inode))
       {
-         LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it");
+         LogContext(logContext).logErr("Busy/Inuse file inode found but failed to reference it."
+            "FileName: " + fileName + ", EntryID: " + dirEntry->getEntryID());
          return FhgfsOpsErr_INTERNAL;
       }
 
@@ -2179,7 +2182,33 @@ FhgfsOpsErr MetaStore::deinlineFileInode(DirInode& parentDir, EntryInfo* entryIn
       return FhgfsOpsErr_INTERNAL;
    }
 
-   // 2. update feature flags for passed-in dentry object so that when its
+   // 2. copy all user-defined xattrs from the inlined inode to the non-inlined inode.
+   StringVector xAttrNames;
+   FhgfsOpsErr listXAttrRes;
+
+   // retrieve the list of xattr names from inlined inode.
+   std::tie(listXAttrRes, xAttrNames) = parentDir.listXAttr(entryInfo);
+
+   if (listXAttrRes == FhgfsOpsErr_SUCCESS)
+   {
+      for (const auto& xAttrName : xAttrNames)
+      {
+         CharVector xAttrValue;
+         FhgfsOpsErr getXAttrRes;
+
+         // retrieve the value of the current xattr using inlined inode.
+         std::tie(getXAttrRes, xAttrValue, std::ignore) = parentDir.getXAttr(entryInfo,
+            xAttrName, XATTR_SIZE_MAX);
+
+         if (getXAttrRes == FhgfsOpsErr_SUCCESS)
+         {
+            // set the xattr with its corresponding value to non-inlined inode.
+            fileInode->setXAttr(entryInfo, xAttrName, xAttrValue, 0);
+         }
+      }
+   }
+
+   // 3. update feature flags for passed-in dentry object so that when its
    // saved to disk again, it gets written in VER-3 format
    dentry.unsetInodeInlined();
    unsigned flags = dentry.getDentryFeatureFlags();
@@ -2187,10 +2216,10 @@ FhgfsOpsErr MetaStore::deinlineFileInode(DirInode& parentDir, EntryInfo* entryIn
    dentry.setDentryFeatureFlags(flags);
    dentry.getInodeStoreData()->setOrigFeature(FileInodeOrigFeature_UNSET);
 
-   // 3. write updated dentry data to disk
+   // 4. write updated dentry data to disk
    bool saveRes = dentry.storeUpdatedDirEntry(dirEntryPath);
 
-   // 4. unlink dentry-by-entryID file present in '#fSiDs#' directory
+   // 5. unlink dentry-by-entryID file present in '#fSiDs#' directory
    if (saveRes)
    {
       parentDir.unlinkDirEntryUnlocked(entryInfo->getFileName(), &dentry, DirEntry_UNLINK_ID);

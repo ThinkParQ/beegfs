@@ -5,8 +5,7 @@
 #include <common/nodes/NumNodeID.h>
 #include <common/storage/EntryInfo.h>
 
-
-class FLockAppendMsg : public NetMessageSerdes<FLockAppendMsg>
+class FLockAppendMsg : public MirroredMessageBase<FLockAppendMsg>
 {
    public:
 
@@ -50,6 +49,8 @@ class FLockAppendMsg : public NetMessageSerdes<FLockAppendMsg>
             % serdes::rawString(obj->fileHandleID, obj->fileHandleIDLen, 4)
             % serdes::rawString(obj->lockAckID, obj->lockAckIDLen, 4);
       }
+
+      bool supportsMirroring() const { return true; }
 
    private:
       NumNodeID clientNumID;

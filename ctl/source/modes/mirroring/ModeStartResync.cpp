@@ -29,6 +29,8 @@ int ModeStartResync::execute()
    bool cfgRestart = false;
    bool isBuddyGroupID = false;
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )
       return APPCODE_RUNTIME_ERROR;

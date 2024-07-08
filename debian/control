@@ -2,8 +2,9 @@ Source: beegfs
 Section: misc
 Priority: optional
 Maintainer: BeeGFS Maintainers <packages@beegfs.com>
-Build-Depends: debhelper (>= 9.0.0), lsb-release, librdmacm-dev, libibverbs-dev, java6-sdk, ant, kmod,
-               dkms, pkg-config, zlib1g-dev, libnl-3-dev, libnl-route-3-dev
+Build-Depends: debhelper (>= 9.0.0), lsb-release, librdmacm-dev, libibverbs-dev, java6-sdk, kmod,
+               dkms (< 3.0.0) | dh-dkms (>=3.0.0), pkg-config, zlib1g-dev, libnl-3-dev,
+               libnl-route-3-dev, libcurl-dev
 Standards-Version: 4.1.4.1
 
 

@@ -226,8 +226,6 @@ void App::initDataObjects()
    if(interfacesFilename.length() )
       Config::loadStringListFile(interfacesFilename.c_str(), *allowedInterfaces);
 
-   RDMASocket::rdmaForkInitOnce();
-
    targetMapper = new TargetMapper();
    mirrorBuddyGroupMapper = new MirrorBuddyGroupMapper(targetMapper);
    metaMirrorBuddyGroupMapper = new MirrorBuddyGroupMapper();

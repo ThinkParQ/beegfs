@@ -21,7 +21,7 @@ std::pair<FhgfsOpsErr, StringVector> MsgHelperXAttr::listxattr(EntryInfo* entryI
 
       auto result = inode->listXAttr();
 
-      metaStore->releaseFile("", inode);
+      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
 
       return result;
    }
@@ -61,7 +61,7 @@ std::tuple<FhgfsOpsErr, std::vector<char>, ssize_t> MsgHelperXAttr::getxattr(Ent
 
       result = inode->getXAttr(name, maxSize);
 
-      metaStore->releaseFile("", inode);
+      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
    }
    else
    {
@@ -108,7 +108,7 @@ FhgfsOpsErr MsgHelperXAttr::removexattr(EntryInfo* entryInfo, const std::string&
 
       auto result = inode->removeXAttr(entryInfo, name);
 
-      metaStore->releaseFile("", inode);
+      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
 
       return result;
    }
@@ -147,7 +147,7 @@ FhgfsOpsErr MsgHelperXAttr::setxattr(EntryInfo* entryInfo, const std::string& na
 
       auto result = inode->setXAttr(entryInfo, name, value, flags);
 
-      metaStore->releaseFile("", inode);
+      metaStore->releaseFile(entryInfo->getParentEntryID(), inode);
 
       return result;
    }

@@ -12,6 +12,8 @@ int ModeListMirrorBuddyGroups::execute()
    App* app = Program::getApp();
    StringMap* cfg = app->getConfig()->getUnknownConfigArgs();
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    NodeType nodeType = ModeHelper::nodeTypeFromCfg(cfg);
 
    if (nodeType != NODETYPE_Meta && nodeType != NODETYPE_Storage)

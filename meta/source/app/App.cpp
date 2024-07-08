@@ -231,9 +231,6 @@ void App::runNormal()
 
    registerSignalHandler();
 
-   // prepare ibverbs for forking
-   RDMASocket::rdmaForkInitOnce();
-
    // ACLs need enabled client side XAttrs in order to work.
    if (cfg->getStoreClientACLs() && !cfg->getStoreClientXAttrs() )
       throw InvalidConfigException(
@@ -325,6 +322,9 @@ void App::runNormal()
 
    // restore sessions from last clean shut down
    restoreSessions();
+
+   // check and log if enterprise features are used
+   checkEnterpriseFeatureUsage();
 
    // log system and configuration info
 
@@ -1632,13 +1632,13 @@ void App::checkTargetUUID()
          throw InvalidConfigException("Could not open /proc/self/mountinfo");
       }
 
+      auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);
+
       std::string line, device_path, device_majmin;
       while (std::getline(mountInfo, line)) {
          std::istringstream is(line);
 	      std::string dummy;
-         is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;
-
-	      auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);
+         is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;	      
 
          if (majmin_f.str() == device_majmin)
             break;
@@ -1647,7 +1647,7 @@ void App::checkTargetUUID()
       }
 
       if (device_path.empty()) {
-         throw InvalidConfigException("Could not find a device path that belongs to device " + device_majmin);
+         throw InvalidConfigException("Determined the underlying device for metadata directory " + metaPathStr + " is " + majmin_f.str() + " but could not find that device in /proc/self/mountinfo");
       }
 
       // Lookup the fs UUID
@@ -1655,7 +1655,7 @@ void App::checkTargetUUID()
             probe(blkid_new_probe_from_filename(device_path.data()), blkid_free_probe);
 
       if (!probe) {
-	      throw InvalidConfigException("Failed to open device for probing: " + device_path);
+	      throw InvalidConfigException("Failed to open device for probing: " + device_path + " (check BeeGFS is running with root or sufficient privileges)");
       }
 
       if (blkid_probe_enable_superblocks(probe.get(), 1) < 0) {
@@ -1687,4 +1687,35 @@ void App::checkTargetUUID()
             "the appropriate UUID.");
    }
 
+}
+
+/**
+ * Creates a list of Enterprise Features that are in use. This list is passed to logEULAMsg.
+ */
+bool App::checkEnterpriseFeatureUsage()
+{
+   std::string enabledFeatures;
+
+   if (this->metaBuddyGroupMapper->getSize() > 0)
+      enabledFeatures.append("Mirroring, ");
+
+   if (this->cfg->getQuotaEnableEnforcement())
+      enabledFeatures.append("Quotas, ");
+
+   if (this->cfg->getStoreClientACLs())
+      enabledFeatures.append("Access Control Lists, ");
+
+   if (this->storagePoolStore->getSize() > 1)
+      enabledFeatures.append("Storage Pools, ");
+
+   // Remove ", " from end of string
+   if (enabledFeatures.length() > 2)
+      enabledFeatures.resize(enabledFeatures.size() - 2);
+
+   logEULAMsg(enabledFeatures);
+
+   if (!enabledFeatures.empty())
+      return true;
+
+   return false;
 }

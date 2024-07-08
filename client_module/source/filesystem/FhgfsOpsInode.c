@@ -78,6 +78,7 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
 #endif // KERNEL_HAS_ATOMIC_OPEN
 {
    App* app = FhgfsOps_getApp(dentry->d_sb);
+   Config* cfg = App_getConfig(app);
    Logger* log = App_getLogger(app);
    const char* logContext = "FhgfsOps_lookupIntent";
 
@@ -223,6 +224,15 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
             dentry->d_op = &fhgfs_dentry_ops;
          #endif // KERNEL_HAS_S_D_OP
 
+         if (Config_getSysXAttrsCheckCapabilities(cfg) == CHECKCAPABILITIES_Never)
+            // The configuration is to never check for capabilities on writes, so use
+            // "inode_has_no_xattr" which does exactly one thing and that is to set the flag
+            // "S_NOSEC" on the inode, if the inode doesn't have the setuid and setgid bits set and
+            // the superblock flag "SB_NOSEC" is set. We set that flag on the superblock according
+            // to user configuration. When "S_NOSEC" is set on the inode, the kernel will skip
+            // checking for capabilities on every write operation.
+            inode_has_no_xattr(newInode);
+
          if (S_ISDIR(newInode->i_mode) )
             returnDentry = d_materialise_unique(dentry, newInode);
          else
@@ -367,6 +377,7 @@ ssize_t FhgfsOps_getxattr(struct inode* inode, const char* name, void* value, si
 #endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
 
    App* app = FhgfsOps_getApp(inode->i_sb);
+   Config* cfg = App_getConfig(app);
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    FhgfsOpsErr remotingRes;
    ssize_t resSize;
@@ -389,6 +400,18 @@ ssize_t FhgfsOps_getxattr(struct inode* inode, const char* name, void* value, si
 
    if(remotingRes != FhgfsOpsErr_SUCCESS)
       resSize = FhgfsOpsErr_toSysErr(remotingRes);
+   else
+   if (Config_getSysXAttrsCheckCapabilities(cfg) == CHECKCAPABILITIES_Cache
+       && resSize == 0 && !strcmp(name, XATTR_NAME_CAPS)) {
+      // We were looking for the xattr "security.capability" (XATTR_NAME_CAPS) and got an empty
+      // result, meaning that it doesn't exist. We cache that result via the weirdly named function
+      // "inode_has_no_xattr" which does exactly one thing and that is to set the flag "S_NOSEC"
+      // on the inode, if the inode doesn't have the setuid and setgid bits set and the superblock
+      // flag "SB_NOSEC" is set. We set that flag on the superblock according to user configuration.
+      // When "S_NOSEC" is set on the inode, the kernel will skip checking for capabilities on
+      // every write operation.
+      inode_has_no_xattr(inode);
+   }
 
    return resSize;
 }
@@ -2413,6 +2436,7 @@ int __FhgfsOps_instantiateInode(struct dentry* dentry, EntryInfo* entryInfo, fhg
 {
    const char* logContext = "__FhgfsOps_instantiateInode";
    App* app = FhgfsOps_getApp(dentry->d_sb);
+   Config* cfg = App_getConfig(app);
    int retVal = 0;
    fhgfs_stat fhgfsStatInternal;
    fhgfs_stat* actualStatInfo; // points either external given or internal stat data
@@ -2455,6 +2479,15 @@ int __FhgfsOps_instantiateInode(struct dentry* dentry, EntryInfo* entryInfo, fhg
          retVal = IS_ERR(newInode) ? PTR_ERR(newInode) : -EACCES;
       else
       { // new inode created
+         if (Config_getSysXAttrsCheckCapabilities(cfg) == CHECKCAPABILITIES_Never)
+            // The configuration is to never check for capabilities on writes, so use
+            // "inode_has_no_xattr" which does exactly one thing and that is to set the flag
+            // "S_NOSEC" on the inode, if the inode doesn't have the setuid and setgid bits set and
+            // the superblock flag "SB_NOSEC" is set. We set that flag on the superblock according
+            // to user configuration. When "S_NOSEC" is set on the inode, the kernel will skip
+            // checking for capabilities on every write operation.
+            inode_has_no_xattr(newInode);
+
          d_instantiate(dentry, newInode);
       }
    }

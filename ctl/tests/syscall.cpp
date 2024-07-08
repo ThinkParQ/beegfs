@@ -2,6 +2,8 @@
 
 #include <mutex>
 #include <exception>
+#include <string>
+#include <stdexcept>
 
 #include <dlfcn.h>
 

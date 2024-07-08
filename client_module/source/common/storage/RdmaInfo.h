@@ -70,9 +70,8 @@ static inline void RdmaInfo_dumpIovIter(const struct iov_iter *iter)
    printk(KERN_ALERT "IOV_ITER : count=%ld", iov_iter_count(&iter_copy));
    while (iov_iter_count(&iter_copy) > 0)
    {
-      struct iovec iovec = iov_iter_iovec(&iter_copy);
-      iov_iter_advance(&iter_copy, iovec.iov_len);
-      printk(KERN_INFO "      %3d: %px %ld", i, iovec.iov_base, iovec.iov_len);
+      printk(KERN_INFO "      %3d: %px %ld", i, iter_iov_addr(&iter_copy), iter_iov_len(&iter_copy));
+      iov_iter_advance(&iter_copy, iter_iov_len(&iter_copy));
    }
 }
 

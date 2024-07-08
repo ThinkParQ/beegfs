@@ -558,14 +558,6 @@ ssize_t _StandardSocket_recvT(Socket* this, struct iov_iter* iter, int flags, in
 }
 
 
-
-#ifdef KERNEL_HAS_MSGHDR_ITER
-#define HAS_MSGHDR_ITER_BOOL true
-#else
-#define HAS_MSGHDR_ITER_BOOL false
-#endif
-
-
 ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
    fhgfs_sockaddr_in *to)
 {
@@ -583,25 +575,10 @@ ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
       .msg_flags        = flags | MSG_NOSIGNAL,
       .msg_name         = (struct sockaddr*)(to ? &toSockAddr : NULL),
       .msg_namelen      = sizeof(toSockAddr),
+      .msg_iter         = *iter,
    };
 
-#ifndef KERNEL_HAS_MSGHDR_ITER
-
-   //XXX Note that if the struct iov_iter is of type ITER_KVEC, we're type punning
-   //it here to get a struct iovec. Not sure if this is even supposed to work... :/
-   struct iovec iov = iov_iter_iovec(beegfs_get_iovec_iov_iter(iter));
-
-   msg.msg_iov       = &iov;
-   msg.msg_iovlen    = 1;
-
-   len = iov.iov_len;
-
-#else
-   msg.msg_iter = *iter;
-
    len = iov_iter_count(iter);
-
-#endif // LINUX_VERSION_CODE
 
    if (to)
    {
@@ -610,11 +587,7 @@ ssize_t _StandardSocket_sendto(Socket* this, struct iov_iter* iter, int flags,
       toSockAddr.sin_port = to->port;
    }
 
-   if (! HAS_MSGHDR_ITER_BOOL && iov_iter_type(iter) == ITER_KVEC)
-      WITH_PROCESS_CONTEXT
-         sendRes = beegfs_sendmsg(sock, &msg, len);
-   else
-      sendRes = beegfs_sendmsg(sock, &msg, len);
+   sendRes = beegfs_sendmsg(sock, &msg, len);
 
    if(sendRes >= 0)
       iov_iter_advance(iter, sendRes);
@@ -637,26 +610,12 @@ ssize_t StandardSocket_recvfrom(StandardSocket* this, struct iov_iter* iter, int
       .msg_flags        = flags,
       .msg_name         = (struct sockaddr*)&fromSockAddr,
       .msg_namelen      = sizeof(fromSockAddr),
+      .msg_iter         = *iter,
    };
 
-#ifndef KERNEL_HAS_MSGHDR_ITER
-   //XXX Note that if the struct iov_iter is of type ITER_KVEC, we're type punning
-   //it here to get a struct iovec. Not sure if this is even supposed to work... :/
-   struct iovec iov = iov_iter_iovec(beegfs_get_iovec_iov_iter(iter));
-
-   msg.msg_iov       = &iov;
-   msg.msg_iovlen    = 1;
-   len = iov.iov_len;
-#else
-   msg.msg_iter = *iter;
    len = iov_iter_count(iter);
-#endif // LINUX_VERSION_CODE
 
-   if (! HAS_MSGHDR_ITER_BOOL && iov_iter_type(iter) == ITER_KVEC)
-      WITH_PROCESS_CONTEXT
-         recvRes = beegfs_recvmsg(sock, &msg, len, flags);
-   else
-      recvRes = beegfs_recvmsg(sock, &msg, len, flags);
+   recvRes = beegfs_recvmsg(sock, &msg, len, flags);
 
    if(recvRes > 0)
       iov_iter_advance(iter, recvRes);

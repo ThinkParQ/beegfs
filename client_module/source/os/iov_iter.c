@@ -10,6 +10,7 @@ static void beegfs_readsink_reserve_no_pipe(BeeGFS_ReadSink *rs, struct iov_iter
       iov_iter_truncate(&rs->sanitized_iter, size);
 }
 
+#ifdef KERNEL_HAS_ITER_PIPE
 static size_t compute_max_pagecount(size_t size)
 {
    // Compute maximal number of pages (in the pipe) that need to be present at once.
@@ -111,14 +112,18 @@ static void beegfs_readsink_reserve_pipe(BeeGFS_ReadSink *rs, struct iov_iter *i
       BEEGFS_IOV_ITER_BVEC(&rs->sanitized_iter, READ, bvecs, rs->npages, view_size);
    }
 }
+#endif
 
 void beegfs_readsink_reserve(BeeGFS_ReadSink *rs, struct iov_iter *iter, size_t size)
 {
-
+#ifdef KERNEL_HAS_ITER_PIPE
    if (iov_iter_type(iter) == ITER_PIPE)
       beegfs_readsink_reserve_pipe(rs, iter, size);
    else
       beegfs_readsink_reserve_no_pipe(rs, iter, size);
+#else
+      beegfs_readsink_reserve_no_pipe(rs, iter, size);
+#endif
 }
 
 void beegfs_readsink_release(BeeGFS_ReadSink *rs)

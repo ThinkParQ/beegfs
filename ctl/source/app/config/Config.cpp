@@ -173,6 +173,8 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("tunePreferredStorageFile",         "", addDashes);
 
    configMapRedefine("runDaemonized",                    "false", addDashes);
+
+   configMapRedefine("sysNoEnterpriseFeatureMsg",        "false", addDashes);
 }
 
 /**
@@ -243,6 +245,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       IGNORE_CONFIG_CLIENT_VALUE("sysSessionChecksEnabled")
       IGNORE_CONFIG_CLIENT_VALUE("sysTargetOfflineTimeoutSecs")
       IGNORE_CONFIG_CLIENT_VALUE("sysXAttrsEnabled")
+      IGNORE_CONFIG_CLIENT_VALUE("sysXAttrsCheckCapabilities")
       IGNORE_CONFIG_CLIENT_VALUE("sysACLsEnabled")
       IGNORE_CONFIG_CLIENT_VALUE("quotaEnabled")
       IGNORE_CONFIG_CLIENT_VALUE("sysFileEventLogMask")
@@ -269,6 +272,8 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
          tunePreferredStorageFile = iter->second;
       else if (testConfigMapKeyMatch(iter, "runDaemonized", addDashes))
          runDaemonized = StringTk::strToBool(iter->second);
+      else if (testConfigMapKeyMatch(iter, "sysNoEnterpriseFeatureMsg", addDashes))
+         sysNoEnterpriseFeatureMsg = StringTk::strToBool(iter->second);
       else
       {
          // unknown element occurred

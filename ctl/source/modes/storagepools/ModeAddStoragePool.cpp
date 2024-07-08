@@ -1,4 +1,5 @@
 #include "ModeAddStoragePool.h"
+#include "modes/modehelpers/ModeHelper.h"
 
 #include <app/App.h>
 #include <common/net/message/nodes/storagepools/AddStoragePoolMsg.h>
@@ -13,6 +14,8 @@
 
 int ModeAddStoragePool::execute()
 {
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )
       return APPCODE_RUNTIME_ERROR;

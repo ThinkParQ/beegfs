@@ -80,32 +80,12 @@ extern ssize_t FhgfsOps_read(struct file* file, char __user *buf, size_t size,
 extern ssize_t FhgfsOps_write(struct file* file, const char __user *buf, size_t size,
    loff_t* offsetPointer);
 
-#if defined(KERNEL_HAS_AIO_WRITE_BUF)
-   extern ssize_t FhgfsOps_aio_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos);
-   extern ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const char __user *buf, size_t count,
-   loff_t pos);
-#elif !defined(KERNEL_HAS_WRITE_ITER)
-   extern ssize_t FhgfsOps_aio_read(struct kiocb *iocb, const struct iovec *iov,
-      unsigned long nr_segs, loff_t pos);
-   extern ssize_t FhgfsOps_aio_write(struct kiocb *iocb, const struct iovec *iov,
-      unsigned long nr_segs, loff_t pos);
-#else
-   ssize_t FhgfsOps_read_iter(struct kiocb *iocb, struct iov_iter *to);
-   ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from);
-#endif // LINUX_VERSION_CODE
+ssize_t FhgfsOps_read_iter(struct kiocb *iocb, struct iov_iter *to);
+ssize_t FhgfsOps_write_iter(struct kiocb *iocb, struct iov_iter *from);
 
 extern int FhgfsOps_mmap(struct file *, struct vm_area_struct *);
 
-#if defined(KERNEL_HAS_IOV_DIO)
-   extern ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter);
-#elif defined(KERNEL_HAS_LONG_IOV_DIO)
-   extern ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter, loff_t pos);
-#elif defined(KERNEL_HAS_DIRECT_IO_ITER)
-   extern ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos);
-#else // KERNEL_HAS_DIRECT_IO_ITER
-   extern ssize_t FhgfsOps_directIO(int rw, struct kiocb *iocb, const struct iovec *iov, loff_t pos,
-   unsigned long nr_segs);
-#endif // KERNEL_HAS_DIRECT_IO_ITER
+extern ssize_t FhgfsOps_directIO(struct kiocb *iocb, struct iov_iter *iter);
 
 extern int FhgfsOps_releaseCancelLocks(struct inode* inode, struct file* file);
 extern ssize_t __FhgfsOps_readSparse(struct file* file, struct iov_iter *iter, size_t size,

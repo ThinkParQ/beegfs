@@ -35,6 +35,8 @@ int ModeAddMirrorBuddyGroup::execute()
    uint16_t cfgSecondaryTargetID = 0;
    uint16_t cfgGroupID = 0;
 
+   ModeHelper::printEnterpriseFeatureMsg();
+
    // check privileges
    if(!ModeHelper::checkRootPrivileges() )
       return APPCODE_RUNTIME_ERROR;
