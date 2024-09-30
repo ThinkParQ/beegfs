@@ -117,6 +117,7 @@ struct IBVCommConfig
 #include <rdma/ib_verbs.h>
 #include <rdma/rdma_cm.h>
 #include <rdma/ib_cm.h>
+#include <common/threading/Mutex.h>
 #include "IBVBuffer.h"
 
 
@@ -262,6 +263,8 @@ struct IBVSocket
                                             // members without locking the NodeConnPool mutex.
                                             // Possibly NULL.
    IBVTimeoutConfig              timeoutCfg;
+   Mutex                         cmaMutex;  // used to manage concurrency of cm_id and commContext
+                                            // with __IBVSocket_cmaHandler
 };
 
 

@@ -70,13 +70,18 @@ static FhgfsOpsErr _FhgfsOpsPages_referenceFileHandle(FhgfsPageData* writePageDa
 
 static int _FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_control* wbc,
    struct page* page);
-static int FhgfsOpsPages_writePageCallBack(struct page *page, struct writeback_control *wbc,
-   void *data);
 #ifdef KERNEL_HAS_FOLIO
 int _FhgfsOpsPages_readahead(struct readahead_control *ractl, struct page* page);
 #else
 int _FhgfsOpsPages_readpages(struct file* file, struct address_space* mapping,
    struct list_head* pageList, struct page* page);
+#endif
+#ifdef KERNEL_WRITEPAGE_HAS_FOLIO
+static int FhgfsOpsPages_writePageCallBack(struct folio *folio, struct writeback_control *wbc,
+   void *data);
+#else
+static int FhgfsOpsPages_writePageCallBack(struct page *page, struct writeback_control *wbc,
+   void *data);
 #endif
 static int FhgfsOpsPages_readPageCallBack(void *dataPtr, struct page *page);
 
@@ -359,8 +364,14 @@ FhgfsOpsErr _FhgfsOpsPages_referenceFileHandle(FhgfsPageData* writePageData, uns
  *
  * @return 0 on success, negative linux error code on error
  */
+#ifdef KERNEL_WRITEPAGE_HAS_FOLIO
+int FhgfsOpsPages_writePageCallBack(struct folio *folio, struct writeback_control *wbc, void *dataPtr)
+{
+    struct page *page = &folio->page;
+#else
 int FhgfsOpsPages_writePageCallBack(struct page *page, struct writeback_control *wbc, void *dataPtr)
 {
+#endif
    const char* logContext = __func__;
    int retVal = 0;
 
@@ -564,8 +575,12 @@ int _FhgfsOpsPages_writepages(struct address_space* mapping, struct writeback_co
    }
    else
    {  // Called with a single page only, so we are called from ->writepage
+#ifdef KERNEL_WRITEPAGE_HAS_FOLIO
+      struct folio *folio = page_folio(page);
+      retVal = FhgfsOpsPages_writePageCallBack(folio, wbc, &pageData);
+#else
       retVal = FhgfsOpsPages_writePageCallBack(page, wbc, &pageData);
-
+#endif
       if (unlikely(retVal < 0) )
       {  // some kind of error
          if (unlikely(pageData.chunkPageVec) )

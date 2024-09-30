@@ -510,29 +510,26 @@ bool __App_initInodeOperations(App* this)
 
       if (Config_getSysACLsEnabled(cfg) )
       {
-#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_DENTRY_ACL)
+#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_ACL_DENTRY)
          this->fileInodeOps->set_acl = FhgfsOps_set_acl;
          this->dirInodeOps->set_acl  = FhgfsOps_set_acl;
-#if defined(KERNEL_HAS_POSIX_GET_ACL) 
+        /* Note: symlinks don't have ACLs
+         * The get_acl() operation was introduced as get_inode_acl() in the struct inode_operations in Linux 6.2
+         */
+#if defined(KERNEL_HAS_GET_ACL) 
          this->fileInodeOps->get_acl = FhgfsOps_get_acl;
          this->dirInodeOps->get_acl  = FhgfsOps_get_acl;
-         // Note: symlinks don't have ACLs
-#elif defined(KERNEL_HAS_GET_INODE_ACL)
-         this->fileInodeOps->get_inode_acl = FhgfsOps_get_acl;
-         this->dirInodeOps->get_inode_acl  = FhgfsOps_get_acl;
-#else
-         Logger_logErr(this->logger, "Init inode operations",
-            "ACLs activated in config, but the signature inode->i_op->get_acl()"
-            "or inode->i_op->get_inode_acl() are not supported on this"
-            "kernel version.");
-         return false;
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif
+#if defined(KERNEL_HAS_GET_INODE_ACL)
+         this->fileInodeOps->get_inode_acl = FhgfsOps_get_inode_acl;
+         this->dirInodeOps->get_inode_acl  = FhgfsOps_get_inode_acl;
+#endif
 #else
          Logger_logErr(this->logger, "Init inode operations",
             "ACLs activated in config, but the signature inode->i_op->set_acl()"
             "not supported on this kernel version.");
          return false;
-#endif // KERNEL_HAS_SET_ACL or KERNEL_HAS_SET_DENTRY_ACL
+#endif // KERNEL_HAS_SET_ACL or KERNEL_HAS_SET_ACL_DENTRY
       }
    }
 

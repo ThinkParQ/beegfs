@@ -79,7 +79,7 @@ FhgfsOpsErr FindOwnerMsgEx::findOwner(EntryInfoWithDepth* outInfo)
       }
 
       EntryInfo subInfo;
-      FhgfsOpsErr getEntryRes = metaStore->getEntryData(currentDir, path[currentDepth],
+      auto [getEntryRes, isFileOpen] = metaStore->getEntryData(currentDir, path[currentDepth],
          &subInfo, NULL);
 
       if (getEntryRes == FhgfsOpsErr_SUCCESS || getEntryRes == FhgfsOpsErr_DYNAMICATTRIBSOUTDATED)

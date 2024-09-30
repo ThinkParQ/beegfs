@@ -9,7 +9,6 @@
 
 #include <common/toolkit/TimeTk.h>
 #include <common/toolkit/Time.h>
-
 #include <linux/in.h>
 #include <linux/sched.h>
 #include <linux/poll.h>
@@ -87,18 +86,20 @@ bool IBVSocket_init(IBVSocket* _this, struct in_addr srcIpAddr, NicAddressStats*
 
    init_waitqueue_head(&_this->eventWaitQ);
 
+   Mutex_init(&_this->cmaMutex);
    return __IBVSocket_createNewID(_this);
 }
 
 void IBVSocket_uninit(IBVSocket* _this)
 {
-   SAFE_KFREE(_this->remoteDest);
-
-   if(_this->commContext)
-      __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
-
+   Mutex_lock(&_this->cmaMutex);
+   __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
+   Mutex_unlock(&_this->cmaMutex);
    if(_this->cm_id)
       rdma_destroy_id(_this->cm_id);
+
+   Mutex_uninit(&_this->cmaMutex);
+   SAFE_KFREE(_this->remoteDest);
 }
 
 bool IBVSocket_rdmaDevicesExist()
@@ -165,6 +166,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned 
    struct sockaddr_in* srcp;
    long connTimeoutJiffies = TimeTk_msToJiffiesSchedulable(IBVSOCKET_CONN_TIMEOUT_MS);
    Time connElapsed;
+   int rc;
 
    /* note: rejected as stale means remote side still had an old open connection associated with
          our current cm_id. what most likely happened is that the client was reset (i.e. no clean
@@ -230,7 +232,10 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned 
       // establish connection...
 
       // (handler calls rdma_connect() )
-      if(__IBVSocket_routeResolvedHandler(_this, _this->cm_id, commCfg, &_this->commContext) )
+      Mutex_lock(&_this->cmaMutex);
+      rc = __IBVSocket_routeResolvedHandler(_this, _this->cm_id, commCfg, &_this->commContext);
+      Mutex_unlock(&_this->cmaMutex);
+      if (rc)
       {
          ibv_print_info_debug("route resolved handler failed\n");
          goto err_invalidateSock;
@@ -261,14 +266,15 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned 
             goto err_invalidateSock;
          }
 
+         printk_fhgfs_connerr(KERN_INFO, "Stale connection detected. Retrying with a new one...\n");
          // We need to clean up the commContext created in the routeResolvedHandler because
          // the next time through the loop it will get recreated.  If this is the final try,
          // then we don't need it anymore.
+         Mutex_lock(&_this->cmaMutex);
          __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
          _this->commContext = NULL;
-
-         printk_fhgfs_connerr(KERN_INFO, "Stale connection detected. Retrying with a new one...\n");
          createIDRes = __IBVSocket_createNewID(_this);
+         Mutex_unlock(&_this->cmaMutex);
          if(!createIDRes)
             goto err_invalidateSock;
 
@@ -296,14 +302,14 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned 
 
 
 err_invalidateSock:
-   // If we have a comm context, we need to delete it since we can't use it.
-   if (_this->commContext)
-   {
-      __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
-      _this->commContext = NULL;
-   }
-
+   // If we have a comm context, we need to delete it since we can't use it. We set an error state
+   // on the socket first, so we stop accepting callbacks that would access the commContext that is
+   // in the process of being destroyed.
    _this->errState = -1;
+   Mutex_lock(&_this->cmaMutex);
+   __IBVSocket_cleanupCommContext(_this->cm_id, _this->commContext);
+   _this->commContext = NULL;
+   Mutex_unlock(&_this->cmaMutex);
    return false;
 }
 
@@ -621,8 +627,6 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    // IB_PD_UNSAFE_GLOBAL_RKEY is still present as of kernel 6.3.
 #ifdef OFED_UNSAFE_GLOBAL_RKEY
    commContext->pd = ib_alloc_pd(dev, globalRkey? IB_PD_UNSAFE_GLOBAL_RKEY : 0);
-   if (globalRkey)
-      commContext->checkConnRkey = commContext->pd->unsafe_global_rkey;
 #else
    if (globalRkey)
    {
@@ -638,6 +642,10 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       commContext->pd = NULL;
       goto err_cleanup;
    }
+#ifdef OFED_UNSAFE_GLOBAL_RKEY
+   if (globalRkey)
+      commContext->checkConnRkey = commContext->pd->unsafe_global_rkey;
+#endif
 
    if (commCfg->keyType == IBVSOCKETKEYTYPE_UnsafeDMA)
    {
@@ -800,7 +808,6 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
 
 err_cleanup:
    __IBVSocket_cleanupCommContext(cm_id, commContext);
-
    *outCommContext = NULL;
    return false;
 }
@@ -1733,10 +1740,17 @@ int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event
    IBVSocket* _this = cm_id->context;
    int retVal = 0;
 
-   if(unlikely(!_this) )
+   if(unlikely(!_this || _this->errState !=0) )
    {
       ibv_print_info_debug("cm_id is being torn down. Event: %d\n", event->event);
       return (event->event == RDMA_CM_EVENT_CONNECT_REQUEST) ? -EINVAL : 0;
+   }
+
+   Mutex_lock(&_this->cmaMutex);
+   if (_this->cm_id != cm_id)
+   {
+      Mutex_unlock(&_this->cmaMutex);
+      return -EINVAL;
    }
 
    ibv_print_info_debug("rdma event: %i, status: %i\n", event->event, event->status);
@@ -1819,6 +1833,7 @@ int __IBVSocket_cmaHandler(struct rdma_cm_id* cm_id, struct rdma_cm_event* event
       retVal = 0;
    }
 
+   Mutex_unlock(&_this->cmaMutex);
    wake_up(&_this->eventWaitQ);
    return retVal;
 }
@@ -1889,6 +1904,7 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
 {
    bool createContextRes;
    struct rdma_conn_param conn_param;
+
    createContextRes = __IBVSocket_createCommContext(_this, _this->cm_id, commCfg,
       &_this->commContext);
    if(!createContextRes)
@@ -1905,6 +1921,7 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
       if (!IBVBuffer_initRegistration(&_this->commContext->checkConBuffer, _this->commContext))
       {
          _this->errState = -1;
+
          return -EPERM;
       }
       _this->commContext->checkConnRkey = _this->commContext->checkConBuffer.mr->rkey;
@@ -1932,7 +1949,6 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
    conn_param.private_data = &_this->localDest;
    conn_param.private_data_len = sizeof(_this->localDest);
 
-
    return rdma_connect(_this->cm_id, &conn_param);
 }
 
@@ -1940,13 +1956,17 @@ int __IBVSocket_routeResolvedHandler(IBVSocket* _this, struct rdma_cm_id* cm_id,
 int __IBVSocket_connectedHandler(IBVSocket* _this, struct rdma_cm_event* event)
 {
    IBVCommContext* commContext = _this->commContext;
-   IBVCommConfig* commCfg = &commContext->commCfg;
+   IBVCommConfig* commCfg;
    int retVal = 0;
    bool parseCommDestRes;
    const void* private_data;
    u8 private_data_len;
    int i;
 
+   if (!commContext)
+      return -EINVAL;
+
+   commCfg = &commContext->commCfg;
    if (_this->commContext->commCfg.keyType == IBVSOCKETKEYTYPE_Register)
    {
       if(IBVSocket_registerMr(_this, _this->commContext->checkConBuffer.mr, IB_ACCESS_REMOTE_READ))

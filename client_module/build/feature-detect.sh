@@ -149,6 +149,16 @@ check_symbol() {
    _check_symbol_input "$name" "$@" | _marker_if_compiles "$marker"
 }
 
+check_struct_field \
+   inode::i_atime \
+   KERNEL_HAS_INODE_ATIME \
+   linux/fs.h
+
+check_struct_field \
+   dentry::d_subdirs \
+   KERNEL_HAS_DENTRY_SUBDIRS \
+   linux/dcache.h
+
 check_function \
    generic_readlink "int (struct dentry *, char __user *, int)" \
    KERNEL_HAS_GENERIC_READLINK \
@@ -161,6 +171,10 @@ check_header \
 check_header \
    linux/stdarg.h \
    KERNEL_HAS_LINUX_STDARG_H
+
+check_header \
+   linux/filelock.h \
+   KERNEL_HAS_LINUX_FILELOCK_H
 
 # cryptohash does not include linux/types.h, so the type comparison fails
 check_function \
@@ -212,6 +226,11 @@ check_struct_field \
    sock::sk_sleep \
    KERNEL_HAS_SK_SLEEP \
    net/sock.h
+
+check_function \
+   current_time "struct timespec64 (struct inode *)" \
+   KERNEL_HAS_CURRENT_TIME_SPEC64 \
+   linux/fs.h
 
 check_function \
    sk_has_sleeper "int (struct sock*)" \
@@ -283,10 +302,29 @@ check_function \
    KERNEL_HAS_SOCK_SETSOCKOPT_SOCKPTR_T_PARAM \
    net/sock.h
 
-check_type       time64_t                                                 KERNEL_HAS_TIME64                       linux/ktime.h
+check_type       time64_t                       KERNEL_HAS_TIME64                       linux/ktime.h
 check_function   ktime_get_ts64             'void (struct timespec64 *)'  KERNEL_HAS_KTIME_GET_TS64               linux/ktime.h
 check_function   ktime_get_real_ts64        'void (struct timespec64 *)'  KERNEL_HAS_KTIME_GET_REAL_TS64          linux/ktime.h
 check_function   ktime_get_coarse_real_ts64 'void (struct timespec64 *)'  KERNEL_HAS_KTIME_GET_COARSE_REAL_TS64   linux/ktime.h
+
+# latest kernel from 6.3 changes moved to timekeeping.h
+check_function \
+   ktime_get_ts64 "void (struct timespec64 *ts)" \
+   KERNEL_HAS_KTIME_GET_TS64 \
+   linux/timekeeping.h
+check_function \
+   ktime_get_real_ts64 "void (struct timespec64 *tv)" \
+   KERNEL_HAS_KTIME_GET_REAL_TS64 \
+   linux/timekeeping.h
+check_function \
+   ktime_get_coarse_real_ts64 "void (struct timespec64 *ts)" \
+   KERNEL_HAS_KTIME_GET_COARSE_REAL_TS64 \
+   linux/timekeeping.h
+
+check_function \
+   generic_file_splice_read "ssize_t (struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int)" \
+   KERNEL_HAS_GENERIC_FILE_SPLICE_READ \
+   linux/fs.h
 
 check_function \
    generic_permission "int (struct inode *, int)" \
@@ -299,6 +337,11 @@ check_function \
    linux/fs.h
 
 check_function \
+   setattr_prepare "int (struct mnt_idmap *, struct dentry *, struct iattr *)" \
+   KERNEL_HAS_SETATTR_PREPARE \
+   linux/fs.h
+
+check_function \
    setattr_prepare "int (struct dentry *dentry, struct iattr *attr)" \
    KERNEL_HAS_SETATTR_PREPARE \
    linux/fs.h
@@ -308,15 +351,25 @@ check_function \
    KERNEL_HAS_SETATTR_PREPARE \
    linux/fs.h
 
-check_struct_field_type \
-   inode_operations::get_acl "struct posix_acl* (*)(struct inode *, int)" \
-   KERNEL_HAS_POSIX_GET_ACL \
+check_struct_field \
+   inode_operations::get_acl \
+   KERNEL_HAS_GET_ACL \
    linux/fs.h
 
 check_struct_field_type \
-   inode_operations::get_acl "struct posix_acl* (*)(struct inode *, int, bool)" \
-   KERNEL_HAS_POSIX_GET_ACL \
+   inode_operations::get_acl "struct posix_acl* (*)(struct mnt_idmap *, struct dentry *, int)" \
+   KERNEL_HAS_POSIX_GET_ACL_IDMAP \
    linux/fs.h
+
+check_struct_field_type \
+   inode_operations::get_acl "struct posix_acl* (*)(struct user_namespace *, struct dentry *, int)" \
+   KERNEL_HAS_POSIX_GET_ACL_NS \
+   linux/fs.h
+
+check_symbol \
+   "extern const struct xattr_handler posix_acl_default_xattr_handler;" \
+   KERNEL_HAS_POSIX_ACL_DEFAULT_XATTR_HANDLER \
+   linux/posix_acl_xattr.h
 
 check_struct_field_type \
    inode_operations::get_acl "struct posix_acl* (*)(struct inode *, int, bool)" \
@@ -328,24 +381,39 @@ check_struct_field_type \
    KERNEL_HAS_GET_INODE_ACL \
    linux/fs.h
 
-check_struct_field_type \
-   inode_operations::set_acl "int (*)(struct inode *, struct posix_acl *, int)" \
+check_struct_field \
+   inode_operations::set_acl \
    KERNEL_HAS_SET_ACL \
    linux/fs.h
 
 check_struct_field_type \
    inode_operations::set_acl "int (*)(struct user_namespace *, struct inode *, struct posix_acl *, int)" \
-   KERNEL_HAS_SET_ACL \
+   KERNEL_HAS_SET_ACL_NS_INODE \
+   linux/fs.h
+
+check_struct_field_type \
+   inode_operations::set_acl "int (*)(struct mnt_idmap *, struct dentry *, struct posix_acl *, int)" \
+   KERNEL_HAS_SET_ACL_DENTRY \
    linux/fs.h
 
 check_struct_field_type \
    inode_operations::set_acl "int (*)(struct user_namespace *, struct dentry *, struct posix_acl *, int)" \
-   KERNEL_HAS_SET_DENTRY_ACL \
+   KERNEL_HAS_SET_ACL_DENTRY \
    linux/fs.h
 
 check_function \
    vfs_create "int (struct user_namespace *, struct inode *, struct dentry *, umode_t, bool)" \
+   KERNEL_HAS_USER_NS_MOUNTS \
+   linux/fs.h
+
+check_function \
+   vfs_create "int (struct mnt_idmap *, struct inode *, struct dentry *, umode_t, bool)" \
    KERNEL_HAS_IDMAPPED_MOUNTS \
+   linux/fs.h
+
+check_struct_field_type \
+   file_operations::iterate "int (*)(struct file *, struct dir_context *)" \
+   KERNEL_HAS_FOPS_ITERATE \
    linux/fs.h
 
 check_struct_field_type \
@@ -358,10 +426,37 @@ check_struct_field_type \
    KERNEL_HAS_XATTR_HANDLERS_INODE_ARG \
    linux/xattr.h
 
+check_struct_field_type \
+   xattr_handler::set "int (*)(const struct xattr_handler *, struct mnt_idmap *, struct dentry *, struct inode *, const char *, const void *, size_t, int)" \
+   KERNEL_HAS_XATTR_HANDLERS_INODE_ARG \
+   linux/xattr.h
+
 check_struct_field \
    thread_info::cpu \
    KERNEL_HAS_CPU_IN_THREAD_INFO \
    linux/thread_info.h
+
+check_function \
+   generic_fillattr "void (struct mnt_idmap *, u32, struct inode *, struct kstat *)" \
+   KERNEL_HAS_GENERIC_FILLATTR_REQUEST_MASK \
+   linux/fs.h
+
+
+
+# Kernel 6.5 introduced getters and setters for struct inode's ctime field
+
+check_function \
+   inode_get_ctime "struct timespec64 (const struct inode *inode)" \
+   KERNEL_HAS_INODE_GET_SET_CTIME \
+   linux/fs.h
+
+# Kernel 6.6 introduced more getters and setters, also for atime and mtime
+
+check_function \
+   inode_get_mtime "struct timespec64 (const struct inode *inode)" \
+   KERNEL_HAS_INODE_GET_SET_CTIME_MTIME_ATIME \
+   linux/fs.h
+
 
 # we have to communicate with the calling makefile somehow. since we can't really use the return
 # code of this script, we'll echo a special string at the end of our output for the caller to

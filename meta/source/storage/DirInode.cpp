@@ -245,6 +245,16 @@ FhgfsOpsErr DirInode::setStripePattern(const StripePattern& newPattern, uint32_t
 
    if (actorUID != 0)
    {
+      // Note there is no way to distinguish if the pool ID or pattern type in the pattern was
+      // actually updated by the user or if CTL just set it to the previous value. Only if either
+      // changes return a permissions error. This does mean non-root users that try to set these to
+      // their current values will not see a permissions error.
+      if (stripePattern->getStoragePoolId() != newPattern.getStoragePoolId()) {
+         return FhgfsOpsErr_PERM;
+      }
+      if (stripePattern->getPatternType() != newPattern.getPatternType()) {
+         return FhgfsOpsErr_PERM;
+      }    
       oldPattern = stripePattern->clone();
       stripePattern->setDefaultNumTargets(newPattern.getDefaultNumTargets());
       stripePattern->setChunkSize(newPattern.getChunkSize());

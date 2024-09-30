@@ -65,14 +65,16 @@ struct file_operations fhgfs_file_buffered_ops =
 #ifdef CONFIG_COMPAT
    .compat_ioctl     = FhgfsOpsIoctl_compatIoctl,
 #endif // CONFIG_COMPAT
-
-#ifdef KERNEL_HAS_ITER_FILE_SPLICE_WRITE
-   .splice_read  = generic_file_splice_read,
-   .splice_write = iter_file_splice_write,
+#ifdef KERNEL_HAS_GENERIC_FILE_SPLICE_READ
+    .splice_read  = generic_file_splice_read,
 #else
-   .splice_read  = generic_file_splice_read,
-   .splice_write = generic_file_splice_write,
-#endif // LINUX_VERSION_CODE
+    .splice_read  = filemap_splice_read,
+#endif
+#ifdef KERNEL_HAS_ITER_FILE_SPLICE_WRITE
+    .splice_write = iter_file_splice_write,
+#else
+    .splice_write = generic_file_splice_write,
+#endif
 
    .read_iter           = FhgfsOps_buffered_read_iter,
    .write_iter          = FhgfsOps_buffered_write_iter, // replacement for aio_write
@@ -101,14 +103,16 @@ struct file_operations fhgfs_file_pagecache_ops =
 #ifdef CONFIG_COMPAT
    .compat_ioctl        = FhgfsOpsIoctl_compatIoctl,
 #endif // CONFIG_COMPAT
-
-#ifdef KERNEL_HAS_ITER_FILE_SPLICE_WRITE
-   .splice_read  = generic_file_splice_read,
-   .splice_write = iter_file_splice_write,
+#ifdef KERNEL_HAS_GENERIC_FILE_SPLICE_READ
+    .splice_read  = generic_file_splice_read,
 #else
-   .splice_read  = generic_file_splice_read,
-   .splice_write = generic_file_splice_write,
-#endif // LINUX_VERSION_CODE
+    .splice_read  = filemap_splice_read,
+#endif
+#ifdef KERNEL_HAS_ITER_FILE_SPLICE_WRITE
+    .splice_write = iter_file_splice_write,
+#else
+    .splice_write = generic_file_splice_write,
+#endif
 
 #ifdef KERNEL_HAS_GENERIC_FILE_SENDFILE
    .sendfile   = generic_file_sendfile, // removed in 2.6.23 (now handled via splice)
@@ -120,7 +124,11 @@ struct file_operations fhgfs_dir_ops =
    .open             = FhgfsOps_opendirIncremental,
    .release          = FhgfsOps_releasedir,
 #ifdef KERNEL_HAS_ITERATE_DIR
+#if defined(KERNEL_HAS_FOPS_ITERATE)
    .iterate       = FhgfsOps_iterateIncremental, // linux 3.11 renamed readdir to iterate
+#else
+   .iterate_shared   = FhgfsOps_iterateIncremental, // linux 6.3 removed .iterate & it's a parallel variant of .iterate().
+#endif
 #else
    .readdir       = FhgfsOps_readdirIncremental, // linux 3.11 renamed readdir to iterate
 #endif // LINUX_VERSION_CODE
@@ -192,19 +200,31 @@ struct address_space_operations fhgfs_address_pagecache_ops =
 loff_t FhgfsOps_llseekdir(struct file *file, loff_t offset, int origin)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
-   Logger* log = App_getLogger(app);
    const char* logContext = "FhgfsOps_llseekDir";
    struct inode* inode = file_inode(file);
 
    loff_t retVal = 0;
    FsDirInfo* dirInfo = __FhgfsOps_getDirInfo(file);
 
-   if(unlikely(Logger_getLogLevel(log) >= Log_SPAM) )
-      FhgfsOpsHelper_logOpMsg(Log_SPAM, app, file_dentry(file), inode, logContext,
-         "offset: %lld directive: %d", (long long)offset, origin);
+   FhgfsOpsHelper_logOpMsg(Log_SPAM, app, file_dentry(file), inode, logContext,
+      "offset: %lld directive: %d", (long long)offset, origin);
 
    if(origin != SEEK_SET)
-      return -EINVAL;
+   {
+      if (origin == SEEK_CUR && offset == 0) {
+         // Some applications use lseek with SEEK_CUR and offset = 0 to get the current position in
+         // the file. To support that special case, we will translate the request into a SEEK_SET
+         // with the current file position as the offset.
+         offset = file->f_pos;
+         origin = SEEK_SET;
+         FhgfsOpsHelper_logOpMsg(Log_SPAM, app, file_dentry(file), inode, logContext,
+            "offset: %lld position: %lld directive: %d", (long long)offset, (long long)file->f_pos,
+            origin);
+      } else {
+         return -EINVAL;
+      }
+   }
+
 
    retVal = generic_file_llseek_unlocked(file, offset, origin);
    if(likely(retVal >= 0) )
@@ -741,7 +761,7 @@ int FhgfsOps_flock(struct file* file, int cmd, struct file_lock* fileLock)
    // local locking
 
    {
-      #ifdef KERNEL_HAS_LOCKS_LOCK_INODE_WAIT
+      #if defined(KERNEL_HAS_LOCKS_FILELOCK_INODE_WAIT) || defined(KERNEL_HAS_LOCKS_LOCK_INODE_WAIT)
          int localLockRes = locks_lock_inode_wait(file_inode(file), fileLock);
       #else
          int localLockRes = flock_lock_file_wait(file, fileLock);
@@ -881,7 +901,7 @@ int FhgfsOps_lock(struct file* file, int cmd, struct file_lock* fileLock)
          failed we wouldn't know how to undo the local locking (e.g. if the process acquires a
          shared lock for the second time or does a merge with existing ranges). */
 
-#ifdef KERNEL_HAS_LOCKS_LOCK_INODE_WAIT
+#if defined(KERNEL_HAS_LOCKS_FILELOCK_INODE_WAIT) || defined(KERNEL_HAS_LOCKS_LOCK_INODE_WAIT)
       int localLockRes = locks_lock_inode_wait(file_inode(file), fileLock);
 #else
       int localLockRes = posix_lock_file_wait(file, fileLock);
@@ -1682,7 +1702,7 @@ int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
    return retVal;
 }
 
-ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
+static  ssize_t __FhgfsOps_directIO_common(int rw, struct kiocb *iocb, struct iov_iter *iter, loff_t pos)
 {
    struct iov_iter bgfsIter = *iter;  // Was a wrapper copy. Now is just a defensive copy. Still needed?
    struct file* file = iocb->ki_filp;

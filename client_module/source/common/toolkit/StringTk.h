@@ -40,8 +40,9 @@ char* StringTk_strncpyTerminated(char* dest, const char* src, size_t count)
 {
    // Note: The problem with strncpy() is that dest is not guaranteed to be zero-terminated.
    // strlcpy() does guarantee that.
+   // strlcpy() was removed in commit d26270061ae6 (string: Remove strlcpy()), use strscpy() instead.
 
-   strlcpy(dest, src, count);
+   strscpy(dest, src, count);
 
    return dest;
 }

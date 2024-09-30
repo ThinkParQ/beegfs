@@ -50,15 +50,27 @@ static inline int os_generic_permission(struct inode *inode, int mask)
    #elif defined(KERNEL_HAS_GENERIC_PERMISSION_4)
       return generic_permission(inode, mask, 0, NULL);
    #elif defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      return generic_permission(&nop_mnt_idmap, inode, mask);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
       return generic_permission(&init_user_ns, inode, mask);
    #else
       return generic_permission(inode, mask, NULL);
    #endif
 }
 
+#if defined(KERNEL_HAS_GENERIC_FILLATTR_REQUEST_MASK)
+static inline void os_generic_fillattr(struct inode *inode, struct kstat *kstat, u32 request_mask)
+#else
 static inline void os_generic_fillattr(struct inode *inode, struct kstat *kstat)
+#endif
 {
-   #ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+   #if defined(KERNEL_HAS_GENERIC_FILLATTR_REQUEST_MASK)
+      generic_fillattr(&nop_mnt_idmap, request_mask, inode, kstat);
+   #else
+      generic_fillattr(&nop_mnt_idmap, inode, kstat);
+   #endif // KERNEL_HAS_GENERIC_FILLATTR_REQUEST_MASK
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
       generic_fillattr(&init_user_ns, inode, kstat);
    #else
       generic_fillattr(inode, kstat);
@@ -68,7 +80,9 @@ static inline void os_generic_fillattr(struct inode *inode, struct kstat *kstat)
 #ifdef KERNEL_HAS_SETATTR_PREPARE
 static inline int os_setattr_prepare(struct dentry *dentry, struct iattr *attr)
 {
-   #ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      return setattr_prepare(&nop_mnt_idmap, dentry, attr);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
       return setattr_prepare(&init_user_ns, dentry, attr);
    #else
       return setattr_prepare(dentry, attr);
@@ -78,7 +92,9 @@ static inline int os_setattr_prepare(struct dentry *dentry, struct iattr *attr)
 
 static inline bool os_inode_owner_or_capable(const struct inode *inode)
 {
-   #ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      return inode_owner_or_capable(&nop_mnt_idmap, inode);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
       return inode_owner_or_capable(&init_user_ns, inode);
    #else
       return inode_owner_or_capable(inode);
@@ -193,15 +209,23 @@ static inline int os_posix_acl_to_xattr(const struct posix_acl* acl, void* buffe
 #endif
 }
 
-#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_DENTRY_ACL)
+#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_ACL_DENTRY)
 static inline int os_posix_acl_chmod(struct inode *inode, umode_t mode)
 {
-#if defined(KERNEL_HAS_IDMAPPED_MOUNTS) && defined(KERNEL_HAS_POSIX_GET_ACL)
-   return posix_acl_chmod(&init_user_ns, inode, mode);
-#elif defined(KERNEL_HAS_IDMAPPED_MOUNTS) && defined(KERNEL_HAS_GET_INODE_ACL)
-   return posix_acl_chmod(&init_user_ns, d_find_alias(inode), mode);
+#if defined(KERNEL_HAS_GET_ACL)
+
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+    return posix_acl_chmod(&nop_mnt_idmap, d_find_alias(inode), mode);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+#if defined(KERNEL_HAS_POSIX_ACL_CHMOD_NS_DENTRY)
+    return posix_acl_chmod(&init_user_ns, d_find_alias(inode), mode);
 #else
-   return posix_acl_chmod(inode, mode);
+    return posix_acl_chmod(&init_user_ns, inode, mode);
+#endif
+#else
+    return posix_acl_chmod(inode, mode);
+#endif
+
 #endif
 }
 #endif // KERNEL_HAS_SET_ACL

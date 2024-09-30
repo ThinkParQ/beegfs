@@ -625,7 +625,11 @@ const struct file_operations fhgfs_file_native_ops = {
    .read_iter = beegfs_read_iter,
    .write_iter = beegfs_write_iter,
 
+#ifdef KERNEL_HAS_GENERIC_FILE_SPLICE_READ
    .splice_read  = generic_file_splice_read,
+#else
+   .splice_read  = filemap_splice_read,
+#endif
 #if defined(KERNEL_HAS_ITER_FILE_SPLICE_WRITE)
    .splice_write = iter_file_splice_write,
 #else
@@ -889,8 +893,14 @@ static bool beegfs_wps_must_flush_before(struct beegfs_writepages_state* state, 
    return false;
 }
 
+#ifdef KERNEL_WRITEPAGE_HAS_FOLIO
+static int beegfs_writepages_callback(struct folio *folio, struct writeback_control* wbc, void* data)
+{
+    struct page *page = &folio->page;
+#else
 static int beegfs_writepages_callback(struct page* page, struct writeback_control* wbc, void* data)
 {
+#endif
    struct beegfs_writepages_context* context = data;
    struct beegfs_writepages_state* state = context->currentState;
 
@@ -947,7 +957,12 @@ static int beegfs_do_write_pages(struct address_space* mapping, struct writeback
 
    if(page)
    {
-      err = beegfs_writepages_callback(page, wbc, &context);
+      #ifdef KERNEL_WRITEPAGE_HAS_FOLIO
+          struct folio *folio = page_folio(page);
+          err = beegfs_writepages_callback(folio, wbc, &context);
+      #else
+          err = beegfs_writepages_callback(page, wbc, &context);
+      #endif
 
       //XXX not sure if it's supposed to be like that
       WARN_ON(wbc->nr_to_write != 1);

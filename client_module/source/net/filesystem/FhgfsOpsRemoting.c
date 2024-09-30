@@ -1564,19 +1564,6 @@ out:
    return retVal;
 }
 
-/**
- * @param fhgfsInode just a hint currently, may be NULL; used for read from secondary heuristic in
- *        case of buddy mirroring.
- *
- * @return number of bytes read or negative fhgfs error code
- */
-ssize_t FhgfsOpsRemoting_readfile(char __user *buf, size_t size, loff_t offset,
-   RemotingIOInfo* ioInfo, FhgfsInode* fhgfsInode)
-{
-   struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_IOV(buf, size, READ);
-   return FhgfsOpsRemoting_readfileVec(iter, size, offset, ioInfo, fhgfsInode);
-}
-
 static void readfile_nextIter(CommKitContext* context, FileOpState* state)
 {
    struct FileOpVecState* vecState = container_of(state, struct FileOpVecState, base);

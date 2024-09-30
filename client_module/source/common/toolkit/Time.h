@@ -26,7 +26,7 @@ static inline unsigned long long Time_toNS(Time* this);
 
 static inline void Time_setToNow(Time* this)
 {
-#ifdef KERNEL_HAS_64BIT_TIMESTAMPS
+#ifdef KERNEL_HAS_KTIME_GET_TS64
    ktime_get_ts64(this);
 #else
    ktime_get_ts(this);
@@ -38,7 +38,7 @@ static inline void Time_setToNow(Time* this)
  */
 static inline void Time_setToNowReal(Time *this)
 {
-#ifdef KERNEL_HAS_64BIT_TIMESTAMPS
+#ifdef KERNEL_HAS_KTIME_GET_REAL_TS64
    ktime_get_real_ts64(this);
 #else
    ktime_get_real_ts(this);

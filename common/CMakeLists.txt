@@ -585,6 +585,7 @@ target_include_directories(
 target_link_libraries(
 	beegfs-common
 	${NL3ROUTE_LIBRARIES}
+	blkid
 )
 
 target_include_directories(beegfs_ib PRIVATE ./ib_lib)

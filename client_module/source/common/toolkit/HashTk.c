@@ -182,7 +182,7 @@ uint32_t HashTk_HsiehHash32(const char* data, int len)
  * Do the halfMD4 hash computation.
  * Note: OutBuf must be an array of size HashTk_HALFMD4_OUT_BUF_SIZE
  */
-void HashTk_halfMD4(const char* data, int len, uint32_t* outBuf)
+static void HashTk_halfMD4(const char* data, int len, uint32_t* outBuf)
 {
    uint32_t inBuf[Hashtk_HALFMD4_IN_BUF_SIZE];
    int maxMD4StrLen = Hashtk_HALFMD4_IN_BUF_SIZE * HashTk_INT_BYTES; // 32

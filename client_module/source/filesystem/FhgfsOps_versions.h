@@ -11,6 +11,8 @@
 #include <linux/page-flags.h>
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+   int FhgfsOps_permission(struct mnt_idmap* idmap, struct inode *inode, int mask);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
    int FhgfsOps_permission(struct user_namespace* mnt_userns, struct inode *inode, int mask);
 #elif defined(KERNEL_HAS_PERMISSION_2)
    int FhgfsOps_permission(struct inode *inode, int mask);

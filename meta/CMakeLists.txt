@@ -89,6 +89,8 @@ add_library(
 	./source/net/message/storage/creating/RmDirEntryMsgEx.cpp
 	./source/net/message/storage/creating/RmLocalDirMsgEx.h
 	./source/net/message/storage/creating/RmDirMsgEx.h
+	./source/net/message/storage/creating/MoveFileInodeMsgEx.cpp
+	./source/net/message/storage/creating/UnlinkLocalFileInodeMsgEx.cpp
 	./source/net/message/storage/TruncFileMsgEx.h
 	./source/net/message/storage/mirroring/ResyncRawInodesMsgEx.cpp
 	./source/net/message/storage/mirroring/StorageResyncStartedMsgEx.cpp
@@ -166,6 +168,7 @@ add_library(
 	./source/net/message/fsck/RemoveInodesMsgEx.cpp
 	./source/net/message/fsck/RetrieveFsIDsMsgEx.cpp
 	./source/net/message/fsck/CreateEmptyContDirsMsgEx.cpp
+	./source/net/message/fsck/CheckAndRepairDupInodeMsgEx.cpp
 	./source/net/msghelpers/MsgHelperMkFile.h
 	./source/net/msghelpers/MsgHelperTrunc.cpp
 	./source/net/msghelpers/MsgHelperXAttr.cpp

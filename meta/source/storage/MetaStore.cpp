@@ -1891,26 +1891,39 @@ FhgfsOpsErr MetaStore::insertDisposableFile(FileInode* inode)
 }
 
 /**
- * @param outInodeMetaData might be NULL
- * @return FhgfsOpsErr_SUCCESS if the entry was found and is not referenced,
- *         FhgfsOpsErr_DYNAMICATTRIBSOUTDATED is the entry was found, but is a referenced FileInode
- *         FhgfsOpsErr_PATHNOTEXISTS if the entry does not exist
+ * Retrieves entry data for a given file or directory.
+ *
+ * @param dirInode Pointer to the parent directory inode.
+ * @param entryName Name of the entry to retrieve data for.
+ * @param outInfo Pointer to store the retrieved EntryInfo.
+ * @param outInodeMetaData Pointer to store inode metadata (may be NULL).
+ *
+ * @return A pair of:
+ *         - FhgfsOpsErr
+ *           SUCCESS if the entry was found and is not referenced
+ *           DYNAMICATTRIBSOUTDATED if the entry was found but might have outdated attributes
+ *           PATHNOTEXISTS if the entry does not exist
+ *         - bool: true if entry is a regular file and is currently open, false otherwise
  *
  * Locking: No lock must be taken already.
  */
-FhgfsOpsErr MetaStore::getEntryData(DirInode *dirInode, const std::string& entryName,
+std::pair<FhgfsOpsErr, bool> MetaStore::getEntryData(DirInode *dirInode, const std::string& entryName,
    EntryInfo* outInfo, FileInodeStoreData* outInodeMetaData)
 {
    FhgfsOpsErr retVal = dirInode->getEntryData(entryName, outInfo, outInodeMetaData);
 
-   if (retVal == FhgfsOpsErr_SUCCESS && DirEntryType_ISREGULARFILE(outInfo->getEntryType() ) )
-   {  /* Hint for the caller not to rely on outInodeMetaData, properly handling close-races
+   if (retVal == FhgfsOpsErr_SUCCESS && DirEntryType_ISREGULARFILE(outInfo->getEntryType()))
+   {
+      /* Hint for the caller not to rely on outInodeMetaData, properly handling close-races
        * is too difficult and in the end probably slower than to just re-get the EAs from the
        * inode (fsIDs/entryID). */
-      retVal = FhgfsOpsErr_DYNAMICATTRIBSOUTDATED;
+      return {FhgfsOpsErr_DYNAMICATTRIBSOUTDATED, false};
    }
 
-   return retVal;
+   if (retVal == FhgfsOpsErr_DYNAMICATTRIBSOUTDATED)
+      return {retVal, true};  // entry is a regular file and currently open
+
+   return {retVal, false};
 }
 
 /**

@@ -137,6 +137,9 @@ $(call define_if_matches, KERNEL_HAS_STRNICMP, "strnicmp", string.h)
 $(call define_if_matches, KERNEL_HAS_BDI_CAP_MAP_COPY, "define BDI_CAP_MAP_COPY", backing-dev.h)
 
 # Find out whether xattr_handler** s_xattr in super_block is const.
+$(call define_if_matches, KERNEL_HAS_CONST_XATTR_CONST_PTR_HANDLER, \
+   -F "const struct xattr_handler * const *s_xattr;", fs.h)
+
 $(call define_if_matches, KERNEL_HAS_CONST_XATTR_HANDLER, \
    -F "const struct xattr_handler **s_xattr;", fs.h)
 
@@ -168,6 +171,9 @@ KERNEL_FEATURE_DETECTION += $(shell \
       && echo "-DKERNEL_HAS_XATTR_HANDLER_NAME")
 
 # locks_lock_inode_wait is used for flock since 4.4 (before flock_lock_file_wait was used)
+# since 6.3 locks_lock_inode_wait moved from file fs.h to filelock.h
+$(call define_if_matches, KERNEL_HAS_LOCKS_FILELOCK_INODE_WAIT, -F "static inline int locks_lock_inode_wait(struct inode *inode, struct file_lock *fl)", filelock.h)
+
 $(call define_if_matches, KERNEL_HAS_LOCKS_LOCK_INODE_WAIT, -F "static inline int locks_lock_inode_wait(struct inode *inode, struct file_lock *fl)", fs.h)
 
 # get_link() replaces follow_link() in 4.5
@@ -268,7 +274,7 @@ $(call define_if_matches, KERNEL_HAS_ALLOC_WORKQUEUE, "alloc_workqueue", workque
 $(call define_if_matches, KERNEL_HAS_WQ_RESCUER, "WQ_RESCUER", workqueue.h)
 $(call define_if_matches, KERNEL_HAS_WAIT_QUEUE_ENTRY_T, "wait_queue_entry_t", wait.h)
 $(call define_if_matches, KERNEL_HAS_CURRENT_FS_TIME, "current_fs_time", fs.h)
-$(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64[[:space:]]\+i_atime;", fs.h)
+$(call define_if_matches, KERNEL_HAS_64BIT_TIMESTAMPS, "struct timespec64 ia_atime;", fs.h)
 $(call define_if_matches, KERNEL_HAS_SB_NODIRATIME, "SB_NODIRATIME", fs.h)
 
 $(call define_if_matches, KERNEL_HAS_GENERIC_GETXATTR, "generic_getxattr", xattr.h)
@@ -293,9 +299,20 @@ $(call define_if_matches, KERNEL_HAS_FOLIO, -F "bool (*dirty_folio)", fs.h)
 $(call define_if_matches, KERNEL_HAS_READ_FOLIO, -F "int (*read_folio)", fs.h)
 
 KERNEL_FEATURE_DETECTION += $(shell \
+    grep -sFA1 "int (*writepage_t)" ${KSRCDIR_PRUNED_HEAD}/include/linux/writeback.h \
+    | grep -qsF "struct folio *" \
+    && echo "-DKERNEL_WRITEPAGE_HAS_FOLIO")
+
+KERNEL_FEATURE_DETECTION += $(shell \
     grep -sFA1 "int (*write_begin)" ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
       | grep -qsF "unsigned flags" \
       && echo "-DKERNEL_WRITE_BEGIN_HAS_FLAGS")
+
+# Matching: int posix_acl_chmod(struct user_namespace *, struct dentry *, umode_t)
+KERNEL_FEATURE_DETECTION += $(shell \
+    grep -sF "int posix_acl_chmod" ${KSRCDIR_PRUNED_HEAD}/include/linux/posix_acl.h \
+    | grep -qs "struct user_namespace\s*.*struct dentry" \
+    && echo "-DKERNEL_HAS_POSIX_ACL_CHMOD_NS_DENTRY")
 
 # linux-6.0 has iov_iter_get_pages2
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_GET_PAGES2, "iov_iter_get_pages2", uio.h)

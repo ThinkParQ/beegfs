@@ -22,7 +22,6 @@ std::tuple<FileIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(Entry
    FileIDLock entryIDLockForDir;
    FileIDLock entryIDLockForFile;
    enum DirEntryType entryType = getEntryInfo()->getEntryType();
-   bool inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
 
    if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE)
    {
@@ -92,6 +91,8 @@ bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)
 
    lookupRes = FhgfsOpsErr_INTERNAL;
 
+   inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
+
    LOG_DBG(GENERAL, DEBUG, "", parentEntryID, entryName, getParentInfo()->getIsBuddyMirrored());
 
    // sanity checks
@@ -116,7 +117,6 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
 
    int createFlag = getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE;
    FhgfsOpsErr createRes = FhgfsOpsErr_INTERNAL;
-   bool inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
 
    // Note: Actually we should first do a lookup. However, a successful create also implies a
    // failed Lookup, so we can take a shortcut.
@@ -213,7 +213,8 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
          return boost::make_unique<ResponseState>(std::move(response));
 
       if ((diskEntryInfo.getFeatureFlags() & ENTRYINFO_FEATURE_INLINED) && !inodeDataOutdated)
-      {  // stat-data from the dentry
+      {
+         // For inlined inodes with up-to-date inode data, use stat data fetched during lookup()
          response.addResponseStat(FhgfsOpsErr_SUCCESS, *inodeData.getInodeStatData());
       }
       else
@@ -277,34 +278,34 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
    DirInode* parentDir = metaStore->referenceDir(parentEntryID, isBuddyMirrored, false);
-   if(!parentDir)
+   if (unlikely(!parentDir))
    { // out of memory
       return FhgfsOpsErr_INTERNAL;
    }
 
-   FhgfsOpsErr lookupRes1 = metaStore->getEntryData(parentDir, entryName, outEntryInfo,
+   auto [lookupRes1, isFileOpen] = metaStore->getEntryData(parentDir, entryName, outEntryInfo,
       outInodeStoreData);
 
    if (lookupRes1 == FhgfsOpsErr_DYNAMICATTRIBSOUTDATED)
    {
       lookupRes1 = FhgfsOpsErr_SUCCESS;
-      outInodeDataOutdated = true;
+      outInodeDataOutdated = isFileOpen;
 
       // If the file inode is not inlined and the intent includes the creation flag,
       // we need to use a different overload of getEntryData() to correctly retrieve the
       // inode disk data for non-inlined inode(s) and prevent potential crashes due to
       // race conditions between create and hardlink creation.
+      // If create flag is set, fetch full inode disk data using non-inlined inode.
       int createFlag = getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE;
       if (!outEntryInfo->getIsInlined() && createFlag)
       {
-         FhgfsOpsErr res = metaStore->getEntryData(outEntryInfo, outInodeStoreData);
-         if (res != FhgfsOpsErr_SUCCESS)
-            lookupRes1 = res;
+         FhgfsOpsErr getRes = metaStore->getEntryData(outEntryInfo, outInodeStoreData);
+         if (getRes != FhgfsOpsErr_SUCCESS)
+            lookupRes1 = getRes;
       }
    }
 
    metaStore->releaseDir(parentEntryID);
-
    return lookupRes1;
 }
 

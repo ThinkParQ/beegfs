@@ -299,6 +299,8 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "sysRenameEbusyAsXdev",             "false");
 
    _Config_configMapRedefine(this, "remapConnectionFailureStatus",     "0");
+
+   _Config_configMapRedefine(this, "sysNoEnterpriseFeatureMsg",        "false");
 }
 
 bool _Config_applyConfigMap(Config* this, bool enableException)
@@ -765,8 +767,9 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       }
       else if(!strcmp(keyStr, "remapConnectionFailureStatus"))
          this->remapConnectionFailureStatus = StringTk_strToUInt(valueStr);
+      else if(!strcmp(keyStr, "sysNoEnterpriseFeatureMsg"))
+         this->sysNoEnterpriseFeatureMsg = StringTk_strToBool(valueStr);
       else
-      IGNORE_CONFIG_VALUE("sysNoEnterpriseFeatureMsg") // Only relevant for ctl
       { // unknown element occurred
 bad_config_elem:
          unknownElement = true;

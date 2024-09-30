@@ -15,17 +15,125 @@
 #include <linux/fs.h>
 #include <linux/vfs.h>
 
-
-#if (defined(KERNEL_HAS_POSIX_GET_ACL) || defined(KERNEL_HAS_GET_INODE_ACL))
-#define KERNEL_HAS_GET_ACL 1
-#endif
-
 // forward declaration
 struct App;
 
 struct FhgfsInodeComparisonInfo;
 typedef struct FhgfsInodeComparisonInfo FhgfsInodeComparisonInfo;
 
+#if defined(KERNEL_HAS_CURRENT_TIME_SPEC64)
+typedef struct timespec64 inode_timespec;
+#else
+typedef struct timespec inode_timespec;
+#endif
+
+#if ! defined(KERNEL_HAS_INODE_GET_SET_CTIME)
+/* These functions have been adapted from kernel code to work for older kernels.
+The function signatures were introduced in version ~6.5 */
+
+static inline time64_t inode_get_ctime_sec(const struct inode *inode)
+{
+   return inode->i_ctime.tv_sec;
+}
+
+static inline long inode_get_ctime_nsec(const struct inode *inode)
+{
+   return inode->i_ctime.tv_nsec;
+}
+
+static inline inode_timespec inode_get_ctime(const struct inode *inode)
+{
+   return inode->i_ctime;
+}
+
+static inline inode_timespec inode_set_ctime_to_ts(struct inode *inode,
+                        inode_timespec ts)
+{
+   inode->i_ctime = ts;
+   return ts;
+}
+
+static inline inode_timespec inode_set_ctime(struct inode *inode,
+                  time64_t sec, long nsec)
+{
+   inode_timespec ts = { .tv_sec  = sec,
+             .tv_nsec = nsec };
+
+   return inode_set_ctime_to_ts(inode, ts);
+}
+#endif
+
+#if ! defined(KERNEL_HAS_INODE_GET_SET_CTIME_MTIME_ATIME)
+/* These functions have been adapted from kernel code to work for older kernels.
+The function signatures were introduced in version ~6.6 */
+
+static inline time64_t inode_get_atime_sec(const struct inode *inode)
+{
+   return inode->i_atime.tv_sec;
+}
+
+static inline long inode_get_atime_nsec(const struct inode *inode)
+{
+   return inode->i_atime.tv_nsec;
+}
+
+static inline inode_timespec inode_get_atime(const struct inode *inode)
+{
+   return inode->i_atime;
+}
+
+static inline inode_timespec inode_set_atime_to_ts(struct inode *inode,
+                        inode_timespec ts)
+{
+   inode->i_atime = ts;
+   return ts;
+}
+
+static inline inode_timespec inode_set_atime(struct inode *inode,
+                  time64_t sec, long nsec)
+{
+   inode_timespec ts = { .tv_sec  = sec,
+             .tv_nsec = nsec };
+   return inode_set_atime_to_ts(inode, ts);
+}
+
+static inline time64_t inode_get_mtime_sec(const struct inode *inode)
+{
+   return inode->i_mtime.tv_sec;
+}
+
+static inline long inode_get_mtime_nsec(const struct inode *inode)
+{
+   return inode->i_mtime.tv_nsec;
+}
+
+static inline inode_timespec inode_get_mtime(const struct inode *inode)
+{
+   return inode->i_mtime;
+}
+
+static inline inode_timespec inode_set_mtime_to_ts(struct inode *inode,
+                        inode_timespec ts)
+{
+   inode->i_mtime = ts;
+   return ts;
+}
+
+static inline inode_timespec inode_set_mtime(struct inode *inode,
+                  time64_t sec, long nsec)
+{
+   inode_timespec ts = { .tv_sec  = sec,
+             .tv_nsec = nsec };
+   return inode_set_mtime_to_ts(inode, ts);
+}
+#endif
+
+static inline void inode_set_mc_time(struct inode *inode,
+                  inode_timespec ts)
+{
+     inode_set_mtime_to_ts(inode, ts);
+     inode_set_ctime_to_ts(inode, ts);
+}
 
 #ifndef KERNEL_HAS_ATOMIC_OPEN
    extern struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* dentry,
@@ -36,22 +144,27 @@ typedef struct FhgfsInodeComparisonInfo FhgfsInodeComparisonInfo;
 #endif // KERNEL_HAS_ATOMIC_OPEN
 
 #ifdef KERNEL_HAS_STATX
-#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_getattr(struct mnt_idmap* idmap, const struct path* path,
+      struct kstat* kstat, u32 request_mask, unsigned int query_flags);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_getattr(struct user_namespace* ns, const struct path* path,
       struct kstat* kstat, u32 request_mask, unsigned int query_flags);
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
+#else
 extern int FhgfsOps_getattr(const struct path* path, struct kstat* kstat, u32 request_mask,
       unsigned int query_flags);
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 #else
 extern int FhgfsOps_getattr(struct vfsmount* mnt, struct dentry* dentry, struct kstat* kstat);
 #endif
 
-#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_setattr(struct mnt_idmap* idmap, struct dentry* dentry, struct iattr* iattr);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_setattr(struct user_namespace* ns, struct dentry* dentry, struct iattr* iattr);
 #else
 extern int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr);
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 
 extern ssize_t FhgfsOps_listxattr(struct dentry* dentry, char* value, size_t size);
 #ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
@@ -66,28 +179,52 @@ extern int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* 
 extern int FhgfsOps_removexattr(struct dentry* dentry, const char* name);
 extern int FhgfsOps_removexattrInode(struct inode* inode, const char* name);
 
+#if defined(KERNEL_HAS_GET_INODE_ACL)
+extern struct posix_acl* FhgfsOps_get_inode_acl(struct inode* inode, int type, bool rcu);
+#endif
 #ifdef KERNEL_HAS_GET_ACL
-#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
+#if defined(KERNEL_HAS_POSIX_GET_ACL_IDMAP)
+extern struct posix_acl * FhgfsOps_get_acl(struct mnt_idmap *idmap, struct dentry *dentry, int type);
+#elif defined(KERNEL_HAS_POSIX_GET_ACL_NS)
+extern struct posix_acl * FhgfsOps_get_acl(struct user_namespace *userns, struct dentry *dentry, int type);
+#elif defined(KERNEL_POSIX_GET_ACL_HAS_RCU)
 extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rcu);
 #else
 extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type);
-#endif // KERNEL_POSIX_GET_ACL_HAS_RCU
+#endif
+
 int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry);
 #endif
 
 #if defined(KERNEL_HAS_SET_ACL)
+#if defined(KERNEL_HAS_SET_ACL_DENTRY)
+
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* inode,
+extern int FhgfsOps_set_acl(struct mnt_idmap* mnt_userns, struct dentry* dentry,
    struct posix_acl* acl, int type);
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
-extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type);
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
-#elif defined(KERNEL_HAS_SET_DENTRY_ACL)
+#else
 extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct dentry* dentry,
    struct posix_acl* acl, int type);
+#endif
+
+#else
+
+#if defined(KERNEL_HAS_SET_ACL_NS_INODE)
+extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* inode,
+   struct posix_acl* acl, int type);
+#else
+extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type);
+#endif
+
+#endif //KERNEL_HAS_SET_ACL_DENTRY
 #endif // KERNEL_HAS_SET_ACL
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_mkdir(struct mnt_idmap* idmap, struct inode* dir,
+   struct dentry* dentry, umode_t mode);
+extern int FhgfsOps_mknod(struct mnt_idmap* idmap, struct inode* dir,
+   struct dentry* dentry, umode_t mode, dev_t dev);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_mkdir(struct user_namespace* mnt_userns, struct inode* dir,
    struct dentry* dentry, umode_t mode);
 extern int FhgfsOps_mknod(struct user_namespace* mnt_userns, struct inode* dir,
@@ -98,7 +235,7 @@ extern int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, umode_t mode
 #else
 extern int FhgfsOps_mkdir(struct inode* dir, struct dentry* dentry, int mode);
 extern int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, int mode, dev_t dev);
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 
 #if defined KERNEL_HAS_ATOMIC_OPEN
    int FhgfsOps_atomicOpen(struct inode* dir, struct dentry* dentry, struct file* file,
@@ -108,12 +245,15 @@ extern int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, int mode, de
       #endif
       );
    #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+   extern int FhgfsOps_createIntent(struct mnt_idmap* idmap, struct inode* dir,
+      struct dentry* dentry, umode_t mode, bool isExclusiveCreate);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
    extern int FhgfsOps_createIntent(struct user_namespace* mnt_userns, struct inode* dir,
       struct dentry* dentry, umode_t mode, bool isExclusiveCreate);
-   #else // KERNEL_HAS_IDMAPPED_MOUNTS
+   #else
    extern int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t mode,
       bool isExclusiveCreate);
-   #endif // KERNEL_HAS_IDMAPPED_MOUNTS
+   #endif
 #elif defined KERNEL_HAS_UMODE_T
    extern int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t mode,
       struct nameidata* nameidata);
@@ -126,11 +266,14 @@ extern int FhgfsOps_rmdir(struct inode* dir, struct dentry* dentry);
 extern int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry);
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_symlink(struct mnt_idmap* idmap, struct inode* dir,
+   struct dentry* dentry, const char* to);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_symlink(struct user_namespace* mnt_userns, struct inode* dir,
    struct dentry* dentry, const char* to);
 #else
 extern int FhgfsOps_symlink(struct inode* dir, struct dentry* dentry, const char* to);
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 
 extern int FhgfsOps_link(struct dentry* dentryFrom, struct inode* inode, struct dentry* dentryTo);
 extern int FhgfsOps_hardlinkAsSymlink(struct dentry* oldDentry, struct inode* dir,
@@ -149,6 +292,9 @@ extern void FhgfsOps_put_link(struct dentry* dentry, struct nameidata* nd, void*
 #endif
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_rename(struct mnt_idmap* idmap, struct inode* inodeDirFrom,
+   struct dentry* dentryFrom, struct inode* inodeDirTo, struct dentry* dentryTo, unsigned flags);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_rename(struct user_namespace* mnt_userns, struct inode* inodeDirFrom,
    struct dentry* dentryFrom, struct inode* inodeDirTo, struct dentry* dentryTo, unsigned flags);
 #elif defined(KERNEL_HAS_RENAME_FLAGS)
@@ -157,7 +303,7 @@ extern int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom
 #else
 extern int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    struct inode* inodeDirTo, struct dentry* dentryTo);
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 
 extern int FhgfsOps_vmtruncate(struct inode* inode, loff_t offset);
 
@@ -243,9 +389,9 @@ void __FhgfsOps_applyStatAttribsToInode(struct kstat* kstat, struct inode* outIn
    outInode->i_mode = kstat->mode;
    outInode->i_uid = kstat->uid;
    outInode->i_gid = kstat->gid;
-   outInode->i_atime = kstat->atime;
-   outInode->i_mtime = kstat->mtime;
-   outInode->i_ctime = kstat->ctime;
+   inode_set_atime_to_ts(outInode, kstat->atime);
+   inode_set_mtime_to_ts(outInode, kstat->mtime);
+   inode_set_ctime_to_ts(outInode, kstat->ctime);
 
    set_nlink(outInode, kstat->nlink);
 

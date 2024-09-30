@@ -7,7 +7,9 @@
 #include <common/storage/StorageDefinitions.h>
 
 #include <linux/fs.h>
-
+#if defined(KERNEL_HAS_LINUX_FILELOCK_H)
+#include <linux/filelock.h>
+#endif
 
 static inline int OsTypeConv_openFlagsOsToFhgfs(int osFlags, bool isPagedMode);
 static inline void OsTypeConv_kstatFhgfsToOs(fhgfs_stat* fhgfsStat, struct kstat* kStat);

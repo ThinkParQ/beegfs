@@ -165,6 +165,7 @@ static inline int Config_getConnRDMATimeoutCompletion(Config* this);
 static inline int Config_getConnRDMATimeoutFlowSend(Config* this);
 static inline int Config_getConnRDMATimeoutFlowRecv(Config* this);
 static inline int Config_getConnRDMATimeoutPoll(Config* this);
+static inline bool Config_getSysNoEnterpriseFeatureMsg(Config* this);
 
 
 enum FileCacheType
@@ -328,6 +329,9 @@ struct Config
 
    // testing
    unsigned  remapConnectionFailureStatus;
+
+   // Only used by CTL but must be included in the procfs config for the --mount option to work:
+   bool sysNoEnterpriseFeatureMsg;
 };
 
 char* Config_getCfgFile(Config* this)
@@ -772,6 +776,11 @@ int Config_getConnRDMATimeoutFlowRecv(Config* this)
 int Config_getConnRDMATimeoutPoll(Config* this)
 {
    return this->connRDMATimeoutPoll;
+}
+
+bool Config_getSysNoEnterpriseFeatureMsg(Config* this)
+{
+   return this->sysNoEnterpriseFeatureMsg;
 }
 
 #endif /*CONFIG_H_*/

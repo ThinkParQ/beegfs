@@ -169,7 +169,7 @@ unlock_and_exit:
  * @param outNewOffset new file offset after append completes (only valid if no error returned)
  * @return number of bytes written or negative fhgfs error code
  */
-ssize_t FhgfsOpsHelper_appendfile_kernel(FhgfsInode* fhgfsInode, const char *buf, size_t size,
+static ssize_t FhgfsOpsHelper_appendfile_kernel(FhgfsInode* fhgfsInode, const char *buf, size_t size,
    RemotingIOInfo* ioInfo, loff_t* outNewOffset)
 {
    struct iov_iter *iter = STACK_ALLOC_BEEGFS_ITER_KVEC(buf, size, WRITE);

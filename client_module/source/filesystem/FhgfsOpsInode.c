@@ -253,13 +253,16 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
 
 
 #ifdef KERNEL_HAS_STATX
-#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_getattr(struct mnt_idmap* idmap, const struct path* path,
+      struct kstat* kstat, u32 request_mask, unsigned int query_flags)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_getattr(struct user_namespace* mnt_userns, const struct path* path,
       struct kstat* kstat, u32 request_mask, unsigned int query_flags)
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
+#else
 int FhgfsOps_getattr(const struct path* path, struct kstat* kstat, u32 request_mask,
       unsigned int query_flags)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 {
    struct vfsmount* mnt = path->mnt;
    struct dentry* dentry = path->dentry;
@@ -303,7 +306,11 @@ int FhgfsOps_getattr(struct vfsmount* mnt, struct dentry* dentry, struct kstat* 
 
    if(!retVal)
    {
+#if defined(KERNEL_HAS_GENERIC_FILLATTR_REQUEST_MASK)
+      os_generic_fillattr(inode, kstat, request_mask);
+#else
       os_generic_fillattr(inode, kstat);
+#endif
 
       kstat->blksize = Config_getTuneInodeBlockSize(cfg);
 
@@ -487,14 +494,10 @@ int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* value, 
    return 0;
 }
 
-#ifdef KERNEL_HAS_GET_ACL
-#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
-struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rcu)
-#else
-struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
-#endif // KERNEL_POSIX_GET_ACL_HAS_RCU
+static struct posix_acl* Fhgfs_get_acl(struct inode* inode, int type)
 {
    App* app = FhgfsOps_getApp(inode->i_sb);
+
    struct posix_acl* res = NULL;
    char* xAttrName;
    FhgfsOpsErr remotingRes;
@@ -506,11 +509,6 @@ struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
 
    int refreshRes;
-
-#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
-   if (rcu)
-      return ERR_PTR(-ECHILD);
-#endif // KERNEL_POSIX_GET_ACL_HAS_RCU
 
    forget_all_cached_acls(inode);
 
@@ -568,32 +566,83 @@ cleanup:
    kfree(xAttrBuf);
    return res;
 }
-#endif // KERNEL_HAS_GET_ACL
+
+/* Kernel API changes for get_acl() and get_inode_acl()
+ * 6.3
+ * struct posix_acl * (*get_inode_acl)(struct inode *, int, bool);
+ * struct posix_acl *(*get_acl)(struct mnt_idmap *, struct dentry *, int);
+ *
+ * 6.2
+ * get_acl() was introduced as get_inode_acl() but both interfaces still provided
+ * struct posix_acl * (*get_inode_acl)(struct inode *, int, bool);
+ * struct posix_acl *(*get_acl)(struct user_namespace *, struct dentry *, int);
+ * 
+ * 5.15
+ * struct posix_acl * (*get_acl)(struct inode *, int type, bool rcu);
+ *
+ * 3.2
+ * struct posix_acl * (*get_acl)(struct inode *, int);
+ */
+#if defined(KERNEL_HAS_POSIX_GET_ACL_IDMAP)
+struct posix_acl * FhgfsOps_get_acl(struct mnt_idmap *idmap, struct dentry *dentry, int type)
+{
+   struct inode* inode = dentry->d_inode;
+   bool rcu = 0;
+#elif defined(KERNEL_HAS_POSIX_GET_ACL_NS)
+struct posix_acl * FhgfsOps_get_acl(struct user_namespace *userns, struct dentry *dentry, int type)
+{
+   struct inode* inode = dentry->d_inode;
+   bool rcu = 0;
+#elif defined(KERNEL_POSIX_GET_ACL_HAS_RCU)
+struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rcu)
+{
+#else
+struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type)
+{
+#endif
+#if defined(KERNEL_POSIX_GET_ACL_HAS_RCU) || defined(KERNEL_HAS_GET_INODE_ACL)
+   if (rcu)
+      return ERR_PTR(-ECHILD);
+#endif // KERNEL_POSIX_GET_ACL_HAS_RCU
+
+   return Fhgfs_get_acl(inode, type);
+}
+
+
+#if defined(KERNEL_HAS_GET_INODE_ACL)
+struct posix_acl* FhgfsOps_get_inode_acl(struct inode* inode, int type, bool rcu)
+{
+    return Fhgfs_get_acl(inode, type);
+}
+#endif
 
 #if defined(KERNEL_HAS_SET_ACL)
-#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* inode,
+
+#if defined(KERNEL_HAS_SET_ACL_DENTRY) && defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_set_acl(struct mnt_idmap* mnt_userns, struct dentry* dentry,
    struct posix_acl* acl, int type)
 {
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
-extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
-{
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
-#elif defined(KERNEL_HAS_SET_DENTRY_ACL)
+   struct inode* inode =  d_inode(dentry);
+#elif defined(KERNEL_HAS_SET_ACL_DENTRY) && defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct dentry* dentry,
    struct posix_acl* acl, int type)
 {
    struct inode* inode =  d_inode(dentry);
-#endif
+#elif defined(KERNEL_HAS_SET_ACL_NS_INODE)
+extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct inode* inode,
+   struct posix_acl* acl, int type)
+{
+#else
+extern int FhgfsOps_set_acl(struct inode* inode, struct posix_acl* acl, int type)
+{
+#endif // KERNEL_HAS_SET_ACL_DENTRY
+#endif // KERNEL_HAS_SET_ACL
    App* app = FhgfsOps_getApp(inode->i_sb);
    int res;
    FhgfsOpsErr remotingRes;
    char* xAttrName;
    int xAttrBufLen;
    void* xAttrBuf = NULL;
-
-#ifdef KERNEL_HAS_SET_DENTRY_ACL
-#endif
 
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    const EntryInfo* entryInfo = FhgfsInode_getEntryInfo(fhgfsInode);
@@ -604,7 +653,7 @@ extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct dentry* de
 
    if (type == ACL_TYPE_ACCESS)
    {
-#ifdef KERNEL_HAS_SET_DENTRY_ACL
+#ifdef KERNEL_HAS_SET_ACL_DENTRY
       if (acl)
       {
          int ret = 0;
@@ -616,19 +665,27 @@ extern int FhgfsOps_set_acl(struct user_namespace* mnt_userns, struct dentry* de
          /* Update the file mode when setting an ACL: compute the new file permission
           * bits based on the ACL.
           */
+         #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+         ret = posix_acl_update_mode(&nop_mnt_idmap, inode, &iattr.ia_mode, &acl);
+         #else
          ret = posix_acl_update_mode(&init_user_ns, inode, &iattr.ia_mode, &acl);
+         #endif
          if (ret)
             return ret;
 
          if (inode->i_mode != iattr.ia_mode)
          {
             iattr.ia_valid = ATTR_MODE; //update the file mode permission bit
+            #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+            setAttrRes = FhgfsOps_setattr(&nop_mnt_idmap, dentry, &iattr);
+            #else
             setAttrRes = FhgfsOps_setattr(&init_user_ns, dentry, &iattr);
+            #endif
             if(setAttrRes < 0)
                return setAttrRes;
          }
       }
-#endif //KERNEL_HAS_SET_DENTRY_ACL
+#endif //KERNEL_HAS_SET_ACL_DENTRY
       xAttrName = XATTR_NAME_POSIX_ACL_ACCESS;
    }
    else if (type == ACL_TYPE_DEFAULT)
@@ -686,7 +743,7 @@ cleanup:
  */
 int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry)
 {
-#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_DENTRY_ACL)
+#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_ACL_DENTRY)
    if (iattr->ia_valid & ATTR_MODE)
       return os_posix_acl_chmod(dentry->d_inode, iattr->ia_mode);
    else
@@ -701,7 +758,13 @@ int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry)
    if( !(iattr->ia_valid & ATTR_MODE) ) // don't have to do anything if the mode hasn't changed
       return 0;
 
+#if defined(KERNEL_HAS_POSIX_GET_ACL_IDMAP)
+   acl = FhgfsOps_get_acl(&nop_mnt_idmap, dentry, ACL_TYPE_ACCESS);
+#elif defined(KERNEL_HAS_POSIX_GET_ACL_NS)
+   acl = FhgfsOps_get_acl(&init_user_ns, dentry, ACL_TYPE_ACCESS);
+#else
    acl = FhgfsOps_get_acl(dentry->d_inode, ACL_TYPE_ACCESS);
+#endif
 
    if(PTR_ERR(acl) == -ENODATA) // entry doesn't have an ACL. We don't have to do anything.
       return 0;
@@ -752,12 +815,15 @@ cleanup:
 /**
  * @return 0 on success, negative linux error code otherwise
  */
-#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_setattr(struct mnt_idmap* idmap, struct dentry* dentry,
+   struct iattr* iattr)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_setattr(struct user_namespace* mnt_userns, struct dentry* dentry,
    struct iattr* iattr)
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
+#else
 int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 {
    // note: called for chmod(), chown(), utime(), truncate()
    // note: changed fields can be determined by the iattr->ia_valid flags (ATTR_...)
@@ -784,13 +850,11 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
 
 #ifdef KERNEL_HAS_SETATTR_PREPARE
    setAttrPrepRes = os_setattr_prepare(dentry, iattr);
-   if(setAttrPrepRes < 0)
-      return setAttrPrepRes;
 #else
    setAttrPrepRes = inode_change_ok(inode, iattr);
+#endif
    if(setAttrPrepRes < 0)
       return setAttrPrepRes;
-#endif
 
    /* we do trunc during open message on meta server, so we don't want this redundant trunc
       (and ctime/mtime update) from the kernel */
@@ -903,9 +967,17 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
 void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
 {
    Time now;
+   #if defined(KERNEL_HAS_CURRENT_TIME_SPEC64)
+       struct timespec64 ts;
+   #else
+       struct timespec ts;
+   #endif
    Time_setToNowReal(&now);
 
    spin_lock(&outInode->i_lock);
+
+   ts.tv_sec = now.tv_sec;
+   ts.tv_nsec = 0;
 
    if(iAttr->ia_valid & ATTR_MODE)
       outInode->i_mode = iAttr->ia_mode;
@@ -918,27 +990,27 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
 
    if(iAttr->ia_valid & ATTR_MTIME_SET)
    {
-      outInode->i_mtime  = iAttr->ia_mtime;
+      inode_set_mtime_to_ts(outInode, iAttr->ia_mtime);
    }
    else
    if(iAttr->ia_valid & ATTR_MTIME)
    { // set mtime to "now"
-      outInode->i_mtime.tv_sec = now.tv_sec;
+      inode_set_mtime_to_ts(outInode, ts);
    }
 
    if(iAttr->ia_valid & ATTR_ATIME_SET)
    {
-      outInode->i_atime             = iAttr->ia_atime;
+      inode_set_atime_to_ts(outInode, iAttr->ia_atime);
    }
    else
    if(iAttr->ia_valid & ATTR_ATIME)
    { // set atime to "now"
-      outInode->i_atime.tv_sec = now.tv_sec;
+     inode_set_atime_to_ts(outInode, ts);
    }
 
    if(iAttr->ia_valid & ATTR_CTIME)
    {
-      outInode->i_ctime.tv_sec = now.tv_sec;
+     inode_set_ctime_to_ts(outInode, ts);
    }
 
    spin_unlock(&outInode->i_lock);
@@ -950,13 +1022,16 @@ void FhgfsOps_newAttrToInode(struct iattr* iAttr, struct inode* outInode)
  * Create directory.
  */
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_mkdir(struct mnt_idmap* idmap, struct inode* dir, struct dentry* dentry,
+   umode_t mode)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 int FhgfsOps_mkdir(struct user_namespace* mnt_userns, struct inode* dir, struct dentry* dentry,
    umode_t mode)
 #elif defined(KERNEL_HAS_UMODE_T)
 int FhgfsOps_mkdir(struct inode* dir, struct dentry* dentry, umode_t mode)
 #else
 int FhgfsOps_mkdir(struct inode* dir, struct dentry* dentry, int mode)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1005,7 +1080,7 @@ int FhgfsOps_mkdir(struct inode* dir, struct dentry* dentry, int mode)
    { // remote success => create the local inode
       retVal = __FhgfsOps_instantiateInode(dentry, &newEntryInfo, NULL, &iSizeHints);
 
-      dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+      inode_set_mc_time(dir, current_fs_time(sb));
    }
 
    FileEvent_uninit(&event);
@@ -1054,9 +1129,8 @@ int FhgfsOps_rmdir(struct inode* dir, struct dentry* dentry)
    { // remote success
       clear_nlink(dentry->d_inode);
 
-      dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+      inode_set_mc_time(dir, current_fs_time(sb));
    }
-
 
    return retVal;
 }
@@ -1068,12 +1142,15 @@ int FhgfsOps_rmdir(struct inode* dir, struct dentry* dentry)
  */
 #if defined KERNEL_HAS_ATOMIC_OPEN
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_createIntent(struct mnt_idmap* idmap, struct inode* dir,
+   struct dentry* dentry, umode_t createMode, bool isExclusiveCreate)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 int FhgfsOps_createIntent(struct user_namespace* mnt_userns, struct inode* dir,
    struct dentry* dentry, umode_t createMode, bool isExclusiveCreate)
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
+#else
 int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t createMode,
    bool isExclusiveCreate)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 #elif defined KERNEL_HAS_UMODE_T
 int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, umode_t createMode,
    struct nameidata* nameidata)
@@ -1192,7 +1269,7 @@ int FhgfsOps_createIntent(struct inode* dir, struct dentry* dentry, int createMo
       lookupOutInfo.fhgfsStat, &iSizeHints);
    LookupIntentInfoOut_setEntryInfoPtr(&lookupOutInfo, NULL); /* Make sure entryInfo will not be
                                                          *  de-initialized */
-   dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+   inode_set_mc_time(dir, current_fs_time(sb));
 
 #ifndef KERNEL_HAS_ATOMIC_OPEN
    if (lookupOutInfo.openRes == FhgfsOpsErr_SUCCESS)
@@ -1411,7 +1488,7 @@ int FhgfsOps_atomicOpen(struct inode* dir, struct dentry* dentry, struct file* f
 
          if (lookupOutInfo.lookupRes != FhgfsOpsErr_SUCCESS)
          {  // only update directory time stamps if the file did not exist yet
-            dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+            inode_set_mc_time(dir, current_fs_time(sb));
          }
       }
       else
@@ -1573,7 +1650,7 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
    }
    else
    { // remote success
-      dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+      inode_set_mc_time(dir, current_fs_time(sb));
 
       if(dentry->d_inode)
       {
@@ -1581,7 +1658,11 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
          FhgfsInode* fhgfsInode = BEEGFS_INODE(fileInode);
 
          FhgfsInode_invalidateCache(fhgfsInode);
+         #if defined(KERNEL_HAS_INODE_ATIME)
          fileInode->i_ctime = dir->i_ctime;
+         #else
+         inode_set_ctime_to_ts(fileInode, inode_get_ctime(dir));
+         #endif
 
          spin_lock(&fileInode->i_lock);
          // only try to drop link count if it still is > 0. Check is needed,
@@ -1602,13 +1683,16 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
  * Create special file.
  */
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_mknod(struct mnt_idmap* idmap, struct inode* dir, struct dentry* dentry,
+   umode_t mode, dev_t dev)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 int FhgfsOps_mknod(struct user_namespace* mnt_userns, struct inode* dir, struct dentry* dentry,
    umode_t mode, dev_t dev)
 #elif defined(KERNEL_HAS_UMODE_T)
 int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, umode_t mode, dev_t dev)
 #else
 int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, int mode, dev_t dev)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1655,7 +1739,7 @@ int FhgfsOps_mknod(struct inode* dir, struct dentry* dentry, int mode, dev_t dev
 
    retVal = __FhgfsOps_instantiateInode(dentry, &newEntryInfo, NULL, &iSizeHints);
 
-   dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+   inode_set_mc_time(dir, current_fs_time(sb));
 
    FileEvent_uninit(&event);
 
@@ -1672,11 +1756,14 @@ outErr:
  * @param to where the symlink points to
  */
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int FhgfsOps_symlink(struct mnt_idmap* idmap, struct inode* dir,
+   struct dentry* dentry, const char* to)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 extern int FhgfsOps_symlink(struct user_namespace* mnt_userns, struct inode* dir,
    struct dentry* dentry, const char* to)
 #else
 extern int FhgfsOps_symlink(struct inode* dir, struct dentry* dentry, const char* to)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 {
    struct super_block* sb = dentry->d_sb;
    App* app = FhgfsOps_getApp(sb);
@@ -1724,9 +1811,8 @@ extern int FhgfsOps_symlink(struct inode* dir, struct dentry* dentry, const char
    { // remote success => create local inode
       retVal = __FhgfsOps_instantiateInode(dentry, &newEntryInfo, NULL, &iSizeHints);
 
-      dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+      inode_set_mc_time(dir, current_fs_time(sb));
    }
-
 
    return retVal;
 }
@@ -1931,7 +2017,7 @@ int FhgfsOps_hardlinkAsSymlink(struct dentry* oldDentry, struct inode* dir,
    { // remote success => create local inode
       retVal = __FhgfsOps_instantiateInode(newDentry, &newEntryInfo, NULL, &iSizeHints);
 
-      dir->i_ctime = dir->i_mtime = current_fs_time(sb);
+      inode_set_mc_time(dir, current_fs_time(sb));
    }
 
    // clean-up
@@ -2050,12 +2136,15 @@ void FhgfsOps_put_link(struct dentry* dentry, struct nameidata* nd, void* p)
 
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+int FhgfsOps_rename(struct mnt_idmap* idmap, struct inode* inodeDirFrom,
+   struct dentry* dentryFrom, struct inode* inodeDirTo, struct dentry* dentryTo
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 int FhgfsOps_rename(struct user_namespace* mnt_userns, struct inode* inodeDirFrom,
    struct dentry* dentryFrom, struct inode* inodeDirTo, struct dentry* dentryTo
 #else
 int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    struct inode* inodeDirTo, struct dentry* dentryTo
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 #ifdef KERNEL_HAS_RENAME_FLAGS
    , unsigned flags
 #endif
@@ -2137,8 +2226,10 @@ int FhgfsOps_rename(struct inode* inodeDirFrom, struct dentry* dentryFrom,
    }
    else
    { // remote success
-      fromEntryInode->i_ctime = inodeDirFrom->i_ctime = inodeDirFrom->i_mtime =
-         inodeDirTo->i_ctime = inodeDirTo->i_mtime = current_fs_time(sb);
+      inode_timespec ts = current_fs_time(sb);
+      inode_set_mc_time(inodeDirTo, ts);
+      inode_set_mc_time(inodeDirFrom, ts);
+      inode_set_ctime_to_ts(fromEntryInode, ts);
 
       FhgfsInode_updateEntryInfoOnRenameUnlocked(fhgfsFromEntryInode, toDirInfo, newName);
    }
@@ -2606,7 +2697,11 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
    FhgfsOpsErr statRes;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
 
-   typeof(inode->i_mtime.tv_sec) oldMTime;
+   #if defined(KERNEL_HAS_INODE_ATIME)
+       typeof(inode->i_mtime.tv_sec) oldMTime;
+   #else
+       typeof(inode->__i_mtime.tv_sec) oldMTime;
+   #endif
    loff_t oldSize;
    unsigned cacheElapsedMS;
    bool mtimeSizeInvalidate;
@@ -2689,15 +2784,24 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
 
    spin_lock(&inode->i_lock); // I _ L O C K
 
+   #if defined(KERNEL_HAS_INODE_ATIME)
    oldMTime = inode->i_mtime.tv_sec;
+   #else
+   oldMTime = inode_get_mtime_sec(inode);
+   #endif
    oldSize = i_size_read(inode);
 
    __FhgfsOps_applyStatDataToInodeUnlocked(&kstat, iSizeHints, inode);
 
    // compare previous size/mtime to detect modifications by other clients
 
+   #if defined(KERNEL_HAS_INODE_ATIME)
    mtimeSizeInvalidate =
       (inode->i_mtime.tv_sec != oldMTime) || (i_size_read(inode) != oldSize);
+   #else
+   mtimeSizeInvalidate =
+      (inode_get_mtime_sec(inode) != oldMTime) || (i_size_read(inode) != oldSize);
+   #endif
    cacheElapsedMS = Time_elapsedMS(&fhgfsInode->dataCacheTime);
    timeoutInvalidate = cacheElapsedMS > Config_getTunePageCacheValidityMS(cfg);
 

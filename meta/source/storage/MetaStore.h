@@ -93,7 +93,7 @@ class MetaStore
 
       FhgfsOpsErr insertDisposableFile(FileInode* inode);
 
-      FhgfsOpsErr getEntryData(DirInode *dirInode, const std::string& entryName,
+      std::pair<FhgfsOpsErr, bool>  getEntryData(DirInode *dirInode, const std::string& entryName,
          EntryInfo* outInfo, FileInodeStoreData* outInodeMetaData);
       FhgfsOpsErr getEntryData(EntryInfo* inEntryInfo, FileInodeStoreData* outInodeMetaData);
 

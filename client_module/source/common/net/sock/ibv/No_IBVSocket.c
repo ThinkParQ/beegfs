@@ -2,10 +2,10 @@
 
 #ifndef BEEGFS_RDMA
 
-bool IBVSocket_init(IBVSocket* _this, struct in_addr srcIpAddr, NicAddressStats* nicStats)
 #define no_ibvsocket_err() \
    printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__)
 
+bool IBVSocket_init(IBVSocket* _this, struct in_addr srcIpAddr, NicAddressStats* nicStats)
 {
    no_ibvsocket_err();
    return false;

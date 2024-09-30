@@ -96,7 +96,7 @@ bool AdjustChunkPermissionsMsgEx::processIncoming(ResponseContext& ctx)
          EntryInfo entryInfo;
          FileInodeStoreData inodeDiskData;
 
-         FhgfsOpsErr getEntryRes = metaStore->getEntryData(parentDirInode, *namesIter, &entryInfo,
+         auto [getEntryRes, isFileOpen] = metaStore->getEntryData(parentDirInode, *namesIter, &entryInfo,
             &inodeDiskData);
          inodeDiskData.setDynamicOrigParentEntryID(parentID);
 

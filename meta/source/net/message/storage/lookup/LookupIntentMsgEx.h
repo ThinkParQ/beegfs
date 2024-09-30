@@ -215,6 +215,7 @@ class LookupIntentMsgEx : public MirroredMessage<LookupIntentMsg,
       FileInodeStoreData inodeData;
       std::string entryID;
       FhgfsOpsErr lookupRes;
+      bool inodeDataOutdated;
       EntryInfo diskEntryInfo;
 };
 

@@ -114,7 +114,7 @@ bool RetrieveDirEntriesMsgEx::processIncoming(ResponseContext& ctx)
          int32_t saveDevice = 0;
          uint64_t saveInode = 0;
 
-         FhgfsOpsErr getEntryRes = metaStore->getEntryData(parentDirInode, *namesIter, &entryInfo,
+         auto [getEntryRes, isFileOpen] = metaStore->getEntryData(parentDirInode, *namesIter, &entryInfo,
             &inodeDiskData);
 
          if (getEntryRes == FhgfsOpsErr_SUCCESS ||

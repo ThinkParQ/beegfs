@@ -11,7 +11,7 @@
 #include <common/toolkit/UnitTk.h>
 #include <program/Program.h>
 #include "ModeSetPattern.h"
-
+#include <cstdint>
 
 #define MODESETPATTERN_ARG_CHUNKSIZE         "--chunksize"
 #define MODESETPATTERN_ARG_NUMTARGETS        "--numtargets"
@@ -41,7 +41,14 @@ int ModeSetPattern::execute()
    iter = cfg->find(MODESETPATTERN_ARG_CHUNKSIZE);
    if(iter != cfg->end() )
    {
-      chunkSize = UnitTk::strHumanToInt64(iter->second);
+      int64_t rawChunksize = 0;
+      rawChunksize = UnitTk::strHumanToInt64(iter->second);
+   if (rawChunksize < STRIPEPATTERN_MIN_CHUNKSIZE || rawChunksize > UINT32_MAX) {
+      std::cerr << "Chunksize " << MODESETPATTERN_ARG_CHUNKSIZE << " out of bounds, must be between " 
+         << STRIPEPATTERN_MIN_CHUNKSIZE << " and " << UINT32_MAX << std::endl;
+      return APPCODE_RUNTIME_ERROR;
+    }
+      chunkSize = static_cast<unsigned>(rawChunksize);
       cfg->erase(iter);
    }
 

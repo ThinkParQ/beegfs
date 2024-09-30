@@ -7,25 +7,27 @@
 #include "FhgfsOpsHelper.h"
 
 #include "FhgfsXAttrHandlers.h"
-
 #define FHGFS_XATTR_USER_PREFIX "user."
 #define FHGFS_XATTR_SECURITY_PREFIX "security."
 
-
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_HAS_GET_ACL
 /**
  * Called when an ACL Xattr is set. Responsible for setting the mode bits corresponding to the
  * ACL mask.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct mnt_idmap* id_map,
+   struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
+   int flags)
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
 static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
    struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
    int flags)
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
+#else
 static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, const void* value, size_t size, int flags)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 {
    int handler_flags = handler->flags;
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
@@ -82,9 +84,11 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
          return -EINVAL;
       }
 
-#ifdef KERNEL_HAS_IDMAPPED_MOUNTS
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      setAttrRes = FhgfsOps_setattr(&nop_mnt_idmap, dentry, &attr);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
       setAttrRes = FhgfsOps_setattr(&init_user_ns, dentry, &attr);
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
+#else
       setAttrRes = FhgfsOps_setattr(dentry, &attr);
 #endif
       if(setAttrRes < 0)
@@ -166,23 +170,23 @@ int FhgfsXAttrGetACL(struct dentry* dentry, const char* name, void* value, size_
 
    return FhgfsOps_getxattr(dentry, attrName, value, size);
 }
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
 
 /**
  * The get-function which is used for all the user.* xattrs.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
-int FhgfsXAttr_getUser(const struct xattr_handler* handler, struct dentry* dentry,
+static int FhgfsXAttr_getUser(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, void* value, size_t size)
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
-int FhgfsXAttr_getUser(const struct xattr_handler* handler, struct dentry* dentry,
+static int FhgfsXAttr_getUser(const struct xattr_handler* handler, struct dentry* dentry,
    const char* name, void* value, size_t size)
 #elif defined(KERNEL_HAS_DENTRY_XATTR_HANDLER)
-int FhgfsXAttr_getUser(struct dentry* dentry, const char* name, void* value, size_t size,
+static int FhgfsXAttr_getUser(struct dentry* dentry, const char* name, void* value, size_t size,
       int handler_flags)
 #else
-int FhgfsXAttr_getUser(struct inode* inode, const char* name, void* value, size_t size)
-#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
+static int FhgfsXAttr_getUser(struct inode* inode, const char* name, void* value, size_t size)
+#endif
 {
    FhgfsOpsErr res;
    char* prefixedName = os_kmalloc(strlen(name) + sizeof(FHGFS_XATTR_USER_PREFIX) );
@@ -195,7 +199,7 @@ int FhgfsXAttr_getUser(struct inode* inode, const char* name, void* value, size_
 #else
    FhgfsOpsHelper_logOpDebug(FhgfsOps_getApp(inode->i_sb), NULL, inode, __func__,
       "(name: %s; size: %u)", name, size);
-#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
+#endif
 
    // add name prefix which has been removed by the generic function
    if(!prefixedName)
@@ -208,7 +212,7 @@ int FhgfsXAttr_getUser(struct inode* inode, const char* name, void* value, size_
    res = FhgfsOps_getxattr(dentry, prefixedName, value, size);
 #else
    res = FhgfsOps_getxattr(inode, prefixedName, value, size);
-#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
+#endif
 
    kfree(prefixedName);
    return res;
@@ -218,23 +222,26 @@ int FhgfsXAttr_getUser(struct inode* inode, const char* name, void* value, size_
  * The set-function which is used for all the user.* xattrs.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
+
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+static int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct mnt_idmap* id_map,
    struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
    int flags)
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
-int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct dentry* dentry,
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+static int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+   struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
+   int flags)
+#else
+static int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, const void* value, size_t size, int flags)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
+
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
-int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct dentry* dentry,
+static int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct dentry* dentry,
    const char* name, const void* value, size_t size, int flags)
 #elif defined(KERNEL_HAS_DENTRY_XATTR_HANDLER)
-int FhgfsXAttr_setUser(struct dentry* dentry, const char* name, const void* value, size_t size,
+static int FhgfsXAttr_setUser(struct dentry* dentry, const char* name, const void* value, size_t size,
    int flags, int handler_flags)
-#else
-int FhgfsXAttr_setUser(struct inode* inode, const char* name, const void* value, size_t size,
-   int flags)
 #endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
 {
    FhgfsOpsErr res;
@@ -265,11 +272,7 @@ int FhgfsXAttr_setUser(struct inode* inode, const char* name, const void* value,
    }
    else
    {
-#ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
       res = FhgfsOps_removexattr(dentry, prefixedName);
-#else
-      res = FhgfsOps_removexattrInode(inode, prefixedName);
-#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
    }
 
    kfree(prefixedName);
@@ -281,16 +284,16 @@ int FhgfsXAttr_setUser(struct inode* inode, const char* name, const void* value,
  * The get-function which is used for all the security.* xattrs.
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
-int FhgfsXAttr_getSecurity(const struct xattr_handler* handler, struct dentry* dentry,
+static int FhgfsXAttr_getSecurity(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, void* value, size_t size)
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
-int FhgfsXAttr_getSecurity(const struct xattr_handler* handler, struct dentry* dentry,
+static int FhgfsXAttr_getSecurity(const struct xattr_handler* handler, struct dentry* dentry,
    const char* name, void* value, size_t size)
 #elif defined(KERNEL_HAS_DENTRY_XATTR_HANDLER)
-int FhgfsXAttr_getSecurity(struct dentry* dentry, const char* name, void* value, size_t size,
+static int FhgfsXAttr_getSecurity(struct dentry* dentry, const char* name, void* value, size_t size,
       int handler_flags)
 #else
-int FhgfsXAttr_getSecurity(struct inode* inode, const char* name, void* value, size_t size)
+static int FhgfsXAttr_getSecurity(struct inode* inode, const char* name, void* value, size_t size)
 #endif
 {
    FhgfsOpsErr res;
@@ -328,22 +331,23 @@ int FhgfsXAttr_getSecurity(struct inode* inode, const char* name, void* value, s
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+static int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct mnt_idmap* idmap,
    struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
    int flags)
-#else // KERNEL_HAS_IDMAPPED_MOUNTS
-int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct dentry* dentry,
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+static int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct user_namespace* mnt_userns,
+   struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
+   int flags)
+#else
+static int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct dentry* dentry,
    struct inode* inode, const char* name, const void* value, size_t size, int flags)
-#endif // KERNEL_HAS_IDMAPPED_MOUNTS
+#endif
 #elif defined(KERNEL_HAS_XATTR_HANDLER_PTR_ARG)
-int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct dentry* dentry,
+static int FhgfsXAttr_setSecurity(const struct xattr_handler* handler, struct dentry* dentry,
    const char* name, const void* value, size_t size, int flags)
 #elif defined(KERNEL_HAS_DENTRY_XATTR_HANDLER)
-int FhgfsXAttr_setSecurity(struct dentry* dentry, const char* name, const void* value, size_t size,
+static int FhgfsXAttr_setSecurity(struct dentry* dentry, const char* name, const void* value, size_t size,
    int flags, int handler_flags)
-#else
-int FhgfsXAttr_setSecurity(struct inode* inode, const char* name, const void* value, size_t size,
-   int flags)
 #endif
 {
    FhgfsOpsErr res;
@@ -374,18 +378,14 @@ int FhgfsXAttr_setSecurity(struct inode* inode, const char* name, const void* va
    }
    else
    {
-#ifdef KERNEL_HAS_DENTRY_XATTR_HANDLER
       res = FhgfsOps_removexattr(dentry, prefixedName);
-#else
-      res = FhgfsOps_removexattrInode(inode, prefixedName);
-#endif // KERNEL_HAS_DENTRY_XATTR_HANDLER
    }
 
    kfree(prefixedName);
    return res;
 }
 
-#ifdef KERNEL_HAS_POSIX_GET_ACL
+#ifdef KERNEL_HAS_GET_ACL
 struct xattr_handler fhgfs_xattr_acl_access_handler =
 {
 #ifdef KERNEL_HAS_XATTR_HANDLER_NAME
@@ -411,7 +411,7 @@ struct xattr_handler fhgfs_xattr_acl_default_handler =
    .get    = FhgfsXAttrGetACL,
    .set    = FhgfsXAttrSetACL,
 };
-#endif // KERNEL_HAS_POSIX_GET_ACL
+#endif // KERNEL_HAS_GET_ACL
 
 struct xattr_handler fhgfs_xattr_user_handler =
 {
@@ -429,17 +429,15 @@ struct xattr_handler fhgfs_xattr_security_handler =
    .get    = FhgfsXAttr_getSecurity,
 };
 
-#ifdef KERNEL_HAS_GET_ACL
-#ifdef KERNEL_HAS_CONST_XATTR_HANDLER
+#if defined(KERNEL_HAS_CONST_XATTR_CONST_PTR_HANDLER)
+const struct xattr_handler* const fhgfs_xattr_handlers[] =
+#elif defined(KERNEL_HAS_CONST_XATTR_HANDLER)
 const struct xattr_handler* fhgfs_xattr_handlers[] =
 #else
 struct xattr_handler* fhgfs_xattr_handlers[] =
-#endif // KERNEL_HAS_CONST_XATTR_HANDLER
+#endif
 {
-#ifdef KERNEL_HAS_GET_INODE_ACL
-   &posix_acl_access_xattr_handler,
-   &posix_acl_default_xattr_handler,
-#else
+#ifdef KERNEL_HAS_GET_ACL
    &fhgfs_xattr_acl_access_handler,
    &fhgfs_xattr_acl_default_handler,
 #endif
@@ -447,13 +445,14 @@ struct xattr_handler* fhgfs_xattr_handlers[] =
    &fhgfs_xattr_security_handler,
    NULL
 };
-#endif // KERNEL_HAS_GET_ACL
 
-#ifdef KERNEL_HAS_CONST_XATTR_HANDLER
+#if defined(KERNEL_HAS_CONST_XATTR_CONST_PTR_HANDLER)
+const struct xattr_handler* const fhgfs_xattr_handlers_noacl[] =
+#elif defined(KERNEL_HAS_CONST_XATTR_HANDLER)
 const struct xattr_handler* fhgfs_xattr_handlers_noacl[] =
 #else
 struct xattr_handler* fhgfs_xattr_handlers_noacl[] =
-#endif // KERNEL_HAS_CONST_XATTR_HANDLER
+#endif
 {
    &fhgfs_xattr_user_handler,
    &fhgfs_xattr_security_handler,

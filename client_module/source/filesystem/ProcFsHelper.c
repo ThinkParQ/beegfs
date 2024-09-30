@@ -83,6 +83,7 @@ const char* const PROCFSHELPER_CONFIGKEYS[] =
    "quotaEnabled",
    "sysFileEventLogMask",
    "sysRenameEbusyAsXdev",
+   "sysNoEnterpriseFeatureMsg",   
 
 #ifdef LOG_DEBUG_MESSAGES
    "tunePageCacheValidityMS", // currently not public
@@ -168,6 +169,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "quotaEnabled = %d\n", (int)Config_getQuotaEnabled(cfg) );
    seq_printf(file, "sysFileEventLogMask = %s\n", Config_eventLogMaskToStr(cfg->eventLogMask));
    seq_printf(file, "sysRenameEbusyAsXdev = %u\n", (unsigned) cfg->sysRenameEbusyAsXdev);
+   seq_printf(file, "sysNoEnterpriseFeatureMsg = %s\n",
+      Config_getSysNoEnterpriseFeatureMsg(cfg) ? "true" : "false");
 
 
 #ifdef LOG_DEBUG_MESSAGES
@@ -650,7 +653,7 @@ int ProcFsHelper_read_nodes(char* buf, char** start, off_t offset, int size, int
    return count;
 }
 
-void ProcFsHelper_readV2_nics(struct seq_file* file, NicAddressList* nicList)
+static void ProcFsHelper_readV2_nics(struct seq_file* file, NicAddressList* nicList)
 {
    NicAddressListIter nicIter;
 
