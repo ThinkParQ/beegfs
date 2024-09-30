@@ -102,6 +102,7 @@ class MetaStore
 
       void invalidateMirroredDirInodes();
 
+      FhgfsOpsErr isFileUnlinkable(DirInode& subDir, EntryInfo* entryInfo);
    private:
       InodeDirStore dirStore;
 
@@ -112,8 +113,6 @@ class MetaStore
       RWLock rwlock; /* note: this is mostly not used as a read/write-lock but rather a shared/excl
          lock (because we're not really modifying anyting directly) - especially relevant for the
          mutliple dirStore locking dual-move methods */
-
-      FhgfsOpsErr isFileUnlinkable(DirInode& subDir, EntryInfo* entryInfo);
 
       FhgfsOpsErr mkMetaFileUnlocked(DirInode& dir, const std::string& entryName,
          DirEntryType entryType, FileInode* inode);

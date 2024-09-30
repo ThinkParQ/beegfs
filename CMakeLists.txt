@@ -24,9 +24,11 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBEEGFS_VERSION=\\\"${BEEGFS_VERSION}\\\"")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBEEGFS_VERSION=\\\"${BEEGFS_VERSION}\\\"")
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wunused-variable -Woverloaded-virtual -Wno-unused-parameter -Wuninitialized -Wno-missing-field-initializers")
+
 set(BEEGFS_DEBUG OFF CACHE BOOL "Build with debug information.")
 if(BEEGFS_DEBUG)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBEEGFS_DEBUG=1 -Wall -Wextra -Werror")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBEEGFS_DEBUG=1 -Werror")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBEEGFS_DEBUG=1")
 endif()
 
@@ -74,8 +76,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include_directories(common/source)
-include_directories(thirdparty/source/boost)
-include_directories(thirdparty/source/nu/include)
+include_directories(SYSTEM thirdparty/source/boost)
+include_directories(SYSTEM thirdparty/source/nu/include)
 include_directories(thirdparty/source/gtest/googletest/include)
 
 if(NOT BEEGFS_SKIP_TESTS)

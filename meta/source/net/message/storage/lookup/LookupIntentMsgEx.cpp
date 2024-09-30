@@ -22,7 +22,6 @@ std::tuple<FileIDLock, ParentNameLock, FileIDLock> LookupIntentMsgEx::lock(Entry
    FileIDLock entryIDLockForDir;
    FileIDLock entryIDLockForFile;
    enum DirEntryType entryType = getEntryInfo()->getEntryType();
-   bool inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
 
    if (getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE)
    {
@@ -92,6 +91,8 @@ bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)
 
    lookupRes = FhgfsOpsErr_INTERNAL;
 
+   inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
+
    LOG_DBG(GENERAL, DEBUG, "", parentEntryID, entryName, getParentInfo()->getIsBuddyMirrored());
 
    // sanity checks
@@ -116,7 +117,6 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
 
    int createFlag = getIntentFlags() & LOOKUPINTENTMSG_FLAG_CREATE;
    FhgfsOpsErr createRes = FhgfsOpsErr_INTERNAL;
-   bool inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
 
    // Note: Actually we should first do a lookup. However, a successful create also implies a
    // failed Lookup, so we can take a shortcut.
@@ -283,13 +283,19 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
       return FhgfsOpsErr_INTERNAL;
    }
 
+   // assume inode data is up-to-date initially
+   outInodeDataOutdated = false;
+
    FhgfsOpsErr lookupRes1 = metaStore->getEntryData(parentDir, entryName, outEntryInfo,
       outInodeStoreData);
 
    if (lookupRes1 == FhgfsOpsErr_DYNAMICATTRIBSOUTDATED)
    {
       lookupRes1 = FhgfsOpsErr_SUCCESS;
-      outInodeDataOutdated = true;
+
+      FhgfsOpsErr res = metaStore->isFileUnlinkable(*parentDir, outEntryInfo);
+      if (res == FhgfsOpsErr_INUSE)
+         outInodeDataOutdated = true; // Mark as outdated if the file is in use
    }
 
    metaStore->releaseDir(parentEntryID);

@@ -608,8 +608,6 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
    // IB_PD_UNSAFE_GLOBAL_RKEY is still present as of kernel 6.3.
 #ifdef OFED_UNSAFE_GLOBAL_RKEY
    commContext->pd = ib_alloc_pd(dev, globalRkey? IB_PD_UNSAFE_GLOBAL_RKEY : 0);
-   if (globalRkey)
-      commContext->checkConnRkey = commContext->pd->unsafe_global_rkey;
 #else
    if (globalRkey)
    {
@@ -625,6 +623,10 @@ bool __IBVSocket_createCommContext(IBVSocket* _this, struct rdma_cm_id* cm_id,
       commContext->pd = NULL;
       goto err_cleanup;
    }
+#ifdef OFED_UNSAFE_GLOBAL_RKEY
+   if (globalRkey)
+      commContext->checkConnRkey = commContext->pd->unsafe_global_rkey;
+#endif
 
    if (commCfg->keyType == IBVSOCKETKEYTYPE_UnsafeDMA)
    {

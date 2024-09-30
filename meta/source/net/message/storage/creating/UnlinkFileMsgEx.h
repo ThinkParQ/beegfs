@@ -25,6 +25,7 @@ class UnlinkFileMsgEx : public MirroredMessage<UnlinkFileMsg,
    private:
       std::unique_ptr<ResponseState> executePrimary(ResponseContext& ctx);
       std::unique_ptr<ResponseState> executeSecondary(ResponseContext& ctx);
+      bool fileExistsForUnlink = false;
 
       void forwardToSecondary(ResponseContext& ctx) override;
 

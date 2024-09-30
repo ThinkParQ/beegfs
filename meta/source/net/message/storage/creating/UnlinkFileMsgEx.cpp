@@ -29,6 +29,7 @@ std::tuple<FileIDLock, ParentNameLock, FileIDLock> UnlinkFileMsgEx::lock(EntryLo
    {
       dentry.getEntryInfo(getParentInfo()->getEntryID(), 0, &fileInfo);
       inodeLock = {&store, dentry.getID(), true};
+      this->fileExistsForUnlink = true;
    }
 
    metaStore->releaseDir(dir->getID());
@@ -83,7 +84,14 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
    // modified. if the dentry does exist, it will be loaded.
     DirInode* dir = app->getMetaStore()->referenceDir(getParentInfo()->getEntryID(),
           getParentInfo()->getIsBuddyMirrored(), false);
-    if (!dir)
+    if (unlikely(!dir))
+       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+
+    // For meta-mirrored setup(s) on the primary metadata node:
+    // Verify file existence and proper inode locking from UnlinkFileMsgEx::lock().
+    // This ensures consistency by preventing unlink operations on non-existent
+    // or improperly locked files. Abort with PATHNOTEXISTS error if check fails.
+    if (isMirrored() && !this->fileExistsForUnlink)
        return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
     const bool fileEventLoggingEnabled = getFileEvent() && app->getFileEventLogger();

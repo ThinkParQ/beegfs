@@ -1608,8 +1608,6 @@ bool App::checkEnterpriseFeatureUsage()
 
    logEULAMsg(enabledFeatures);
 
-   if (!enabledFeatures.empty())
-      return true;
-
-   return false;
+   // return true only if any enterprise features are enabled, false otherwise
+   return !enabledFeatures.empty();
 }

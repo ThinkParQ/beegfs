@@ -452,7 +452,7 @@ out:
 FhgfsOpsErr DirInode::linkFilesInDirUnlocked(const std::string& fromName, FileInode& fromInode,
    const std::string& toName)
 {
-   FhgfsOpsErr linkRes = entries.linkEntryInDir(fromName, toName);
+   FhgfsOpsErr linkRes = entries.linkEntryInDir(fromInode.getEntryID(), toName);
 
    if(linkRes == FhgfsOpsErr_SUCCESS)
    {

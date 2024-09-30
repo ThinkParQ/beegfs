@@ -202,19 +202,31 @@ struct address_space_operations fhgfs_address_pagecache_ops =
 loff_t FhgfsOps_llseekdir(struct file *file, loff_t offset, int origin)
 {
    App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
-   Logger* log = App_getLogger(app);
    const char* logContext = "FhgfsOps_llseekDir";
    struct inode* inode = file_inode(file);
 
    loff_t retVal = 0;
    FsDirInfo* dirInfo = __FhgfsOps_getDirInfo(file);
 
-   if(unlikely(Logger_getLogLevel(log) >= Log_SPAM) )
-      FhgfsOpsHelper_logOpMsg(Log_SPAM, app, file_dentry(file), inode, logContext,
-         "offset: %lld directive: %d", (long long)offset, origin);
+   FhgfsOpsHelper_logOpMsg(Log_SPAM, app, file_dentry(file), inode, logContext,
+      "offset: %lld directive: %d", (long long)offset, origin);
 
    if(origin != SEEK_SET)
-      return -EINVAL;
+   {
+      if (origin == SEEK_CUR && offset == 0) {
+         // Some applications use lseek with SEEK_CUR and offset = 0 to get the current position in
+         // the file. To support that special case, we will translate the request into a SEEK_SET
+         // with the current file position as the offset.
+         offset = file->f_pos;
+         origin = SEEK_SET;
+         FhgfsOpsHelper_logOpMsg(Log_SPAM, app, file_dentry(file), inode, logContext,
+            "offset: %lld position: %lld directive: %d", (long long)offset, (long long)file->f_pos,
+            origin);
+      } else {
+         return -EINVAL;
+      }
+   }
+
 
    retVal = generic_file_llseek_unlocked(file, offset, origin);
    if(likely(retVal >= 0) )

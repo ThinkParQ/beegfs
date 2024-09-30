@@ -340,15 +340,22 @@ FhgfsOpsErr DirEntryStore::unlinkDirEntryUnlocked(const std::string& entryName, 
 }
 
 /**
- * Create a hardlink from 'fromEntryName' to 'toEntryName'.
+ * Create a hardlink from the entryID file in '#fSiDs#' directory to 'toEntryName'.
+ *
+ * This function creates a new hardlink within same directory, specifically for entries
+ * with inlined inodes. It uses the entry-by-id file present in '#fSiDs#' directory as
+ * the source for the link to ensure consistency across all hardlinks to the same inode.
  *
  * NOTE: Only do this for the entries in the same directory with inlined inodes. In order to avoid
  *       a wrong link count on a possible crash/reboot, the link count already must have been
  *       increased by 1 (If the link count is too high after a crash we might end up with leaked
  *       chunk files on unlink, but not with missing chunk files if done the other way around).
+ *
+ * @param entryID The entryID of the file for which the hardlink needs to be created
+ * @param toEntryName The name of the new hardlink to be created
+ * @return FhgfsOpsErr indicating success or the type of error encountered
  */
-FhgfsOpsErr DirEntryStore::linkEntryInDir(const std::string& fromEntryName,
-   const std::string& toEntryName)
+FhgfsOpsErr DirEntryStore::linkEntryInDir(const std::string& entryID, const std::string& toEntryName)
 {
    const char *logContext = "DirEntryStore renameEntry";
 
@@ -356,7 +363,7 @@ FhgfsOpsErr DirEntryStore::linkEntryInDir(const std::string& fromEntryName,
 
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
-   std::string fromPath = getDirEntryPathUnlocked() + '/' + fromEntryName;
+   std::string fromPath = MetaStorageTk::getMetaDirEntryIDPath(getDirEntryPathUnlocked()) + entryID;
    std::string toPath   = getDirEntryPathUnlocked() + '/' + toEntryName;
 
    int linkRes = link(fromPath.c_str(), toPath.c_str() );
@@ -367,7 +374,7 @@ FhgfsOpsErr DirEntryStore::linkEntryInDir(const std::string& fromEntryName,
       else
       {
          LogContext(logContext).logErr(std::string("Failed to link file in dir: ") +
-            getDirEntryPathUnlocked() + " from: " + fromEntryName + " to: " + toEntryName +
+            getDirEntryPathUnlocked() + " from (entryID): " + entryID + " to: " + toEntryName +
             ". SysErr: " + System::getErrString() );
          retVal = FhgfsOpsErr_INTERNAL;
       }

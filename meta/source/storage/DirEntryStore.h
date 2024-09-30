@@ -41,7 +41,7 @@ class DirEntryStore
 
       FhgfsOpsErr makeEntry(DirEntry* entry);
 
-      FhgfsOpsErr linkEntryInDir(const std::string& fromEntryName, const std::string& toEntryName);
+      FhgfsOpsErr linkEntryInDir(const std::string& entryID, const std::string& toEntryName);
       FhgfsOpsErr linkInodeToDir(const std::string& inodePath, const std::string &fileName);
 
       FhgfsOpsErr removeDir(const std::string& entryName, DirEntry** outDirEntry);

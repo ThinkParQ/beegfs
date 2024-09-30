@@ -1,6 +1,7 @@
 include_directories(
 	source
 	${CMAKE_SOURCE_DIR}/client_devel/include
+	${CMAKE_SOURCE_DIR}/client_module/include
 )
 
 add_library(

@@ -2,6 +2,9 @@
 
 #ifndef BEEGFS_RDMA
 
+#define no_ibvsocket_err() \
+   printk_fhgfs(KERN_INFO, "%s:%d: You should never see this message\n", __func__, __LINE__)
+
 bool IBVSocket_init(IBVSocket* _this)
 {
    no_ibvsocket_err();
