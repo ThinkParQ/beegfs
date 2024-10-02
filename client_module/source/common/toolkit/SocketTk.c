@@ -91,7 +91,7 @@ int SocketTk_poll(PollState* state, int timeoutMS)
             unsigned long mask = RDMASocket_poll(
                currentRDMASock, socket->poll._events, finishPoll);
 
-            if(mask)
+            if(mask & socket->poll._events)
             { // interesting event occurred
                socket->poll.revents = mask; // save event mask as revents
                numSocksWithREvents++;
