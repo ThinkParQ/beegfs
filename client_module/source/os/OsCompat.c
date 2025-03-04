@@ -155,8 +155,11 @@ struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSiz
 {
    struct kmem_cache* cache;
 
+   #if defined(KERNEL_HAS_SLAB_MEM_SPREAD)
    unsigned long cacheFlags = SLAB_RECLAIM_ACCOUNT | SLAB_MEM_SPREAD;
-
+   #else
+   unsigned long cacheFlags = SLAB_RECLAIM_ACCOUNT;
+   #endif
 #if defined(KERNEL_HAS_KMEMCACHE_DTOR)
    cache = kmem_cache_create(cacheName, cacheSize, 0, cacheFlags, initFuncPtr, NULL);
 #else

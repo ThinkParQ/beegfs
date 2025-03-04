@@ -174,7 +174,7 @@ static inline int OsTypeConv_flockTypeToFhgfs(struct file_lock* fileLock)
 {
    int fhgfsLockFlags = 0;
 
-   switch(fileLock->fl_type)
+   switch(FhgfsCommon_getFileLockType(fileLock))
    {
       case F_RDLCK:
       {
@@ -192,7 +192,7 @@ static inline int OsTypeConv_flockTypeToFhgfs(struct file_lock* fileLock)
       } break;
    }
 
-   if(!(fileLock->fl_flags & FL_SLEEP) )
+   if(!(FhgfsCommon_getFileLockFlags(fileLock) & FL_SLEEP) )
       fhgfsLockFlags |= ENTRYLOCKTYPE_NOWAIT;
 
    return fhgfsLockFlags;

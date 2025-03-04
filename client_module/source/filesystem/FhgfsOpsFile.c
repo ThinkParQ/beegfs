@@ -445,7 +445,11 @@ int FhgfsOps_readdirIncremental(struct file* file, void* buf, filldir_t filldir)
          currentIno = inode->i_ino;
       else
       if(!strcmp("..", currentName) )
+         #if defined(KERNEL_HAS_PARENT_INO)
          currentIno = parent_ino(dentry);
+         #else
+         currentIno = d_parent_ino(dentry);
+         #endif
       else
       { // generate inode number from entryID
          const char* currentEntryID = StrCpyVec_at(dirContentIDs, contentsPos);
@@ -626,8 +630,6 @@ int FhgfsOps_release(struct inode* inode, struct file* file)
    FsObjectInfo_virtualDestruct( (FsObjectInfo*)fileInfo);
    __FhgfsOps_setFileInfo( (FsFileInfo*)NULL, file);
 
-   FhgfsInode_invalidateCache(fhgfsInode);
-
    // warning: linux vfs won't return this result to user apps. only flush() res is passed to apps.
    return retVal;
 }
@@ -743,8 +745,8 @@ int FhgfsOps_flock(struct file* file, int cmd, struct file_lock* fileLock)
       FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo
 
       globalLockRes = FhgfsOpsRemoting_flockEntryEx(&fhgfsInode->entryInfo,
-         &fhgfsInode->entryInfoLock, app, ioInfo.fileHandleID, (size_t)fileLock->fl_file,
-         fileLock->fl_pid, lockTypeFlags, true);
+         &fhgfsInode->entryInfoLock, app, ioInfo.fileHandleID, (size_t)FhgfsCommon_getFileLock(fileLock),
+         FhgfsCommon_getFileLockPID(fileLock), lockTypeFlags, true);
 
       FhgfsInode_entryInfoReadUnlock(fhgfsInode); // UNLOCK EntryInfo
 
@@ -864,13 +866,12 @@ int FhgfsOps_lock(struct file* file, int cmd, struct file_lock* fileLock)
       RemotingIOInfo ioInfo;
 
       FsFileInfo_getIOInfo(fileInfo, fhgfsInode, &ioInfo);
-
-      FhgfsInode_addRangeLockPID(fhgfsInode, fileLock->fl_pid);
+      FhgfsInode_addRangeLockPID(fhgfsInode, FhgfsCommon_getFileLockPID(fileLock));
 
       FhgfsInode_entryInfoReadLock(fhgfsInode); // LOCK EntryInfo
 
       globalLockRes = FhgfsOpsRemoting_flockRangeEx(&fhgfsInode->entryInfo,
-         &fhgfsInode->entryInfoLock, ioInfo.app, ioInfo.fileHandleID, fileLock->fl_pid,
+         &fhgfsInode->entryInfoLock, ioInfo.app, ioInfo.fileHandleID, FhgfsCommon_getFileLockPID(fileLock),
          lockTypeFlags, fileLock->fl_start, fileLock->fl_end, true);
 
       FhgfsInode_entryInfoReadUnlock(fhgfsInode); // UNLOCK EntryInfo

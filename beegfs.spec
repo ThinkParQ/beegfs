@@ -56,7 +56,7 @@ Summary: BeeGFS parallel file system
 License: BeeGFS EULA
 Version: %{VER}
 Release: %{RELEASE}
-URL: http://www.beegfs.com
+URL: http://www.beegfs.io
 Source: beegfs-%{BEEGFS_VERSION}.tar
 Vendor: ThinkParQ GmbH
 BuildRoot: %{_tmppath}/beegfs-root
@@ -122,6 +122,8 @@ install -D common_package/scripts/etc/beegfs/lib/init-multi-mode \
 install -D common/build/libbeegfs_ib.so \
    ${RPM_BUILD_ROOT}/opt/beegfs/lib/libbeegfs_ib.so
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/libbeegfs-ib/copyright
+
 ##########
 ########## daemons, utils
 ##########
@@ -161,6 +163,8 @@ install -D meta/build/dist/sbin/beegfs-setup-meta \
 
 install -D meta/build/dist/etc/default/beegfs-meta ${RPM_BUILD_ROOT}/etc/default/beegfs-meta
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-meta/copyright
+
 ##########
 ########## mgmtd extra files
 ##########
@@ -185,6 +189,8 @@ install -D mgmtd/build/dist/sbin/beegfs-setup-mgmtd \
 	${RPM_BUILD_ROOT}/opt/beegfs/sbin/beegfs-setup-mgmtd
 
 install -D mgmtd/build/dist/etc/default/beegfs-mgmtd ${RPM_BUILD_ROOT}/etc/default/beegfs-mgmtd
+
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-mgmtd/copyright
 
 ##########
 ########## storage extra files
@@ -212,6 +218,8 @@ install -D storage/build/dist/sbin/beegfs-setup-storage \
 
 install -D storage/build/dist/etc/default/beegfs-storage ${RPM_BUILD_ROOT}/etc/default/beegfs-storage
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-storage/copyright
+
 ##########
 ########## helperd extra files
 ##########
@@ -233,6 +241,8 @@ install -D -m644 helperd/build/dist/usr/lib/systemd/system/beegfs-helperd@.servi
 	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-helperd@.service
 
 install -D helperd/build/dist/etc/default/beegfs-helperd ${RPM_BUILD_ROOT}/etc/default/beegfs-helperd
+
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-helperd/copyright
 
 ##########
 ########## mon extra files
@@ -258,6 +268,14 @@ install -D -m644 mon/build/dist/usr/lib/systemd/system/beegfs-mon@.service \
 install -D mon/build/dist/etc/default/beegfs-mon ${RPM_BUILD_ROOT}/etc/default/beegfs-mon
 cp -a mon/scripts/grafana/* ${RPM_BUILD_ROOT}/opt/beegfs/scripts/grafana/
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-mon/copyright
+
+##########
+########## mon-grafana
+##########
+
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-mon-grafana/copyright
+
 ##########
 ########## utils
 ##########
@@ -273,6 +291,9 @@ cp utils/build/libjbeegfs.so utils/build/jbeegfs.jar \
 cp -a utils/scripts/etc/bash_completion.d/beegfs-ctl \
    ${RPM_BUILD_ROOT}/etc/bash_completion.d/
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils/copyright
+
+
 ##########
 ########## utils-devel
 ##########
@@ -282,6 +303,8 @@ cp -a event_listener/build/Makefile \
    ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/build/
 cp -a event_listener/source/beegfs-event-listener.cpp \
    ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/source/
+
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/copyright
 
 ##########
 ########## eventlistener extra files
@@ -335,6 +358,8 @@ install -D client_module/build/dist/sbin/beegfs-setup-client \
 install -D client_module/build/dist/etc/beegfs-client-mount-hook.example \
    ${RPM_BUILD_ROOT}/etc/beegfs/beegfs-client-mount-hook.example
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client/copyright
+
 ##########
 ########## client-dkms
 ##########
@@ -357,6 +382,14 @@ sed -e 's/__VERSION__/%{VER}/g' -e 's/__NAME__/beegfs/g' -e 's/__MODNAME__/beegf
 	 < client_module/dkms.conf.in \
 	 > ${RPM_BUILD_ROOT}/usr/src/beegfs-%{VER}/dkms.conf
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-dkms/copyright
+
+##########
+########## client-compat
+##########
+
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-compat/copyright
+
 ##########
 ########## client-devel
 ##########
@@ -370,6 +403,8 @@ sed -i '~s~uapi/beegfs_client~beegfs/beegfs_client~g' \
 cp -a client_devel/build/dist/usr/share/doc/beegfs-client-devel/examples/* \
    ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-devel/examples/
 
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-client-devel/copyright
+
 ##########
 ########## beeond
 ##########
@@ -379,6 +414,8 @@ install -D beeond/source/beeond-cp ${RPM_BUILD_ROOT}/opt/beegfs/sbin/beeond-cp
 cp beeond/scripts/lib/* ${RPM_BUILD_ROOT}/opt/beegfs/lib/
 ln -s /opt/beegfs/sbin/beeond ${RPM_BUILD_ROOT}/usr/bin/beeond
 ln -s /opt/beegfs/sbin/beeond-cp ${RPM_BUILD_ROOT}/usr/bin/beeond-cp
+
+install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beeond/copyright
 
 # disabled, doesn't build
 ###########
@@ -423,7 +460,6 @@ The package contains files required by all BeeGFS daemons
 /etc/beegfs/lib/start-stop-functions
 
 
-
 %package -n libbeegfs-ib
 
 Summary: BeeGFS InfiniBand support
@@ -435,6 +471,7 @@ BuildRequires: libnl3-devel
 This package contains support libraries for InfiniBand.
 
 %files -n libbeegfs-ib
+%license /usr/share/doc/libbeegfs-ib/copyright
 /opt/beegfs/lib/libbeegfs_ib.so
 
 
@@ -457,6 +494,7 @@ This package contains the BeeGFS meta server binaries.
 
 %files meta
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-meta/copyright
 %config(noreplace) /etc/beegfs/beegfs-meta.conf
 %config(noreplace) /etc/default/beegfs-meta
 /etc/init.d/beegfs-meta
@@ -485,6 +523,7 @@ The package contains the BeeGFS management daemon.
 
 %files mgmtd
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-mgmtd/copyright
 %config(noreplace) /etc/beegfs/beegfs-mgmtd.conf
 %config(noreplace) /etc/default/beegfs-mgmtd
 /etc/init.d/beegfs-mgmtd
@@ -513,6 +552,7 @@ This package contains the BeeGFS storage server binaries.
 
 %files storage
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-storage/copyright
 %config(noreplace) /etc/beegfs/beegfs-storage.conf
 %config(noreplace) /etc/default/beegfs-storage
 /etc/init.d/beegfs-storage
@@ -541,6 +581,7 @@ The package contains the BeeGFS helper daemon.
 
 %files helperd
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-helperd/copyright
 %config(noreplace) /etc/beegfs/beegfs-helperd.conf
 %config(noreplace) /etc/default/beegfs-helperd
 /etc/init.d/beegfs-helperd
@@ -568,6 +609,7 @@ This package contains the BeeGFS mon server binaries.
 
 %files mon
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-mon/copyright
 %config(noreplace) /etc/beegfs/beegfs-mon.conf
 %config(noreplace) /etc/beegfs/beegfs-mon.auth
 %config(noreplace) /etc/default/beegfs-mon
@@ -590,6 +632,7 @@ This package contains the BeeGFS mon dashboards to display monitoring data in Gr
 The default dashboard setup requires both Grafana, and InfluxDB.
 
 %files mon-grafana
+%license /usr/share/doc/beegfs-mon-grafana/copyright
 %defattr(-,root,root)
 /opt/beegfs/scripts/grafana/
 
@@ -607,6 +650,7 @@ This package contains BeeGFS utilities.
 
 %files utils
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-utils/copyright
 %attr(0755, root, root) /opt/beegfs/sbin/beegfs-fsck
 %attr(4755, root, root) /opt/beegfs/sbin/beegfs-ctl
 /opt/beegfs/lib/jbeegfs.jar
@@ -635,6 +679,7 @@ This package contains BeeGFS utils development files and examples.
 
 %files utils-devel
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-utils-devel/copyright
 /usr/include/beegfs/beegfs_file_event_log.hpp
 /usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/*
 
@@ -670,6 +715,7 @@ touch /var/lib/beegfs/client/force-auto-build
 
 %files client
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-client/copyright
 %config(noreplace) /etc/beegfs/beegfs-client-autobuild.conf
 %config(noreplace) /etc/beegfs/beegfs-client-mount-hook.example
 %config(noreplace) /etc/beegfs/beegfs-client.conf
@@ -684,7 +730,7 @@ touch /var/lib/beegfs/client/force-auto-build
 %{CLIENT_DIR}
 
 %postun client
-/usr/bin/rm -rf /lib/modules/*/updates/fs/beegfs_autobuild
+rm -rf /lib/modules/*/updates/fs/beegfs_autobuild
 
 %package client-dkms
 
@@ -713,6 +759,7 @@ dkms remove beegfs/%{VER} --all
 
 %files client-dkms
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-client-dkms/copyright
 %config(noreplace) /etc/beegfs/beegfs-client.conf
 %config(noreplace) /etc/beegfs/beegfs-client-build.mk
 /usr/src/beegfs-%{VER}
@@ -737,6 +784,7 @@ This package allows to build and to run a compatbility beegfs-client kernel modu
 on a system that has a newer beegfs-client version installed.
 
 %files client-compat
+%license /usr/share/doc/beegfs-client-compat/copyright
 %defattr(-,root,root)
 %{CLIENT_COMPAT_DIR}
 
@@ -753,6 +801,7 @@ This package contains BeeGFS client development files.
 
 %files client-devel
 %defattr(-,root,root)
+%license /usr/share/doc/beegfs-client-devel/copyright
 %dir /usr/include/beegfs
 /usr/include/beegfs/beegfs.h
 /usr/include/beegfs/beegfs_client.h
@@ -775,6 +824,7 @@ This package contains BeeOND.
 
 %files -n beeond
 %defattr(-,root,root)
+%license /usr/share/doc/beeond/copyright
 /opt/beegfs/sbin/beeond
 /usr/bin/beeond
 /opt/beegfs/sbin/beeond-cp

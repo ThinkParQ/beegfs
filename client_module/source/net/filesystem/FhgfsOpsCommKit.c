@@ -40,11 +40,21 @@ bool FhgfsOpsCommKit_initEmergencyPools()
    }
 
 #ifdef KERNEL_HAS_KMEMCACHE_DTOR
+   #if defined(KERNEL_HAS_SLAB_MEM_SPREAD)
    headerBufferCache = kmem_cache_create(cacheName, BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
       SLAB_MEM_SPREAD, NULL, NULL);
+   #else
+   headerBufferCache = kmem_cache_create(cacheName, BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
+      0, NULL, NULL);
+   #endif
 #else
+   #if defined(KERNEL_HAS_SLAB_MEM_SPREAD)
    headerBufferCache = kmem_cache_create(cacheName, BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
       SLAB_MEM_SPREAD, NULL);
+   #else
+   headerBufferCache = kmem_cache_create(cacheName, BEEGFS_COMMKIT_MSGBUF_SIZE, 0,
+      0, NULL);
+   #endif
 #endif
 
    if(!headerBufferCache)

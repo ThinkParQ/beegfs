@@ -14,6 +14,10 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
+#ifdef KERNEL_HAS_LINUX_FILELOCK_H
+#include <linux/filelock.h>
+#endif
+
 #ifdef KERNEL_HAS_LINUX_STDARG_H
 #include <linux/stdarg.h>
 #else
@@ -41,10 +45,14 @@
 #define CONN_MEDIUM_TIMEOUT    90000
 #define CONN_SHORT_TIMEOUT     30000
 
+#ifndef MIN
 #define MIN(a, b) \
    ( ( (a) < (b) ) ? (a) : (b) )
+#endif
+#ifndef MAX
 #define MAX(a, b) \
    ( ( (a) < (b) ) ? (b) : (a) )
+#endif
 
 #define SAFE_VFREE(p) \
    do{ if(p) {vfree(p); (p)=NULL;} } while(0)
@@ -273,6 +281,45 @@ unsigned FhgfsCommon_getCurrentUserID(void)
 unsigned FhgfsCommon_getCurrentGroupID(void)
 {
    return from_kgid(&init_user_ns, current_fsgid());
+}
+
+// Helper function for getting file pointer
+static inline struct file * FhgfsCommon_getFileLock(struct file_lock *fileLock)
+{
+#if defined(KERNEL_HAS_FILE_LOCK_CORE)
+    return fileLock->c.flc_file;
+#else
+    return fileLock->fl_file;
+#endif
+}
+// Helper function to get PID from file lock
+static inline pid_t FhgfsCommon_getFileLockPID(struct file_lock *fileLock)
+{
+#if defined(KERNEL_HAS_FILE_LOCK_CORE)
+    return fileLock->c.flc_pid;
+#else
+    return fileLock->fl_pid;
+#endif
+}
+
+// Helper function to get lock type
+static inline unsigned char FhgfsCommon_getFileLockType(struct file_lock *flock)
+{
+#if defined(KERNEL_HAS_FILE_LOCK_CORE)
+    return flock->c.flc_type;
+#else
+    return flock->fl_type;
+#endif
+}
+
+// Helper function to get lock flags
+static inline unsigned int FhgfsCommon_getFileLockFlags(struct file_lock *fileLock)
+{
+#if defined(KERNEL_HAS_FILE_LOCK_CORE)
+    return fileLock->c.flc_flags;
+#else
+    return fileLock->fl_flags;
+#endif
 }
 
 

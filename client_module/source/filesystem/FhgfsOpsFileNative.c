@@ -547,7 +547,7 @@ static int beegfs_flock(struct file* filp, int cmd, struct file_lock* flock)
    FhgfsOpsHelper_logOp(5, app, file_dentry(filp), file_inode(filp), __func__);
    IGNORE_UNUSED_VARIABLE(app);
 
-   switch(flock->fl_type)
+   switch(FhgfsCommon_getFileLockType(flock))
    {
       case F_RDLCK:
       case F_WRLCK:
@@ -573,7 +573,7 @@ static int beegfs_lock(struct file* filp, int cmd, struct file_lock* flock)
    FhgfsOpsHelper_logOp(5, app, file_dentry(filp), file_inode(filp), __func__);
    IGNORE_UNUSED_VARIABLE(app);
 
-   switch(flock->fl_type)
+   switch(FhgfsCommon_getFileLockType(flock))
    {
       case F_RDLCK:
       case F_WRLCK:

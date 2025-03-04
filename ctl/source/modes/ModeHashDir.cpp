@@ -98,7 +98,7 @@ void ModeHashDir::printHelp()
    std::cout << " Get dentry or inode path " << std::endl;
    std::cout << std::endl;
    std::cout << " Example: Print an inode path" << std::endl;
-   std::cout << "  $ beegfs-ctl --type=inode 4C08-51FBAC63-7C" << std::endl;
+   std::cout << "  $ beegfs-ctl --hashdir --type=inode 4C08-51FBAC63-7C" << std::endl;
 }
 
 

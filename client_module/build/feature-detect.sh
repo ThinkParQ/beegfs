@@ -150,8 +150,13 @@ check_symbol() {
 }
 
 check_struct_field \
-   inode::i_atime \
-   KERNEL_HAS_INODE_ATIME \
+   inode::i_ctime \
+   KERNEL_HAS_INODE_CTIME \
+   linux/fs.h
+
+check_struct_field \
+   inode::i_mtime \
+   KERNEL_HAS_INODE_MTIME \
    linux/fs.h
 
 check_struct_field \
@@ -292,6 +297,8 @@ check_function \
    stack_trace_print 'void (unsigned long *trace, unsigned int nr_entries, int spaces)' \
    KERNEL_HAS_STACK_TRACE_PRINT \
    linux/stacktrace.h \
+
+check_type       'struct file_lock_core'      KERNEL_HAS_FILE_LOCK_CORE               linux/filelock.h
 
 check_type       'struct proc_ops'            KERNEL_HAS_PROC_OPS                     linux/proc_fs.h
 

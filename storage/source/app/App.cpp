@@ -24,6 +24,7 @@
 #include <csignal>
 #include <syslog.h>
 #include <sys/resource.h>
+#include <sys/sysmacros.h>
 #include <dlfcn.h>
 #include <blkid/blkid.h>
 #include <uuid/uuid.h>
@@ -1534,7 +1535,7 @@ void App::checkTargetsUUIDs()
             throw InvalidConfigException("Could not open /proc/self/mountinfo");
          }
 
-         auto majmin_f = boost::format("%1%:%2%") % (st.st_dev >> 8) % (st.st_dev & 0xFF);         
+         auto majmin_f = boost::format("%1%:%2%") % major(st.st_dev) % minor(st.st_dev);       
 
          std::string line, device_path, device_majmin;
          while (std::getline(mountInfo, line)) {

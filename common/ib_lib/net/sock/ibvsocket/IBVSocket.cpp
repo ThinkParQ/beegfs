@@ -12,8 +12,18 @@
 #endif /* BEEGFS_NVFS */
 
 #define IBVSOCKET_CONN_TIMEOUT_MS                  3000
-// IBVSOCKET_CONN_TIMEOUT_POLL_MS must be < 1000
-#define IBVSOCKET_CONN_TIMEOUT_POLL_MS              500
+// IBVSOCKET_CONN_TIMEOUT_INITIAL_POLL_MS is the initial timeout to wait between checks for
+// RDMA response events while establishing outgoing connections. Will be scaled up exponentially
+// after every poll (up to IBVSOCKET_CONN_TIMEOUT_MAX_POLL_MS) to reduce load but allow for quick
+// turnaround in the majority of cases where an event will come shortly after initiating the
+// connection.
+//
+// There used to be a fixed timeout of 500ms here, which lead to long initial connection initiation
+// times when an event was not received immediately
+// (https://github.com/ThinkParQ/beegfs-core/issues/4054).
+#define IBVSOCKET_CONN_TIMEOUT_INITIAL_POLL_MS        1
+#define IBVSOCKET_CONN_TIMEOUT_MAX_POLL_MS          512
+
 #define IBVSOCKET_FLOWCONTROL_ONSEND_TIMEOUT_MS  180000
 #define IBVSOCKET_POLL_TIMEOUT_MS                  7500
 #define IBVSOCKET_LISTEN_BACKLOG                    128
@@ -206,6 +216,7 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned 
    bool parseCommDestRes;
    bool epollInitRes;
    int rc;
+   int connTimeoutMS = IBVSOCKET_CONN_TIMEOUT_INITIAL_POLL_MS;
    int connTimeoutRemaining = IBVSOCKET_CONN_TIMEOUT_MS;
    int oldChannelFlags;
    int setOldFlagsRes;
@@ -330,16 +341,28 @@ bool IBVSocket_connectByIP(IBVSocket* _this, struct in_addr ipaddress, unsigned 
       else
       {
          // we got an event
+         LOG(SOCKLIB, DEBUG, "Received RDMA connect response event.", ("Milliseconds spent polling", IBVSOCKET_CONN_TIMEOUT_MS - connTimeoutRemaining));
          break;
       }
 
-      connTimeoutRemaining -= IBVSOCKET_CONN_TIMEOUT_POLL_MS;
+      connTimeoutRemaining -= connTimeoutMS;
       if (connTimeoutRemaining > 0)
       {
          struct timespec ts = {
             .tv_sec = 0,
-            .tv_nsec = (IBVSOCKET_CONN_TIMEOUT_POLL_MS * 1000 * 1000)
+            .tv_nsec = (connTimeoutMS * 1000 * 1000)
          };
+
+         // progressively scale the timeout by squaring it until it is larger than
+         // IBVSOCKET_CONN_TIMEOUT_MAX_POLL_MS
+         if (connTimeoutMS == 1)
+         {
+            connTimeoutMS = 2;
+         }
+         else if (connTimeoutMS * 2 <= IBVSOCKET_CONN_TIMEOUT_MAX_POLL_MS)
+         {
+            connTimeoutMS *= 2;
+         }
 
          if (::nanosleep(&ts, NULL) != 0)
          {

@@ -130,7 +130,7 @@ std::unique_ptr<RmDirMsgEx::ResponseState> RmDirMsgEx::rmDir(ResponseContext& ct
    // clean-up
    metaStore->releaseDir(parentInfo->getEntryID() );
 
-   if (!isSecondary && app->getFileEventLogger() && getFileEvent())
+   if (!isSecondary && retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
    {
          app->getFileEventLogger()->log(
                   *getFileEvent(),

@@ -284,6 +284,14 @@ KERNEL_FEATURE_DETECTION += $(shell \
       | grep -qsF "unsigned int" \
       && echo "-DKERNEL_HAS_RENAME_FLAGS")
 
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -qsF "static inline ino_t parent_ino" $(KSRCDIR_PRUNED_HEAD)/include/linux/fs.h \
+   && echo "-DKERNEL_HAS_PARENT_INO")
+
+KERNEL_FEATURE_DETECTION += $(shell \
+   grep -qsF "define SLAB_MEM_SPREAD" $(KSRCDIR_PRUNED_HEAD)/include/linux/slab.h \
+   && echo "-DKERNEL_HAS_SLAB_MEM_SPREAD")
+
 $(call define_if_matches, KERNEL_ACCESS_OK_WANTS_TYPE, "define access_ok(type, addr, size)" \
    $(KSRCDIR_PRUNED_HEAD)/include/asm-generic/uaccess.h)
 
@@ -318,3 +326,4 @@ KERNEL_FEATURE_DETECTION += $(shell \
 $(call define_if_matches, KERNEL_HAS_IOV_ITER_GET_PAGES2, "iov_iter_get_pages2", uio.h)
 
 $(call define_if_matches, KERNEL_HAS_GET_RANDOM_INT, "get_random_int", random.h)
+

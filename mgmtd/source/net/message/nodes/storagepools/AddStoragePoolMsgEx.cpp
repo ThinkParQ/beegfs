@@ -16,12 +16,6 @@ bool AddStoragePoolMsgEx::processIncoming(ResponseContext& ctx)
       return true;
    }
 
-   if (Program::getApp()->isShuttingDown())
-   {
-      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_TRYAGAIN, "Mgmtd shutting down."));
-      return true;
-   }
-
    std::pair<FhgfsOpsErr, StoragePoolId> createRes =
          storagePoolStore->createPool(poolId, description, &targets, &buddyGroups);
 

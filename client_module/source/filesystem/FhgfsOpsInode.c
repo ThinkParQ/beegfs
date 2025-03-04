@@ -1658,7 +1658,7 @@ int FhgfsOps_unlink(struct inode* dir, struct dentry* dentry)
          FhgfsInode* fhgfsInode = BEEGFS_INODE(fileInode);
 
          FhgfsInode_invalidateCache(fhgfsInode);
-         #if defined(KERNEL_HAS_INODE_ATIME)
+         #if defined(KERNEL_HAS_INODE_CTIME)
          fileInode->i_ctime = dir->i_ctime;
          #else
          inode_set_ctime_to_ts(fileInode, inode_get_ctime(dir));
@@ -2697,10 +2697,10 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
    FhgfsOpsErr statRes;
    FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
 
-   #if defined(KERNEL_HAS_INODE_ATIME)
+   #if defined(KERNEL_HAS_INODE_MTIME)
        typeof(inode->i_mtime.tv_sec) oldMTime;
    #else
-       typeof(inode->__i_mtime.tv_sec) oldMTime;
+       time64_t oldMTime;
    #endif
    loff_t oldSize;
    unsigned cacheElapsedMS;
@@ -2784,7 +2784,7 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
 
    spin_lock(&inode->i_lock); // I _ L O C K
 
-   #if defined(KERNEL_HAS_INODE_ATIME)
+   #if defined(KERNEL_HAS_INODE_MTIME)
    oldMTime = inode->i_mtime.tv_sec;
    #else
    oldMTime = inode_get_mtime_sec(inode);
@@ -2795,7 +2795,7 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
 
    // compare previous size/mtime to detect modifications by other clients
 
-   #if defined(KERNEL_HAS_INODE_ATIME)
+   #if defined(KERNEL_HAS_INODE_MTIME)
    mtimeSizeInvalidate =
       (inode->i_mtime.tv_sec != oldMTime) || (i_size_read(inode) != oldSize);
    #else
