@@ -1,5 +1,4 @@
-#ifndef GETCHUNKFILEATTRIBSMSGEX_H_
-#define GETCHUNKFILEATTRIBSMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/attribs/GetChunkFileAttribsMsg.h>
 
@@ -14,4 +13,3 @@ class GetChunkFileAttribsMsgEx : public GetChunkFileAttribsMsg
       int getTargetFD(const StorageTarget& target, ResponseContext& ctx, bool* outResponseSent);
 };
 
-#endif /*GETCHUNKFILEATTRIBSMSGEX_H_*/

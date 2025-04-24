@@ -1,5 +1,4 @@
-#ifndef META_RESYNCSESSIONSTOREMSGEX_H
-#define META_RESYNCSESSIONSTOREMSGEX_H
+#pragma once
 
 #include <common/net/message/storage/mirroring/ResyncSessionStoreMsg.h>
 
@@ -9,4 +8,3 @@ class ResyncSessionStoreMsgEx : public ResyncSessionStoreMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* META_RESYNCSESSIONSTOREMSGEX_H */

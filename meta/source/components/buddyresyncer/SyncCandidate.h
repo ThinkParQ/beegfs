@@ -1,5 +1,4 @@
-#ifndef META_COMPONENTS_BUDDYRESYNCER_SYNCCANDIDATE_H
-#define META_COMPONENTS_BUDDYRESYNCER_SYNCCANDIDATE_H
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 #include <common/storage/mirroring/SyncCandidateStore.h>
@@ -112,4 +111,3 @@ class MetaSyncCandidateFile
 
 typedef SyncCandidateStore<MetaSyncCandidateDir, MetaSyncCandidateFile> MetaSyncCandidateStore;
 
-#endif /* META_COMPONENTS_BUDDYRESYNCER_SYNCCANDIDATE_H */

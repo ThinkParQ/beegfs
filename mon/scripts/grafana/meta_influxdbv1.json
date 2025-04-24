@@ -222,7 +222,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -270,7 +270,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -432,7 +432,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -480,7 +480,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -588,7 +588,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -750,7 +750,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -798,7 +798,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -821,13 +821,13 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "",
+        "definition": "show tag values from meta with key = \"nodeNumID\" ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "metaID",
         "options": [],
-        "query": "show tag values from meta with key = \"nodeID\" ",
+        "query": "show tag values from meta with key = \"nodeNumID\" ",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,

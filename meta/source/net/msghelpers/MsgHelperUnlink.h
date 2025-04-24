@@ -1,5 +1,4 @@
-#ifndef MSGHELPERUNLINK_H_
-#define MSGHELPERUNLINK_H_
+#pragma once
 
 #include <common/storage/Path.h>
 #include <common/Common.h>
@@ -12,9 +11,9 @@ class MsgHelperUnlink
       static FhgfsOpsErr unlinkFile(DirInode& parentDir, const std::string& removeName,
          unsigned msgUserID);
       static FhgfsOpsErr unlinkMetaFile(DirInode& parentDir, const std::string& removeName,
-         std::unique_ptr<FileInode>* outUnlinkedFile);
+         std::unique_ptr<FileInode>* outUnlinkedFile, unsigned& outInitialHardlinkCount);
       static FhgfsOpsErr unlinkFileInode(EntryInfo* delFileInfo,
-         std::unique_ptr<FileInode>* outUnlinkedFile);
+         std::unique_ptr<FileInode>* outUnlinkedFile, unsigned& outInitialHardlinkCount);
       static FhgfsOpsErr unlinkChunkFiles(FileInode* unlinkedInode, unsigned msgUserID);
 
    private:
@@ -31,4 +30,3 @@ class MsgHelperUnlink
       static FhgfsOpsErr unlinkChunkFilesInternal(FileInode& file, unsigned msgUserID);
 };
 
-#endif /* MSGHELPERUNLINK_H_ */

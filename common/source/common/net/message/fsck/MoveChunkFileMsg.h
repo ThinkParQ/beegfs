@@ -1,5 +1,4 @@
-#ifndef MOVECHUNKFILESMSG_H
-#define MOVECHUNKFILESMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -81,4 +80,3 @@ class MoveChunkFileMsg: public NetMessageSerdes<MoveChunkFileMsg>
       }
 };
 
-#endif /*MOVECHUNKFILESMSG_H*/

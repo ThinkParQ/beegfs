@@ -1,5 +1,4 @@
-#ifndef COMMON_STORAGEPOOL_H
-#define COMMON_STORAGEPOOL_H
+#pragma once
 
 #include <common/nodes/DynamicPoolLimits.h>
 #include <common/nodes/NodeCapacityPools.h>
@@ -162,4 +161,3 @@ typedef std::map<StoragePoolId, StoragePoolPtr> StoragePoolPtrMap;
 typedef StoragePoolPtrMap::iterator StoragePoolPtrMapIter;
 typedef StoragePoolPtrMap::const_iterator StoragePoolPtrMapCIter;
 
-#endif /*COMMON_STORAGEPOOL_H*/

@@ -1,5 +1,4 @@
-#ifndef MKLOCALDIRMSGEX_H_
-#define MKLOCALDIRMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/MkLocalDirMsg.h>
@@ -35,4 +34,3 @@ class MkLocalDirMsgEx : public MirroredMessage<MkLocalDirMsg, HashDirLock>
       const char* mirrorLogContext() const override { return "MkLocalDirMsgEx/forward"; }
 };
 
-#endif /*MKLOCALDIRMSGEX_H_*/

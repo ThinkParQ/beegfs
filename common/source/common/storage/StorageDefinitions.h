@@ -1,5 +1,4 @@
-#ifndef STORAGEDEFINITIONS_H_
-#define STORAGEDEFINITIONS_H_
+#pragma once
 
 /*
  * Remember to keep these definitions in sync with StorageDefinitions.h of fhgfs_client_module!!!
@@ -141,4 +140,3 @@ typedef TargetFDMap::const_iterator TargetFDMapCIter;
 typedef TargetFDMap::value_type TargetFDMapVal;
 
 
-#endif /*STORAGEDEFINITIONS_H_*/

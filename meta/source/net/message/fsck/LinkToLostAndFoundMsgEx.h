@@ -1,5 +1,4 @@
-#ifndef LINKTOLOSTANDFOUNDMSGEX_H
-#define LINKTOLOSTANDFOUNDMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/LinkToLostAndFoundMsg.h>
@@ -23,4 +22,3 @@ class LinkToLostAndFoundMsgEx : public LinkToLostAndFoundMsg
       FhgfsOpsErr deleteInode(std::string& entryID, uint16_t ownerNodeID);
 };
 
-#endif /*LINKTOLOSTANDFOUNDMSGEX_H*/

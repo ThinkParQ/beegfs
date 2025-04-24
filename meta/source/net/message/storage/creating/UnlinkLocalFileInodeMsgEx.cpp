@@ -3,7 +3,6 @@
 #include <net/msghelpers/MsgHelperUnlink.h>
 #include "UnlinkLocalFileInodeMsgEx.h"
 
-
 std::tuple<HashDirLock, FileIDLock> UnlinkLocalFileInodeMsgEx::lock(EntryLockStore& store)
 {
    // we must not lock hash dir and inode if it is owned by current node. if it is a locally
@@ -40,15 +39,20 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkLocalFileInodeMsgEx::execute
    EntryInfo entryInfo;
    entryInfo.set(getDelEntryInfo());
 
+   UnlinkLocalFileInodeResponseState resp;
+   unsigned outLinkCount = 0;
+
    std::unique_ptr<FileInode> unlinkedInode;
-   FhgfsOpsErr unlinkInodeRes = MsgHelperUnlink::unlinkFileInode(&entryInfo, &unlinkedInode);
+   FhgfsOpsErr unlinkInodeRes = MsgHelperUnlink::unlinkFileInode(&entryInfo, &unlinkedInode, outLinkCount);
+   resp.setResult(unlinkInodeRes);
+   resp.setPreUnlinkHardlinkCount(outLinkCount);
 
    if ((unlinkInodeRes == FhgfsOpsErr_SUCCESS) && unlinkedInode && !isSecondary)
    {
       MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(), getMsgHeaderUserID());
    }
 
-   return boost::make_unique<ResponseState>(unlinkInodeRes);
+   return boost::make_unique<ResponseState>(std::move(resp));
 }
 
 void UnlinkLocalFileInodeMsgEx::forwardToSecondary(ResponseContext& ctx)

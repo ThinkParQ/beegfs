@@ -24,6 +24,8 @@ void LookupIntentMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 
    if (thisCast->intentFlags & LOOKUPINTENTMSG_FLAG_REVALIDATE)
    {
+      //metadata version
+      Serialization_serializeUInt(ctx, thisCast->metaVersion);
       // entryInfo
       EntryInfo_serialize(ctx, thisCast->entryInfoPtr);
    }

@@ -1,5 +1,4 @@
-#ifndef MKDIRRESPMSG_H_
-#define MKDIRRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -58,4 +57,3 @@ class MkDirRespMsg : public NetMessageSerdes<MkDirRespMsg>
 
 };
 
-#endif /*MKDIRRESPMSG_H_*/

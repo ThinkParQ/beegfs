@@ -1,5 +1,4 @@
-#ifndef FSYNCLOCALFILEMSG_H_
-#define FSYNCLOCALFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -78,4 +77,3 @@ class FSyncLocalFileMsg : public NetMessageSerdes<FSyncLocalFileMsg>
 };
 
 
-#endif /*FSYNCLOCALFILEMSG_H_*/

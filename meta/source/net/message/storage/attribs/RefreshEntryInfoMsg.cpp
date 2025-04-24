@@ -71,7 +71,7 @@ FhgfsOpsErr RefreshEntryInfoMsgEx::refreshInfoRec()
    auto refreshRes = MsgHelperStat::refreshDynAttribs(entryInfo, true, getMsgHeaderUserID());
    if (refreshRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
    {
-      auto file = metaStore->referenceFile(getEntryInfo());
+      auto [file, referenceRes] = metaStore->referenceFile(getEntryInfo());
       if (file)
          fixInodeTimestamp(*file, fileTimestamps, getEntryInfo());
 

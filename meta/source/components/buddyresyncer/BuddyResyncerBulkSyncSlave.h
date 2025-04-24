@@ -1,5 +1,4 @@
-#ifndef META_BUDDYRESYNCERBULKSYNCSLAVE_H
-#define META_BUDDYRESYNCERBULKSYNCSLAVE_H
+#pragma once
 
 #include <common/storage/mirroring/SyncCandidateStore.h>
 #include <common/threading/PThread.h>
@@ -66,4 +65,3 @@ class BuddyResyncerBulkSyncSlave : public SyncSlaveBase
       }
 };
 
-#endif

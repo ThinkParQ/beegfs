@@ -1,5 +1,4 @@
-#ifndef COMMON_UNIQUERWLOCK_H
-#define COMMON_UNIQUERWLOCK_H
+#pragma once
 
 #include <common/threading/RWLock.h>
 #include <common/threading/SafeRWLock.h>
@@ -74,4 +73,3 @@ inline void swap(UniqueRWLock& a, UniqueRWLock& b)
    a.swap(b);
 }
 
-#endif

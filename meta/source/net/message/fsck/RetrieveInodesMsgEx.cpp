@@ -4,7 +4,7 @@
 
 bool RetrieveInodesMsgEx::processIncoming(ResponseContext& ctx)
 {
-   LogContext log("Incoming RetrieveDirEntriesMsg");
+   LogContext log("Incoming RetrieveInodesMsg");
 
    MetaStore *metaStore = Program::getApp()->getMetaStore();
 

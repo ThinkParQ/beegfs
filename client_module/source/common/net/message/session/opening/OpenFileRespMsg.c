@@ -30,7 +30,7 @@ bool OpenFileRespMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
       &thisCast->patternStart, &thisCast->patternLength) )
       return false;
 
-   if (!Serialization_deserializeUInt64(ctx, &thisCast->fileVersion))
+   if (!Serialization_deserializeUInt(ctx, &thisCast->fileVersion))
       return false;
 
    return true;

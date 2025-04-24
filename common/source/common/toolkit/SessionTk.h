@@ -1,5 +1,4 @@
-#ifndef SESSIONTK_H_
-#define SESSIONTK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/storage/StorageDefinitions.h>
@@ -80,4 +79,3 @@ class SessionTk
 };
 
 
-#endif /* SESSIONTK_H_ */

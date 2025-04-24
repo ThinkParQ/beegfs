@@ -1,5 +1,4 @@
-#ifndef _RDMAINFO_H_
-#define _RDMAINFO_H_
+#pragma once
 
 #ifdef BEEGFS_NVFS
 
@@ -106,4 +105,3 @@ class RdmaInfo
 };
 #endif /* BEEGFS_NVFS */
 
-#endif /* _RDMAINFO_H_ */

@@ -1,5 +1,4 @@
-#ifndef FSCKCHUNK_H_
-#define FSCKCHUNK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/storage/Path.h>
@@ -238,4 +237,3 @@ class FsckChunk
 template<>
 struct ListSerializationHasLength<FsckChunk> : boost::false_type {};
 
-#endif /* FSCKCHUNK_H_ */

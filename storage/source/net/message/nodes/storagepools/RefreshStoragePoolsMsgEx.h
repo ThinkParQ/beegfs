@@ -1,5 +1,4 @@
-#ifndef STORAGE_REFRESHSTORAGEPOOLSMSGEX_H_
-#define STORAGE_REFRESHSTORAGEPOOLSMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/storagepools/RefreshStoragePoolsMsg.h>
 
@@ -9,4 +8,3 @@ class RefreshStoragePoolsMsgEx : public RefreshStoragePoolsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*STORAGE_REFRESHSTORAGEPOOLSMSGEX_H_*/

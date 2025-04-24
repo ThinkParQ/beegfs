@@ -1,5 +1,4 @@
-#ifndef TRUNCLOCALFILEMSG_H_
-#define TRUNCLOCALFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/PathInfo.h>
@@ -122,4 +121,3 @@ class TruncLocalFileMsg : public NetMessageSerdes<TruncLocalFileMsg>
       }
 };
 
-#endif /*TRUNCLOCALFILEMSG_H_*/

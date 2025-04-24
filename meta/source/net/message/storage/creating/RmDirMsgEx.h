@@ -1,5 +1,4 @@
-#ifndef RMDIRMSGEX_H_
-#define RMDIRMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/RmDirMsg.h>
@@ -41,4 +40,3 @@ class RmDirMsgEx : public MirroredMessage<RmDirMsg,
       const char* mirrorLogContext() const override { return "RmDirMsgEx/forward"; }
 };
 
-#endif /*RMDIRMSGEX_H_*/

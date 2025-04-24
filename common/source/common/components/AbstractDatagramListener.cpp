@@ -346,7 +346,7 @@ bool AbstractDatagramListener::sendToNodesUDPwithAck(const std::vector<NodeHandl
 
    for (auto iter = nodes.begin(); iter != nodes.end(); iter++)
    {
-      std::string ackID(ackIDPrefix + (*iter)->getID() );
+      std::string ackID(ackIDPrefix + (*iter)->getAlias() );
       WaitAck waitAck(ackID, iter->get());
 
       waitAcks.insert(WaitAckMapVal(ackID, waitAck) );

@@ -480,7 +480,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -1407,7 +1407,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -1455,7 +1455,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -1617,7 +1617,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -1665,7 +1665,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -1827,7 +1827,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -1875,7 +1875,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$metaID$/"
             }
@@ -3119,14 +3119,14 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "",
+        "definition": "show tag values from meta with key = \"nodeNumID\" ",
         "hide": 0,
         "includeAll": false,
         "label": "Meta ID",
         "multi": false,
         "name": "metaID",
         "options": [],
-        "query": "show tag values from meta with key = \"nodeID\" ",
+        "query": "show tag values from meta with key = \"nodeNumID\" ",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -3142,13 +3142,14 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "select last(\"hostnameid\") from meta where nodeID =~ /^$metaID$/",
-        "hide": 2,
+        "definition": "select last(\"hostnameid\") from meta  where nodeNumID =~ /^$metaID$/",
+        "hide": 0,
         "includeAll": false,
+        "label": "Meta Host",
         "multi": false,
         "name": "hostmeta",
         "options": [],
-        "query": "select last(\"hostnameid\") from meta  where nodeID =~ /^$metaID$/",
+        "query": "select last(\"hostnameid\") from meta  where nodeNumID =~ /^$metaID$/",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

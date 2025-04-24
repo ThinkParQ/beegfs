@@ -36,7 +36,7 @@ static inline void LookupIntentMsg_init(LookupIntentMsg* this);
 static inline void LookupIntentMsg_initFromName(LookupIntentMsg* this, const EntryInfo* parentInfo,
    const char* entryName);
 static inline void LookupIntentMsg_initFromEntryInfo(LookupIntentMsg* this,
-   const EntryInfo* parentInfo, const char* entryName, const EntryInfo* entryInfo);
+   const EntryInfo* parentInfo, const char* entryName, const EntryInfo* entryInfo, uint32_t metaVersion);
 
 // virtual functions
 extern void LookupIntentMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
@@ -74,6 +74,7 @@ struct LookupIntentMsg
    // for serialization
    const EntryInfo* parentInfoPtr; // not owned by this object (lookup/open/creation data)
    UInt16List* preferredTargets; // not owned by this object! (file creation data)
+   uint32_t metaVersion;            
 };
 
 extern const struct NetMessageOps LookupIntentMsg_Ops;
@@ -108,7 +109,7 @@ void LookupIntentMsg_initFromName(LookupIntentMsg* this, const EntryInfo* parent
  * Initialize from entryInfo - supposed to be used for revalidate intent
  */
 void LookupIntentMsg_initFromEntryInfo(LookupIntentMsg* this, const EntryInfo* parentInfo,
-   const char* entryName, const EntryInfo* entryInfo)
+   const char* entryName, const EntryInfo* entryInfo, uint32_t metaVersion)
 {
    LookupIntentMsg_init(this);
 
@@ -120,6 +121,7 @@ void LookupIntentMsg_initFromEntryInfo(LookupIntentMsg* this, const EntryInfo* p
    this->entryNameLen = strlen(entryName);
 
    this->entryInfoPtr = entryInfo;
+   this->metaVersion = metaVersion;
 }
 
 void LookupIntentMsg_addIntentCreate(LookupIntentMsg* this,

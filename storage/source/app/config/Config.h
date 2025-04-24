@@ -1,5 +1,4 @@
-#ifndef CONFIG_H_
-#define CONFIG_H_
+#pragma once
 
 #include <common/app/config/AbstractConfig.h>
 
@@ -228,4 +227,3 @@ class Config : public AbstractConfig
 
 };
 
-#endif /*CONFIG_H_*/

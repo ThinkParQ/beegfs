@@ -1,5 +1,4 @@
-#ifndef MOVINGDIRINSERTRESPMSG_H_
-#define MOVINGDIRINSERTRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -32,4 +31,3 @@ class MovingDirInsertRespMsg : public SimpleIntMsg
 };
 
 
-#endif /*MOVINGDIRINSERTRESPMSG_H_*/

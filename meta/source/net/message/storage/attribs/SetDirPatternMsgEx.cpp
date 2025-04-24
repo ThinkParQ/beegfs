@@ -38,6 +38,7 @@ std::unique_ptr<MirroredMessageResponseState> SetDirPatternMsgEx::executeLocally
 
    EntryInfo* entryInfo = getEntryInfo();
    StripePattern* pattern = &getPattern();
+   RemoteStorageTarget* rst = getRemoteStorageTarget();
 
    FhgfsOpsErr retVal = FhgfsOpsErr_NOTADIR;
 
@@ -73,16 +74,50 @@ std::unique_ptr<MirroredMessageResponseState> SetDirPatternMsgEx::executeLocally
 
    DirInode* dir = metaStore->referenceDir(entryInfo->getEntryID(), entryInfo->getIsBuddyMirrored(),
       true);
-   if(dir)
-   { // entry is a directory
-      retVal = dir->setStripePattern(*pattern, actorUID);
-      if (retVal != FhgfsOpsErr_SUCCESS)
-         LogContext(logContext).logErr("Update of stripe pattern failed. "
-            "DirID: " + entryInfo->getEntryID() );
 
-      metaStore->releaseDir(entryInfo->getEntryID() );
+   if (unlikely(!dir))
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+
+   // entry is a directory
+   retVal = dir->setStripePattern(*pattern, actorUID);
+   if (retVal != FhgfsOpsErr_SUCCESS)
+   {
+      LogContext(logContext).logErr("Update of stripe pattern failed. "
+         "DirID: " + entryInfo->getEntryID());
+      metaStore->releaseDir(entryInfo->getEntryID());
+      return boost::make_unique<ResponseState>(retVal);
    }
 
+   // Ignore if the request did not contain RST configuration:
+   if (!rst->hasInvalidVersion())
+   {
+      auto const& rstIDs = rst->getRstIdVector();
+      if (rstIDs.empty())
+      {
+         // Empty RST ID list indicates a request to clear/unset RSTs for this directory.
+         retVal = dir->clearRemoteStorageTarget();
+         if (retVal != FhgfsOpsErr_SUCCESS)
+         {
+            LogContext(logContext).logErr("Failed to clear RST info; "
+               "DirID: " +  entryInfo->getEntryID());
+            metaStore->releaseDir(entryInfo->getEntryID());
+            return boost::make_unique<ResponseState>(retVal);
+         }
+      }
+      else
+      {
+         retVal = dir->setRemoteStorageTarget(*rst);
+         if (retVal != FhgfsOpsErr_SUCCESS)
+         {
+            LogContext(logContext).logErr("Storing remote storage targets failed. "
+               "DirID: " + entryInfo->getEntryID());
+            metaStore->releaseDir(entryInfo->getEntryID());
+            return boost::make_unique<ResponseState>(retVal);
+         }
+      }
+   }
+
+   metaStore->releaseDir(entryInfo->getEntryID());
    return boost::make_unique<ResponseState>(retVal);
 }
 

@@ -1,5 +1,4 @@
-#ifndef MESSAGINGTK_H_
-#define MESSAGINGTK_H_
+#pragma once
 
 #include <common/app/AbstractApp.h>
 #include <common/app/log/LogContext.h>
@@ -38,4 +37,3 @@ class MessagingTk
       static FhgfsOpsErr handleGenericResponse(RequestResponseArgs* rrArgs);
 };
 
-#endif /*MESSAGINGTK_H_*/

@@ -22,6 +22,10 @@
 
 #include <boost/lexical_cast.hpp>
 
+// forward declaration
+namespace UUID {
+   std::string getMachineUUID();
+}
 
 InternodeSyncer::InternodeSyncer(TargetConsistencyState initialConsistencyState)
    : PThread("XNodeSync"),
@@ -381,10 +385,17 @@ bool InternodeSyncer::registerNode(AbstractDatagramListener* dgramLis)
    bool rootIsBuddyMirrored = app->getMetaRoot().getIsMirrored();
    NicAddressList nicList(localNode.getNicList());
 
-   HeartbeatMsg msg(localNode.getID(), localNodeNumID, NODETYPE_Meta, &nicList);
+   HeartbeatMsg msg(localNode.getAlias(), localNodeNumID, NODETYPE_Meta, &nicList);
    msg.setRootNumID(rootNodeID);
    msg.setRootIsBuddyMirrored(rootIsBuddyMirrored);
-   msg.setPorts(cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
+   msg.setPorts(cfg->getConnMetaPort(), cfg->getConnMetaPort() );
+   auto uuid = UUID::getMachineUUID();
+   if (uuid.empty()) {
+      LogContext(logContext).log(Log_CRITICAL,
+         "Couldn't determine UUID for machine. Node registration not possible.");
+      return false;
+   }
+   msg.setMachineUUID(uuid);
 
    bool nodeRegistered = dgramLis->sendToNodeUDPwithAck(mgmtNode, &msg);
 
@@ -600,6 +611,7 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
          unsigned accessFlags = sessionFile->getAccessFlags();
          unsigned numHardlinks;
          unsigned numInodeRefs;
+         bool lastWriterClosed; // ignored here!
 
          MetaFileHandle inode = sessionFile->releaseInode();
          std::string fileID = inode->getEntryID();
@@ -639,7 +651,7 @@ void InternodeSyncer::syncClients(const std::vector<NodeHandle>& clientsList, bo
             entryInfo->getParentEntryID() + " FileName: " + entryInfo->getFileName() );
 
          metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks,
-               &numInodeRefs);
+               &numInodeRefs, lastWriterClosed);
 
          if(allowRemoteComm && !numHardlinks && !numInodeRefs)
             MsgHelperClose::unlinkDisposableFile(fileID, NETMSG_DEFAULT_USERID,

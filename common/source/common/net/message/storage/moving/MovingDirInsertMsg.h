@@ -1,5 +1,4 @@
-#ifndef MOVINGDIRINSERTMSG_H_
-#define MOVINGDIRINSERTMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -79,4 +78,3 @@ class MovingDirInsertMsg : public MirroredMessageBase<MovingDirInsertMsg>
       uint32_t getSerialBufLen() const { return serialBufLen; }
 };
 
-#endif /*MOVINGDIRINSERTMSG_H_*/

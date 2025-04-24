@@ -1,5 +1,4 @@
-#ifndef READLOCALFILERDMAMSG_H_
-#define READLOCALFILERDMAMSG_H_
+#pragma once
 
 #ifdef BEEGFS_NVFS
 #include <common/net/message/NetMessage.h>
@@ -61,4 +60,3 @@ class ReadLocalFileRDMAMsg : public ReadLocalFileV2MsgBase, public NetMessageSer
 };
 #endif /* BEEGFS_NVFS */
 
-#endif /*READLOCALFILERDMAMSG_H_*/

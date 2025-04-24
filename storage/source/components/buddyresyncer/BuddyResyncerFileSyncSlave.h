@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCERFILESYNCSLAVE_H_
-#define BUDDYRESYNCERFILESYNCSLAVE_H_
+#pragma once
 
 #include <common/storage/mirroring/SyncCandidateStore.h>
 #include <common/nodes/Node.h>
@@ -97,4 +96,3 @@ typedef BuddyResyncerFileSyncSlaveList::iterator BuddyResyncerFileSyncSlaveListI
 typedef std::vector<BuddyResyncerFileSyncSlave*> BuddyResyncerFileSyncSlaveVec;
 typedef BuddyResyncerFileSyncSlaveVec::iterator BuddyResyncerFileSyncSlaveVecIter;
 
-#endif /* BUDDYRESYNCERFILESYNCSLAVE_H_ */

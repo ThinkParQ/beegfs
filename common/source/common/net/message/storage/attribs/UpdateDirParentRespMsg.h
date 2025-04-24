@@ -1,5 +1,4 @@
-#ifndef UPDATEPARENTENTRYIDRESPMSG_H_
-#define UPDATEPARENTENTRYIDRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class UpdateDirParentRespMsg : public SimpleIntMsg
       }
 };
 
-#endif

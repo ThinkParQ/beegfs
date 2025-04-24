@@ -88,7 +88,7 @@ int64_t ReadLocalFileV2Work::communicate(Node& node, char* bufIn, unsigned bufIn
          {
             LogContext(logContext).logErr(
                std::string("Received a lengthInfo that would lead to a buffer overflow from ") +
-                  node.getID() + ": " + StringTk::int64ToStr(lengthInfo) );
+                  node.getAlias() + ": " + StringTk::int64ToStr(lengthInfo) );
 
             retVal = -FhgfsOpsErr_INTERNAL;
 
@@ -108,7 +108,7 @@ int64_t ReadLocalFileV2Work::communicate(Node& node, char* bufIn, unsigned bufIn
    catch(SocketConnectException& e)
    {
       LogContext(logContext).log(2, std::string("Unable to connect to storage server: ") +
-         node.getID() );
+         node.getAlias() );
 
       retVal = -FhgfsOpsErr_COMMUNICATION;
    }

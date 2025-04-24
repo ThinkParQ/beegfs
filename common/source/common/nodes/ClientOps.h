@@ -1,5 +1,4 @@
-#ifndef CLIENTOPS_H_
-#define CLIENTOPS_H_
+#pragma once
 
 #include <common/nodes/Node.h>
 #include <common/threading/Mutex.h>
@@ -66,4 +65,3 @@ class ClientOpsRequestor
       static IdOpsUnorderedMap request(Node& node, bool perUser);
 };
 
-#endif

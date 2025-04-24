@@ -1,5 +1,4 @@
-#ifndef LOCALCONNWORKER_H_
-#define LOCALCONNWORKER_H_
+#pragma once
 
 #include <common/components/ComponentInitException.h>
 #include <common/components/worker/UnixConnWorker.h>
@@ -47,4 +46,3 @@ class LocalConnWorker : public UnixConnWorker
       }
 };
 
-#endif /*LOCALCONNWORKER_H_*/

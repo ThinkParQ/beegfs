@@ -1,5 +1,4 @@
-#ifndef READLOCALFILERDMAMSGEX_H_
-#define READLOCALFILERDMAMSGEX_H_
+#pragma once
 
 #ifdef BEEGFS_NVFS
 #include <string>
@@ -113,4 +112,3 @@ typedef ReadLocalFileMsgExBase<ReadLocalFileRDMAMsgSender,
 
 #endif /* BEEGFS_NVFS */
 
-#endif /*READLOCALFILERDMAMSGEX_H_*/

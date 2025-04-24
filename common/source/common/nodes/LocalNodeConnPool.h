@@ -1,5 +1,4 @@
-#ifndef LOCALNODECONNPOOL_H_
-#define LOCALNODECONNPOOL_H_
+#pragma once
 
 #include <common/components/worker/UnixConnWorker.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
@@ -57,4 +56,3 @@ class LocalNodeConnPool : public NodeConnPool
 
 };
 
-#endif /*LOCALNODECONNPOOL_H_*/

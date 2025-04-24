@@ -1,5 +1,4 @@
-#ifndef HEARTBEATREQUESTMSG_H_
-#define HEARTBEATREQUESTMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include "../SimpleMsg.h"
@@ -13,4 +12,3 @@ class HeartbeatRequestMsg : public SimpleMsg
 };
 
 
-#endif /*HEARTBEATREQUESTMSG_H_*/

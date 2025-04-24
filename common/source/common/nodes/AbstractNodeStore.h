@@ -1,5 +1,4 @@
-#ifndef ABSTRACTNODESTORE_H_
-#define ABSTRACTNODESTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/Node.h>
@@ -51,4 +50,3 @@ class AbstractNodeStore
       }
 };
 
-#endif /* ABSTRACTNODESTORE_H_ */

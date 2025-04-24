@@ -1,5 +1,4 @@
-#ifndef MIRRORMETADATAMSG_H_
-#define MIRRORMETADATAMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -48,4 +47,3 @@ class MirrorMetadataMsg : public NetMessage
 };
 
 
-#endif /* MIRRORMETADATAMSG_H_ */

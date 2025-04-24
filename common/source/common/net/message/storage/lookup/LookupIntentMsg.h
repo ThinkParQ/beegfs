@@ -1,5 +1,4 @@
-#ifndef LOOKUPINTENTMSG_H_
-#define LOOKUPINTENTMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -49,15 +48,17 @@ class LookupIntentMsg : public MirroredMessageBase<LookupIntentMsg>
        * Used for revalidate intent
        * @param parentInfo just a reference, so do not free it as long as you use this object!
        * @param entryInfo  just a reference, so do not free it as long as you use this object!
+       * @param metaVersion    
        *
        */
-      LookupIntentMsg(const EntryInfo* parentInfo, const EntryInfo* entryInfo) :
+      LookupIntentMsg(const EntryInfo* parentInfo, const EntryInfo* entryInfo,  uint32_t metaVersion) :
          BaseType(NETMSGTYPE_LookupIntent)
       {
          this->intentFlags = LOOKUPINTENTMSG_FLAG_REVALIDATE;
 
          this->parentInfoPtr = parentInfo;
          this->entryInfoPtr  = entryInfo;
+         this->metaVersion = metaVersion;
       }
 
       LookupIntentMsg() : BaseType(NETMSGTYPE_LookupIntent)
@@ -73,7 +74,10 @@ class LookupIntentMsg : public MirroredMessageBase<LookupIntentMsg>
             % serdes::stringAlign4(obj->entryName);
 
          if(obj->intentFlags & LOOKUPINTENTMSG_FLAG_REVALIDATE)
-            ctx % serdes::backedPtr(obj->entryInfoPtr, obj->entryInfo);
+            ctx 
+               % obj->metaVersion
+               % serdes::backedPtr(obj->entryInfoPtr, obj->entryInfo);
+               
 
          if(obj->intentFlags & LOOKUPINTENTMSG_FLAG_OPEN)
             ctx
@@ -133,6 +137,7 @@ class LookupIntentMsg : public MirroredMessageBase<LookupIntentMsg>
       // for deserialization
       EntryInfo parentInfo;
       EntryInfo entryInfo;               // (revalidate data)
+      uint32_t  metaVersion;             // (revalidate data)
       struct {
          UInt16List preferredTargets;
          std::unique_ptr<StripePattern> newStripePattern;
@@ -212,6 +217,11 @@ class LookupIntentMsg : public MirroredMessageBase<LookupIntentMsg>
          return &this->entryInfo;
       }
 
+      uint32_t getMetaVersion()
+      {
+         return this->metaVersion;
+      }
+
       unsigned getUserID() const
       {
          return this->userID;
@@ -260,4 +270,3 @@ class LookupIntentMsg : public MirroredMessageBase<LookupIntentMsg>
       StripePattern* getNewStripePattern() const { return newStripePattern; }
 };
 
-#endif /* LOOKUPINTENTMSG_H_ */

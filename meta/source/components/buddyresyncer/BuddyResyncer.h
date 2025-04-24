@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCER_H_
-#define BUDDYRESYNCER_H_
+#pragma once
 
 #include <components/buddyresyncer/BuddyResyncJob.h>
 #include <common/storage/StorageErrors.h>
@@ -68,4 +67,3 @@ class BuddyResyncer
       BuddyResyncer& operator=(const BuddyResyncer&);
 };
 
-#endif /* BUDDYRESYNCER_H_ */

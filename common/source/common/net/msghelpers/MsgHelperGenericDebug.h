@@ -1,5 +1,4 @@
-#ifndef MSGHELPERGENERICDEBUG_H_
-#define MSGHELPERGENERICDEBUG_H_
+#pragma once
 
 #include <common/nodes/NodeStoreServers.h>
 #include <common/storage/quota/ExceededQuotaStore.h>
@@ -57,4 +56,3 @@ class MsgHelperGenericDebug
    public:
 };
 
-#endif /* MSGHELPERGENERICDEBUG_H_ */

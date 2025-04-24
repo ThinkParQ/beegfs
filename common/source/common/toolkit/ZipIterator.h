@@ -1,5 +1,4 @@
-#ifndef ZIP_ITERATOR_H_
-#define ZIP_ITERATOR_H_
+#pragma once
 
 #include <iterator>
 
@@ -407,4 +406,3 @@ class ZipConstIterRange<F, S, void>
 };
 
 
-#endif /* ZIP_ITERATOR_H_ */

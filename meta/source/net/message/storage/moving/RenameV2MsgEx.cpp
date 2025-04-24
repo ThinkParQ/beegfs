@@ -13,12 +13,15 @@
 #include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileInodeMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileInodeRespMsg.h>
+#include <common/net/message/storage/attribs/StatMsg.h>
+#include <common/net/message/storage/attribs/StatRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/MetadataTk.h>
 #include <components/FileEventLogger.h>
 #include <components/ModificationEventFlusher.h>
 #include <net/msghelpers/MsgHelperUnlink.h>
 #include <net/msghelpers/MsgHelperXAttr.h>
+#include <net/msghelpers/MsgHelperStat.h>
 #include <program/Program.h>
 #include <session/EntryLock.h>
 #include "RenameV2MsgEx.h"
@@ -191,57 +194,72 @@ bool RenameV2MsgEx::processIncoming(ResponseContext& ctx)
 std::unique_ptr<MirroredMessageResponseState> RenameV2MsgEx::executeLocally(ResponseContext& ctx,
    bool isSecondary)
 {
-   MetaStore* metaStore = Program::getApp()->getMetaStore();
-   ModificationEventFlusher* modEventFlusher = Program::getApp()->getModificationEventFlusher();
-   bool modEventLoggingEnabled = modEventFlusher->isLoggingEnabled();
-
-   std::string movedEntryID;
-   std::string unlinkedEntryID;
+   App* app = Program::getApp();
+   MetaStore* metaStore = app->getMetaStore();
 
    // reference fromParent
    DirInode* fromParent = metaStore->referenceDir(getFromDirInfo()->getEntryID(),
       getFromDirInfo()->getIsBuddyMirrored(), true);
-   if(!fromParent)
+
+   if (unlikely(!fromParent))
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
 
-   const auto fileEventLogEnabled = !isSecondary
-                                    && getFileEvent()
-                                    && Program::getApp()->getFileEventLogger();
+   std::string unlinkedEntryID;     // ID of potential overwritten destination file for cleanup
+   EntryInfo srcEntryInfo;          // EntryInfo of source file/directory being renamed
+   unsigned srcEntryLinkCount = 0;  // Hardlink count needed for event logging
+
+   ModificationEventFlusher* modEventFlusher = app->getModificationEventFlusher();
+   const bool modEventLoggingEnabled = modEventFlusher->isLoggingEnabled();
+
+   const bool fileEventLogEnabled = !isSecondary && getFileEvent() && app->getFileEventLogger();
 
    if (modEventLoggingEnabled || fileEventLogEnabled)
    {
-      EntryInfo entryInfo;
-      fromParent->getEntryInfo(getOldName(), entryInfo);
+      fromParent->getEntryInfo(getOldName(), srcEntryInfo);
 
-      movedEntryID = entryInfo.getEntryID();
+      // Fetch link count early before rename occurs:
+      // - Inlined inode data might move to a different metadata node post-rename
+      // - Early fetch avoids a StatMsg round trip to retrieve link count from the new node
+      FhgfsOpsErr res;
+      std::tie(res, srcEntryLinkCount) = getLinkCountForMovedEntry(&srcEntryInfo);
+      if (res != FhgfsOpsErr_SUCCESS)
+      {
+         LogContext("RenameV2MsgEx::executeLocally").logErr(
+            "Failed to get link count for entry: " + srcEntryInfo.getEntryID());
+         // don't return an error to client
+      }
    }
 
-   FhgfsOpsErr renameRes = movingPerform(*fromParent, getFromDirInfo(), getOldName(),
+   FhgfsOpsErr renameRes = movingPerform(*fromParent, getOldName(),
          getEntryType(), getToDirInfo(), getNewName(), unlinkedEntryID);
 
-   if (shouldFixTimestamps())
+   if ((renameRes == FhgfsOpsErr_SUCCESS) && shouldFixTimestamps())
       fixInodeTimestamp(*fromParent, fromDirTimestamps);
 
    metaStore->releaseDir(getFromDirInfo()->getEntryID());
 
-   if (!isSecondary && Program::getApp()->getFileEventLogger() && getFileEvent())
+   if ((renameRes == FhgfsOpsErr_SUCCESS) && fileEventLogEnabled)
    {
-         Program::getApp()->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  movedEntryID,
-                  getFromDirInfo()->getEntryID(),
-                  getToDirInfo()->getEntryID());
+      EventContext eventCtx = makeEventContext(
+         &srcEntryInfo,
+         getFromDirInfo()->getEntryID(),
+         getMsgHeaderUserID(),
+         getToDirInfo()->getEntryID(),
+         srcEntryLinkCount,
+         isSecondary
+      );
+
+      logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    // clean-up
-
-   if (modEventLoggingEnabled)
+   if ((renameRes == FhgfsOpsErr_SUCCESS) && modEventLoggingEnabled)
    {
       if (DirEntryType_ISDIR(getEntryType()))
-         modEventFlusher->add(ModificationEvent_DIRMOVED, movedEntryID);
+         modEventFlusher->add(ModificationEvent_DIRMOVED, srcEntryInfo.getEntryID());
       else
       {
-         modEventFlusher->add(ModificationEvent_FILEMOVED, movedEntryID);
+         modEventFlusher->add(ModificationEvent_FILEMOVED, srcEntryInfo.getEntryID());
          if (!unlinkedEntryID.empty())
             modEventFlusher->add(ModificationEvent_FILEREMOVED, unlinkedEntryID);
       }
@@ -250,19 +268,15 @@ std::unique_ptr<MirroredMessageResponseState> RenameV2MsgEx::executeLocally(Resp
    return boost::make_unique<ResponseState>(renameRes);
 }
 
-FhgfsOpsErr RenameV2MsgEx::movingPerform(DirInode& fromParent, EntryInfo* fromDirInfo,
-   const std::string& oldName, DirEntryType entryType, EntryInfo* toDirInfo,
-   const std::string& newName, std::string& unlinkedEntryID)
+FhgfsOpsErr RenameV2MsgEx::movingPerform(DirInode& fromParent, const std::string& oldName,
+   DirEntryType entryType, EntryInfo* toDirInfo, const std::string& newName, std::string& unlinkedEntryID)
 {
    const char* logContext = "RenameV2MsgEx::movingPerform";
    IGNORE_UNUSED_VARIABLE(logContext);
-
    App* app = Program::getApp();
-   MirrorBuddyGroupMapper* metaBuddyGroupMapper = app->getMetaBuddyGroupMapper();
-
-   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
    // is this node the owner of the fromParent dir?
+   MirrorBuddyGroupMapper* metaBuddyGroupMapper = app->getMetaBuddyGroupMapper();
    NumNodeID expectedOwnerID = fromParent.getIsBuddyMirrored() ?
       NumNodeID(metaBuddyGroupMapper->getLocalGroupID() ) : app->getLocalNode().getNumID();
 
@@ -275,18 +289,18 @@ FhgfsOpsErr RenameV2MsgEx::movingPerform(DirInode& fromParent, EntryInfo* fromDi
       return FhgfsOpsErr_INTERNAL;
    }
 
-   if (fromDirInfo->getEntryID() == toDirInfo->getEntryID())
+   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
+
+   if (fromParent.getID() == toDirInfo->getEntryID())
    { // simple rename (<= not a move && everything local)
       LOG_DEBUG(logContext, Log_SPAM, "Method: rename in same dir"); // debug in
-
       retVal = renameInSameDir(fromParent, oldName, newName, unlinkedEntryID);
    }
    else
    if (entryType == DirEntryType_DIRECTORY)
-      retVal = renameDir(fromParent, fromDirInfo, oldName, toDirInfo, newName);
+      retVal = renameDir(fromParent, oldName, toDirInfo, newName);
    else
-      retVal = renameFile(fromParent, fromDirInfo, oldName, toDirInfo, newName,
-         unlinkedEntryID);
+      retVal = renameFile(fromParent, oldName, toDirInfo, newName, unlinkedEntryID);
 
    return retVal;
 }
@@ -299,11 +313,10 @@ void RenameV2MsgEx::forwardToSecondary(ResponseContext& ctx)
 /**
  * Rename a directory
  */
-FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInfo,
-   const std::string& oldName, EntryInfo* toDirInfo, const std::string& newName)
+FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, const std::string& oldName,
+   EntryInfo* toDirInfo, const std::string& newName)
 {
    const char* logContext = "RenameV2MsgEx::renameDir";
-
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
    DirEntry fromDirEntry(oldName);
@@ -315,10 +328,9 @@ FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInf
    }
 
    // when we we verified the 'oldName' is really a directory
-
    LOG_DEBUG(logContext, Log_SPAM, "Method: remote dir move."); // debug in
 
-   if (fromDirInfo->getIsBuddyMirrored() && hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
+   if (fromParent.getIsBuddyMirrored() && hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
    {
       retVal = FhgfsOpsErr_SUCCESS;
    }
@@ -339,7 +351,7 @@ FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInf
    }
 
    // finish local part of the move operation
-   if(retVal == FhgfsOpsErr_SUCCESS)
+   if (retVal == FhgfsOpsErr_SUCCESS)
    {
       DirEntry* rmDirEntry;
 
@@ -371,19 +383,16 @@ FhgfsOpsErr RenameV2MsgEx::renameDir(DirInode& fromParent, EntryInfo* fromDirInf
 /**
  * Rename a file
  */
-FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirInfo,
-   const std::string& oldName, EntryInfo* toDirInfo, const std::string& newName,
-   std::string& unlinkedEntryID)
+FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, const std::string& oldName,
+   EntryInfo* toDirInfo, const std::string& newName, std::string& unlinkedEntryID)
 {
    const char* logContext = "RenameV2MsgEx::renameFile";
-   App* app = Program::getApp();
-   MetaStore* metaStore = app->getMetaStore();
-
+   MetaStore* metaStore = Program::getApp()->getMetaStore();
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
-   EntryInfo fromFileEntryInfo;
-   bool getRes = fromParent.getFileEntryInfo(oldName, fromFileEntryInfo);
-   if(!getRes )
+   EntryInfo fromFileInfo;
+   bool getRes = fromParent.getFileEntryInfo(oldName, fromFileInfo);
+   if (!getRes)
    {
       LOG_DEBUG(logContext, Log_SPAM, "Error: fromDir does not exist.");
       return FhgfsOpsErr_PATHNOTEXISTS;
@@ -391,52 +400,52 @@ FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirIn
 
    // when we are here we verified the file to be renamed is really a file
 
-   if (fromDirInfo->getIsBuddyMirrored() && hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
+   if (fromParent.getIsBuddyMirrored() && hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
    {
       retVal = FhgfsOpsErr_SUCCESS;
    }
    else
    {
-      // the buffer is used to transfer all data of the data of the dir-entry
+      // the buffer is used to transfer all data of the dir-entry
       boost::scoped_array<char> serialBuf(new char[META_SERBUF_SIZE]);
       size_t usedSerialBufLen;
-      StringVector xattrNames;
 
       retVal = metaStore->moveRemoteFileBegin(
-         fromParent, &fromFileEntryInfo, serialBuf.get(), META_SERBUF_SIZE, &usedSerialBufLen);
+         fromParent, &fromFileInfo, serialBuf.get(), META_SERBUF_SIZE, &usedSerialBufLen);
       if (retVal != FhgfsOpsErr_SUCCESS)
          return retVal;
 
       LOG_DEBUG(logContext, Log_SPAM, "Method: remote file move."); // debug in
 
-      if (app->getConfig()->getStoreClientXAttrs() && fromFileEntryInfo.getIsInlined())
+      StringVector xattrNames;
+      if (Program::getApp()->getConfig()->getStoreClientXAttrs() && fromFileInfo.getIsInlined())
       {
          FhgfsOpsErr listXAttrRes;
 
-         std::tie(listXAttrRes, xattrNames) = MsgHelperXAttr::listxattr(&fromFileEntryInfo);
+         std::tie(listXAttrRes, xattrNames) = MsgHelperXAttr::listxattr(&fromFileInfo);
          if (listXAttrRes != FhgfsOpsErr_SUCCESS)
          {
-            metaStore->moveRemoteFileComplete(fromParent, fromFileEntryInfo.getEntryID());
+            metaStore->moveRemoteFileComplete(fromParent, fromFileInfo.getEntryID());
             return FhgfsOpsErr_TOOBIG;
          }
       }
 
       // Do the remote operation (insert and possible unlink of an existing toFile)
-      retVal = remoteFileInsertAndUnlink(&fromFileEntryInfo, toDirInfo, newName, serialBuf.get(),
+      retVal = remoteFileInsertAndUnlink(&fromFileInfo, toDirInfo, newName, serialBuf.get(),
          usedSerialBufLen, std::move(xattrNames), unlinkedEntryID);
    }
-
 
    // finish local part of the owned file move operation (+ remove local file-link)
    if (retVal == FhgfsOpsErr_SUCCESS)
    {
       FhgfsOpsErr unlinkRes;
 
-      if (fromFileEntryInfo.getIsInlined())
+      if (fromFileInfo.getIsInlined())
       {
          // We are not interested in the inode here , as we are not going to delete storage chunks.
          EntryInfo entryInfo;
-         unlinkRes = metaStore->unlinkFile(fromParent, oldName, &entryInfo, NULL);
+         unsigned outNumHardlinks;  // Not used here!
+         unlinkRes = metaStore->unlinkFile(fromParent, oldName, &entryInfo, NULL, outNumHardlinks);
       }
       else
       {
@@ -451,14 +460,14 @@ FhgfsOpsErr RenameV2MsgEx::renameFile(DirInode& fromParent, EntryInfo* fromDirIn
       if (unlikely (unlinkRes) )
       {
          LogContext(logContext).logErr(std::string("Error: Failed to unlink fromFile: ") +
-               "DirID: " + fromFileEntryInfo.getParentEntryID() + " "
+               "DirID: " + fromFileInfo.getParentEntryID() + " "
                "entryName: " + oldName + ". " +
                "Remote toFile was successfully created.");
       }
    }
 
-   if (!fromDirInfo->getIsBuddyMirrored() || !hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
-      metaStore->moveRemoteFileComplete(fromParent, fromFileEntryInfo.getEntryID() );
+   if (!fromParent.getIsBuddyMirrored() || !hasFlag(NetMessageHeader::Flag_BuddyMirrorSecond))
+      metaStore->moveRemoteFileComplete(fromParent, fromFileInfo.getEntryID() );
 
    return retVal;
 }
@@ -504,7 +513,7 @@ FhgfsOpsErr RenameV2MsgEx::renameInSameDir(DirInode& fromParent, const std::stri
             }
             else
             {
-               auto file = metaStore->referenceFile(&info);
+               auto [file, referenceRes] = metaStore->referenceFile(&info);
                if (file)
                {
                   fixInodeTimestamp(*file, renamedInodeTimestamps, &info);
@@ -822,4 +831,66 @@ FhgfsOpsErr RenameV2MsgEx::unlinkRemoteFileInode(EntryInfo* entryInfo)
    } while (false);
 
    return retVal;
+}
+
+std::pair<FhgfsOpsErr, unsigned> RenameV2MsgEx::getLinkCountForMovedEntry(EntryInfo* entryInfo)
+{
+   const char* logContext = "RenameV2Msg (Get Link Count)";
+
+   App* app = Program::getApp();
+   FhgfsOpsErr statRes = FhgfsOpsErr_SUCCESS;
+   unsigned linkCount = 0;
+
+   NumNodeID ownerNodeID = entryInfo->getOwnerNodeID();
+   bool isLocalOwner = ((!isMirrored() && ownerNodeID == app->getLocalNode().getNumID()) ||
+         (isMirrored() && ownerNodeID.val() == app->getMetaBuddyGroupMapper()->getLocalGroupID()));
+
+   if (isLocalOwner)
+   {
+      StatData statData;
+      statRes = MsgHelperStat::stat(entryInfo, true, getMsgHeaderUserID(), statData);
+
+      if (statRes == FhgfsOpsErr_SUCCESS)
+         linkCount = statData.getNumHardlinks();
+      else
+         LogContext(logContext).logErr("Stat Failed!. entryID: " + entryInfo->getEntryID());
+   }
+   else
+   {
+      // send StatMsg to remote meta node/buddygroup
+      StatMsg statMsg(entryInfo);
+      RequestResponseArgs rrArgs(NULL, &statMsg, NETMSGTYPE_StatResp);
+      RequestResponseNode rrNode(ownerNodeID, app->getMetaNodes());
+      rrNode.setTargetStates(app->getMetaStateStore());
+
+      if (entryInfo->getIsBuddyMirrored())
+         rrNode.setMirrorInfo(app->getMetaBuddyGroupMapper(), false);
+
+      do
+      {
+         FhgfsOpsErr resp = MessagingTk::requestResponseNode(&rrNode, &rrArgs);
+         if (unlikely(resp != FhgfsOpsErr_SUCCESS))
+         {
+            LogContext(logContext).logErr("Communication with metadata server failed. "
+               "nodeID: " + ownerNodeID.str());
+            statRes = resp;
+            break;
+         }
+
+         // response received
+         const auto statRespMsg = (StatRespMsg*) rrArgs.outRespMsg.get();
+         statRes = (FhgfsOpsErr) statRespMsg->getResult();
+         if (statRes != FhgfsOpsErr_SUCCESS)
+         {
+            LogContext(logContext).logErr("Stat Failed!. nodeID: " + ownerNodeID.str()
+               + "; entryID: " + entryInfo->getEntryID());
+            break;
+         }
+
+         // success
+         linkCount = statRespMsg->getStatData()->getNumHardlinks();
+      } while (false);
+   }
+
+   return {statRes, linkCount};
 }

@@ -1,5 +1,4 @@
-#ifndef MSGHELPERSTAT_H_
-#define MSGHELPERSTAT_H_
+#pragma once
 
 #include <common/Common.h>
 #include <storage/MetaStore.h>
@@ -29,4 +28,3 @@ class MsgHelperStat
       // inliners
 };
 
-#endif /* MSGHELPERSTAT_H_ */

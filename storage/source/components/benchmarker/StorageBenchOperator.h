@@ -1,5 +1,4 @@
-#ifndef STORAGEBENCHOPERATOR_H_
-#define STORAGEBENCHOPERATOR_H_
+#pragma once
 
 
 #include "StorageBenchSlave.h"
@@ -44,4 +43,3 @@ class StorageBenchOperator
       }
 };
 
-#endif /* STORAGEBENCHOPERATOR_H_ */

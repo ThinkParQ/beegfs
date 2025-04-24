@@ -1,5 +1,4 @@
-#ifndef PTHREAD_H_
-#define PTHREAD_H_
+#pragma once
 
 #include <common/system/System.h>
 #include <common/threading/Atomics.h>
@@ -425,4 +424,3 @@ class PThread
       static PThread* getCurrentThread() { return currentThread; }
 };
 
-#endif /*PTHREAD_H_*/

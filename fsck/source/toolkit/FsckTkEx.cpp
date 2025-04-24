@@ -43,7 +43,7 @@ bool FsckTkEx::checkReachability()
    {
       if ( !FsckTkEx::checkReachability(*node, NODETYPE_Meta) )
       {
-         errors.push_back("Communication with metadata node failed: " + node->getID());
+         errors.push_back("Communication with metadata node failed: " + node->getAlias());
          commSuccess = false;
       }
    }
@@ -52,7 +52,7 @@ bool FsckTkEx::checkReachability()
    {
       if ( !FsckTkEx::checkReachability(*node, NODETYPE_Storage) )
       {
-         errors.push_back("Communication with storage node failed: " + node->getID());
+         errors.push_back("Communication with storage node failed: " + node->getAlias());
          commSuccess = false;
       }
    }
@@ -78,7 +78,7 @@ bool FsckTkEx::checkReachability(Node& node, NodeType nodetype)
 {
    bool retVal = false;
    HeartbeatRequestMsg heartbeatRequestMsg;
-   std::string realNodeID = node.getID();
+   std::string realNodeID = node.getAlias();
 
    const auto respMsg = MessagingTk::requestResponse(node, heartbeatRequestMsg,
          NETMSGTYPE_Heartbeat);
@@ -462,7 +462,7 @@ FhgfsOpsErr FsckTkEx::startModificationLogging(NodeStore* metaNodes, Node& local
          if (!started) // EventFlusher was already running on this node!
          {
             LogContext(logContext).logErr("Modification logging already running on node: "
-                  + node->getID());
+                  + node->getAlias());
 
             retVal = FhgfsOpsErr_INUSE;
             break;
@@ -470,7 +470,7 @@ FhgfsOpsErr FsckTkEx::startModificationLogging(NodeStore* metaNodes, Node& local
       }
       else
       {
-         LogContext(logContext).logErr("Communication error occured with node: " + node->getID());
+         LogContext(logContext).logErr("Communication error occured with node: " + node->getAlias());
          retVal = FhgfsOpsErr_COMMUNICATION;
       }
    }
@@ -532,7 +532,7 @@ bool FsckTkEx::stopModificationLogging(NodeStore* metaNodes)
       }
       else
       {
-         LogContext(logContext).logErr("Communication error occured with node: " + node->getID());
+         LogContext(logContext).logErr("Communication error occurred with node: " + node->getAlias());
          retVal = false;
       }
 

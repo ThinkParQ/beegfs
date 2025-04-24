@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCERDIRSYNCSLAVE_H_
-#define BUDDYRESYNCERDIRSYNCSLAVE_H_
+#pragma once
 
 #include <common/nodes/Node.h>
 #include <common/storage/StorageErrors.h>
@@ -105,4 +104,3 @@ typedef BuddyResyncerDirSyncSlaveList::iterator BuddyResyncerDirSyncSlaveListIte
 typedef std::vector<BuddyResyncerDirSyncSlave*> BuddyResyncerDirSyncSlaveVec;
 typedef BuddyResyncerDirSyncSlaveVec::iterator BuddyResyncerDirSyncSlaveVecIter;
 
-#endif /* BUDDYRESYNCERDIRSYNCSLAVE_H_ */

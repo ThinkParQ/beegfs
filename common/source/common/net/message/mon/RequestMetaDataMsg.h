@@ -1,5 +1,4 @@
-#ifndef REQUESTMETADATAMSG_H_
-#define REQUESTMETADATAMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleInt64Msg.h>
 #include <common/net/message/NetMessageTypes.h>
@@ -22,4 +21,3 @@ public:
    }
 };
 
-#endif /*REQUESTMETADATAMSG_H_*/

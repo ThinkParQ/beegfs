@@ -1,5 +1,4 @@
-#ifndef GETHIGHRESSTATSMSG_H_
-#define GETHIGHRESSTATSMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleInt64Msg.h>
 #include <common/Common.h>
@@ -24,4 +23,3 @@ class GetHighResStatsMsg : public SimpleInt64Msg
 };
 
 
-#endif /* GETHIGHRESSTATSMSG_H_ */

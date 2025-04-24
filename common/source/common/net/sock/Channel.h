@@ -1,5 +1,4 @@
-#ifndef CHANNEL_H_
-#define CHANNEL_H_
+#pragma once
 
 #include <common/toolkit/poll/Pollable.h>
 #include <common/Common.h>
@@ -72,4 +71,3 @@ class Channel : public Pollable
 };
 
 
-#endif /*CHANNEL_H_*/

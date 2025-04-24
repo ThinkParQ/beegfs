@@ -1,5 +1,4 @@
-#ifndef RENAMERESPMSG_H_
-#define RENAMERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -16,4 +15,3 @@ class RenameRespMsg : public SimpleIntMsg
 };
 
 
-#endif /*RENAMERESPMSG_H_*/

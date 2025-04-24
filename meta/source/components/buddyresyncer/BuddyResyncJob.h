@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCJOB_H_
-#define BUDDYRESYNCJOB_H_
+#pragma once
 
 #include <components/buddyresyncer/BuddyResyncerGatherSlave.h>
 #include <components/buddyresyncer/SessionStoreResyncer.h>
@@ -91,4 +90,3 @@ class BuddyResyncJob : public PThread
       void stopAllWorkersOn(Barrier& barrier);
 };
 
-#endif /* BUDDYRESYNCJOB_H_ */

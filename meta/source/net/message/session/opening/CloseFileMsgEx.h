@@ -1,5 +1,4 @@
-#ifndef CLOSEFILEMSGEX_H_
-#define CLOSEFILEMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/session/opening/CloseFileMsg.h>
@@ -27,7 +26,7 @@ class CloseFileMsgEx : public MirroredMessage<CloseFileMsg, FileIDLock>
       std::unique_ptr<ResponseState> closeFileSecondary(ResponseContext& ctx);
       void forwardToSecondary(ResponseContext& ctx) override;
       FhgfsOpsErr closeFileAfterEarlyResponse(MetaFileHandle inode, unsigned accessFlags,
-         bool* outUnlinkDisposalFile);
+         bool* outUnlinkDisposalFile, unsigned& numHardlinks, bool& outLastWriterClosed);
 
       FhgfsOpsErr processSecondaryResponse(NetMessage& resp) override
       {
@@ -37,4 +36,3 @@ class CloseFileMsgEx : public MirroredMessage<CloseFileMsg, FileIDLock>
       const char* mirrorLogContext() const override { return "CloseFileMsgEx/forward"; }
 };
 
-#endif /*CLOSEFILEMSGEX_H_*/

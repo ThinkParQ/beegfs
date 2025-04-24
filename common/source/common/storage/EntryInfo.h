@@ -4,8 +4,7 @@
  * NOTE: If you change this file, do not forget to adjust the client side EntryInfo.h
  */
 
-#ifndef ENTRYINFO_H_
-#define ENTRYINFO_H_
+#pragma once
 
 #include <common/nodes/NumNodeID.h>
 #include <common/storage/StorageDefinitions.h>
@@ -169,4 +168,3 @@ class EntryInfo
       }
 };
 
-#endif /* ENTRYINFO_H_ */

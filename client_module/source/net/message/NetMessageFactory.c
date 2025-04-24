@@ -1,9 +1,6 @@
 // control messages
 #include <common/net/message/control/AckMsgEx.h>
 #include <common/net/message/control/GenericResponseMsg.h>
-// helperd messages
-#include <common/net/message/helperd/GetHostByNameRespMsg.h>
-#include <common/net/message/helperd/LogRespMsg.h>
 // nodes messages
 #include <common/net/message/nodes/GetNodesRespMsg.h>
 #include <common/net/message/nodes/GetStatesAndBuddyGroupsRespMsg.h>
@@ -163,9 +160,6 @@ NetMessage* NetMessageFactory_createFromMsgType(unsigned short msgType)
       // control messages
       HANDLE(Ack, AckMsgEx);
       HANDLE(GenericResponse, GenericResponseMsg);
-      // helperd messages
-      HANDLE(GetHostByNameResp, GetHostByNameRespMsg);
-      HANDLE(LogResp, LogRespMsg);
       // nodes messages
       HANDLE(GetNodesResp, GetNodesRespMsg);
       HANDLE(GetStatesAndBuddyGroupsResp, GetStatesAndBuddyGroupsRespMsg);

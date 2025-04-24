@@ -1,5 +1,4 @@
-#ifndef RWLOCK_H_
-#define RWLOCK_H_
+#pragma once
 
 #include <common/system/System.h>
 #include <common/threading/Atomics.h>
@@ -252,4 +251,3 @@ class RWLock
 
 };
 
-#endif /* RWLOCK_H_ */

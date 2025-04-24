@@ -1,5 +1,4 @@
-#ifndef EXCEEDEDQUOTASTORE_H_
-#define EXCEEDEDQUOTASTORE_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -49,4 +48,3 @@ class ExceededQuotaStore
 
 typedef std::shared_ptr<ExceededQuotaStore> ExceededQuotaStorePtr;
 
-#endif /* EXCEEDEDQUOTASTORE_H_ */

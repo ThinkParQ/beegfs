@@ -1,5 +1,4 @@
-#ifndef GETNODECAPACITYPOOLSMSG_H_
-#define GETNODECAPACITYPOOLSMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include "../SimpleIntMsg.h"
@@ -54,4 +53,3 @@ class GetNodeCapacityPoolsMsg : public SimpleIntMsg
       }
 };
 
-#endif /* GETNODECAPACITYPOOLSMSG_H_ */

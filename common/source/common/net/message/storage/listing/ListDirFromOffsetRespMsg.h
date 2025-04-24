@@ -1,5 +1,4 @@
-#ifndef LISTDIRFROMPFFSETRESPMSG_H_
-#define LISTDIRFROMPFFSETRESPMSG_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/net/message/NetMessage.h>
@@ -105,4 +104,3 @@ class ListDirFromOffsetRespMsg : public NetMessageSerdes<ListDirFromOffsetRespMs
 
 };
 
-#endif /*LISTDIRFROMPFFSETRESPMSG_H_*/

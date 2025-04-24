@@ -1,5 +1,4 @@
-#ifndef CLOSECHUNKFILEWORK_H_
-#define CLOSECHUNKFILEWORK_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/net/sock/Socket.h>
@@ -68,4 +67,3 @@ class CloseChunkFileWork : public Work
 
 };
 
-#endif /* CLOSECHUNKFILEWORK_H_ */

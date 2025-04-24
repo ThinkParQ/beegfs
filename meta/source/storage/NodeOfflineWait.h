@@ -1,5 +1,4 @@
-#ifndef NODEOFFLINEWAIT_H_
-#define NODEOFFLINEWAIT_H_
+#pragma once
 
 #include <common/threading/SafeRWLock.h>
 #include <common/toolkit/Time.h>
@@ -77,4 +76,3 @@ class NodeOfflineWait
       }
 };
 
-#endif /* NODEOFFLINEWAIT_H_ */

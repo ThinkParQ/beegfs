@@ -1,5 +1,4 @@
-#ifndef UNMAPTARGETMSG_H_
-#define UNMAPTARGETMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleUInt16Msg.h>
 
@@ -29,4 +28,3 @@ class UnmapTargetMsg : public SimpleUInt16Msg
       }
 };
 
-#endif /* UNMAPTARGETMSG_H_ */

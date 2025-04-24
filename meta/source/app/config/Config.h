@@ -1,5 +1,4 @@
-#ifndef CONFIG_H_
-#define CONFIG_H_
+#pragma once
 
 #include <common/app/config/AbstractConfig.h>
 #include <common/nodes/TargetCapacityPools.h>
@@ -78,6 +77,8 @@ class Config : public AbstractConfig
 
       bool limitXAttrListLength;
       std::string sysFileEventLogTarget;
+      std::string sysFileEventPersistDirectory;
+      int64_t sysFileEventPersistSize;
 
 
       // internals
@@ -287,6 +288,7 @@ class Config : public AbstractConfig
       void setLimitXAttrListLength(bool value) { limitXAttrListLength = value; }
 
       const std::string& getFileEventLogTarget() const { return sysFileEventLogTarget; }
+      const std::string& getFileEventPersistDirectory() const { return sysFileEventPersistDirectory; }
+      uint64_t getFileEventPersistSize() const { return sysFileEventPersistSize; }
 };
 
-#endif /*CONFIG_H_*/

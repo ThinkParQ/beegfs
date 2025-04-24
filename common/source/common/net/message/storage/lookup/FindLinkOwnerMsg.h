@@ -1,5 +1,4 @@
-#ifndef FINDLINKOWNERMSG_H_
-#define FINDLINKOWNERMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleStringMsg.h>
 
@@ -33,4 +32,3 @@ class FindLinkOwnerMsg : public SimpleStringMsg
       }
 };
 
-#endif /* FINDLINKOWNERMSG_H_ */

@@ -1,5 +1,4 @@
-#ifndef REMOVEINODESRESPMSG_H
-#define REMOVEINODESRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StorageDefinitions.h>
@@ -31,4 +30,3 @@ class RemoveInodesRespMsg : public NetMessageSerdes<RemoveInodesRespMsg>
 };
 
 
-#endif /*REMOVEINODESRESPMSG_H*/

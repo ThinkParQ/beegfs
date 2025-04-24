@@ -1,5 +1,4 @@
-#ifndef COMMON_NET_MESSAGE_CONTROL_PEERINFOMSGEX_H
-#define COMMON_NET_MESSAGE_CONTROL_PEERINFOMSGEX_H
+#pragma once
 
 #include <common/net/message/control/PeerInfoMsg.h>
 
@@ -10,4 +9,3 @@ class PeerInfoMsgEx : public PeerInfoMsg
 };
 
 
-#endif /* AUTHENTICATECHANNELMSGEX_H_ */

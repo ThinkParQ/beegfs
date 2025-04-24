@@ -101,8 +101,17 @@ void _DatagramListener_handleIncomingMsg(DatagramListener* this,
 
    switch(NetMessage_getMsgType(msg) )
    {
-      // valid messages within this context
+      // An ack has historically been considered a valid message in this context, but the client
+      // doesn't actually do anything with them. Ack messages are handled as a SimpleStringMsg which
+      // uses the default NetMessage_processIncoming() handler which always returns false causing a
+      // confusing "problem encountered" error to be logged if `processIncoming()` is called below.
+      // Probably historically this wasn't an issue because clients didn't usually see acks, but at
+      // least with the 8.0 mgmtd this can happen when the client and mgmtd are on the same node.
       case NETMSGTYPE_Ack:
+      {
+         Logger_log(log, 4, logContext, "Ignoring incoming ack message");
+      } break;
+      // valid messages within this context
       case NETMSGTYPE_HeartbeatRequest:
       case NETMSGTYPE_Heartbeat:
       case NETMSGTYPE_MapTargets:
@@ -114,8 +123,9 @@ void _DatagramListener_handleIncomingMsg(DatagramListener* this,
          if(!msg->ops->processIncoming(msg, this->app, fromAddr, (Socket*)this->udpSock,
             this->sendBuf, DGRAMMGR_SENDBUF_SIZE) )
          {
-            Logger_log(log, 2, logContext,
-               "Problem encountered during handling of incoming message");
+            Logger_logFormatted(log, 2, logContext,
+               "Problem encountered during handling of incoming message of type %d",
+               NetMessage_getMsgType(msg));
          }
       } break;
 

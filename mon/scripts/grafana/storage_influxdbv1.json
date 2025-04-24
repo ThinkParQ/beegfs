@@ -213,7 +213,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -261,7 +261,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -472,7 +472,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -642,7 +642,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -690,7 +690,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -854,7 +854,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -900,7 +900,13 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "nodeNumID",
+              "operator": "=~",
+              "value": "/^$storageID$/"
+            }
+          ]
         }
       ],
       "title": "Work Requests",
@@ -1000,7 +1006,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1237,7 +1243,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1277,36 +1283,17 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "show tag values from storage with key = \"nodeID\" ",
+        "definition": "show tag values from storage with key = \"nodeNumID\" ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "storageID",
         "options": [],
-        "query": "show tag values from storage with key = \"nodeID\" ",
+        "query": "show tag values from storage with key = \"nodeNumID\" ",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-        },
-        "definition": "SHOW TAG VALUES FROM \"cpu\" WITH KEY = \"cpu\" WHERE host =~ /$storageID/",
-        "hide": 2,
-        "includeAll": true,
-        "multi": false,
-        "name": "cpu",
-        "options": [],
-        "query": "SHOW TAG VALUES FROM \"cpu\" WITH KEY = \"cpu\" WHERE host =~ /$storageID/",
-        "refresh": 1,
-        "regex": "^cpu[0-9].*",
-        "skipUrlSync": false,
-        "sort": 1,
         "type": "query"
       }
     ]

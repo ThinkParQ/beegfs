@@ -13,8 +13,8 @@ bool HeartbeatRequestMsgEx::processIncoming(ResponseContext& ctx)
    NumNodeID localNodeNumID = localNode.getNumID();
    NicAddressList nicList(localNode.getNicList() );
 
-   HeartbeatMsg hbMsg(localNode.getID(), localNodeNumID, NODETYPE_Storage, &nicList);
-   hbMsg.setPorts(cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
+   HeartbeatMsg hbMsg(localNode.getAlias(), localNodeNumID, NODETYPE_Storage, &nicList);
+   hbMsg.setPorts(cfg->getConnStoragePort(), cfg->getConnStoragePort() );
 
    ctx.sendResponse(hbMsg);
 

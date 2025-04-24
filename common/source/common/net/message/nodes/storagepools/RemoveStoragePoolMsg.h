@@ -1,5 +1,4 @@
-#ifndef COMMON_REMOVESTORAGEPOOLMSG_H_
-#define COMMON_REMOVESTORAGEPOOLMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StoragePoolId.h>
@@ -29,4 +28,3 @@ class RemoveStoragePoolMsg : public NetMessageSerdes<RemoveStoragePoolMsg>
       StoragePoolId poolId;
 };
 
-#endif /*COMMON_REMOVESTORAGEPOOLMSG_H_*/

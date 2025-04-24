@@ -1,5 +1,4 @@
-#ifndef CREATEDEFDIRINODESMSG_H
-#define CREATEDEFDIRINODESMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -28,4 +27,3 @@ class CreateDefDirInodesMsg : public NetMessageSerdes<CreateDefDirInodesMsg>
       }
 };
 
-#endif /* CREATEDEFDIRINODESMSG_H */

@@ -22,7 +22,6 @@
 
 // forward declarations
 struct Config;
-struct ExternalHelperd;
 struct Logger;
 struct DatagramListener;
 struct InternodeSyncer;
@@ -70,12 +69,13 @@ extern void App_findAllowedRDMAInterfaces(App* this, NicAddressList* nicList, Ni
 // external getters & setters
 extern const char* App_getVersionStr(void);
 extern void App_updateLocalInterfaces(App* app, NicAddressList* nicList);
+extern char* App_cloneFsUUID(App* this);
+extern void App_updateFsUUID(App* this, const char* fsUUID);
 extern void App_cloneLocalNicList(App* this, NicAddressList* nicList);
 extern void App_cloneLocalRDMANicList(App* this, NicAddressList* rdmaNicList);
 
 // inliners
 static inline struct Logger* App_getLogger(App* this);
-static inline struct ExternalHelperd* App_getHelperd(App* this);
 static inline struct Config* App_getConfig(App* this);
 static inline struct MountConfig* App_getMountConfig(App* this);
 static inline struct NetFilter* App_getNetFilter(App* this);
@@ -138,8 +138,9 @@ struct App
    MountConfig* mountConfig;
 
    struct Config*  cfg;
-   struct ExternalHelperd* helperd;
    struct Logger*  logger;
+   const char*     fsUUID;
+   Mutex           fsUUIDMutex;
 
    struct NetFilter* netFilter; // empty filter means "all nets allowed"
    struct NetFilter* tcpOnlyFilter; // for IPs which allow only plain TCP (no RDMA etc)
@@ -213,11 +214,6 @@ struct Config* App_getConfig(App* this)
 struct MountConfig* App_getMountConfig(App* this)
 {
    return this->mountConfig;
-}
-
-struct ExternalHelperd* App_getHelperd(App* this)
-{
-   return this->helperd;
 }
 
 struct NetFilter* App_getNetFilter(App* this)

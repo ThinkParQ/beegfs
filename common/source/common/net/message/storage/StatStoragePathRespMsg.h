@@ -1,5 +1,4 @@
-#ifndef STATSTORAGEPATHMSGRESP_H_
-#define STATSTORAGEPATHMSGRESP_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/Common.h>
@@ -71,4 +70,3 @@ class StatStoragePathRespMsg : public NetMessageSerdes<StatStoragePathRespMsg>
       }
 };
 
-#endif /*STATSTORAGEPATHMSGRESP_H_*/

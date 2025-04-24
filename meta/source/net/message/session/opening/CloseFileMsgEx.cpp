@@ -47,8 +47,9 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
 {
    FhgfsOpsErr closeRes;
    bool unlinkDisposalFile = false;
+   bool outLastWriterClosed = false;
    EntryInfo* entryInfo = getEntryInfo();
-   bool modificationEventsMissed = true;
+   unsigned numHardlinks;
    bool closeSucceeded;
 
    if(isMsgHeaderFeatureFlagSet(CLOSEFILEMSG_FLAG_CANCELAPPENDLOCKS) )
@@ -86,22 +87,22 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
       // send response
       earlyComplete(ctx, ResponseState(closeRes));
 
-      modificationEventsMissed = inode->getNumHardlinks() > 1;
-
       // if session file close succeeds but chunk file close fails we should not attempt to
       // dispose. if chunk close failed for any other reason than network outages we might
       // put the storage server into an even weirder state by unlinking the chunk file:
       // the file itself is still open (has a session), but is gone on disk, and thus cannot
       // be reopened from stored sessions when the server is restarted.
       if(likely(closeRes == FhgfsOpsErr_SUCCESS) )
-         closeRes = closeFileAfterEarlyResponse(std::move(inode), accessFlags, &unlinkDisposalFile);
+         closeRes = closeFileAfterEarlyResponse(std::move(inode), accessFlags, &unlinkDisposalFile,
+            numHardlinks, outLastWriterClosed);
    }
    else
    { // alternative 2: normal response (after chunk file close)
 
       closeRes = MsgHelperClose::closeFile(getClientNumID(), getFileHandleID(),
          entryInfo, getMaxUsedNodeIndex(), getMsgHeaderUserID(), &unlinkDisposalFile,
-         &modificationEventsMissed, &dynAttribs, &inodeTimestamps);
+         &numHardlinks, outLastWriterClosed, &dynAttribs, &inodeTimestamps);
+
       closeSucceeded = closeRes == FhgfsOpsErr_SUCCESS;
 
       if (getEntryInfo()->getIsBuddyMirrored() && getMaxUsedNodeIndex() >= 0)
@@ -116,12 +117,29 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFilePrimary(
 
    if (closeSucceeded && Program::getApp()->getFileEventLogger() && getFileEvent())
    {
-         Program::getApp()->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  entryInfo->getEntryID(),
-                  entryInfo->getParentEntryID(),
-                  "",
-                  modificationEventsMissed);
+         // Important Note:
+         // - If the last writer, who previously opened this file with write permissions,
+         //   is currently closing it,
+         // - And it is not marked for disposal,
+         // - And it is not due to a symlink creation,
+         // Then we update the event type to LAST_WRITER_CLOSED.
+         bool isSymlinkEvent = getFileEvent()->type == FileEventType::SYMLINK;
+         if (!isSymlinkEvent && outLastWriterClosed && !unlinkDisposalFile)
+         {
+            auto fileEvent =  const_cast<FileEvent*>(getFileEvent());
+            fileEvent->type = FileEventType::LAST_WRITER_CLOSED;
+         }
+
+         EventContext eventCtx = makeEventContext(
+            entryInfo,
+            entryInfo->getParentEntryID(),
+            getMsgHeaderUserID(),
+            "",  // targetParentID
+            numHardlinks,
+            false // This is not the secondary node if closeFilePrimary() was called.
+         );
+
+         logEvent(Program::getApp()->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    // unlink if file marked as disposable
@@ -178,8 +196,10 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFileSecondar
 
    unsigned numHardlinks;
    unsigned numInodeRefs;
+   bool outLastWriterClosed;
+
    Program::getApp()->getMetaStore()->closeFile(getEntryInfo(), std::move(inode), accessFlags,
-         &numHardlinks, &numInodeRefs);
+         &numHardlinks, &numInodeRefs, outLastWriterClosed);
 
    // unlink if file marked as disposable
    // this only touches timestamps on the disposal dirinode, which is not visible to the user,
@@ -200,26 +220,21 @@ std::unique_ptr<CloseFileMsgEx::ResponseState> CloseFileMsgEx::closeFileSecondar
  * @param outFileWasUnlinked true if the hardlink count of the file was 0
  */
 FhgfsOpsErr CloseFileMsgEx::closeFileAfterEarlyResponse(MetaFileHandle inode, unsigned accessFlags,
-   bool* outUnlinkDisposalFile)
+   bool* outUnlinkDisposalFile, unsigned& outNumHardlinks, bool& outLastWriterClosed)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
-
-   unsigned numHardlinks;
    unsigned numInodeRefs;
 
    *outUnlinkDisposalFile = false;
-
 
    FhgfsOpsErr chunksRes = MsgHelperClose::closeChunkFile(
       getClientNumID(), getFileHandleID(), getMaxUsedNodeIndex(), *inode, getEntryInfo(),
       getMsgHeaderUserID(), NULL);
 
+   metaStore->closeFile(getEntryInfo(), std::move(inode), accessFlags, &outNumHardlinks,
+         &numInodeRefs, outLastWriterClosed);
 
-   metaStore->closeFile(getEntryInfo(), std::move(inode), accessFlags, &numHardlinks,
-         &numInodeRefs);
-
-
-   if (!numHardlinks && !numInodeRefs)
+   if (!outNumHardlinks && !numInodeRefs)
       *outUnlinkDisposalFile = true;
 
    return chunksRes;

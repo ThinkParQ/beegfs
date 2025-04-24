@@ -17,8 +17,9 @@ FhgfsOpsErr MsgHelperUnlink::unlinkFile(DirInode& parentDir, const std::string& 
    unsigned msgUserID)
 {
    std::unique_ptr<FileInode> unlinkedInode;
+   unsigned numHardlinks;  // Not used here!
 
-   FhgfsOpsErr unlinkMetaRes = unlinkMetaFile(parentDir, removeName, &unlinkedInode);
+   FhgfsOpsErr unlinkMetaRes = unlinkMetaFile(parentDir, removeName, &unlinkedInode, numHardlinks);
 
    /* note: if the file is still opened or if there are/were hardlinks then unlinkedInode will be
       NULL even on FhgfsOpsErr_SUCCESS */
@@ -31,11 +32,15 @@ FhgfsOpsErr MsgHelperUnlink::unlinkFile(DirInode& parentDir, const std::string& 
 /**
  * Unlink file in metadata store.
  *
+ * @param outInitialHardlinkCount will be set to the initial hardlink count of the file
+ * inode before unlinking.
+ *
  * @return if this returns success and outUnlinkedFile is set, then the caller also needs to unlink
  * the chunk files via unlinkChunkFiles().
  */
 FhgfsOpsErr MsgHelperUnlink::unlinkMetaFile(DirInode& parentDir,
-   const std::string& removeName, std::unique_ptr<FileInode>* outUnlinkedFile)
+   const std::string& removeName, std::unique_ptr<FileInode>* outUnlinkedFile,
+   unsigned& outInitialHardlinkCount)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    ModificationEventFlusher* modEventFlusher = Program::getApp()->getModificationEventFlusher();
@@ -44,7 +49,7 @@ FhgfsOpsErr MsgHelperUnlink::unlinkMetaFile(DirInode& parentDir,
    EntryInfo entryInfo;
 
    FhgfsOpsErr unlinkMetaRes = metaStore->unlinkFile(parentDir, removeName,
-      &entryInfo, outUnlinkedFile);
+      &entryInfo, outUnlinkedFile, outInitialHardlinkCount);
 
    if (modEventLoggingEnabled)
    {
@@ -67,10 +72,11 @@ FhgfsOpsErr MsgHelperUnlink::unlinkMetaFile(DirInode& parentDir,
  *
  */
 FhgfsOpsErr MsgHelperUnlink::unlinkFileInode(EntryInfo* delFileInfo,
-               std::unique_ptr<FileInode>* outUnlinkedFile)
+               std::unique_ptr<FileInode>* outUnlinkedFile, unsigned& outInitialHardlinkCount)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
-   FhgfsOpsErr unlinkRes = metaStore->unlinkFileInode(delFileInfo, outUnlinkedFile);
+   FhgfsOpsErr unlinkRes = metaStore->unlinkFileInode(delFileInfo, outUnlinkedFile,
+      outInitialHardlinkCount);
    return unlinkRes;
 }
 

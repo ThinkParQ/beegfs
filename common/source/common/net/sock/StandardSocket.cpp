@@ -21,9 +21,6 @@ StandardSocket::StandardSocket(int domain, int type, int protocol, bool epoll)
 {
    this->sockDomain = domain;
 
-   if(domain == PF_SDP)
-      this->sockType = NICADDRTYPE_SDP;
-
    this->sock = ::socket(domain, type, protocol);
    if(sock == -1)
    {
@@ -63,9 +60,6 @@ StandardSocket::StandardSocket(int fd, unsigned short sockDomain, struct in_addr
    this->sockDomain = sockDomain;
    this->peerIP = peerIP;
    this->peername = peername;
-
-   if(sockDomain == PF_SDP)
-      this->sockType = NICADDRTYPE_SDP;
 
    this->epollFD = epoll_create(1); // "1" is just a hint (and is actually ignored)
    if(epollFD == -1)

@@ -1,6 +1,7 @@
 #include <app/log/Logger.h>
 #include <common/toolkit/HashTk.h>
 #include <common/toolkit/StringTk.h>
+#include <common/toolkit/SocketTk.h>
 #include "Config.h"
 
 #include <linux/fs.h>
@@ -25,7 +26,6 @@
 #define FILECACHETYPE_PAGED_STR     "paged"
 #define FILECACHETYPE_NATIVE_STR    "native"
 
-#define LOGGERTYPE_HELPERD_STR      "helperd"
 #define LOGGERTYPE_SYSLOG_STR       "syslog"
 
 #define EVENTLOGMASK_NONE "none"
@@ -35,6 +35,10 @@
 #define EVENTLOGMASK_CLOSE "close"
 #define EVENTLOGMASK_LINK_OP "link-op"
 #define EVENTLOGMASK_READ "read"
+#define EVENTLOGMASK_OPEN_READ "open-read"
+#define EVENTLOGMASK_OPEN_WRITE "open-write"
+#define EVENTLOGMASK_OPEN_READ_WRITE "open-readwrite"
+
 
 #define IGNORE_CONFIG_VALUE(compareStr) /* to be used in applyConfigMap() */ \
    if(!strcmp(keyStr, compareStr) ) \
@@ -67,7 +71,7 @@ static size_t Config_fs_read(struct file *file, char *buf, size_t size, loff_t *
 
 static bool assignKeyIfNotZero(const char* key, const char* strVal, int* const intVal) {
    const int tempVal = StringTk_strToInt(strVal);
-   if (tempVal <= 0 || intVal == NULL) {
+   if (tempVal == 0 || intVal == NULL) {
       return false;
    }
 
@@ -82,8 +86,6 @@ bool Config_init(Config* this, MountConfig* mountConfig)
 {
    // init configurable strings
    this->cfgFile = NULL;
-   this->logHelperdIP = NULL;
-   this->logType = NULL;
    this->connInterfacesFile = NULL;
    this->connRDMAInterfacesFile = NULL;
    this->connNetFilterFile = NULL;
@@ -99,7 +101,7 @@ bool Config_init(Config* this, MountConfig* mountConfig)
    this->connInterfacesList = NULL;
    this->connRDMAKeyType = NULL;
 
-   return _Config_initConfig(this, mountConfig, true);
+   return _Config_initConfig(this, mountConfig);
 }
 
 Config* Config_construct(MountConfig* mountConfig)
@@ -119,8 +121,6 @@ Config* Config_construct(MountConfig* mountConfig)
 void Config_uninit(Config* this)
 {
    SAFE_KFREE(this->cfgFile);
-   SAFE_KFREE(this->logHelperdIP);
-   SAFE_KFREE(this->logType);
    SAFE_KFREE(this->connInterfacesFile);
    SAFE_KFREE(this->connRDMAInterfacesFile);
    SAFE_KFREE(this->connNetFilterFile);
@@ -146,15 +146,17 @@ void Config_destruct(Config* this)
    kfree(this);
 }
 
-bool _Config_initConfig(Config* this, MountConfig* mountConfig, bool enableException)
+bool _Config_initConfig(Config* this, MountConfig* mountConfig)
 {
+   struct in_addr ipAddr;
+
    StrCpyMap_init(&this->configMap);
 
    // load and apply args to see whether we have a cfgFile
    _Config_loadDefaults(this);
    __Config_loadFromMountConfig(this, mountConfig);
 
-   if(!_Config_applyConfigMap(this, enableException) )
+   if(!_Config_applyConfigMap(this) )
       goto error;
 
    if(this->cfgFile && strlen(this->cfgFile) )
@@ -168,11 +170,16 @@ bool _Config_initConfig(Config* this, MountConfig* mountConfig, bool enableExcep
 
       __Config_loadFromMountConfig(this, mountConfig);
 
-      if(!_Config_applyConfigMap(this, enableException) )
+      if(!_Config_applyConfigMap(this) )
          goto error;
 
       if (this->connMaxInternodeNum > 0xffff)
          goto error;
+   }
+
+   if(!SocketTk_getHostByAddrStr(this->sysMgmtdHost, &ipAddr)) {
+      printk_fhgfs(KERN_WARNING, "Management address '%s' is not an IPv4 address\n", this->sysMgmtdHost);
+      goto error;
    }
 
    return __Config_initImplicitVals(this);
@@ -213,14 +220,15 @@ void _Config_loadDefaults(Config* this)
 
    _Config_configMapRedefine(this, "logLevel",                         "3");
    _Config_configMapRedefine(this, "logClientID",                      "false");
-   _Config_configMapRedefine(this, "logHelperdIP",                     "127.0.0.1");
-   _Config_configMapRedefine(this, "logType",                          LOGGERTYPE_HELPERD_STR);
 
    _Config_configMapRedefine(this, "connPortShift",                    "0");
-   _Config_configMapRedefine(this, "connClientPortUDP",                "8004");
-   _Config_configMapRedefine(this, "connMgmtdPortUDP",                 "8008");
-   _Config_configMapRedefine(this, "connHelperdPortTCP",               "8006");
-   _Config_configMapRedefine(this, "connMgmtdPortTCP",                 "8008");
+
+   // To be able to merge these with the legacy settings later, we set them to -1 here. Otherwise it
+   // is impossible to detect if they have actually been set or just loaded the default.
+   // The actual default values are applied during the post processing in applyConfigMap.
+   _Config_configMapRedefine(this, "connClientPort",                   "-1"); // 8004
+   _Config_configMapRedefine(this, "connMgmtdPort",                    "-1"); // 8008
+
    _Config_configMapRedefine(this, "connUseRDMA",                      "true");
    _Config_configMapRedefine(this, "connTCPFallbackEnabled",           "true");
    _Config_configMapRedefine(this, "connMaxInternodeNum",              "8");
@@ -278,6 +286,7 @@ void _Config_loadDefaults(Config* this)
 
    _Config_configMapRedefine(this, "sysMgmtdHost",                     "");
    _Config_configMapRedefine(this, "sysInodeIDStyle",                  INODEIDSTYLE_DEFAULT);
+   _Config_configMapRedefine(this, "sysCacheInvalidationVersion",      "true");
    _Config_configMapRedefine(this, "sysCreateHardlinksAsSymlinks",     "false");
    _Config_configMapRedefine(this, "sysMountSanityCheckMS",            "11000");
    _Config_configMapRedefine(this, "sysSyncOnClose",                   "false");
@@ -299,24 +308,22 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "sysRenameEbusyAsXdev",             "false");
 
    _Config_configMapRedefine(this, "remapConnectionFailureStatus",     "0");
-
-   _Config_configMapRedefine(this, "sysNoEnterpriseFeatureMsg",        "false");
 }
 
-bool _Config_applyConfigMap(Config* this, bool enableException)
+bool _Config_applyConfigMap(Config* this)
 {
-   /**
-    * **IMPORTANT**: Don't forget to add new values also to the BEEGFS_ONLINE_CFG and BEEGFS_FSCK
-    * ignored config values!
-    */
+   // IMPORTANT: Don't forget to add new values also to the fsck ignored config values!
 
+   // Deprecated separate port settings. These are post processed below and merged into the new
+   // combined settings.
+   int connClientPortUDP = -1;
+   int connMgmtdPortUDP = -1;
+   int connMgmtdPortTCP = -1;
 
+   // Scan the whole config map
    StrCpyMapIter iter = StrCpyMap_begin(&this->configMap);
-
    while(!StrCpyMapIter_end(&iter) )
    {
-      bool unknownElement = false;
-
       char* keyStr = StrCpyMapIter_key(&iter);
       char* valueStr = StrCpyMapIter_value(&iter);
 
@@ -326,6 +333,12 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
          this->cfgFile = StringTk_strDup(valueStr );
       }
       else
+      if(!strcmp(keyStr, "sysMgmtdHost") )
+      {
+         SAFE_KFREE(this->sysMgmtdHost);
+         this->sysMgmtdHost = StringTk_strDup(valueStr);
+      }
+      else
       if(!strcmp(keyStr, "logLevel") )
          this->logLevel = StringTk_strToInt(valueStr);
       else
@@ -333,45 +346,39 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "logClientID") )
          this->logClientID = StringTk_strToBool(valueStr);
       else
-      if(!strcmp(keyStr, "logHelperdIP") )
-      {
-         SAFE_KFREE(this->logHelperdIP);
-         this->logHelperdIP = StringTk_strDup(valueStr);
-      }
-      else
       IGNORE_CONFIG_VALUE("logStdFile")
       IGNORE_CONFIG_VALUE("logNumLines")
       IGNORE_CONFIG_VALUE("logNumRotatedFiles")
-      if(!strcmp(keyStr, "logType") )
-      {
-         SAFE_KFREE(this->logType);
-         this->logType = StringTk_strDup(valueStr);
-      }
-      else
       if(!strcmp(keyStr, "connPortShift") )
          this->connPortShift = StringTk_strToInt(valueStr);
       else
+      if(!strcmp(keyStr, "connClientPort") )
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connClientPort))
+            goto bad_config_elem;
+      }
+      else
+      if(!strcmp(keyStr, "connMgmtdPort") )
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connMgmtdPort))
+            goto bad_config_elem;
+      }
+      else
       if(!strcmp(keyStr, "connClientPortUDP") )
       {
-         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connClientPortUDP))
-            goto bad_config_elem;
-      }
-      else
-      if(!strcmp(keyStr, "connMgmtdPortUDP") )
-      {
-         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connMgmtdPortUDP))
-            goto bad_config_elem;
-      }
-      else
-      if(!strcmp(keyStr, "connHelperdPortTCP") )
-      {
-         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connHelperdPortTCP))
+         if (!assignKeyIfNotZero(keyStr, valueStr, &connClientPortUDP))
             goto bad_config_elem;
       }
       else
       if(!strcmp(keyStr, "connMgmtdPortTCP") )
       {
-         if (!assignKeyIfNotZero(keyStr, valueStr, &this->connMgmtdPortTCP))
+         if (!assignKeyIfNotZero(keyStr, valueStr, &connMgmtdPortTCP))
+            goto bad_config_elem;
+      }
+      else
+      if(!strcmp(keyStr, "connMgmtdPortUDP") )
+      {
+         if (!assignKeyIfNotZero(keyStr, valueStr, &connMgmtdPortUDP))
             goto bad_config_elem;
       }
       else
@@ -662,17 +669,14 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       if(!strcmp(keyStr, "tuneCoherentBuffers") )
          this->tuneCoherentBuffers = StringTk_strToBool(valueStr);
       else
-      if(!strcmp(keyStr, "sysMgmtdHost") )
-      {
-         SAFE_KFREE(this->sysMgmtdHost);
-         this->sysMgmtdHost = StringTk_strDup(valueStr);
-      }
-      else
       if(!strcmp(keyStr, "sysInodeIDStyle") )
       {
          SAFE_KFREE(this->sysInodeIDStyle);
          this->sysInodeIDStyle = StringTk_strDup(valueStr);
       }
+      else
+      if(!strcmp(keyStr, "sysCacheInvalidationVersion") )
+         this->sysCacheInvalidationVersion = StringTk_strToBool(valueStr);
       else
       if(!strcmp(keyStr, "sysCreateHardlinksAsSymlinks") )
          this->sysCreateHardlinksAsSymlinks = StringTk_strToBool(valueStr);
@@ -751,8 +755,13 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
                   this->eventLogMask |= EventLogMask_CLOSE;
                else if (!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_LINK_OP))
                   this->eventLogMask |= EventLogMask_LINK_OP;
-               else if (!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_READ))
-                  this->eventLogMask |= EventLogMask_READ;
+               else if ((!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_READ)) ||
+                        ((!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_OPEN_READ))))
+                  this->eventLogMask |= EventLogMask_OPEN_READ;
+               else if (!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_OPEN_WRITE))
+                  this->eventLogMask |= EventLogMask_OPEN_WRITE;
+               else if (!strcmp(StrCpyListIter_value(&it), EVENTLOGMASK_OPEN_READ_WRITE))
+                  this->eventLogMask |= EventLogMask_OPEN_READ_WRITE;
                else
                {
                   StrCpyList_uninit(&parts);
@@ -767,31 +776,65 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       }
       else if(!strcmp(keyStr, "remapConnectionFailureStatus"))
          this->remapConnectionFailureStatus = StringTk_strToUInt(valueStr);
-      else if(!strcmp(keyStr, "sysNoEnterpriseFeatureMsg"))
-         this->sysNoEnterpriseFeatureMsg = StringTk_strToBool(valueStr);
+      else if(!strcmp(keyStr, "logType"))
+         printk_fhgfs(KERN_INFO, "Ignoring obsolete config argument 'logType'\n");
+      else if(!strcmp(keyStr, "logHelperdIP"))
+         printk_fhgfs(KERN_INFO, "Ignoring obsolete config argument 'logHelperdIP'\n");
+      else if(!strcmp(keyStr, "connHelperdPortTCP"))
+         printk_fhgfs(KERN_INFO, "Ignoring obsolete config argument 'connHelperdPortTCP'\n");
       else
-      { // unknown element occurred
-bad_config_elem:
-         unknownElement = true;
-
-         if(enableException)
-         {
-            printk_fhgfs(KERN_WARNING, "The config argument '%s' is invalid\n", keyStr );
-
-            return false;
-         }
-      }
-
-      // remove known elements from the map (we don't need them any longer)
-      if(unknownElement)
-      { // just skip the unknown element
+      {
          StrCpyMapIter_next(&iter);
+         continue;
       }
-      else
-      { // remove this element from the map
-         iter = _Config_eraseFromConfigMap(this, &iter);
-      }
+
+      iter = _Config_eraseFromConfigMap(this, &iter);
+      continue;
+
+bad_config_elem:
+      printk_fhgfs(KERN_WARNING, "The config argument '%s' is invalid\n", keyStr );
+      return false;
    } // end of while loop
+
+   if(this->connClientPort == -1) {
+      if(connClientPortUDP != -1) {
+         this->connClientPort = connClientPortUDP;
+         printk_fhgfs(KERN_INFO, "Using deprecated config argument 'connClientPortUDP'\n");
+      } else {
+         this->connClientPort = 8004;
+      }
+   } else if(connClientPortUDP != -1) {
+      printk_fhgfs(KERN_WARNING, "Deprecated config argument 'connClientPortUDP' set along with the new \
+'connClientPort' setting. Please use only the new setting.\n");
+      return false;
+   }
+
+   if(this->connMgmtdPort == -1) {
+      if(connMgmtdPortUDP != -1 && connMgmtdPortTCP != -1 && connMgmtdPortTCP != connMgmtdPortUDP) {
+         printk_fhgfs(KERN_WARNING, "Deprecated config arguments 'connMgmtdPortUDP' and \
+'connMgmtdPortTCP' set to different values, which is no longer allowed. Please use the new 'connMgmtdPort' \
+setting instead.\n");
+         return false;
+      }
+
+      if(connMgmtdPortUDP != -1) {
+         printk_fhgfs(KERN_INFO, "Using deprecated config argument 'connMgmtdPortUDP'\n");
+         this->connMgmtdPort = connMgmtdPortUDP;
+      }
+
+      if(connMgmtdPortTCP != -1) {
+         printk_fhgfs(KERN_INFO, "Using deprecated config argument 'connMgmtdPortTCP'\n");
+         this->connMgmtdPort = connMgmtdPortTCP;
+      }
+
+      if(this->connMgmtdPort == -1) {
+         this->connMgmtdPort = 8008;
+      }
+   } else if(connMgmtdPortUDP != -1 || connMgmtdPortTCP != -1) {
+      printk_fhgfs(KERN_WARNING, "Deprecated config argument 'connMgmtdPortUDP/TCP' set along with the new \
+'connMgmtdPort' setting. Please use only the new setting.\n");
+      return false;
+   }
 
    return true;
 }
@@ -879,6 +922,14 @@ void __Config_loadFromMountConfig(Config* this, MountConfig* mountConfig)
       _Config_configMapRedefine(this, "connInterfacesList", mountConfig->connInterfacesList);
    }
 
+   if(mountConfig->connAuthFile)
+      _Config_configMapRedefine(this, "connAuthFile",
+         mountConfig->connAuthFile);
+
+   if(mountConfig->connDisableAuthentication)
+      _Config_configMapRedefine(this, "connDisableAuthentication",
+         mountConfig->connDisableAuthentication);
+
    // integer args
 
    if(mountConfig->logLevelDefined)
@@ -895,17 +946,10 @@ void __Config_loadFromMountConfig(Config* this, MountConfig* mountConfig)
       kfree(valueStr);
    }
 
-   if(mountConfig->connMgmtdPortUDPDefined)
+   if(mountConfig->connMgmtdPortDefined)
    {
-      char* valueStr = StringTk_uintToStr(mountConfig->connMgmtdPortUDP);
-      _Config_configMapRedefine(this, "connMgmtdPortUDP", valueStr);
-      kfree(valueStr);
-   }
-
-   if(mountConfig->connMgmtdPortTCPDefined)
-   {
-      char* valueStr = StringTk_uintToStr(mountConfig->connMgmtdPortTCP);
-      _Config_configMapRedefine(this, "connMgmtdPortTCP", valueStr);
+      char* valueStr = StringTk_uintToStr(mountConfig->connMgmtdPort);
+      _Config_configMapRedefine(this, "connMgmtdPort", valueStr);
       kfree(valueStr);
    }
 
@@ -1182,7 +1226,6 @@ bool __Config_initImplicitVals(Config* this)
    __Config_initConnNumCommRetries(this);
    __Config_initTuneFileCacheTypeNum(this);
    __Config_initSysInodeIDStyleNum(this);
-   __Config_initLogTypeNum(this);
    __Config_initConnRDMAKeyTypeNum(this);
 
    // tuneMsgBufNum
@@ -1346,34 +1389,24 @@ const char* Config_inodeIDStyleNumToStr(InodeIDStyle inodeIDStyle)
    }
 }
 
-void __Config_initLogTypeNum(Config* this)
-{
-   const char* valueStr = this->logType;
-
-   if(!strcasecmp(valueStr, LOGGERTYPE_SYSLOG_STR))
-      this->logTypeNum = LOGTYPE_Syslog;
-   else
-      this->logTypeNum = LOGTYPE_Helperd;
-}
-
-const char* Config_logTypeNumToStr(LogType logType)
-{
-   switch(logType)
-   {
-      case LOGTYPE_Syslog:
-         return LOGGERTYPE_SYSLOG_STR;
-
-      default:
-         return LOGGERTYPE_HELPERD_STR;
-   }
-}
-
 const char* Config_eventLogMaskToStr(enum EventLogMask mask)
 {
+#define ELM_PART_OPEN_READ(Prefix) \
+   (mask & EventLogMask_OPEN_READ \
+    ? Prefix "," EVENTLOGMASK_OPEN_READ \
+    : Prefix)
+#define ELM_PART_OPEN_WRITE(Prefix) \
+   (mask & EventLogMask_OPEN_WRITE \
+    ? ELM_PART_OPEN_READ(Prefix "," EVENTLOGMASK_OPEN_WRITE) \
+    : ELM_PART_OPEN_READ(Prefix))
+#define ELM_PART_OPEN_READ_WRITE(Prefix) \
+   (mask & EventLogMask_OPEN_READ_WRITE \
+    ? ELM_PART_OPEN_WRITE(Prefix "," EVENTLOGMASK_OPEN_READ_WRITE) \
+    : ELM_PART_OPEN_WRITE(Prefix))
 #define ELM_PART_FLUSH(Prefix) \
    (mask & EventLogMask_FLUSH \
-    ? Prefix "," EVENTLOGMASK_FLUSH \
-    : Prefix)
+    ? ELM_PART_OPEN_READ_WRITE(Prefix "," EVENTLOGMASK_FLUSH) \
+    : ELM_PART_OPEN_READ_WRITE(Prefix))
 #define ELM_PART_TRUNC(Prefix) \
    (mask & EventLogMask_TRUNC \
     ? ELM_PART_FLUSH(Prefix "," EVENTLOGMASK_TRUNC) \
@@ -1390,16 +1423,11 @@ const char* Config_eventLogMaskToStr(enum EventLogMask mask)
    (mask & EventLogMask_LINK_OP \
     ? ELM_PART_CLOSE(Prefix "," EVENTLOGMASK_LINK_OP) \
     : ELM_PART_CLOSE(Prefix))
-#define ELM_PART_READ(Prefix) \
-   (mask & EventLogMask_READ \
-    ? ELM_PART_LINK_OP(Prefix "," EVENTLOGMASK_READ) \
-    : ELM_PART_LINK_OP(Prefix))
    // If new event types are added here, the return below must be updated.
-
    if (mask == EventLogMask_NONE)
       return EVENTLOGMASK_NONE;
    else
-      return ELM_PART_READ("") + 1;
+      return ELM_PART_LINK_OP("") + 1;
 }
 
 void __Config_initConnRDMAKeyTypeNum(Config* this)
@@ -1453,18 +1481,17 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
    ssize_t readRes;
 
 
+   if (this->connDisableAuthentication)
+   {
+      *outConnAuthHash = 0;
+      return true; // connAuthFile explicitly disabled => no hash to be generated
+   }
+
+   // Connection authentication not explicitly disabled, so bail if connAuthFile is not configured
    if(!connAuthFile || !StringTk_hasLength(connAuthFile))
    {
-      if (this->connDisableAuthentication)
-      {
-         *outConnAuthHash = 0;
-         return true; // connAuthFile explicitly disabled => no hash to be generated
-      }
-      else
-      {
-         printk_fhgfs(KERN_WARNING, "No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
-         return false;
-      }
+      printk_fhgfs(KERN_WARNING, "No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
+      return false;
    }
 
 
@@ -1512,17 +1539,9 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
    }
 
 
-   { // hash file contents
-
-      // (hsieh hash only generates 32bit hashes, so we make two hashes for 64 bits)
-
-      int len1stHalf = readRes / 2;
-      int len2ndHalf = readRes - len1stHalf;
-
-      uint64_t high = HashTk_hash32(HASHTK_HSIEHHASH32, buf, len1stHalf);
-      uint64_t low  = HashTk_hash32(HASHTK_HSIEHHASH32, &buf[len1stHalf], len2ndHalf);
-
-      *outConnAuthHash = (high << 32) | low;
+   // Calculate Hash
+   if(HashTk_authHash(buf, readRes, outConnAuthHash) != 0) {
+      return false;
    }
 
    // clean up

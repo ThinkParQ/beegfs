@@ -35,6 +35,9 @@ struct RegisterNodeMsg
 
    uint64_t instanceVersion; // not used currently
    uint64_t nicListVersion; // not used currently
+
+   const char* machineUUID;
+   unsigned machineUUIDLen;
 };
 
 extern const struct NetMessageOps RegisterNodeMsg_Ops;
@@ -68,6 +71,8 @@ void RegisterNodeMsg_initFromNodeData(RegisterNodeMsg* this, const char* nodeID,
    this->nicListVersion = 0; // undefined
    this->instanceVersion = 0; // undefined
    this->portTCP = 0; // undefined
+   this->machineUUID = ""; // not currently needed on the client
+   this->machineUUIDLen = 0;
 }
 
 #endif /*REGISTERNODEMSG_H*/

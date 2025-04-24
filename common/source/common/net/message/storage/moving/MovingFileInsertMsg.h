@@ -1,5 +1,4 @@
-#ifndef MOVINGFILEINSERTMSG_H_
-#define MOVINGFILEINSERTMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -108,4 +107,3 @@ class MovingFileInsertMsg : public MirroredMessageBase<MovingFileInsertMsg>
       }
 };
 
-#endif /*MOVINGFILEINSERTMSG_H_*/

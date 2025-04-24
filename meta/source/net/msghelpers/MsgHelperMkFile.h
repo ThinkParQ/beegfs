@@ -1,5 +1,4 @@
-#ifndef MSGHELPERMKFILE_H_
-#define MSGHELPERMKFILE_H_
+#pragma once
 
 
 #include <common/storage/StorageErrors.h>
@@ -18,8 +17,8 @@ class MsgHelperMkFile
    public:
       static FhgfsOpsErr mkFile(DirInode& parentDir, MkFileDetails* mkDetails,
          const UInt16List* preferredTargets, const unsigned numtargets, const unsigned chunksize,
-         StripePattern* stripePattern, EntryInfo* outEntryInfo,FileInodeStoreData* outInodeData,
-         StoragePoolId storagePoolId = StoragePoolStore::INVALID_POOL_ID);
+         StripePattern* stripePattern, RemoteStorageTarget* rstInfo, EntryInfo* outEntryInfo,
+         FileInodeStoreData* outInodeData, StoragePoolId storagePoolId = StoragePoolStore::INVALID_POOL_ID);
 
    private:
       MsgHelperMkFile() {}
@@ -27,4 +26,3 @@ class MsgHelperMkFile
 };
 
 
-#endif /* MSGHELPERMKFILE_H_ */

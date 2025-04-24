@@ -1,5 +1,4 @@
-#ifndef STORAGESTREAMLISTENERV2_H_
-#define STORAGESTREAMLISTENERV2_H_
+#pragma once
 
 #include <app/App.h>
 #include <common/components/streamlistenerv2/StreamListenerV2.h>
@@ -31,4 +30,3 @@ class StorageStreamListenerV2 : public StreamListenerV2
      }
 };
 
-#endif /* STORAGESTREAMLISTENERV2_H_ */

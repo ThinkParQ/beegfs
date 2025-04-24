@@ -1,5 +1,4 @@
-#ifndef STORAGEERRORS_H_
-#define STORAGEERRORS_H_
+#pragma once
 
 /*
  * Remember to keep these definitions in sync with StorageErrors.h of fhgfs_client_module!
@@ -65,6 +64,9 @@ enum FhgfsOpsErr
    FhgfsOpsErr_NODATA                  =    28, // corresponds to ENODATA==ENOATTR (xattr not found)
    FhgfsOpsErr_NOTSUPP                 =    29, // corresponds to EOPNOTSUPP
    FhgfsOpsErr_UNKNOWNPOOL             =    30, // unknown storage pool
+   FhgfsOpsErr_METAVERSIONMISMATCH     =    31, // metadata versions do not match, needed for cache invalidation
+   FhgfsOpsErr_INODELOCKED             =    32, // inode is locked, needed for GlobalInodeLock store
+
 };
 typedef enum FhgfsOpsErr FhgfsOpsErr;
 
@@ -93,4 +95,3 @@ class FhgfsOpsErrTk
 
 std::ostream& operator<<(std::ostream& os, FhgfsOpsErr errCode);
 
-#endif /*STORAGEERRORS_H_*/

@@ -1,5 +1,4 @@
-#ifndef IBVSOCKET_H_
-#define IBVSOCKET_H_
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 #include <common/Common.h>
@@ -199,4 +198,3 @@ struct IBVSocket
 };
 
 
-#endif /*IBVSOCKET_H_*/

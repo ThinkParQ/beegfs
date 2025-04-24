@@ -1,5 +1,4 @@
-#ifndef RMDIRENTRYMSG_H_
-#define RMDIRENTRYMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/Path.h>
@@ -63,4 +62,3 @@ class RmDirEntryMsg : public NetMessageSerdes<RmDirEntryMsg>
 };
 
 
-#endif /* RMDIRENTRYMSG_H_ */

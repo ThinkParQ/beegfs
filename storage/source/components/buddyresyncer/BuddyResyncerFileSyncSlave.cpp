@@ -119,6 +119,7 @@ FhgfsOpsErr BuddyResyncerFileSyncSlave::doResync(std::string& chunkPathStr, uint
    int64_t offset = 0;
    ssize_t readRes = 0;
    unsigned resyncMsgFlags = 0;
+   resyncMsgFlags |= RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR;
 
    LogContext(__func__).log(Log_DEBUG,
       "File sync started. chunkPath: " + chunkPathStr + "; localTargetID: "

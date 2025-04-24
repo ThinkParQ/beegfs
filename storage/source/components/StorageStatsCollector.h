@@ -1,5 +1,4 @@
-#ifndef STORAGESTATSCOLLECTOR_H_
-#define STORAGESTATSCOLLECTOR_H_
+#pragma once
 
 #include <common/components/StatsCollector.h>
 
@@ -24,4 +23,3 @@ class StorageStatsCollector : public StatsCollector
 
 };
 
-#endif /* STORAGESTATSCOLLECTOR_H_ */

@@ -1,5 +1,4 @@
-#ifndef SETXATTRMSGEX_H_
-#define SETXATTRMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/attribs/SetXAttrMsg.h>
 #include <common/net/message/storage/attribs/SetXAttrRespMsg.h>
@@ -30,4 +29,3 @@ class SetXAttrMsgEx : public MirroredMessage<SetXAttrMsg, std::tuple<FileIDLock,
       const char* mirrorLogContext() const override { return "SetXAttrMsgEx/forward"; }
 };
 
-#endif /*SETXATTRMSGEX_H_*/

@@ -1,5 +1,4 @@
-#ifndef REFRESHCAPACITYPOOLSMSG_H_
-#define REFRESHCAPACITYPOOLSMSG_H_
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/Common.h>
@@ -21,4 +20,3 @@ class RefreshCapacityPoolsMsg : public AcknowledgeableMsgSerdes<RefreshCapacityP
 };
 
 
-#endif /* REFRESHCAPACITYPOOLSMSG_H_ */

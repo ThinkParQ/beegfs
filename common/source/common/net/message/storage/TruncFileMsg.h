@@ -1,5 +1,4 @@
-#ifndef TRUNCFILEMSG_H_
-#define TRUNCFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -89,4 +88,3 @@ class TruncFileMsg : public MirroredMessageBase<TruncFileMsg>
       }
 };
 
-#endif /*TRUNCFILEMSG_H_*/

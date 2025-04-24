@@ -1,5 +1,4 @@
-#ifndef GETCLIENTSTATSRESPMSG_H_
-#define GETCLIENTSTATSRESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -56,4 +55,3 @@ class GetClientStatsRespMsg : public NetMessageSerdes<GetClientStatsRespMsg>
       }
 };
 
-#endif /* GETCLIENTSTATSRESPMSG_H_ */

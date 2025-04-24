@@ -1,5 +1,4 @@
-#ifndef GETNODECAPACITYPOOLSRESP_H_
-#define GETNODECAPACITYPOOLSRESP_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -50,4 +49,3 @@ class GetNodeCapacityPoolsRespMsg : public NetMessageSerdes<GetNodeCapacityPools
       }
 };
 
-#endif /* GETNODECAPACITYPOOLSRESP_H_ */

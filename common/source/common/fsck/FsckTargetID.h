@@ -1,5 +1,4 @@
-#ifndef FSCKTARGETID_H_
-#define FSCKTARGETID_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -77,4 +76,3 @@ typedef FsckTargetIDList::iterator FsckTargetIDListIter;
 template<>
 struct ListSerializationHasLength<FsckTargetID> : boost::false_type {};
 
-#endif /* FSCKTARGETID_H_ */

@@ -1,5 +1,4 @@
-#ifndef LISTWORKCONTAINER_H_
-#define LISTWORKCONTAINER_H_
+#pragma once
 
 #include <common/Common.h>
 #include "AbstractWorkContainer.h"
@@ -60,4 +59,3 @@ class ListWorkContainer : public AbstractWorkContainer
 };
 
 
-#endif /* LISTWORKCONTAINER_H_ */

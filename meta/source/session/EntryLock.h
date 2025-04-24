@@ -1,5 +1,4 @@
-#ifndef ENTRYLOCK_H_
-#define ENTRYLOCK_H_
+#pragma once
 
 #include "EntryLockStore.h"
 
@@ -126,4 +125,3 @@ class HashDirLock : UniqueEntryLockBase<HashDirLockData>
       }
 };
 
-#endif /* ENTRYLOCK_H_ */

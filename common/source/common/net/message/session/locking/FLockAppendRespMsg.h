@@ -1,5 +1,4 @@
-#ifndef FLOCKAPPENDRESPMSG_H_
-#define FLOCKAPPENDRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -29,4 +28,3 @@ class FLockAppendRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /* FLOCKAPPENDRESPMSG_H_ */

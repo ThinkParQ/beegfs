@@ -1,5 +1,4 @@
-#ifndef MKDIRMSG_H_
-#define MKDIRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -168,4 +167,3 @@ class MkDirMsg : public MirroredMessageBase<MkDirMsg>
       }
 };
 
-#endif /*MKDIRMSG_H_*/

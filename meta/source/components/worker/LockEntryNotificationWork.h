@@ -1,5 +1,4 @@
-#ifndef LOCKENTRYNOTIFICATIONWORK_H_
-#define LOCKENTRYNOTIFICATIONWORK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/components/worker/Work.h>
@@ -56,4 +55,3 @@ class LockEntryNotificationWork : public Work
 };
 
 
-#endif /* LOCKENTRYNOTIFICATIONWORK_H_ */

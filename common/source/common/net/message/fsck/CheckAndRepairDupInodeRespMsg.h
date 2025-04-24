@@ -1,5 +1,4 @@
-#ifndef CHECKANDREPAIRDUPINODERESPMSG_H
-#define CHECKANDREPAIRDUPINODERESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StorageDefinitions.h>
@@ -30,4 +29,3 @@ class CheckAndRepairDupInodeRespMsg : public NetMessageSerdes<CheckAndRepairDupI
       }
 };
 
-#endif /* CHECKANDREPAIRDUPINODERESPMSG_H */

@@ -1,5 +1,4 @@
-#ifndef CREATEDEFDIRINODESRESPMSG_H
-#define CREATEDEFDIRINODESRESPMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirInode.h>
 #include <common/net/message/NetMessage.h>
@@ -49,4 +48,3 @@ class CreateDefDirInodesRespMsg : public NetMessageSerdes<CreateDefDirInodesResp
       }
 };
 
-#endif /* CREATEDEFDIRINODESRESPMSG_H */

@@ -26,7 +26,7 @@ std::unique_ptr<MirroredMessageResponseState> BumpFileVersionMsgEx::executeLocal
    auto* app = Program::getApp();
    auto* metaStore = app->getMetaStore();
 
-   auto inode = metaStore->referenceFile(&getEntryInfo());
+   auto [inode, referenceRes] = metaStore->referenceFile(&getEntryInfo());
    if (!inode)
       return boost::make_unique<ResponseState>(FhgfsOpsErr_INTERNAL);
 
@@ -39,12 +39,16 @@ std::unique_ptr<MirroredMessageResponseState> BumpFileVersionMsgEx::executeLocal
 
    if (!isSecondary && app->getFileEventLogger() && getFileEvent())
    {
-         app->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  getEntryInfo().getEntryID(),
-                  getEntryInfo().getParentEntryID(),
-                  "",
-                  inode->getNumHardlinks() > 1);
+      EventContext eventCtx = makeEventContext(
+         &getEntryInfo(),
+         getEntryInfo().getParentEntryID(),
+         getMsgHeaderUserID(),
+         "",
+         inode->getNumHardlinks(),
+         isSecondary
+      );
+
+      logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    metaStore->releaseFile(getEntryInfo().getParentEntryID(), inode);

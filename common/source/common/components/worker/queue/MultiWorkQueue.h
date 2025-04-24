@@ -1,5 +1,4 @@
-#ifndef MULTIWORKQUEUE_H_
-#define MULTIWORKQUEUE_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/queue/StreamListenerWorkQueue.h>
@@ -173,4 +172,3 @@ class MultiWorkQueue : public StreamListenerWorkQueue
 
 };
 
-#endif /*MULTIWORKQUEUE_H_*/

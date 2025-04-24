@@ -24,7 +24,7 @@ bool RequestMetaDataMsgEx::processIncoming(ResponseContext& ctx)
    StatsCollector* statsCollector = app->getStatsCollector();
    statsCollector->getStatsSince(lastStatsMS, statsHistory);
 
-   RequestMetaDataRespMsg requestMetaDataRespMsg(node.getID(), hostnameid, node.getNumID(), &nicList,
+   RequestMetaDataRespMsg requestMetaDataRespMsg(node.getAlias(), hostnameid, node.getNumID(), &nicList,
       app->getMetaRoot().getID() == node.getNumID(), workQueue->getIndirectWorkListSize(),
       workQueue->getDirectWorkListSize(), sessionCount, &statsHistory);
    ctx.sendResponse(requestMetaDataRespMsg);

@@ -15,12 +15,13 @@ enum {
    Opt_tunePreferredStorageFile,
 
    Opt_connInterfacesList,
+   Opt_connAuthFile,
+   Opt_connDisableAuthentication,
 
    /* Mount options that take integer arguments */
    Opt_logLevel,
    Opt_connPortShift,
-   Opt_connMgmtdPortUDP,
-   Opt_connMgmtdPortTCP,
+   Opt_connMgmtdPort,
    Opt_sysMountSanityCheckMS,
 
    /* Mount options that take no arguments */
@@ -40,12 +41,13 @@ static match_table_t fhgfs_mount_option_tokens =
    { Opt_tunePreferredStorageFile, "tunePreferredStorageFile=%s" },
 
    { Opt_connInterfacesList, "connInterfacesList=%s" },
+   { Opt_connAuthFile, "connAuthFile=%s" },
+   { Opt_connDisableAuthentication, "connDisableAuthentication=%s" },
 
    /* Mount options that take integer arguments */
    { Opt_logLevel, "logLevel=%d" },
    { Opt_connPortShift, "connPortShift=%d" },
-   { Opt_connMgmtdPortUDP, "connMgmtdPortUDP=%u" },
-   { Opt_connMgmtdPortTCP, "connMgmtdPortTCP=%u" },
+   { Opt_connMgmtdPort, "connMgmtdPort=%u" },
    { Opt_sysMountSanityCheckMS, "sysMountSanityCheckMS=%u" },
 
    { Opt_grpid, "grpid" },
@@ -120,8 +122,22 @@ bool MountConfig_parseFromRawOptions(MountConfig* this, char* mountOptions)
          case Opt_connInterfacesList:
          {
             SAFE_KFREE(this->connInterfacesList);
-            this->connInterfacesList = match_strdup(args);
 
+            this->connInterfacesList = match_strdup(args);
+         } break;
+
+         case Opt_connAuthFile:
+         {
+            SAFE_KFREE(this->connAuthFile);
+
+            this->connAuthFile = match_strdup(args);
+         } break;
+
+         case Opt_connDisableAuthentication:
+         {
+            SAFE_KFREE(this->connDisableAuthentication);
+
+            this->connDisableAuthentication = match_strdup(args);
          } break;
 
          /* Mount options that take INTEGER arguments */
@@ -142,20 +158,12 @@ bool MountConfig_parseFromRawOptions(MountConfig* this, char* mountOptions)
             this->connPortShiftDefined = true;
          } break;
 
-         case Opt_connMgmtdPortUDP:
+         case Opt_connMgmtdPort:
          {
-            if(match_int(args, &this->connMgmtdPortUDP) )
+            if(match_int(args, &this->connMgmtdPort) )
                goto err_exit_invalid_option;
 
-            this->connMgmtdPortUDPDefined = true;
-         } break;
-
-         case Opt_connMgmtdPortTCP:
-         {
-            if(match_int(args, &this->connMgmtdPortTCP) )
-               goto err_exit_invalid_option;
-
-            this->connMgmtdPortTCPDefined = true;
+            this->connMgmtdPortDefined = true;
          } break;
 
          case Opt_sysMountSanityCheckMS:
@@ -207,17 +215,20 @@ void MountConfig_showOptions(MountConfig* this, struct seq_file* sf)
    if (this->connInterfacesList)
       seq_printf(sf, ",connInterfacesList=%s", this->connInterfacesList);
 
+   if (this->connAuthFile)
+      seq_printf(sf, ",connAuthFile=%s", this->connInterfacesList);
+
+   if (this->connDisableAuthentication)
+      seq_printf(sf, ",connDisableAuthentication=%s", this->connInterfacesList);
+
    if (this->logLevelDefined)
       seq_printf(sf, ",logLevel=%d", this->logLevel);
 
    if (this->connPortShiftDefined)
       seq_printf(sf, ",connPortShift=%d", this->connPortShift);
 
-   if (this->connMgmtdPortUDPDefined)
-      seq_printf(sf, ",connMgmtdPortUDB=%u", this->connMgmtdPortUDP);
-
-   if (this->connMgmtdPortTCPDefined)
-      seq_printf(sf, ",connMgmtdPortTCP=%u", this->connMgmtdPortTCP);
+   if (this->connMgmtdPortDefined)
+      seq_printf(sf, ",connMgmtdPort=%u", this->connMgmtdPort);
 
    if (this->sysMountSanityCheckMSDefined)
       seq_printf(sf, ",sysMountSanityCheckMS=%u", this->sysMountSanityCheckMS);

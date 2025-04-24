@@ -1,5 +1,4 @@
-#ifndef RETRIEVEDIRENTRIESRESPMSG_H
-#define RETRIEVEDIRENTRIESRESPMSG_H
+#pragma once
 
 #include <common/Common.h>
 #include <common/fsck/FsckContDir.h>
@@ -90,4 +89,3 @@ class RetrieveDirEntriesRespMsg : public NetMessageSerdes<RetrieveDirEntriesResp
       }
 };
 
-#endif /*RETRIEVEDIRENTRIESRESPMSG_H*/

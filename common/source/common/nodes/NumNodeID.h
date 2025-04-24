@@ -1,5 +1,4 @@
-#ifndef NUMNODEID_H
-#define NUMNODEID_H
+#pragma once
 
 #include <common/NumericID.h>
 
@@ -20,4 +19,3 @@ typedef std::vector<NumNodeID> NumNodeIDVector;
 typedef NumNodeIDVector::iterator NumNodeIDVectorIter;
 typedef NumNodeIDVector::const_iterator NumNodeIDVectorCIter;
 
-#endif /*NUMNODEID_H*/

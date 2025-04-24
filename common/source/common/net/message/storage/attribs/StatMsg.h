@@ -1,5 +1,4 @@
-#ifndef STATMSG_H_
-#define STATMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/Path.h>
@@ -58,4 +57,3 @@ class StatMsg : public MirroredMessageBase<StatMsg>
       }
 };
 
-#endif /*STATMSG_H_*/

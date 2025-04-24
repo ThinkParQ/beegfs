@@ -1,5 +1,4 @@
-#ifndef GETNODESRESPMSG_H_
-#define GETNODESRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/Node.h>
@@ -69,4 +68,3 @@ class GetNodesRespMsg : public NetMessageSerdes<GetNodesRespMsg>
       }
 };
 
-#endif /*GETNODESRESPMSG_H_*/

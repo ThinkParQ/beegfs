@@ -1,5 +1,4 @@
-#ifndef META_NODE_OP_STATS_H_
-#define META_NODE_OP_STATS_H_
+#pragma once
 
 #include <common/nodes/OpCounter.h>
 #include <common/threading/SafeRWLock.h>
@@ -53,5 +52,4 @@ class MetaNodeOpStats : public NodeOpStats
       }
 };
 
-#endif /* META_NODE_OP_STATS_H_ */
 

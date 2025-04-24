@@ -1,5 +1,4 @@
-#ifndef ADJUSTCHUNKPERMISSIONSMSGEX_H
-#define ADJUSTCHUNKPERMISSIONSMSGEX_H
+#pragma once
 
 #include <common/net/message/fsck/AdjustChunkPermissionsMsg.h>
 #include <common/net/message/fsck/AdjustChunkPermissionsRespMsg.h>
@@ -16,4 +15,3 @@ class AdjustChunkPermissionsMsgEx : public AdjustChunkPermissionsMsg
          PathInfo* pathInfo, StripePattern* pattern);
 };
 
-#endif /*ADJUSTCHUNKPERMISSIONSMSGEX_H*/

@@ -1,5 +1,4 @@
-#ifndef COMMON_H_
-#define COMMON_H_
+#pragma once
 
 // define certain macros for (u)int64_t in inttypes.h; this is useful for printf on 32-/64-bit
 #ifndef __STDC_FORMAT_MACROS
@@ -344,4 +343,3 @@ extern void assertMsg(const char* file, unsigned line, const char* condition);
 // must be kept in sync with client.
 #define BEEGFS_DATA_VERSION (uint32_t(0))
 
-#endif /*COMMON_H_*/

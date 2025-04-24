@@ -1,5 +1,4 @@
-#ifndef DATAGRAMLISTENER_H_
-#define DATAGRAMLISTENER_H_
+#pragma once
 
 #include <common/components/AbstractDatagramListener.h>
 
@@ -17,4 +16,3 @@ class DatagramListener : public AbstractDatagramListener
 
 };
 
-#endif /*DATAGRAMLISTENER_H_*/

@@ -1,5 +1,4 @@
-#ifndef LINKTOLOSTANDFOUNDMSG_H
-#define LINKTOLOSTANDFOUNDMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirInode.h>
 #include <common/net/message/NetMessage.h>
@@ -85,4 +84,3 @@ class LinkToLostAndFoundMsg : public NetMessageSerdes<LinkToLostAndFoundMsg>
 };
 
 
-#endif /*LINKTOLOSTANDFOUNDMSG_H*/

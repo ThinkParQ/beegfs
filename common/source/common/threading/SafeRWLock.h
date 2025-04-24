@@ -1,5 +1,4 @@
-#ifndef SAFERWLOCK_H_
-#define SAFERWLOCK_H_
+#pragma once
 
 #include "RWLock.h"
 #include "PThread.h"
@@ -158,4 +157,3 @@ class SafeRWLock
 
 };
 
-#endif /* SAFERWLOCK_H_ */

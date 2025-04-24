@@ -1,5 +1,4 @@
-#ifndef REGISTERTARGETRESPMSG_H_
-#define REGISTERTARGETRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include "../SimpleUInt16Msg.h"
@@ -38,4 +37,3 @@ class RegisterTargetRespMsg : public SimpleUInt16Msg
 };
 
 
-#endif /* REGISTERTARGETRESPMSG_H_ */

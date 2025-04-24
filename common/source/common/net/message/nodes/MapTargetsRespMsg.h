@@ -1,5 +1,4 @@
-#ifndef MAPTARGETSRESPMSG_H_
-#define MAPTARGETSRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleIntMsg.h>
@@ -45,4 +44,3 @@ class MapTargetsRespMsg : public NetMessageSerdes<MapTargetsRespMsg>
 };
 
 
-#endif /* MAPTARGETSRESPMSG_H_ */

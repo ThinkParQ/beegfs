@@ -1,5 +1,4 @@
-#ifndef GETCLIENTSTATSMSG_H_
-#define GETCLIENTSTATSMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleInt64Msg.h>
 #include <common/Common.h>
@@ -46,4 +45,3 @@ class GetClientStatsMsg : public SimpleInt64Msg
 };
 
 
-#endif /* GETCLIENTSTATSMSG_H_ */

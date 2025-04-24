@@ -1,5 +1,4 @@
-#ifndef GETTARGETMAPPINGSMSGEX_H_
-#define GETTARGETMAPPINGSMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/GetTargetMappingsMsg.h>
 
@@ -10,4 +9,3 @@ class GetTargetMappingsMsgEx : public GetTargetMappingsMsg
 };
 
 
-#endif /* GETTARGETMAPPINGSMSGEX_H_ */

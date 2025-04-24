@@ -1,5 +1,4 @@
-#ifndef RMLOCALDIRMSG_H_
-#define RMLOCALDIRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -48,4 +47,3 @@ class RmLocalDirMsg : public MirroredMessageBase<RmLocalDirMsg>
       bool supportsMirroring() const { return true; }
 };
 
-#endif /*RMLOCALDIRMSG_H_*/

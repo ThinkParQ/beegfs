@@ -1,5 +1,4 @@
-#ifndef FSCKMODIFICATIONEVENT_H_
-#define FSCKMODIFICATIONEVENT_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/MetadataTk.h>
@@ -83,4 +82,3 @@ class FsckModificationEvent
 template<>
 struct ListSerializationHasLength<FsckModificationEvent> : boost::false_type {};
 
-#endif /* FSCKMODIFICATIONEVENT_H_ */

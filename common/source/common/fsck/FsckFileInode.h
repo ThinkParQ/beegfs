@@ -1,5 +1,4 @@
-#ifndef FSCKFILEINODE_H
-#define FSCKFILEINODE_H
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/FsckTk.h>
@@ -215,4 +214,3 @@ class FsckFileInode
 template<>
 struct ListSerializationHasLength<FsckFileInode> : boost::false_type {};
 
-#endif /* FSCKFILEINODE_H */

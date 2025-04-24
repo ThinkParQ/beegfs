@@ -1,5 +1,4 @@
-#ifndef GETXATTRMSGEX_H_
-#define GETXATTRMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/attribs/GetXAttrMsg.h>
 #include <common/net/message/storage/attribs/GetXAttrRespMsg.h>
@@ -73,4 +72,3 @@ class GetXAttrMsgEx : public MirroredMessage<GetXAttrMsg, FileIDLock>
       const char* mirrorLogContext() const override { return "GetXAttrMsgEx/forward"; }
 };
 
-#endif /*GETXATTRMSGEX_H_*/

@@ -1,5 +1,4 @@
-#ifndef MAPTK_H_
-#define MAPTK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/StorageTk.h>
@@ -30,4 +29,3 @@ class MapTk
 
 };
 
-#endif /* MAPTK_H_ */

@@ -1,5 +1,4 @@
-#ifndef SESSION_ZFSSESSION_H_
-#define SESSION_ZFSSESSION_H_
+#pragma once
 
 
 
@@ -53,4 +52,3 @@ class ZfsSession
       }
 };
 
-#endif /* SESSION_ZFSSESSION_H_ */

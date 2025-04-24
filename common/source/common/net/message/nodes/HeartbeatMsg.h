@@ -1,10 +1,10 @@
-#ifndef HEARTBEATMSG_H_
-#define HEARTBEATMSG_H_
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
 #include <common/nodes/Node.h>
 #include <common/Common.h>
+#include <iostream>
 
 class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
 {
@@ -31,6 +31,8 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
 
          this->portUDP = 0; // 0 means "undefined"
          this->portTCP = 0; // 0 means "undefined"
+
+         this->machineUUID = "";
       }
 
       /**
@@ -57,11 +59,13 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
             % obj->rootIsBuddyMirrored
             % obj->portUDP
             % obj->portTCP
-            % serdes::backedPtr(obj->nicList, obj->parsed.nicList);
+            % serdesNicAddressList(obj->nicList, obj->parsed.nicList)
+            % obj->machineUUID;
       }
 
    private:
       std::string nodeID;
+      std::string machineUUID;
       int32_t nodeType;
       NumNodeID nodeNumID;
       NumNodeID rootNumID; // 0 means unknown/undefined
@@ -127,6 +131,11 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
          this->portTCP = portTCP;
       }
 
+      void setMachineUUID(std::string uuid)
+      {
+         this->machineUUID = uuid;
+      }
+
       uint16_t getPortUDP() const
       {
          return portUDP;
@@ -139,4 +148,3 @@ class HeartbeatMsg : public AcknowledgeableMsgSerdes<HeartbeatMsg>
 
 };
 
-#endif /*HEARTBEATMSG_H_*/

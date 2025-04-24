@@ -1,5 +1,4 @@
-#ifndef DUMMYMSG_H_
-#define DUMMYMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleMsg.h>
 
@@ -12,4 +11,3 @@ class DummyMsg : public SimpleMsg
 };
 
 
-#endif /* DUMMYMSG_H_ */

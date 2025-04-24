@@ -6,7 +6,7 @@ NodeStoreMgmtEx::NodeStoreMgmtEx() :
 
 NodeStoreResult NodeStoreMgmtEx::addOrUpdateNodeEx(std::shared_ptr<Node> node, NumNodeID* outNodeNumID)
 {
-   std::string nodeID(node->getID());
+   std::string nodeID(node->getAlias());
    NumNodeID nodeNumID = node->getNumID();
 
    // sanity check: don't allow nodeNumID==0 (only mgmtd allows this)

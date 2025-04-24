@@ -1,5 +1,4 @@
-#ifndef COMMON_PATH_H_
-#define COMMON_PATH_H_
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 
@@ -317,4 +316,3 @@ class Path
       }
 };
 
-#endif /* COMMON_PATH_H_ */

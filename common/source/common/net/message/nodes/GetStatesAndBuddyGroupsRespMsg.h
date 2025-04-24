@@ -1,5 +1,4 @@
-#ifndef GETSTATESANDBUDDYGROUPSRESPMSG_H_
-#define GETSTATESANDBUDDYGROUPSRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -64,4 +63,3 @@ class GetStatesAndBuddyGroupsRespMsg : public NetMessageSerdes<GetStatesAndBuddy
       }
 };
 
-#endif /* GETSTATESANDBUDDYGROUPSRESPMSG_H_ */

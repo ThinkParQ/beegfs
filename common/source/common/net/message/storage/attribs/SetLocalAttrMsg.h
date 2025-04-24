@@ -1,5 +1,4 @@
-#ifndef COMMON_SETLOCALATTRMSG_H_
-#define COMMON_SETLOCALATTRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/PathInfo.h>
@@ -112,4 +111,3 @@ class SetLocalAttrMsg : public NetMessageSerdes<SetLocalAttrMsg>
 
 };
 
-#endif /*COMMON_SETLOCALATTRMSG_H_*/

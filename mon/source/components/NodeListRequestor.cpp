@@ -72,7 +72,7 @@ bool NodeListRequestor::getMgmtNodeInfo()
 
       // get mgmtd node using NodesTk
       auto mgmtNode = NodesTk::downloadNodeInfo(app->getConfig()->getSysMgmtdHost(),
-         app->getConfig()->getConnMgmtdPortUDP(), app->getConfig()->getConnAuthHash(),
+         app->getConfig()->getConnMgmtdPort(), app->getConfig()->getConnAuthHash(),
          app->getNetMessageFactory(),
          NODETYPE_Mgmt, MGMT_TIMEOUT.count());
 

@@ -1,5 +1,4 @@
-#ifndef META_MIRRORMESSAGERESPONSESTATE_H
-#define META_MIRRORMESSAGERESPONSESTATE_H
+#pragma once
 
 #include <common/net/message/control/GenericResponseMsg.h>
 #include <common/storage/EntryInfo.h>
@@ -114,4 +113,3 @@ class ErrorAndEntryResponseState : public MirroredMessageResponseState
       EntryInfo info;
 };
 
-#endif

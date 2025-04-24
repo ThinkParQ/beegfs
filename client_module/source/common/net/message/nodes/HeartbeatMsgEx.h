@@ -52,13 +52,13 @@ struct HeartbeatMsgEx
    uint16_t portTCP; // 0 means "undefined"
    unsigned ackIDLen;
    const char* ackID;
+   const char* machineUUID;
+   unsigned machineUUIDLen;
 
    // for serialization
    NicAddressList* nicList; // not owned by this object
 
    // for deserialization
-   // NETMSG_NICLISTELEM_SIZE defines the element size
-   // see NETMSG_NICLISTELEM_SIZE for element structure
    RawList rawNicList;
 };
 
@@ -98,6 +98,8 @@ void HeartbeatMsgEx_initFromNodeData(HeartbeatMsgEx* this,
    this->ackID = "";
    this->ackIDLen = 0;
 
+   this->machineUUID = ""; // not currently needed on the client
+   this->machineUUIDLen = 0;
 }
 
 void HeartbeatMsgEx_parseNicList(HeartbeatMsgEx* this, NicAddressList* outNicList)

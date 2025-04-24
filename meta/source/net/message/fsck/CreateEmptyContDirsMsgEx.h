@@ -1,5 +1,4 @@
-#ifndef CREATEEMPTYCONTDIRSMSGEX_H
-#define CREATEEMPTYCONTDIRSMSGEX_H
+#pragma once
 
 #include <common/storage/striping/Raid0Pattern.h>
 #include <common/net/message/fsck/CreateEmptyContDirsMsg.h>
@@ -11,4 +10,3 @@ class CreateEmptyContDirsMsgEx : public CreateEmptyContDirsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*CREATEEMPTYCONTDIRSMSGEX_H*/

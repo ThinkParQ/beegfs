@@ -1,5 +1,4 @@
-#ifndef ENTRYLOCKSTORE_H_
-#define ENTRYLOCKSTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/app/log/LogContext.h>
@@ -230,4 +229,3 @@ class EntryLockStore
       HashDirLockStore hashDirLocks;
 };
 
-#endif /* ENTRYLOCKSTORE_H_ */

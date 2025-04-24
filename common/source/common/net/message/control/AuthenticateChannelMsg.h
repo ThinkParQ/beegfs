@@ -1,5 +1,4 @@
-#ifndef AUTHENTICATECHANNELMSG_H_
-#define AUTHENTICATECHANNELMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleInt64Msg.h>
 
@@ -32,4 +31,3 @@ class AuthenticateChannelMsg : public SimpleInt64Msg
 
 };
 
-#endif /* AUTHENTICATECHANNELMSG_H_ */

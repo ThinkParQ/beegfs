@@ -1,5 +1,4 @@
-#ifndef GETHIGHRESSTATSRESPMSG_H_
-#define GETHIGHRESSTATSRESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -48,4 +47,3 @@ class GetHighResStatsRespMsg : public NetMessageSerdes<GetHighResStatsRespMsg>
       }
 };
 
-#endif /* GETHIGHRESSTATSRESPMSG_H_ */

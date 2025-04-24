@@ -98,12 +98,10 @@ build_dir := $(realpath $(dir $(firstword $(MAKEFILE_LIST))))
 
 BEEGFS_COMMON_PATH             ?= $(root_dir)/common
 BEEGFS_THIRDPARTY_PATH         ?= $(root_dir)/thirdparty
-BEEGFS_ONLINE_CFG_PATH         ?= $(root_dir)/ctl
 BEEGFS_COMM_DEBUG_PATH         ?= $(root_dir)/comm_debug
 BEEGFS_FSCK_PATH               ?= $(root_dir)/fsck
 BEEGFS_EVENT_LISTENER_PATH     ?= $(root_dir)/event_listener
 BEEGFS_DEVEL_INCLUDE_PATH      ?= $(root_dir)/client_devel/include
-BEEGFS_JAVA_LIB_PATH           ?= $(root_dir)/java_lib
 BEEGFS_CLIENT_PATH             ?= $(root_dir)/client_module/include
 
 BOOST_INC_PATH    ?= $(BEEGFS_THIRDPARTY_PATH)/source/boost
@@ -395,6 +393,7 @@ define -clang_tidy_checks
 -modernize-use-auto
 -modernize-use-default
 -modernize-use-default-member-init
+-modernize-use-nodiscard
 -modernize-use-emplace
 -modernize-use-equals-default
 -modernize-use-equals-delete

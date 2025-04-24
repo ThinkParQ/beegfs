@@ -1,5 +1,4 @@
-#ifndef SESSIONLOCALFILESTORE_H_
-#define SESSIONLOCALFILESTORE_H_
+#pragma once
 
 #include <common/toolkit/ObjectReferencer.h>
 #include <common/threading/Mutex.h>
@@ -61,4 +60,3 @@ class SessionLocalFileStore
       mutable Mutex mutex;
 };
 
-#endif /*SESSIONLOCALFILESTORE_H_*/

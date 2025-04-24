@@ -1,5 +1,4 @@
-#ifndef RENAMEMSG_H_
-#define RENAMEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -118,4 +117,3 @@ class RenameMsg : public MirroredMessageBase<RenameMsg>
 };
 
 
-#endif /*RENAMEMSG_H_*/

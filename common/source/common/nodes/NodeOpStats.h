@@ -1,5 +1,4 @@
-#ifndef NODEOPSTATS_H_
-#define NODEOPSTATS_H_
+#pragma once
 
 #include <common/nodes/OpCounter.h>
 #include <common/threading/SafeRWLock.h>
@@ -92,4 +91,3 @@ class NodeOpStats
 };
 
 
-#endif /* NODEOPSTATS_H_ */

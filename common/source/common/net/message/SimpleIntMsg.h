@@ -1,5 +1,4 @@
-#ifndef SIMPLEINTMSG_H_
-#define SIMPLEINTMSG_H_
+#pragma once
 
 #include "NetMessage.h"
 
@@ -29,4 +28,3 @@ class SimpleIntMsg : public NetMessageSerdes<SimpleIntMsg>
       int getValue() const { return value; }
 };
 
-#endif /*SIMPLEINTMSG_H_*/

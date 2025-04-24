@@ -1,5 +1,4 @@
-#ifndef LOCKING_H_
-#define LOCKING_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/NumNodeID.h>
@@ -489,4 +488,3 @@ typedef RangeLockDetailsList::iterator RangeLockDetailsListIter;
 typedef RangeLockDetailsList::const_iterator RangeLockDetailsListCIter;
 
 
-#endif /* LOCKING_H_ */

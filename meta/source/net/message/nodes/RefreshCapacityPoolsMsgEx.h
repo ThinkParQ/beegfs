@@ -1,5 +1,4 @@
-#ifndef REFRESHCAPACITYPOOLSMSGEX_H_
-#define REFRESHCAPACITYPOOLSMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/RefreshCapacityPoolsMsg.h>
 
@@ -10,4 +9,3 @@ class RefreshCapacityPoolsMsgEx : public RefreshCapacityPoolsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* REFRESHCAPACITYPOOLSMSGEX_H_ */

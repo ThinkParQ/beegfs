@@ -1,5 +1,4 @@
-#ifndef SETTARGETCONSISTENCYSTATESMSG_H
-#define SETTARGETCONSISTENCYSTATESMSG_H
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/nodes/Node.h>
@@ -83,4 +82,3 @@ class SetTargetConsistencyStatesMsg : public AcknowledgeableMsgSerdes<SetTargetC
       }
 };
 
-#endif /*SETTARGETCONSISTENCYSTATESMSG_H*/

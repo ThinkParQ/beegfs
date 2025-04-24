@@ -1,5 +1,4 @@
-#ifndef LOGGER_H_
-#define LOGGER_H_
+#pragma once
 
 #include <common/app/config/ICommonConfig.h>
 #include <common/app/config/InvalidConfigException.h>
@@ -213,29 +212,6 @@ class Logger
          log(level, context.c_str(), msg.c_str());
       }
 
-      /**
-       * Special log method that allows logging independent of the configured log level.
-       *
-       * Note: Used by helperd to log client messages independent of helperd log level.
-       *
-       * @param forceLogging true to force logging without checking the log level.
-       */
-      void logForcedWithThreadName(int level, const char* threadName, const char* context,
-         const char* msg)
-      {
-         logGranted(level, threadName, context, -1, msg);
-      }
-
-      /**
-       * Special version with addidional threadName argument.
-       *
-       * Note: Used by helperd to log client messages with threadName given by client.
-       */
-      void logErrWithThreadName(const char* threadName, const char* context, const char* msg)
-      {
-         logForcedWithThreadName(0, threadName, context, msg);
-      }
-
       void logBacktrace(const char* context, int backtraceLength, char** backtraceSymbols)
       {
          if(!backtraceSymbols)
@@ -402,4 +378,3 @@ class Logger
    #define LOG_CTX_TOP_DBG(...) do {} while (0)
 #endif
 
-#endif /*LOGGER_H_*/

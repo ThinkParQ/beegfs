@@ -1,5 +1,4 @@
-#ifndef STORAGERESYNCSTARTEDRESPMSG_H_
-#define STORAGERESYNCSTARTEDRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleMsg.h>
 
@@ -11,4 +10,3 @@ class StorageResyncStartedRespMsg : public SimpleMsg
       }
 };
 
-#endif /*STORAGERESYNCSTARTEDRESPMSG_H_*/

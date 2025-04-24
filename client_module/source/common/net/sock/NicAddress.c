@@ -18,12 +18,6 @@ bool NicAddress_preferenceComp(const NicAddress* lhs, const NicAddress* rhs)
    if( (rhs->nicType == NICADDRTYPE_RDMA) && (lhs->nicType != NICADDRTYPE_RDMA) )
       return false;
 
-   // prefer SDP NICs
-   if( (lhs->nicType == NICADDRTYPE_SDP) && (rhs->nicType == NICADDRTYPE_STANDARD) )
-      return true;
-   if( (rhs->nicType == NICADDRTYPE_SDP) && (lhs->nicType == NICADDRTYPE_STANDARD) )
-      return false;
-
    // no bandwidth in client NicAddress
 //   // prefer higher bandwidth
 //   if(lhs->bandwidth > rhs->bandwidth)

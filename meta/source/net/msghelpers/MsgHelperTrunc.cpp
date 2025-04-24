@@ -17,9 +17,9 @@ FhgfsOpsErr MsgHelperTrunc::truncFile(EntryInfo* entryInfo, int64_t filesize, bo
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
-   MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+   auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
    if(!inode)
-      return FhgfsOpsErr_PATHNOTEXISTS;
+      return referenceRes;
 
    FhgfsOpsErr localRes = truncChunkFile(*inode, entryInfo, filesize, useQuota, msgUserID,
          dynAttribs);

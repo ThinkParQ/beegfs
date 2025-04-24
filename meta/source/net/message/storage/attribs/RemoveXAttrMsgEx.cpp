@@ -68,7 +68,7 @@ std::unique_ptr<MirroredMessageResponseState> RemoveXAttrMsgEx::executeLocally(R
       }
       else
       {
-         auto file = metaStore->referenceFile(getEntryInfo());
+         auto [file, referenceRes] = metaStore->referenceFile(getEntryInfo());
          if (file)
          {
             fixInodeTimestamp(*file, inodeTimestamps, getEntryInfo());

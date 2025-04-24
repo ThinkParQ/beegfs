@@ -1,5 +1,4 @@
-#ifndef SETLASTBUDDYCOMMOVERRIDEMSGEX_H_
-#define SETLASTBUDDYCOMMOVERRIDEMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/mirroring/SetLastBuddyCommOverrideMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -10,4 +9,3 @@ class SetLastBuddyCommOverrideMsgEx : public SetLastBuddyCommOverrideMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*SETLASTBUDDYCOMMOVERRIDEMSGEX_H_*/

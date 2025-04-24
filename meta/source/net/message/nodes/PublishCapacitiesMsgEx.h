@@ -1,5 +1,4 @@
-#ifndef PUBLISHCAPACITIESMSGEX_H_
-#define PUBLISHCAPACITIESMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/PublishCapacitiesMsg.h>
 
@@ -11,4 +10,3 @@ class PublishCapacitiesMsgEx : public PublishCapacitiesMsg
 };
 
 
-#endif /* PUBLISHCAPACITIESMSGEX_H_*/

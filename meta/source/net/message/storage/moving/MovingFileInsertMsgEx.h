@@ -1,5 +1,4 @@
-#ifndef MOVINGFILEINSERTMSGEX_H_
-#define MOVINGFILEINSERTMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/moving/MovingFileInsertMsg.h>
@@ -113,4 +112,3 @@ class MovingFileInsertMsgEx : public MirroredMessage<MovingFileInsertMsg,
       const char* mirrorLogContext() const override { return "MovingFileInsertMsgEx/forward"; }
 };
 
-#endif /*MOVINGFILEINSERTMSGEX_H_*/

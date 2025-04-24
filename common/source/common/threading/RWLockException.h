@@ -1,8 +1,6 @@
-#ifndef RWLOCKEXCEPTION_H_
-#define RWLOCKEXCEPTION_H_
+#pragma once
 
 #include "SynchronizationException.h"
 
 DECLARE_NAMEDSUBEXCEPTION(RWLockException, "RWLockException", SynchronizationException)
 
-#endif /* RWLOCKEXCEPTION_H_ */

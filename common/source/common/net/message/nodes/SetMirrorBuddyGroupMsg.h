@@ -1,5 +1,4 @@
-#ifndef SETMIRRORBUDDYGROUPMSG_H_
-#define SETMIRRORBUDDYGROUPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/AcknowledgeableMsg.h>
@@ -77,4 +76,3 @@ class SetMirrorBuddyGroupMsg : public AcknowledgeableMsgSerdes<SetMirrorBuddyGro
       }
 };
 
-#endif /* SETMIRRORBUDDYGROUPMSG_H_ */

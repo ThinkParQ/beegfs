@@ -1,5 +1,4 @@
-#ifndef COMMON_PREALLOCATEDFILE_H_
-#define COMMON_PREALLOCATEDFILE_H_
+#pragma once
 
 #include <common/toolkit/FDHandle.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -120,4 +119,3 @@ class PreallocatedFile
       FDHandle fd;
 };
 
-#endif

@@ -1,5 +1,4 @@
-#ifndef SESSIONFILE_H_
-#define SESSIONFILE_H_
+#pragma once
 
 #include <common/storage/Path.h>
 #include <common/Common.h>
@@ -120,4 +119,3 @@ class SessionFile
 
 
 
-#endif /*SESSIONFILE_H_*/

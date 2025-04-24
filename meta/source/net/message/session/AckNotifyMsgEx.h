@@ -1,5 +1,4 @@
-#ifndef META_ACKNOTIFYMSGEX_H
-#define META_ACKNOTIFYMSGEX_H
+#pragma once
 
 #include <common/net/message/session/AckNotifyMsg.h>
 #include <common/net/message/session/AckNotifyRespMsg.h>
@@ -37,4 +36,3 @@ class AckNotifiyMsgEx : public MirroredMessage<AckNotifiyMsg, std::tuple<>>
       const char* mirrorLogContext() const override { return "AckNotifiyMsgEx/forward"; }
 };
 
-#endif

@@ -1,5 +1,4 @@
-#ifndef REMOVEBUDDYGROUPMSGEX_H
-#define REMOVEBUDDYGROUPMSGEX_H
+#pragma once
 
 #include <common/net/message/nodes/RemoveBuddyGroupMsg.h>
 
@@ -9,4 +8,3 @@ class RemoveBuddyGroupMsgEx : public RemoveBuddyGroupMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif

@@ -1,5 +1,4 @@
-#ifndef STORAGERESYNCSTARTEDMSGEX_H_
-#define STORAGERESYNCSTARTEDMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/mirroring/StorageResyncStartedMsg.h>
 
@@ -12,4 +11,3 @@ class StorageResyncStartedMsgEx : public StorageResyncStartedMsg
       void deleteMirrorSessions(uint16_t targetID);
 };
 
-#endif /*STORAGERESYNCSTARTEDMSGEX_H_*/

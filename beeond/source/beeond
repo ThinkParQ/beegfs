@@ -5,22 +5,19 @@ CURRENTTIME=$(date +%Y%m%d-%H%M%S)
 MGMTD_BIN=beegfs-mgmtd
 META_BIN=beegfs-meta
 STORAGE_BIN=beegfs-storage
-HELPERD_BIN=beegfs-helperd
 CLIENT_BIN=beegfs-client # not really a binary, but name of config, init, etc.
-CTL_BIN=beegfs-ctl
+CTL_BIN=beegfs
 
 DEFAULT_LOG_PATH=/var/log
 LOG_PATH=${DEFAULT_LOG_PATH}
 STORAGE_LOG=${STORAGE_BIN}_${CURRENTTIME}.log
 META_LOG=${META_BIN}_${CURRENTTIME}.log
-MGMTD_LOG=${MGMTD_BIN}_${CURRENTTIME}.log
 CLIENT_LOG=${CLIENT_BIN}_${CURRENTTIME}.log
 
 STORAGE_CFG_NAME=${STORAGE_BIN}.conf
 META_CFG_NAME=${META_BIN}.conf
-MGMTD_CFG_NAME=${MGMTD_BIN}.conf
+MGMTD_CFG_NAME=${MGMTD_BIN}.toml
 CLIENT_CFG_NAME=${CLIENT_BIN}.conf
-HELPERD_CFG_NAME=${HELPERD_BIN}.conf
 
 META_NUMID_FILE=nodeNumID
 TARGET_NUMID_FILE=targetNumID
@@ -36,6 +33,7 @@ NUM_STORAGE_SERVER=0
 
 BEEGFS_BIN_PATH=/opt/beegfs/sbin
 
+DEFAULT_MGMTD_GRPC_PORT=8010
 DEFAULT_PORT_SHIFT=1000
 
 SSH="ssh"
@@ -110,7 +108,7 @@ print_usage_and_exit()
    echo "         -f PATH     => Directory containing additional beegfs config files."
    echo "                        There can be one file for each service as well as the client."
    echo "                        They must be  named in the form beegfs-<service>.conf, where "
-   echo "                        <service> can be meta, storage, mgmtd, helperd or client."
+   echo "                        <service> can be meta, storage, mgmtd or client."
    echo "                        Only the options specified within the files are"
    echo "                        set/overwritten, the rest of the defaults will not be"
    echo "                        touched and still be applied. The directory and the "
@@ -156,6 +154,21 @@ print_usage_and_exit()
    echo "                        on the root level of the BeeGFS mount."
    echo "                        This option can only be used together with -F."
    echo "         -T          => Don't create and assign the pool directories when using -t."
+   echo "         -G          => The base gRPC port (before port shifting) that the mgmtd"
+   echo "                        uses in this BeeOND instance. Defaults to 8010 and only needs"
+   echo "                        to be supplied if mgmtd is configured via configuration file"
+   echo "                        (see -f) to use a base gRPC port other than 8010."
+   echo ""
+   echo "      Arguments that require a configuration directory (option -f) that is available"
+   echo "      on all nodes and contains the required files (see option descriptions):"
+   echo "         -C          => Enable connection authentication. Requires a \"conn.auth\""
+   echo "                        file in the configuration directory."
+   echo "         -E          => Enable TLS encryption between the mgmtmd and the command"
+   echo "                        line configuration tool. Requires \"cert.pem\" and"
+   echo "                        \"key.pem\" files in the configuration directory."
+   echo "         -H          => Enable enterprise features. This mode is required by all"
+   echo "                        other modes that enable enterprise features and requires a"
+   echo "                        \"license.pem\" file in the configuration directory."
    echo ""
    echo "   stop:"
    echo "      Stop the file system on a number of nodes, specified by the node file."
@@ -550,7 +563,7 @@ needed parameters"
    DATAPATH=${DATAPATH}/${META_BIN}
 
    PARAMS="sysMgmtdHost=${MGMTD} storeMetaDirectory=${DATAPATH} logStdFile=${LOGFILE} \
-runDaemonized=true pidFile=${PIDFILE}"
+      ${CONNAUTH_LEGACY} runDaemonized=true pidFile=${PIDFILE}"
 
    if [ "${PORT_SHIFT}" != "" ]
    then
@@ -634,7 +647,7 @@ needed parameters"
 
    DATAPATH=${DATAPATH}/${STORAGE_BIN}
 
-   PARAMS="sysMgmtdHost=${MGMTD} logStdFile=${LOGFILE} runDaemonized=true pidFile=${PIDFILE}"
+   PARAMS="sysMgmtdHost=${MGMTD} logStdFile=${LOGFILE} runDaemonized=true pidFile=${PIDFILE} ${CONNAUTH_LEGACY}"
 
    if [ "${PORT_SHIFT}" != "" ]
    then
@@ -737,16 +750,22 @@ create_storage_pools()
          do
             CMD="echo \"${TARGETS}\" | tr ',' '\n' | \
                while read T; do if [ -f \"\${T}/${TARGET_NUMID_FILE}\" ]; then \
-               echo -n \$(cat \"\${T}/targetNumID\"),; fi; done"
+               echo -n \"\$(cat \"\${T}/targetNumID\") \"; fi; done"
             HOST_TARGETS=$(execute_ssh_cmd "${HOST}" "${CMD}")
-            TARGET_IDS="$TARGET_IDS$HOST_TARGETS"
+            for TARGET_ID in $HOST_TARGETS
+            do
+               TARGET_IDS="${TARGET_IDS:+$TARGET_IDS,}storage:$TARGET_ID"
+            done
          done < <(echo "${HOSTS}" | tr ',' '\n')
 
-         if [ "$POOL" != "default" ] && [ "$POOL" != "Default" ]
+         if [ "$POOL" == "default" ] || [ "$POOL" == "Default" ]
          then
+            "${CTL_BIN}" ${CTL_GLOBAL_PARAMS} \
+               pool set-alias storage:1 "${POOL}" > /dev/null
+         else
             # create pool with collected ids
-            "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
-               --addstoragepool --desc="${POOL}" --targets="${TARGET_IDS}"
+            "${CTL_BIN}" ${CTL_GLOBAL_PARAMS} \
+               pool create "${POOL}" --targets "${TARGET_IDS}" > /dev/null
          fi
       done < <(grep -v "^$" "${TARGETFILE}" | grep -v "^\s*\#")
    fi
@@ -755,18 +774,18 @@ create_storage_pools()
 assign_storage_pool_dirs()
 {
    local POOLS
-   POOLS=$("${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
-      --liststoragepools | tail -n+4 | awk '{print $1 " " $2}')
+   POOLS=$("${CTL_BIN}" ${CTL_GLOBAL_PARAMS} \
+	   pool list --columns alias | grep -v '^\s*$'| tail -n+2)
 
    while read LINE
    do
-      read ID DESC <<< "${LINE}"
+      read ALIAS <<< "${LINE}"
 
-      "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
-      --createdir --unmounted "/${DESC}"
+      "${CTL_BIN}" ${CTL_GLOBAL_PARAMS} \
+      entry create dir --mount=none "/${ALIAS}" > /dev/null
 
-      "${CTL_BIN}" --sysMgmtdHost="${MGMTD}" --connPortShift="${PORT_SHIFT}" \
-      --setpattern --unmounted --storagepoolid="${ID}" "/${DESC}"
+      "${CTL_BIN}" ${CTL_GLOBAL_PARAMS} \
+      entry set --mount=none --pool "${ALIAS}" "/${ALIAS}" &> /dev/null
 
    done < <(echo "${POOLS}")
 }
@@ -839,7 +858,6 @@ start_mgmtd()
    local CFG_PATH=$4 # may be empty
    local CFG_FILE=${CFG_PATH}/${MGMTD_CFG_NAME}
 
-   local LOGFILE=${LOG_PATH}/${MGMTD_LOG}
    local PIDFILE=/var/run/${MGMTD_BIN}-${CURRENTTIME}.pid
 
    # error checks
@@ -850,33 +868,33 @@ parameters"
    fi
 
    DATAPATH=${DATAPATH}/${MGMTD_BIN}
+   DBPATH=${DATAPATH}/beegfs-mgmtd.sqlite3
 
    # start server
    print_info "Starting ${MGMTD_BIN} processes"
-   print_info "Management daemon log: ${LOGFILE}"
 
    print_info "Starting ${MGMTD_BIN} on host: ${HOST}"
 
-   PARAMS="storeMgmtdDirectory=${DATAPATH} logStdFile=${LOGFILE} runDaemonized=true \
-pidFile=${PIDFILE}"
+   PARAMS="--db-file ${DBPATH} --daemonize true --daemonize-pid-file ${PIDFILE} ${TLS_DISABLE} ${TLS_CERT_FILE} ${TLS_KEY_FILE} ${CONNAUTH_FLAG} ${LICENSE_FILE}"
 
    if [ "${PORT_SHIFT}" != "" ]
    then
-      PARAMS="${PARAMS} connPortShift=${PORT_SHIFT}"
+      PARAMS="${PARAMS} --port-shift ${PORT_SHIFT}"
    fi
 
    CMD="PARAMS=\"${PARAMS}\"; \
 if [ -n \"${CFG_PATH}\" ] && [ -e \"${CFG_FILE}\" ]; then \
-   PARAMS=\"\${PARAMS} cfgFile=${CFG_FILE}\"; fi; \
+   PARAMS=\"\${PARAMS} --config-file ${CFG_FILE}\"; fi; \
 if [ \"${CLEAR_DATA}\" = \"true\" ]; then \
    rm -rf ${DATAPATH}; fi; \
+${BEEGFS_BIN_PATH}/${MGMTD_BIN} --init --db-file ${DBPATH}; \
 ${BEEGFS_BIN_PATH}/${MGMTD_BIN} \${PARAMS}"
 
    if ! execute_ssh_cmd "${HOST}" "${CMD}"
    then
       print_error_and_exit "Unable to start ${MGMTD_BIN} on host: ${HOST}"
    else
-      add_to_status_file "${HOST}" "${MGMTD_BIN}" "${DATAPATH}" "${LOGFILE}" "${PIDFILE}"
+      add_to_status_file "${HOST}" "${MGMTD_BIN}" "${DATAPATH}" "-" "${PIDFILE}"
    fi
 
    if [ "${QUIET}" != "true" ]
@@ -892,11 +910,9 @@ start_clients()
    local MOUNTPOINT=$3
    local PORT_SHIFT=$4 # port shift can be empty!
    local CFG_PATH=$5 # may be empty
-   local HELPERD_CFG_FILE=${CFG_PATH}/${HELPERD_CFG_NAME}
    local CLIENT_CFG_FILE=${CFG_PATH}/${CLIENT_CFG_NAME}
 
    local LOGFILE=${LOG_PATH}/${CLIENT_LOG}
-   local PIDFILE=/var/run/${HELPERD_BIN}-${CURRENTTIME}.pid
 
    # error checks
    if [ "${HOSTS}" = "" ] || [ "${MGMTD}" = "" ] || [ "${MOUNTPOINT}" = "" ]
@@ -905,21 +921,10 @@ start_clients()
 needed parameters"
    fi
 
-   HELPERD_PARAMS="logStdFile=${LOGFILE} runDaemonized=true pidFile=${PIDFILE}"
-
-   if [ "${PORT_SHIFT}" != "" ]
-   then
-      HELPERD_PARAMS="${HELPERD_PARAMS} connPortShift=${PORT_SHIFT}"
-   fi
-
-   HELPERD_CMD="PARAMS=\"${HELPERD_PARAMS}\"; if [ -n \"${CFG_PATH}\" ] && \
-[ -e \"${HELPERD_CFG_FILE}\" ]; then PARAMS=\"\${PARAMS} cfgFile=${HELPERD_CFG_FILE}\"; fi; \
-${BEEGFS_BIN_PATH}/${HELPERD_BIN} \${PARAMS}"
-
    MODPROBE_CMD="modprobe beegfs"
    REBUILD_CMD="/etc/init.d/${CLIENT_BIN} rebuild"
 
-   MOUNT_PARAMS="-osysMgmtdHost=${MGMTD}"
+   MOUNT_PARAMS="-osysMgmtdHost=${MGMTD},${CONNAUTH_LEGACY// /,}"
 
    if [ "${PORT_SHIFT}" != "" ]
    then
@@ -940,9 +945,6 @@ mkdir -p ${MOUNTPOINT} && ${MODPROBE_CMD} && mount -t beegfs beegfs_ondemand ${M
       print_info "Starting ${CLIENT_BIN} processes on the following hosts: ${HOSTS}"
       print_info "Client log: ${LOGFILE}"
 
-      execute_pdsh_cmd "${HOSTS}" "${HELPERD_CMD}" "false"
-
-      execute_pdsh_cmd "${HOSTS}" "echo %h,${HELPERD_BIN},-,${LOGFILE},${PIDFILE} >> ${STATUSFILE}" "false"
       execute_pdsh_cmd "${HOSTS}" "echo %h,${CLIENT_BIN},${MOUNTPOINT},${LOGFILE},- >> ${STATUSFILE}" "false"
 
       execute_pdsh_cmd "${HOSTS}" "${MODPROBE_CMD} || ${REBUILD_CMD}" "false"
@@ -950,8 +952,8 @@ mkdir -p ${MOUNTPOINT} && ${MODPROBE_CMD} && mount -t beegfs beegfs_ondemand ${M
 
       if [ "${PREFER_LOCAL}" = "true" ] #set target count to 1
       then
-        CTL_CMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} --setpattern \
---numtargets=1 --chunksize=512k ${MOUNTPOINT} > /dev/null"
+        CTL_CMD="${CTL_BIN} ${CTL_GLOBAL_PARAMS} \
+           entry set --num-targets 1 --chunk-size 512ki ${MOUNTPOINT} > /dev/null"
         execute_pdsh_cmd "${HOSTS}" "${CTL_CMD}" "false"
       fi
    else
@@ -965,13 +967,6 @@ mkdir -p ${MOUNTPOINT} && ${MODPROBE_CMD} && mount -t beegfs beegfs_ondemand ${M
       for HOST in ${HOSTS}
       do
          print_info "Starting ${CLIENT_BIN} on host: ${HOST}"
-         if ! execute_ssh_cmd "${HOST}" "${HELPERD_CMD}"
-         then
-            print_error_and_exit "Unable to start ${CLIENT_BIN} on host: ${HOST}"
-         else
-            # NOTE : - is empty data path
-            add_to_status_file "${HOST}" "${HELPERD_BIN}" "-" "${LOGFILE}" "${PIDFILE}"
-         fi
 
          if ! execute_ssh_cmd "${HOST}" "${MODPROBE_CMD}"
          then
@@ -989,8 +984,8 @@ from source."
 
             if [ "${PREFER_LOCAL}" = "true" ] #set target count to 1
             then
-                 CTL_CMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
---setpattern --numtargets=1 --chunksize=512k ${MOUNTPOINT} > /dev/null"
+                 CTL_CMD="${CTL_BIN} ${CTL_GLOBAL_PARAMS} \
+                    entry set --num-targets 1 --chunk-size 512ki ${MOUNTPOINT} > /dev/null"
                  execute_ssh_cmd "${HOST}" "${CTL_CMD}"
             fi
 
@@ -1128,22 +1123,42 @@ wait_online_good()
    local NUM_NODES=$2
 
    #first, wait for the correct number of *nodes* to become available.
-   local CTLCMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
-         --listnodes --nodetype=${NODE_TYPE}"
-   while [ ! "$(${CTLCMD} | wc -l)" = "${NUM_NODES}" ]
+   echo -n "Waiting until all nodes have registered with mgmtd..."
+   local CTLCMD="${CTL_BIN} ${CTL_GLOBAL_PARAMS}          \
+         node list --node-type ${NODE_TYPE}"
+   while [ ! "$(${CTLCMD} | head -n-1 | tail -n+2 | wc -l)" = "${NUM_NODES}" ]
    do
+      echo -n "."
       sleep 1
    done
+   echo
 
    # now wait for all *targets* to become online/good. (also works for metadata servers, since they
    # are internally treated as one target per server)
-   local CTLCMD="${CTL_BIN} --sysMgmtdHost=${MGMTD} --connPortShift=${PORT_SHIFT} \
-         --listtargets --nodetype=${NODE_TYPE} --state"
-
-   while [ ! "$(${CTLCMD} | tail -n+3 | grep "Online\s\+Good" -c)" = "$(${CTLCMD} | tail -n+3 | wc -l)" ]
+   echo -n "Waiting for all nodes/targets to be online and in sync..."
+   local CTLCMD="${CTL_BIN} ${CTL_GLOBAL_PARAMS}          \
+         target list --node-type ${NODE_TYPE} --state --columns reachability,consistency"
+   while [ ! "$(${CTLCMD} | head -n-1 | tail -n+2 | grep "Online\s\+Good" -c)" = "$(${CTLCMD} | head -n-1 | tail -n+2 | wc -l)" ]
    do
+      echo -n "."
       sleep 1
    done
+   echo
+
+   # and now, we wait until all targets have reported their available space and inodes. It should be
+   # good enough to only check space, because both will be reported at the same time. Without this,
+   # the automatic mirror group creation might fail, because it compares target sizes and free
+   # inodes.
+   echo -n "Waiting for all nodes/targets to report their available space..."
+   local CTLCMD="${CTL_BIN} ${CTL_GLOBAL_PARAMS}          \
+         target list --node-type ${NODE_TYPE} --raw --columns space"
+   while [ ! "$(${CTLCMD} | head -n-1 | tail -n+2 | grep -s '^-\s\+$' | wc -l)" == 0 ]
+   do
+      echo -n "."
+      sleep 1
+   done
+   echo
+
 }
 
 ### main functions ###
@@ -1158,8 +1173,15 @@ do_start()
    META_MIRROR="false"
    PORT_SHIFT=${DEFAULT_PORT_SHIFT}
    ASSIGN_STORAGE_POOL_DIRS=true
+   CONNAUTH_FLAG="--auth-disable"
+   CONNAUTH_LEGACY="connDisableAuthentication=true"
+   TLS_DISABLE="--tls-disable"
+   TLS_CERT_FILE=""
+   TLS_KEY_FILE=""
+   LICENSE_FILE=""
+   MGMTD_GRPC_PORT=${DEFAULT_MGMTD_GRPC_PORT}
 
-   while getopts ":c:d:f:Fi:m:n:p:lL:Pb:s:qrkjt:T" opt; do
+   while getopts ":c:d:f:Fi:m:n:p:G:lL:Pb:s:qrkjt:TCEH" opt; do
       case $opt in
          n)
             HOSTFILE=${OPTARG}
@@ -1193,6 +1215,13 @@ do_start()
             fi
             PORT_SHIFT=${OPTARG}
          ;;
+         G)
+            if ! [[ ${OPTARG} =~ ^[0-9]+$ ]];
+            then
+               print_error_and_exit "management gRPC port must be numeric";
+            fi
+            MGMTD_GRPC_PORT=${OPTARG}
+         ;;
          P)
             USE_PDSH="true"
          ;;
@@ -1222,16 +1251,46 @@ do_start()
             USE_TMPFS="true"
          ;;
          k)
+            if [[ -z ${LICENSE_FILE} ]] ; then
+               print_error_and_exit "To use mirroring, licensing (option -H) must be configured before the option -k"
+            fi
             STORAGE_MIRROR="true"
          ;;
          j)
+            if [[ -z ${LICENSE_FILE} ]] ; then
+               print_error_and_exit "To use mirroring, licensing (option -H) must be configured before the option -j"
+            fi
             META_MIRROR="true"
          ;;
          t)
+            if [[ -z ${LICENSE_FILE} ]] ; then
+               print_error_and_exit "To use storage pools, licensing (option -H) must be configured before the option -t"
+            fi
             TARGETFILE=${OPTARG}
          ;;
          T)
             ASSIGN_STORAGE_POOL_DIRS="false"
+         ;;
+         C)
+            if ! [[ -f ${CONFIGPATH}/conn.auth ]] ; then
+               print_error_and_exit "To use connection authentication, a config path (option -f) that contains a \"conn.auth\" file and is available on all nodes needs to be specified before the option -C"
+            fi
+            CONNAUTH_FLAG="--auth-file ${CONFIGPATH}/conn.auth"
+            CONNAUTH_LEGACY="connAuthFile=${CONFIGPATH}/conn.auth connDisableAuthentication=false"
+         ;;
+         E)
+            if ! [[ -f ${CONFIGPATH}/cert.pem && -f ${CONFIGPATH}/key.pem ]] ; then
+               print_error_and_exit "To use TLS encryption, a config path (option -f) that contains a \"cert.pem\" and a \"key.pem\" file and is available on all nodes needs to be specified before the option -E"
+            fi
+            TLS_DISABLE="--tls-disable=false"
+            TLS_CERT_FILE="--tls-cert-file ${CONFIGPATH}/cert.pem"
+            TLS_KEY_FILE="--tls-key-file ${CONFIGPATH}/key.pem"
+         ;;
+         H)
+            if ! [[ -f ${CONFIGPATH}/license.pem ]] ; then
+               print_error_and_exit "To use enterprise features, a config path (option -f) that contains a \"license.pem\" file and is available on all nodes needs to be specified before the option -H"
+            fi
+            LICENSE_FILE="--license-cert-file ${CONFIGPATH}/license.pem"
          ;;
          \?)
             echo "ERROR: invalid option: -${OPTARG}" >&2
@@ -1324,6 +1383,12 @@ do_start()
    # MASTERHOST is also mgmtd host
    MGMTD=${MASTERHOST}
 
+   # The gRPC port for MGMTD, important for CTL
+   MGMTD_GRPC_PORT=$((MGMTD_GRPC_PORT+PORT_SHIFT))
+
+   # Combine variables relevant to CTL into one
+   CTL_GLOBAL_PARAMS="--mgmtd-addr ${MGMTD}:${MGMTD_GRPC_PORT} ${TLS_DISABLE} ${TLS_CERT_FILE} ${CONNAUTH_FLAG}"
+
    # port shift and config path may be empty, but that's ok
    start_mgmtd "${MGMTD}" "${DATA_PATH}" "${PORT_SHIFT}" "${CONFIGPATH}"
 
@@ -1346,8 +1411,8 @@ do_start()
    # enable mirroring
    if [ "${STORAGE_MIRROR}" = "true" ]
    then
-      if ! ${CTL_BIN} --sysMgmtdHost="${MGMTD}" --connPortShift=${PORT_SHIFT} --addmirrorgroup \
-            --nodetype=storage --automatic --force > /dev/null
+      if ! ${CTL_BIN} ${CTL_GLOBAL_PARAMS} \
+            mirror autocreate storage > /dev/null
       then
          print_error_and_exit "Unable to create storage target buddy mirror groups."
       fi
@@ -1358,8 +1423,8 @@ do_start()
 
    if [ "${META_MIRROR}" = "true" ]
    then
-      if ! ${CTL_BIN} --sysMgmtdHost="${MGMTD}" --connPortShift=${PORT_SHIFT} --addmirrorgroup \
-            --nodetype=meta --automatic --force > /dev/null
+      if ! ${CTL_BIN} ${CTL_GLOBAL_PARAMS} \
+            mirror autocreate meta > /dev/null
       then
          print_error_and_exit "Unable to create metadata server buddy mirror groups."
       fi
@@ -1367,7 +1432,8 @@ do_start()
       # all metadata servers need to know about the newly created mirror groups
       sleep 8
 
-      if ! ${CTL_BIN} --sysMgmtdHost="${MGMTD}" --connPortShift=${PORT_SHIFT} --mirrormd > /dev/null
+      if ! ${CTL_BIN} ${CTL_GLOBAL_PARAMS} \
+         mirror init --yes > /dev/null
       then
          print_error_and_exit "Unable to enable metadata mirroring."
       fi
@@ -1387,13 +1453,38 @@ do_start()
 
    if [ "${STORAGE_MIRROR}" = "true" ]
    then
-      if ! ${CTL_BIN} --sysMgmtdHost="${MGMTD}" --connPortShift=${PORT_SHIFT} --setpattern \
-            --pattern=buddymirror --chunksize=512k --numtargets=4 "${MOUNTPOINT}" > /dev/null
+      if ! ${CTL_BIN} ${CTL_GLOBAL_PARAMS} \
+            entry set --chunk-size 512ki --num-targets 4 --pattern mirrored "${MOUNTPOINT}" > /dev/null
       then
          print_error_and_exit "Unable to enable mirroring pattern."
       fi
    fi
 
+   echo " ****************************************************************************** "
+   echo "* BeeOND setup finished successfully! To configure the \`beegfs\` command line"
+   echo "* utility to talk to the BeeOND mgmtd service, some additional configuration"
+   echo "* might be necessary."
+   echo "*"
+   echo "* If there is more than one BeeGFS mounted on the node that runs \`beegfs\`,"
+   echo "* the correct mgmtd will need to be configured by using"
+   echo "*   --mgmtd-addr \"${MGMTD}:${MGMTD_GRPC_PORT}\" or"
+   echo "*   export BEEGFS_MGMTD_ADDR=\"${MGMTD}:${MGMTD_GRPC_PORT}\""
+   if ! [[ -z ${CONNAUTH_FLAG} ]]
+   then
+	echo "*"
+	echo "* To configure \`beegfs\` to use the correct connection authentication file,"
+	echo "* please use"
+	echo "*   --auth-file \"${CONFIGPATH}/conn.auth\" or"
+	echo "*   export BEEGFS_AUTH_FILE=\"${CONFIGPATH}/conn.auth\""
+   fi
+   if ! [[ -z ${TLS_DISABLE} ]]
+   then
+	echo "*"
+	echo "* To configure \`beegfs\` to use TLS encryption when talking to mgmtd, use"
+	echo "*   --tls-cert-file \"${CONFIGPATH}/cert.pem\" or"
+	echo "*   export BEEGFS_TLS_CERT_FILE=\"${CONFIGPATH}/cert.pem\""
+   fi
+   echo " ****************************************************************************** "
 }
 
 do_stop()

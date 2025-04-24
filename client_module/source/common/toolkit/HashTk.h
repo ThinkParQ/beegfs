@@ -12,6 +12,9 @@ extern uint64_t HashTk_hash64(HashTkHashTypes hashType, const char* data, int le
 static inline uint64_t HashTk_hash(HashTkHashTypes hashType, size_t hashSize,
    const char* data, int len);
 
+int HashTk_sha256(const unsigned char* data, unsigned dataLen, unsigned char* outHash);
+int HashTk_authHash(const unsigned char* data, unsigned dataLen, uint64_t* outHash);
+
 enum HashTkHashTypes
 {
    HASHTK_HSIEHHASH32      = 0,

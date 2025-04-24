@@ -1,5 +1,4 @@
-#ifndef SETXATTRMSG_H_
-#define SETXATTRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -81,4 +80,3 @@ class SetXAttrMsg : public MirroredMessageBase<SetXAttrMsg>
          bool supportsMirroring() const { return true; }
 };
 
-#endif /*SETXATTRMSG_H_*/

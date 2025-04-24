@@ -1,5 +1,4 @@
-#ifndef UNLINKLOCALFILEMSG_H_
-#define UNLINKLOCALFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/PathInfo.h>
@@ -85,4 +84,3 @@ class UnlinkLocalFileMsg : public NetMessageSerdes<UnlinkLocalFileMsg>
 };
 
 
-#endif /*UNLINKLOCALFILEMSG_H_*/

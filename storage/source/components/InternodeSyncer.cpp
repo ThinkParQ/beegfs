@@ -28,6 +28,11 @@
 
 #include <boost/lexical_cast.hpp>
 
+// forward declaration
+namespace UUID {
+   std::string getMachineUUID();
+}
+
 InternodeSyncer::InternodeSyncer():
    PThread("XNodeSync"),
    log("XNodeSync"), forceTargetStatesUpdate(true), forcePublishCapacities(true)
@@ -488,8 +493,15 @@ bool InternodeSyncer::registerNode(AbstractDatagramListener* dgramLis)
    NumNodeID localNodeNumID = localNode.getNumID();
    NicAddressList nicList(localNode.getNicList() );
 
-   HeartbeatMsg msg(localNode.getID(), localNodeNumID, NODETYPE_Storage, &nicList);
-   msg.setPorts(cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
+   HeartbeatMsg msg(localNode.getAlias(), localNodeNumID, NODETYPE_Storage, &nicList);
+   msg.setPorts(cfg->getConnStoragePort(), cfg->getConnStoragePort() );
+   auto uuid = UUID::getMachineUUID();
+   if (uuid.empty()) {
+      LogContext(logContext).log(Log_CRITICAL,
+         "Couldn't determine UUID for machine. Node registration not possible.");
+      return false;
+   }
+   msg.setMachineUUID(uuid);
 
    bool registered = dgramLis->sendToNodeUDPwithAck(mgmtNode, &msg);
 

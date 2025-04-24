@@ -1,5 +1,4 @@
-#ifndef NETMESSAGETYPES_H_
-#define NETMESSAGETYPES_H_
+#pragma once
 
 /* This file MUST be kept in sync with the corresponding client file!
  * See fhgfs_client/source/closed/common/net/message/NetMessageTypes.h
@@ -173,6 +172,16 @@
 #define NETMSGTYPE_MoveFileInodeResp               2120
 #define NETMSGTYPE_UnlinkLocalFileInode            2121
 #define NETMSGTYPE_UnlinkLocalFileInodeResp        2122
+#define NETMSGTYPE_SetFilePattern                  2123
+#define NETMSGTYPE_SetFilePatternResp              2124
+#define NETMSGTYPE_CpChunkPaths                    2125
+#define NETMSGTYPE_CpChunkPathsResp                2126
+#define NETMSGTYPE_ChunkBalance                    2127
+#define NETMSGTYPE_ChunkBalanceResp                2128
+#define NETMSGTYPE_StripePatternUpdate             2129
+#define NETMSGTYPE_StripePatternUpdateResp         2130
+#define NETMSGTYPE_SetFileDataState                2131
+#define NETMSGTYPE_SetFileDataStateResp            2132
 
 // session messages
 #define NETMSGTYPE_OpenFile                        3001
@@ -217,12 +226,6 @@
 #define NETMSGTYPE_AuthenticateChannel             4007
 #define NETMSGTYPE_GenericResponse                 4009
 #define NETMSGTYPE_PeerInfo                        4011
-
-// helperd messages
-#define NETMSGTYPE_Log                             5001
-#define NETMSGTYPE_LogResp                         5002
-#define NETMSGTYPE_GetHostByName                   5003
-#define NETMSGTYPE_GetHostByNameResp               5004
 
 // mon messages
 #define NETMSGTYPE_GetNodesFromRootMetaNode        6001
@@ -277,4 +280,3 @@
 #define NETMSGTYPE_CheckAndRepairDupInode          7044
 #define NETMSGTYPE_CheckAndRepairDupInodeResp      7045
 
-#endif /*NETMESSAGETYPES_H_*/

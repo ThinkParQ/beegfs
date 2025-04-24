@@ -1,5 +1,4 @@
-#ifndef READLOCALFILEV2WORK_H_
-#define READLOCALFILEV2WORK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/sock/Socket.h>
@@ -73,4 +72,3 @@ class ReadLocalFileV2Work : public Work
 
 };
 
-#endif /*READLOCALFILEV2WORK_H_*/

@@ -1,5 +1,4 @@
-#ifndef COMMON_SETLOCALATTRRESPMSG_H_
-#define COMMON_SETLOCALATTRRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/striping/DynamicFileAttribs.h>
@@ -77,4 +76,3 @@ class SetLocalAttrRespMsg : public NetMessageSerdes<SetLocalAttrRespMsg>
       uint64_t storageVersion;
 };
 
-#endif /*COMMON_SETLOCALATTRRESPMSG_H_*/

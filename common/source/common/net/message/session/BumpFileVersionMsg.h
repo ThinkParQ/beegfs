@@ -1,5 +1,4 @@
-#ifndef BUMPFILEVERSIONMSG_H
-#define BUMPFILEVERSIONMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -57,4 +56,3 @@ class BumpFileVersionMsg : public MirroredMessageBase<BumpFileVersionMsg>
       }
 };
 
-#endif

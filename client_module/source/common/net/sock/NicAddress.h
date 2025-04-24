@@ -25,7 +25,12 @@ static inline void NicAddress_ipToStr(struct in_addr ipAddr, char* outStr);
 static inline bool NicAddress_equals(NicAddress* this, NicAddress* other);
 
 
-enum NicAddrType        {NICADDRTYPE_STANDARD=0, NICADDRTYPE_SDP=1, NICADDRTYPE_RDMA=2};
+enum NicAddrType
+{
+   NICADDRTYPE_STANDARD = 0,
+   // removed: NICADDRTYPE_SDP = 1,
+   NICADDRTYPE_RDMA = 2
+};
 
 struct NicAddress
 {
@@ -39,7 +44,6 @@ struct NicAddress
 
 struct NicListCapabilities
 {
-   bool supportsSDP;
    bool supportsRDMA;
 };
 

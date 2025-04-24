@@ -1,5 +1,4 @@
-#ifndef SYNCCANDIDATESTORE_H
-#define SYNCCANDIDATESTORE_H
+#pragma once
 
 #include <common/threading/Condition.h>
 #include <common/threading/Mutex.h>
@@ -207,4 +206,3 @@ class SyncCandidateStore
       }
 };
 
-#endif /* CHUNKSYNCCANDIDATESTORE_H */

@@ -1,5 +1,4 @@
-#ifndef COMMON_LOCKFD_H
-#define COMMON_LOCKFD_H
+#pragma once
 
 #include <common/toolkit/FDHandle.h>
 
@@ -57,4 +56,3 @@ class LockFD final
       explicit LockFD(std::string path, FDHandle fd): path(std::move(path)), fd(std::move(fd)) {}
 };
 
-#endif

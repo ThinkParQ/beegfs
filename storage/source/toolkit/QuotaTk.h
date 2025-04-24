@@ -1,5 +1,4 @@
-#ifndef TOOLKIT_QUOTATK_H_
-#define TOOLKIT_QUOTATK_H_
+#pragma once
 
 
 
@@ -42,4 +41,3 @@ class QuotaTk
 
 };
 
-#endif /* TOOLKIT_QUOTATK_H_ */

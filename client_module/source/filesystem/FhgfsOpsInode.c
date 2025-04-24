@@ -201,13 +201,14 @@ struct dentry* FhgfsOps_lookupIntent(struct inode* parentDir, struct dentry* den
    { // entry exists => create inode
       struct kstat kstat;
       struct inode* newInode;
+      unsigned int metaVersion = fhgfsStat.metaVersion;
 
       OsTypeConv_kstatFhgfsToOs(&fhgfsStat, &kstat);
 
       kstat.ino = FhgfsInode_generateInodeID(dentry->d_sb,
          newEntryInfo.entryID, strlen(newEntryInfo.entryID) );
 
-      newInode = __FhgfsOps_newInode(parentDir->i_sb, &kstat, 0, &newEntryInfo, &iSizeHints);
+      newInode = __FhgfsOps_newInode(parentDir->i_sb, &kstat, 0, &newEntryInfo, &iSizeHints, metaVersion);
 
       freeNewEntryInfo = false; // newEntryInfo now owned or freed by _newInode()
 
@@ -2385,10 +2386,11 @@ void FhgfsOps_destroy_inode(struct inode* inode)
  * @param parentNodeID: usually 0, except for NFS export callers, which needs it to connect dentries
  *    with their parents. By default dentries are connected to their parents, so usually this
  *    is not required (nfs is an exception).
+ * @param metaVersion: set to 0 for root inode, otherwise to the value from stat
  * @return NULL if not successful
  */
 struct inode* __FhgfsOps_newInodeWithParentID(struct super_block* sb, struct kstat* kstat,
-   dev_t dev, EntryInfo* entryInfo, NumNodeID parentNodeID, FhgfsIsizeHints* iSizeHints)
+   dev_t dev, EntryInfo* entryInfo, NumNodeID parentNodeID, FhgfsIsizeHints* iSizeHints, unsigned int metaVersion)
 {
    App* app = FhgfsOps_getApp(sb);
    Config* cfg = App_getConfig(app);
@@ -2415,7 +2417,10 @@ struct inode* __FhgfsOps_newInodeWithParentID(struct super_block* sb, struct kst
    if( !(inode->i_state & I_NEW) )
    {  // Found an existing inode, which is possibly actively used. We still need to update it.
       FhgfsInode_entryInfoWriteLock(fhgfsInode); // LOCK EntryInfo
+
       FhgfsInode_updateEntryInfoUnlocked(fhgfsInode, entryInfo);
+      fhgfsInode->metaVersion = metaVersion;  //set the metaVersion of new inode to match the meta version 
+      
       FhgfsInode_entryInfoWriteUnlock(fhgfsInode); // UNLOCK EntryInfo
 
       spin_lock(&inode->i_lock);
@@ -2436,6 +2441,14 @@ struct inode* __FhgfsOps_newInodeWithParentID(struct super_block* sb, struct kst
 
    // no one can access inode yet => unlocked
    __FhgfsOps_applyStatDataToInodeUnlocked(kstat, iSizeHints, inode);
+
+   //set the version of new inode to match the meta version
+   FhgfsInode_entryInfoWriteLock(fhgfsInode);   //LOCK EntryInfo
+   {
+      fhgfsInode->metaVersion = metaVersion;  //set the metaVersion of new inode to match the meta version 
+   }
+   FhgfsInode_entryInfoWriteUnlock(fhgfsInode); // UNLOCK EntryInfo
+   
 
    inode->i_ino = kstat->ino; // pre-set by caller
 
@@ -2559,13 +2572,14 @@ int __FhgfsOps_instantiateInode(struct dentry* dentry, EntryInfo* entryInfo, fhg
    { // success (entry exists on server or was already given by caller)
       struct kstat kstat;
       struct inode* newInode;
+      unsigned int metaVersion = actualStatInfo->metaVersion;
 
       OsTypeConv_kstatFhgfsToOs(actualStatInfo, &kstat);
 
       kstat.ino = FhgfsInode_generateInodeID(dentry->d_sb, entryInfo->entryID,
          strlen(entryInfo->entryID) );
 
-      newInode = __FhgfsOps_newInode(dentry->d_sb, &kstat, 0, entryInfo, iSizeHints);
+      newInode = __FhgfsOps_newInode(dentry->d_sb, &kstat, 0, entryInfo, iSizeHints, metaVersion);
       if(unlikely(!newInode || IS_ERR(newInode) ) )
          retVal = IS_ERR(newInode) ? PTR_ERR(newInode) : -EACCES;
       else
@@ -2862,4 +2876,45 @@ int __FhgfsOps_revalidateMapping(App* app, struct inode* inode)
       return __FhgfsOps_refreshInode(app, inode, NULL, &iSizeHints);
 
    return 0;
+}
+
+/** 
+ * Used for client cache invalidation with metadata version.
+ * Either clears inode stripe pattern or makes the inode invalid.
+ * Acquires i_lock spinlock. 
+ */
+void __FhgfsOps_clearInodeStripePattern(App* app, struct inode* inode)
+{
+   const char* logContext = "FhgfsOps_clearInodeStripePattern";
+   FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
+   IGNORE_UNUSED_VARIABLE(logContext);
+   spin_lock(&inode->i_lock); 
+
+   //check the inode reference counter
+   if (atomic_read(&inode->i_count) == 1)
+   {
+      //we are the only ones with reference, clear stripe pattern (updates on open)
+      FhgfsInode_clearStripePattern(fhgfsInode);
+      spin_unlock(&inode->i_lock);
+   } 
+   else
+   {
+      //someone else is holding a reference to the inode
+      //should not occur, but as a precaution we mark the inode as bad
+      //forces new inode creation (and therefore new stripe pattern)
+      umode_t savedMode = inode->i_mode; // save mode
+      spin_unlock(&inode->i_lock);  //must release spin lock before make_bad_inode 
+      make_bad_inode(inode);
+      inode->i_mode = savedMode; // restore mode
+
+      FhgfsOpsHelper_logOpMsg(Log_WARNING, app, NULL, inode, logContext, 
+         "Blocked access to inode due to unexpected inode access during cache invalidation");
+      
+
+      // invalidate cached pages
+      if(!S_ISDIR(inode->i_mode) )
+      {
+         invalidate_remote_inode(inode);
+      }
+   } 
 }

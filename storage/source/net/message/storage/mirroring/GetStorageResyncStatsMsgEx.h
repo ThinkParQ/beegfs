@@ -1,5 +1,4 @@
-#ifndef GETSTORAGERESYNCSTATSMSGEX_H_
-#define GETSTORAGERESYNCSTATSMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/mirroring/GetStorageResyncStatsMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -10,4 +9,3 @@ class GetStorageResyncStatsMsgEx : public GetStorageResyncStatsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*GETSTORAGERESYNCSTATSMSGEX_H_*/

@@ -1,5 +1,4 @@
-#ifndef PROGRAM_H_
-#define PROGRAM_H_
+#pragma once
 
 #include <app/App.h>
 
@@ -22,4 +21,3 @@ class Program
       
 };
 
-#endif /*PROGRAM_H_*/

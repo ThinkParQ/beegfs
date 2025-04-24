@@ -1,5 +1,4 @@
-#ifndef RMDIRENTRYRESPMSG_H_
-#define RMDIRENTRYRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class RmDirEntryRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /* RMDIRENTRYRESPMSG_H_ */

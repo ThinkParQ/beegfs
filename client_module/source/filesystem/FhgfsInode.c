@@ -71,7 +71,8 @@ void FhgfsInode_allocInit(FhgfsInode* fhgfsInode)
    AtomicInt64_set(&fhgfsInode->lastWriteBackEndOrIsizeWriteTime, 0);
 
    fhgfsInode->flags = 0;
-   fhgfsInode->version = 0;
+   fhgfsInode->fileVersion = 0;
+   fhgfsInode->metaVersion = 0;
    atomic_set(&fhgfsInode->modified, 0);
    atomic_set(&fhgfsInode->coRWInProg, 0);
 }
@@ -113,7 +114,7 @@ void FhgfsInode_destroyUninit(FhgfsInode* fhgfsInode)
  */
 FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry, int openFlags,
    bool allowRWHandle, LookupIntentInfoOut* lookupInfo, FileHandleType* outHandleType,
-   uint64_t* outVersion)
+   uint32_t* outVersion)
 {
    App* app = FhgfsOps_getApp(this->vfs_inode.i_sb);
    Logger* log = App_getLogger(app);
@@ -182,12 +183,33 @@ FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry, 
 
          FhgfsInode_entryInfoReadLock(this); // LOCK EntryInfo
 
-         if ((openFlags & OPENFILE_ACCESS_READ) && (app->cfg->eventLogMask & EventLogMask_READ))
+         // Prioritize the evaluation of read-write flags to determine the appropriate event type.
+         // The order of assessment is critical as only one event will be dispatched for a
+         // file's open() operation, contingent upon the supplied read-write flags.
+
+         // The sequence for evaluating read-write flags is as follows:
+         // 1. Read and Write
+         // 2. Write Only
+         // 3. Read Only
+         if ((openFlags & OPENFILE_ACCESS_READWRITE) &&
+            (app->cfg->eventLogMask & EventLogMask_OPEN_READ_WRITE))
          {
-            FileEvent_init(&event, FileEventType_READ, dentry);
+            FileEvent_init(&event, FileEventType_OPEN_READ_WRITE, dentry);
             eventSent = &event;
          }
-         else
+         else if ((openFlags & OPENFILE_ACCESS_WRITE) &&
+            (app->cfg->eventLogMask & EventLogMask_OPEN_WRITE))
+         {
+            FileEvent_init(&event, FileEventType_OPEN_WRITE, dentry);
+            eventSent = &event;
+         }
+         else if ((openFlags & OPENFILE_ACCESS_READ) &&
+            (app->cfg->eventLogMask & EventLogMask_OPEN_READ))
+         {
+            FileEvent_init(&event, FileEventType_OPEN_READ, dentry);
+            eventSent = &event;
+         }
+
          if ((openFlags & OPENFILE_ACCESS_TRUNC) && (app->cfg->eventLogMask & EventLogMask_TRUNC))
          {
             FileEvent_init(&event, FileEventType_TRUNCATE, dentry);

@@ -1,5 +1,4 @@
-#ifndef GETMIRRORBUDDYGROUPSRESPMSG_H_
-#define GETMIRRORBUDDYGROUPSRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -60,4 +59,3 @@ class GetMirrorBuddyGroupsRespMsg : public NetMessageSerdes<GetMirrorBuddyGroups
 };
 
 
-#endif /* GETMIRRORBUDDYGROUPSRESPMSG_H_ */

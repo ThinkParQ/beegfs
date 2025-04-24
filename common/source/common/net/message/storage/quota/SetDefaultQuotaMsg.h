@@ -1,5 +1,4 @@
-#ifndef COMMON_SETDEFAULTQUOTAMSG_H_
-#define COMMON_SETDEFAULTQUOTAMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -53,4 +52,3 @@ class SetDefaultQuotaMsg : public NetMessageSerdes<SetDefaultQuotaMsg>
       }
 };
 
-#endif /* COMMON_SETDEFAULTQUOTAMSG_H_ */

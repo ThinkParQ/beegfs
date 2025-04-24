@@ -1,6 +1,4 @@
-#ifndef BEEGFS_DISPOSALGARBAGECOLLECTOR_H
-#define BEEGFS_DISPOSALGARBAGECOLLECTOR_H
+#pragma once
 
 void disposalGarbageCollector();
 
-#endif //BEEGFS_DISPOSALGARBAGECOLLECTOR_H

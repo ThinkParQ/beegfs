@@ -427,6 +427,8 @@ struct dentry* __FhgfsOpsExport_lookupDentryFromNfsHandle(struct super_block *sb
       NumNodeID parentNodeID;
       char* statParentEntryID;
 
+      unsigned int metaVersion;
+
       if (!lookupParent)
       {
          // generate parentEntryID string
@@ -480,12 +482,12 @@ struct dentry* __FhgfsOpsExport_lookupDentryFromNfsHandle(struct super_block *sb
          goto err_cleanup_entryinfo;
 
       // entry found => create inode
-
+      metaVersion = fhgfsStat.metaVersion;
       OsTypeConv_kstatFhgfsToOs(&fhgfsStat, &kstat);
 
       kstat.ino = inodeHash;
 
-      inode = __FhgfsOps_newInode(sb, &kstat, 0, &entryInfo, &iSizeHints);
+      inode = __FhgfsOps_newInode(sb, &kstat, 0, &entryInfo, &iSizeHints, metaVersion);
 
       if (likely(inode) )
       {
@@ -685,6 +687,7 @@ struct dentry* FhgfsOpsExport_getParentDentry(struct dentry* childDentry)
          FhgfsOpsErr statRes = FhgfsOpsErr_SUCCESS;
          const char* fileName = StringTk_strDup("<nfs_fh>");
          EntryInfo parentInfo;
+         unsigned int metaVersion;
 
          NumNodeID parentNodeID = (NumNodeID){0};
          char* parentEntryID = NULL;
@@ -740,13 +743,14 @@ struct dentry* FhgfsOpsExport_getParentDentry(struct dentry* childDentry)
          }
 
          // entry found => create inode
+         metaVersion = fhgfsStat.metaVersion;
 
          OsTypeConv_kstatFhgfsToOs(&fhgfsStat, &kstat);
 
          kstat.ino = comparisonInfo.inodeHash;
 
          parentInode = __FhgfsOps_newInodeWithParentID(superBlock, &kstat, 0, &parentInfo,
-            parentNodeID, &iSizeHints);
+            parentNodeID, &iSizeHints, metaVersion);
 
          if (likely(parentInode) && parentEntryID)
          {  // update the parentEntryID

@@ -1,5 +1,4 @@
-#ifndef OPENFILERESPMSG_H_
-#define OPENFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/striping/StripePattern.h>
@@ -14,7 +13,7 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
        * @param fileHandleID just a reference, so do not free it as long as you use this object!
        */
       OpenFileRespMsg(int result, const char* fileHandleID, StripePattern* pattern,
-            PathInfo* pathInfo, uint64_t fileVersion = 0) :
+            PathInfo* pathInfo, uint32_t fileVersion = 0) :
          BaseType(NETMSGTYPE_OpenFileResp),
          fileVersion(fileVersion)
       {
@@ -32,7 +31,7 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
        * @param fileHandleID just a reference, so do not free it as long as you use this object!
        */
       OpenFileRespMsg(int result, std::string& fileHandleID, StripePattern* pattern,
-            PathInfo* pathInfo, uint64_t fileVersion) :
+            PathInfo* pathInfo, uint32_t fileVersion) :
          BaseType(NETMSGTYPE_OpenFileResp),
          fileVersion(fileVersion)
       {
@@ -67,7 +66,7 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
       unsigned fileHandleIDLen;
       const char* fileHandleID;
       PathInfo pathInfo;
-      uint64_t fileVersion;
+      uint32_t fileVersion;
 
       // for serialization
       StripePattern* pattern; // not owned by this object!
@@ -99,4 +98,3 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
       }
 };
 
-#endif /*OPENFILERESPMSG_H_*/

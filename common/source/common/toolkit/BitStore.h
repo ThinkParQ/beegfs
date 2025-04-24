@@ -1,5 +1,4 @@
-#ifndef BITSTORE_COMMON_H_
-#define BITSTORE_COMMON_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -112,4 +111,3 @@ class BitStore
       }
 };
 
-#endif /* BITSTORE_COMMON_H_ */

@@ -1,5 +1,4 @@
-#ifndef LOOKUPINTENTRESPMSG_H_
-#define LOOKUPINTENTRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -187,4 +186,3 @@ class LookupIntentRespMsg : public NetMessageSerdes<LookupIntentRespMsg>
 
 };
 
-#endif /* LOOKUPINTENTRESPMSG_H_ */

@@ -1,5 +1,4 @@
-#ifndef DUMMYWORK_H_
-#define DUMMYWORK_H_
+#pragma once
 
 #include "Work.h"
 
@@ -13,4 +12,3 @@ class DummyWork : public Work
    }
 };
 
-#endif /*DUMMYWORK_H_*/

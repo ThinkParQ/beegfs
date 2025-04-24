@@ -1,5 +1,4 @@
-#ifndef REMOVEXATTRMSGEX_H_
-#define REMOVEXATTRMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/attribs/RemoveXAttrMsg.h>
 #include <common/net/message/storage/attribs/RemoveXAttrRespMsg.h>
@@ -30,5 +29,4 @@ class RemoveXAttrMsgEx : public MirroredMessage<RemoveXAttrMsg, std::tuple<FileI
       const char* mirrorLogContext() const override { return "RemoveXAttrMsgEx/forward"; }
 };
 
-#endif /*REMOVEXATTRMSGEX_H_*/
 

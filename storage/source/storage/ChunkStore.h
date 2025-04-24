@@ -1,5 +1,4 @@
-#ifndef CHUNKSTORE_H_
-#define CHUNKSTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Mutex.h>
@@ -105,4 +104,3 @@ class ChunkStore
 
 };
 
-#endif /*CHUNKSTORE_H_*/

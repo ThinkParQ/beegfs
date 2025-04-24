@@ -53,7 +53,7 @@ bool RequestStorageDataMsgEx::processIncoming(ResponseContext& ctx)
       directWorkListSize += iter->second->getDirectWorkListSize();
    }
 
-   RequestStorageDataRespMsg requestStorageDataRespMsg(node.getID(), hostnameid, node.getNumID(),
+   RequestStorageDataRespMsg requestStorageDataRespMsg(node.getAlias(), hostnameid, node.getNumID(),
       &nicList, indirectWorkListSize, directWorkListSize, diskSpaceTotal, diskSpaceFree,
       sessionCount, &statsHistory, &storageTargetInfoList);
    ctx.sendResponse(requestStorageDataRespMsg);

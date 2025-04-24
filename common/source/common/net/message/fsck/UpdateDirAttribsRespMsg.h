@@ -1,5 +1,4 @@
-#ifndef UPDATEDIRATTRIBSRESPMSG_H
-#define UPDATEDIRATTRIBSRESPMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirInode.h>
 #include <common/net/message/NetMessage.h>
@@ -39,4 +38,3 @@ class UpdateDirAttribsRespMsg : public NetMessageSerdes<UpdateDirAttribsRespMsg>
 };
 
 
-#endif /*UPDATEDIRATTRIBSRESPMSG_H*/

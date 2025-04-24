@@ -291,6 +291,89 @@ FhgfsOpsErr DirInode::setStripePattern(const StripePattern& newPattern, uint32_t
    return FhgfsOpsErr_SUCCESS;
 }
 
+/*
+ * set remote storage target(s) for DirInode
+ */
+FhgfsOpsErr DirInode::setRemoteStorageTarget(const RemoteStorageTarget& rst)
+{
+   const char* logContext = "Set Remote Storage Target (DirInode)";
+   UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
+
+   bool loadSuccess = loadIfNotLoadedUnlocked();
+   if (!loadSuccess)
+      return FhgfsOpsErr_INTERNAL;
+
+   auto [isValid, details] = rst.validateWithDetails();
+   if (!isValid)
+   {
+      LogContext(logContext).log(Log_WARNING, "Invalid RST data: " + details);
+      return FhgfsOpsErr_INTERNAL;
+   }
+
+   // copy-assignment
+   this->rstInfo = rst;
+
+   if (storeRemoteStorageTargetInfoUnlocked())
+   {
+      if (!getIsRstAvailable())
+      {
+         this->addFeatureFlag(DIRINODE_FEATURE_HAS_RST);
+         if (!storeUpdatedMetaDataUnlocked())
+            return FhgfsOpsErr_INTERNAL;
+      }
+   }
+   else
+      return FhgfsOpsErr_INTERNAL;
+
+   return FhgfsOpsErr_SUCCESS;
+}
+
+FhgfsOpsErr DirInode::clearRemoteStorageTarget()
+{
+   const char* logContext = "Clear Remote Storage Target (DirInode)";
+   UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
+
+   bool loadSuccess = loadIfNotLoadedUnlocked();
+   if (!loadSuccess)
+      return FhgfsOpsErr_PATHNOTEXISTS;
+
+   if (!this->getIsRstAvailable())
+      return FhgfsOpsErr_SUCCESS;
+
+   // Clear RST feature flag and store updated metadata
+   removeFeatureFlag(DIRINODE_FEATURE_HAS_RST);
+   if (!storeUpdatedMetaDataUnlocked())
+   {
+      LogContext(logContext).log(Log_WARNING,
+         "Failed to update metadata after clearing RST feature flag; dirID: " + getID());
+      return FhgfsOpsErr_INTERNAL;
+   }
+
+   // Clear in-memory RST info
+   this->rstInfo.reset();
+
+   // Remove RST xattr from meta file
+   App* app = Program::getApp();
+   const Path* inodePath = getIsBuddyMirrored() ? 
+         app->getBuddyMirrorInodesPath() : app->getInodesPath();
+   std::string metaFilename = MetaStorageTk::getMetaInodePath(inodePath->str(), id);
+   int res = removexattr(metaFilename.c_str(), RST_XATTR_NAME);
+   if (unlikely(res == -1))
+   {
+      if (errno == ENODATA)
+      {
+         LogContext(logContext).log(Log_WARNING, "RST xattr not found; dirID: " + getID());
+      }
+      else
+      {
+         LogContext(logContext).log(Log_WARNING, "Failed to remove RST xattr; dirID: " +
+            getID() + "; error: " + System::getErrString());
+      }
+   }
+
+   return FhgfsOpsErr_SUCCESS;
+}
+
 /**
  * Note: See listIncrementalEx for comments; this is just a wrapper for it that doen't retrieve the
  * direntry types.
@@ -1280,6 +1363,50 @@ bool DirInode::storeUpdatedMetaDataUnlocked()
    return storeUpdatedMetaDataBuf(buf, ser.size());
 }
 
+bool DirInode::storeRemoteStorageTargetInfoUnlocked()
+{
+   char buf[META_SERBUF_SIZE];
+   Serializer ser(buf, sizeof(buf));
+   ser % rstInfo;
+
+   if (!ser.good())
+      return false;
+
+   bool useXAttrs = Program::getApp()->getConfig()->getStoreUseExtendedAttribs();
+   if (useXAttrs)
+      return storeRemoteStorageTargetDataBufAsXAttr(buf, ser.size());
+   else
+   {
+      LOG(GENERAL, WARNING, "Storing RST info as file contents is unsupported. "
+         "Please check the 'storeUseExtendedAttribs' setting in the BeeGFS meta config");
+      return false;
+   }
+}
+
+bool DirInode::storeRemoteStorageTargetDataBufAsXAttr(char* buf, unsigned bufLen)
+{
+   const char* logContext = "DirInode (store remote storage targets as xattr)";
+
+   App* app = Program::getApp();
+   const Path* inodePath =
+      getIsBuddyMirrored() ? app->getBuddyMirrorInodesPath() : app->getInodesPath();
+
+   std::string metaFilename = MetaStorageTk::getMetaInodePath(inodePath->str(), id);
+
+   int setRes = setxattr(metaFilename.c_str(), RST_XATTR_NAME, buf, bufLen, 0);
+
+   if (unlikely(setRes == -1))
+   {
+      // error
+      LogContext(logContext).logErr("Unable to write remote storage target info to disk: " +
+         metaFilename + ". SysErr: " + System::getErrString());
+
+      return false;
+   }
+
+   return true;
+}
+
 /**
  * Note: Assumes that the caller already verified that the directory is empty
  */
@@ -1350,6 +1477,9 @@ bool DirInode::loadIfNotLoadedUnlocked()
 
          return false;
       }
+
+      if (this->getIsRstAvailable())
+         loadRstFromFileXAttr();
    }
 
    return true;
@@ -1475,6 +1605,43 @@ bool DirInode::loadFromFileContents()
    return retVal;
 }
 
+bool DirInode::loadRstFromFileXAttr()
+{
+   const char* logContext = "Remote storage target (load from xattr)";
+   App* app = Program::getApp();
+
+   const Path* inodePath = getIsBuddyMirrored() ? app->getBuddyMirrorInodesPath() : app->getInodesPath();
+   std::string inodeFilename = MetaStorageTk::getMetaInodePath(inodePath->str(), id);
+
+   bool retVal = false;
+   char buf[META_SERBUF_SIZE];
+   ssize_t getRes = getxattr(inodeFilename.c_str(), RST_XATTR_NAME, buf, META_SERBUF_SIZE);
+
+   if (getRes > 0)
+   {
+      Deserializer des(buf, getRes);
+      des % rstInfo;
+
+      if (unlikely(!des.good()))
+      {
+         LogContext(logContext).logErr("Unable to deserialize metadata in file: " + inodeFilename);
+      }
+
+      retVal = true;
+   }
+   else if ((getRes == -1) && (errno == ENOENT))
+   {
+      LOG_DEBUG(logContext, Log_DEBUG, "Metadata file not exists: " +
+         inodeFilename + ". " + "SysErr: " + System::getErrString() );
+   }
+   else
+   {
+      LogContext(logContext).logErr("Unable to open/read xattr metadata file: " +
+         inodeFilename + ". " + "SysErr: " + System::getErrString() );
+   }
+
+   return retVal;
+}
 
 DirInode* DirInode::createFromFile(const std::string& id, bool isBuddyMirrored)
 {
@@ -1514,6 +1681,7 @@ FhgfsOpsErr DirInode::getStatData(StatData& outStatData,
    this->statData.setNumHardLinks(2 + numSubdirs); // +2 by definition (for "." and "<name>")
 
    this->statData.setFileSize(numSubdirs + numFiles); // just because we got those values anyway
+   this->statData.setMetaVersionStat(0); //metaVersion not planned for use with directories, so it is set to zero.
 
    outStatData = this->statData;
 
@@ -1738,7 +1906,7 @@ FhgfsOpsErr DirInode::removeXAttr(EntryInfo* file, const std::string& xAttrName)
    {
       if (file)
       {
-         auto fileHandle = Program::getApp()->getMetaStore()->referenceFile(file);
+         auto [fileHandle, referenceRes] = Program::getApp()->getMetaStore()->referenceFile(file);
          if (fileHandle)
          {
             fileHandle->updateInodeChangeTime(file);
@@ -1777,7 +1945,7 @@ FhgfsOpsErr DirInode::setXAttr(EntryInfo* file, const std::string& xAttrName,
    {
       if (file)
       {
-         auto fileHandle = Program::getApp()->getMetaStore()->referenceFile(file);
+         auto [fileHandle, referenceRes] = Program::getApp()->getMetaStore()->referenceFile(file);
          if (fileHandle)
          {
             fileHandle->updateInodeChangeTime(file);

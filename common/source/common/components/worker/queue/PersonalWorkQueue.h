@@ -1,5 +1,4 @@
-#ifndef PERSONALWORKQUEUE_H_
-#define PERSONALWORKQUEUE_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/toolkit/NamedException.h>
@@ -76,4 +75,3 @@ class PersonalWorkQueue
 
 };
 
-#endif /*PERSONALWORKQUEUE_H_*/

@@ -7,7 +7,7 @@ struct dentry;
 
 enum FileEventType
 {
-   FileEventType_FLUSH,
+   FileEventType_FLUSH = 1,
    FileEventType_TRUNCATE,
    FileEventType_SETATTR,
    FileEventType_CLOSE_WRITE,
@@ -19,7 +19,10 @@ enum FileEventType
    FileEventType_UNLINK,
    FileEventType_HARDLINK,
    FileEventType_RENAME,
-   FileEventType_READ,
+   FileEventType_OPEN_READ,
+   FileEventType_OPEN_WRITE,
+   FileEventType_OPEN_READ_WRITE,
+   FileEventType_LAST_WRITER_CLOSED
 };
 
 struct FileEvent

@@ -1,5 +1,4 @@
-#ifndef REGISTERNODEMSG_H_
-#define REGISTERNODEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
@@ -40,6 +39,8 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
 
          this->portUDP = portUDP;
          this->portTCP = portTCP;
+
+         this->machineUUID = "";
       }
 
       /**
@@ -56,17 +57,19 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
             % obj->instanceVersion
             % obj->nicListVersion
             % obj->nodeID
-            % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
+            % serdesNicAddressList(obj->nicList, obj->parsed.nicList)
             % obj->nodeType
             % obj->nodeNumID
             % obj->rootNumID
             % obj->rootIsBuddyMirrored
             % obj->portUDP
-            % obj->portTCP;
+            % obj->portTCP
+            % obj->machineUUID;
       }
 
    private:
       std::string nodeID;
+      std::string machineUUID;
       int32_t nodeType;
       NumNodeID nodeNumID; // 0 means "undefined"
       NumNodeID rootNumID; // 0 means "undefined"
@@ -83,7 +86,6 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
       struct {
          NicAddressList nicList;
       } parsed;
-
 
    public:
       NicAddressList& getNicList()
@@ -126,6 +128,12 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
          this->rootIsBuddyMirrored = rootIsBuddyMirrored;
       }
 
+      void setMachineUUID(std::string uuid)
+      {
+         this->machineUUID = uuid;
+      }
+
+
       uint16_t getPortUDP() const
       {
          return portUDP;
@@ -139,4 +147,3 @@ class RegisterNodeMsg : public NetMessageSerdes<RegisterNodeMsg>
 };
 
 
-#endif /* REGISTERNODEMSG_H_ */

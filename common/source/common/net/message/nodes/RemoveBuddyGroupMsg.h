@@ -1,5 +1,4 @@
-#ifndef REMOVEBUDDYGROUPMSG_H_
-#define REMOVEBUDDYGROUPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/AcknowledgeableMsg.h>
@@ -36,4 +35,3 @@ class RemoveBuddyGroupMsg : public NetMessageSerdes<RemoveBuddyGroupMsg>
       bool force;
 };
 
-#endif

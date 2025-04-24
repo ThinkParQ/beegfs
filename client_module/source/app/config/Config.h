@@ -19,9 +19,6 @@ typedef enum FileCacheType FileCacheType;
 enum InodeIDStyle;
 typedef enum InodeIDStyle InodeIDStyle;
 
-enum LogType;
-typedef enum LogType LogType;
-
 enum RDMAKeyType;
 typedef enum RDMAKeyType RDMAKeyType;
 
@@ -36,7 +33,9 @@ enum EventLogMask
    EventLogMask_SETATTR = 4,
    EventLogMask_CLOSE = 8,
    EventLogMask_LINK_OP = 16,
-   EventLogMask_READ = 32,
+   EventLogMask_OPEN_READ = 32,
+   EventLogMask_OPEN_WRITE = 64,
+   EventLogMask_OPEN_READ_WRITE = 128
 };
 
 
@@ -45,11 +44,10 @@ extern Config* Config_construct(MountConfig* mountConfig);
 extern void Config_uninit(Config* this);
 extern void Config_destruct(Config* this);
 
-extern bool _Config_initConfig(Config* this, MountConfig* mountConfig,
-   bool enableException);
+extern bool _Config_initConfig(Config* this, MountConfig* mountConfig);
 extern StrCpyMapIter _Config_eraseFromConfigMap(Config* this, StrCpyMapIter* iter);
 extern void _Config_loadDefaults(Config* this);
-extern bool _Config_applyConfigMap(Config* this, bool enableException);
+extern bool _Config_applyConfigMap(Config* this);
 extern void _Config_configMapRedefine(Config* this, char* keyStr, const char* valueStr);
 extern void __Config_addLineToConfigMap(Config* this, char* line);
 
@@ -64,14 +62,12 @@ extern bool __Config_initImplicitVals(Config* this);
 extern void __Config_initConnNumCommRetries(Config* this);
 extern void __Config_initTuneFileCacheTypeNum(Config* this);
 void __Config_initSysInodeIDStyleNum(Config* this);
-void __Config_initLogTypeNum(Config* this);
 bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outConnAuthHash);
 void __Config_initConnRDMAKeyTypeNum(Config* this);
 
 // conversion
 const char* Config_fileCacheTypeNumToStr(FileCacheType cacheType);
 const char* Config_inodeIDStyleNumToStr(InodeIDStyle inodeIDStyle);
-const char* Config_logTypeNumToStr(LogType logType);
 const char* Config_eventLogMaskToStr(enum EventLogMask mask);
 const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType);
 const char* Config_checkCapabilitiesTypeToStr(CheckCapabilities checkCapabilities);
@@ -79,16 +75,13 @@ const char* Config_checkCapabilitiesTypeToStr(CheckCapabilities checkCapabilitie
 // getters & setters
 static inline char* Config_getCfgFile(Config* this);
 static inline int Config_getLogLevel(Config* this);
-static inline LogType Config_getLogTypeNum(Config* this);
-static inline void Config_setLogTypeNum(Config* this, LogType logType);
 static inline bool Config_getLogClientID(Config* this);
-static inline char* Config_getLogHelperdIP(Config* this);
 static inline bool Config_getConnUseRDMA(Config* this);
 static inline bool Config_getConnTCPFallbackEnabled(Config* this);
-static inline int Config_getConnClientPortUDP(Config* this);
-static inline int Config_getConnMgmtdPortUDP(Config* this);
-static inline int Config_getConnHelperdPortTCP(Config* this);
-static inline int Config_getConnMgmtdPortTCP(Config* this);
+static inline int Config_getConnClientPort(Config* this);
+static inline int Config_getConnMgmtdPort(Config* this);
+static inline int Config_getConnMgmtdGrpcPort(Config* this);
+static inline void Config_setConnMgmtdGrpcPort(Config* this, int port);
 static inline unsigned Config_getConnMaxInternodeNum(Config* this);
 static inline char* Config_getConnInterfacesFile(Config* this);
 static inline char* Config_getConnInterfacesList(Config* this);
@@ -145,6 +138,7 @@ static inline bool Config_getTuneCoherentBuffers(Config* this);
 static inline char* Config_getSysMgmtdHost(Config* this);
 static inline char* Config_getSysInodeIDStyle(Config* this);
 static inline InodeIDStyle Config_getSysInodeIDStyleNum(Config* this);
+static inline bool Config_getSysCacheInvalidationVersion(Config* this);
 static inline bool Config_getSysCreateHardlinksAsSymlinks(Config* this);
 static inline unsigned Config_getSysMountSanityCheckMS(Config* this);
 static inline bool Config_getSysSyncOnClose(Config* this);
@@ -165,7 +159,6 @@ static inline int Config_getConnRDMATimeoutCompletion(Config* this);
 static inline int Config_getConnRDMATimeoutFlowSend(Config* this);
 static inline int Config_getConnRDMATimeoutFlowRecv(Config* this);
 static inline int Config_getConnRDMATimeoutPoll(Config* this);
-static inline bool Config_getSysNoEnterpriseFeatureMsg(Config* this);
 
 
 enum FileCacheType
@@ -187,10 +180,6 @@ enum InodeIDStyle
    INODEIDSTYLE_Hash64MD4               // half-md4
 };
 #define INODEIDSTYLE_Default  INODEIDSTYLE_Hash64MD4
-
-
-enum LogType
-   {LOGTYPE_Helperd = 0, LOGTYPE_Syslog = 1};
 
 #define RDMAKEYTYPE_UNSAFE_GLOBAL_STR   "global"
 #define RDMAKEYTYPE_UNSAFE_DMA_STR      "dma"
@@ -220,17 +209,13 @@ struct Config
    char*          cfgFile;
 
    int            logLevel;
-   bool     logClientID;
-   char*          logHelperdIP;
-   char*          logType; // logger type (helperd, syslog)
-   LogType        logTypeNum; // auto-generated based on logType string
+   bool           logClientID;
 
    int            connPortShift; // shifts all UDP and TCP ports
-   int            connClientPortUDP;
-   int            connMgmtdPortUDP;
-   int            connHelperdPortTCP;
-   int            connMgmtdPortTCP;
-   bool     connUseRDMA;
+   int            connClientPort;
+   int            connMgmtdPort;
+   int            connMgmtdGrpcPort; // pulled from mgmtd and not meant to be configured by the user
+   bool           connUseRDMA;
    bool           connTCPFallbackEnabled;
    unsigned       connMaxInternodeNum;
    char*          connInterfacesFile;
@@ -239,7 +224,7 @@ struct Config
    unsigned       connFallbackExpirationSecs;
    unsigned       connNumCommRetries; // auto-computed from connCommRetrySecs
    unsigned       connCommRetrySecs;
-   bool     connUnmountRetries;
+   bool           connUnmountRetries;
    int            connTCPRcvBufSize;
    int            connUDPRcvBufSize;
    int            connRDMABufSize;
@@ -301,6 +286,7 @@ struct Config
    char*          sysMgmtdHost;
    char*          sysInodeIDStyle;
    InodeIDStyle   sysInodeIDStyleNum; // auto-generated based on sysInodeIDStyle
+   bool     sysCacheInvalidationVersion;
    bool     sysCreateHardlinksAsSymlinks;
    unsigned       sysMountSanityCheckMS;
    bool     sysSyncOnClose;
@@ -329,9 +315,6 @@ struct Config
 
    // testing
    unsigned  remapConnectionFailureStatus;
-
-   // Only used by CTL but must be included in the procfs config for the --mount option to work:
-   bool sysNoEnterpriseFeatureMsg;
 };
 
 char* Config_getCfgFile(Config* this)
@@ -344,48 +327,30 @@ int Config_getLogLevel(Config* this)
    return this->logLevel;
 }
 
-LogType Config_getLogTypeNum(Config* this)
-{
-   return this->logTypeNum;
-}
-
-void Config_setLogTypeNum(Config* this, LogType logType)
-{
-   this->logTypeNum = logType;
-}
-
 bool Config_getLogClientID(Config* this)
 {
    return this->logClientID;
 }
 
-char* Config_getLogHelperdIP(Config* this)
+int Config_getConnClientPort(Config* this)
 {
-   return this->logHelperdIP;
+   return this->connClientPort ? (this->connClientPort + this->connPortShift) : 0;
 }
 
-
-int Config_getConnClientPortUDP(Config* this)
+int Config_getConnMgmtdPort(Config* this)
 {
-   return this->connClientPortUDP ? (this->connClientPortUDP + this->connPortShift) : 0;
+   return this->connMgmtdPort ? (this->connMgmtdPort + this->connPortShift) : 0;
 }
 
-
-
-int Config_getConnMgmtdPortUDP(Config* this)
+int Config_getConnMgmtdGrpcPort(Config* this)
 {
-   return this->connMgmtdPortUDP ? (this->connMgmtdPortUDP + this->connPortShift) : 0;
+   // not adding port shift here because connMgmtdGrpcPort is pulled from mgmtd and already shifted
+   return this->connMgmtdGrpcPort ? this->connMgmtdGrpcPort : 0;
 }
 
-
-int Config_getConnHelperdPortTCP(Config* this)
+void Config_setConnMgmtdGrpcPort(Config* this, int port)
 {
-   return this->connHelperdPortTCP ? (this->connHelperdPortTCP + this->connPortShift) : 0;
-}
-
-int Config_getConnMgmtdPortTCP(Config* this)
-{
-   return this->connMgmtdPortTCP ? (this->connMgmtdPortTCP + this->connPortShift) : 0;
+   this->connMgmtdGrpcPort = port;
 }
 
 bool Config_getConnUseRDMA(Config* this)
@@ -683,6 +648,11 @@ InodeIDStyle Config_getSysInodeIDStyleNum(Config* this)
    return this->sysInodeIDStyleNum;
 }
 
+bool Config_getSysCacheInvalidationVersion(Config* this)
+{
+   return this->sysCacheInvalidationVersion;
+}
+
 bool Config_getSysCreateHardlinksAsSymlinks(Config* this)
 {
    return this->sysCreateHardlinksAsSymlinks;
@@ -776,11 +746,6 @@ int Config_getConnRDMATimeoutFlowRecv(Config* this)
 int Config_getConnRDMATimeoutPoll(Config* this)
 {
    return this->connRDMATimeoutPoll;
-}
-
-bool Config_getSysNoEnterpriseFeatureMsg(Config* this)
-{
-   return this->sysNoEnterpriseFeatureMsg;
 }
 
 #endif /*CONFIG_H_*/

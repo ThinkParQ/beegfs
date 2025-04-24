@@ -50,6 +50,9 @@ void HeartbeatMsgEx_serializePayload(NetMessage* this, SerializeCtx* ctx)
 
    // nicList
    Serialization_serializeNicList(ctx, thisCast->nicList);
+
+   // machineUUID
+   Serialization_serializeStr(ctx, thisCast->machineUUIDLen, thisCast->machineUUID);
 }
 
 bool HeartbeatMsgEx_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
@@ -98,6 +101,10 @@ bool HeartbeatMsgEx_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
 
    // nicList
    if(!Serialization_deserializeNicListPreprocess(ctx, &thisCast->rawNicList) )
+      return false;
+
+   // machineUUID
+   if(!Serialization_deserializeStr(ctx, &thisCast->machineUUIDLen, &thisCast->machineUUID) )
       return false;
 
    return true;
@@ -173,7 +180,7 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
       // (will belong to the NodeStore => no destruct() required)
    App_unlockNicList(app);
 
-   Node_setNodeType(node, nodeType);
+   Node_setNodeAliasAndType(node, NULL, nodeType);
 
    // set local nic capabilities
 
@@ -189,15 +196,13 @@ bool __HeartbeatMsgEx_processIncoming(NetMessage* this, struct App* app,
    isNodeNew = NodeStoreEx_addOrUpdateNode(nodes, &node);
    if(isNodeNew)
    {
-      bool supportsSDP = NIC_supportsSDP(&nicList);
       bool supportsRDMA = NIC_supportsRDMA(&nicList);
 
       Logger_logFormatted(log, Log_WARNING, logContext,
-         "New node: %s %s [ID: %hu]; %s%s",
+         "New node: %s %s [ID: %hu]; %s",
          Node_nodeTypeToStr(nodeType),
          HeartbeatMsgEx_getNodeID(thisCast),
          HeartbeatMsgEx_getNodeNumID(thisCast).value,
-         (supportsSDP ? "SDP; " : ""),
          (supportsRDMA ? "RDMA; " : "") );
    }
 

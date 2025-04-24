@@ -1,5 +1,4 @@
-#ifndef SETSTORAGETARGETINFOMSG_H_
-#define SETSTORAGETARGETINFOMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/Node.h>
@@ -48,4 +47,3 @@ class SetStorageTargetInfoMsg: public NetMessageSerdes<SetStorageTargetInfoMsg>
       }
 };
 
-#endif /*SETSTORAGETARGETINFOMSG_H_*/

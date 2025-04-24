@@ -1,5 +1,4 @@
-#ifndef FSCKDUPLICATEINODEINFO_H_
-#define FSCKDUPLICATEINODEINFO_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -90,4 +89,3 @@ class FsckDuplicateInodeInfo
 template<>
 struct ListSerializationHasLength<FsckDuplicateInodeInfo> : boost::false_type {};
 
-#endif /* FSCKDUPLICATEINODEINFO_H_ */

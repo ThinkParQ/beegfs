@@ -1,5 +1,4 @@
-#ifndef RECREATEDENTRIESMSGEX_H
-#define RECREATEDENTRIESMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/RecreateDentriesMsg.h>
@@ -11,4 +10,3 @@ class RecreateDentriesMsgEx : public RecreateDentriesMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*RECREATEDENTRIESMSGEX_H*/

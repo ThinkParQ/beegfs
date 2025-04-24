@@ -1,5 +1,4 @@
-#ifndef COMMON_NODES_NODETYPE_H
-#define COMMON_NODES_NODETYPE_H
+#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -13,7 +12,6 @@ enum NodeType
    NODETYPE_Storage = 2,
    NODETYPE_Client = 3,
    NODETYPE_Mgmt = 4,
-   NODETYPE_Helperd = 5,
 };
 
 inline std::ostream& operator<<(std::ostream& os, NodeType nodeType)
@@ -30,10 +28,8 @@ inline std::ostream& operator<<(std::ostream& os, NodeType nodeType)
       case NODETYPE_Storage:     return os << "beegfs-storage";
       case NODETYPE_Client:      return os << "beegfs-client";
       case NODETYPE_Mgmt:        return os << "beegfs-mgmtd";
-      case NODETYPE_Helperd:     return os << "beegfs-helperd";
       default:
          return os << "<unknown(" << int(nodeType) << ")>";
    }
 }
 
-#endif

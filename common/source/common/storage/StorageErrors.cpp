@@ -41,6 +41,8 @@ struct FhgfsOpsErrListEntry const __FHGFSOPS_ERRLIST[] =
    {"No data available", ENODATA}, // FhgfsOpsErr_NODATA
    {"Operation not supported", EOPNOTSUPP}, // FhgfsOpsErr_NOTSUPP
    {"Unknown storage pool", EINVAL},  // FhgfsOpsErr_UNKNOWNPOOL
+   {"Metadata version mismatch", ESTALE}, // FhgfsOpsErr_METAVERSIONMISMATCH
+   {"Inode is locked", EBUSY},      // FhgfsOpsErr_INODELOCKED
    {NULL, 0}
 };
 

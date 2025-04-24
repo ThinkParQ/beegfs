@@ -1,5 +1,4 @@
-#ifndef COMMON_REMOVESTORAGEPOOLRESPMSG_H_
-#define COMMON_REMOVESTORAGEPOOLRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StorageErrors.h>
@@ -31,4 +30,3 @@ class RemoveStoragePoolRespMsg : public NetMessageSerdes<RemoveStoragePoolRespMs
       FhgfsOpsErr result;
 };
 
-#endif /*COMMON_REMOVESTORAGEPOOLRESPMSG_H_*/

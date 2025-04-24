@@ -1,5 +1,4 @@
-#ifndef OBJECTREFERENCER_H_
-#define OBJECTREFERENCER_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 
@@ -85,4 +84,3 @@ class ObjectReferencer
 };
 
 
-#endif /*OBJECTREFERENCER_H_*/

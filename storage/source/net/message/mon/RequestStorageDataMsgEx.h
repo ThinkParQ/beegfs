@@ -1,5 +1,4 @@
-#ifndef REQUESTSTORAGEDATAMSGEX_H_
-#define REQUESTSTORAGEDATAMSGEX_H_
+#pragma once
 
 #include <app/App.h>
 #include <common/app/log/LogContext.h>
@@ -19,4 +18,3 @@ class RequestStorageDataMsgEx : public RequestStorageDataMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*REQUESTSTORAGEDATAMSGEX_H_*/

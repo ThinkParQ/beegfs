@@ -1,5 +1,4 @@
-#ifndef META_SETEXCEEDEDQUOTAMSGEX_H_
-#define META_SETEXCEEDEDQUOTAMSGEX_H_
+#pragma once
 
 
 #include <common/net/message/storage/quota/SetExceededQuotaMsg.h>
@@ -12,4 +11,3 @@ class SetExceededQuotaMsgEx : public SetExceededQuotaMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* META_SETEXCEEDEDQUOTAMSGEX_H_ */

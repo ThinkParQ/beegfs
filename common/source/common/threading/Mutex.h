@@ -1,5 +1,4 @@
-#ifndef COMMON_MUTEX_H_
-#define COMMON_MUTEX_H_
+#pragma once
 
 #include "MutexException.h"
 #include <common/system/System.h>
@@ -64,4 +63,3 @@ class Mutex
       pthread_mutex_t* getMutex() {return &mutex;}
 };
 
-#endif /*COMMON_MUTEX_H_*/

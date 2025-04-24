@@ -136,8 +136,6 @@ void AbstractApp::logUsableNICs(LogContext* log, NicAddressList& nicList)
 
       if (nicIter->nicType == NICADDRTYPE_RDMA)
          nicTypeStr = "RDMA";
-      else if (nicIter->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
       else if (nicIter->nicType == NICADDRTYPE_STANDARD)
          nicTypeStr = "TCP";
       else
@@ -200,41 +198,4 @@ bool AbstractApp::initNoDefaultRouteList(NetVector* outNets)
       outNets->push_back(net);
    }
    return true;
-}
-
-/**
- * Logs a message that explains the terms of the EULA regarding the use of Enterprise Features
- * and other use cases that require a License & Support Agreement.
- * @param enabledFeatures string containing the Enterprise Features that are enabled in the
- * specific BeeGFS service. Will be included in the output if not empty.
- */
-void AbstractApp::logEULAMsg(std::string enabledFeatures)
-{
-   if (!enabledFeatures.empty())
-      enabledFeatures.resize(72, ' ');
-   LOG(GENERAL, WARNING, "--------------------------------------------------------------------------------");
-   LOG(GENERAL, WARNING, "| BeeGFS End User License Agreement                                            |");
-   LOG(GENERAL, WARNING, "|                                                                              |");
-   LOG(GENERAL, WARNING, "| By downloading and/or installing BeeGFS, you have agreed to the EULA of      |");
-   LOG(GENERAL, WARNING, "| BeeGFS: https://www.beegfs.io/docs/BeeGFS_EULA.txt                           |");
-   LOG(GENERAL, WARNING, "|                                                                              |");
-   LOG(GENERAL, WARNING, "| Please note that the following use cases of BeeGFS are only allowed if you   |");
-   LOG(GENERAL, WARNING, "| have a valid License & Support Agreement with the licensor of BeeGFS         |");
-   LOG(GENERAL, WARNING, "| \"ThinkParQ GmbH\":                                                            |");
-   LOG(GENERAL, WARNING, "|                                                                              |");
-   LOG(GENERAL, WARNING, "|  - The use of any Enterprise Features of BeeGFS for longer than the trial    |");
-   if (enabledFeatures.empty())
-      LOG(GENERAL, WARNING, "|    period of 60 (sixty) days (§3.4 EULA).                                    |");
-   else {
-      LOG(GENERAL, WARNING, "|    period of 60 (sixty) days (§3.4 EULA). The following Enterprise Features  |");
-      LOG(GENERAL, WARNING, "|    are currently in use:                                                     |");
-      LOG(GENERAL, WARNING, "|      " + enabledFeatures + "|");
-   }
-   LOG(GENERAL, WARNING, "|  - The use of BeeGFS as part of a commercial turn-key solution (§3.3 EULA)   |");
-   LOG(GENERAL, WARNING, "|  - Any commercial services for the product BeeGFS by a third party           |");
-   LOG(GENERAL, WARNING, "|    (§3.3 EULA)                                                               |");
-   LOG(GENERAL, WARNING, "|                                                                              |");
-   LOG(GENERAL, WARNING, "| Contact: sales@thinkparq.com                                                 |");
-   LOG(GENERAL, WARNING, "| Thank you for supporting BeeGFS development!                                 |");
-   LOG(GENERAL, WARNING, "--------------------------------------------------------------------------------");
 }

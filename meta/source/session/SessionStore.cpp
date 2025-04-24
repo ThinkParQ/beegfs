@@ -331,7 +331,7 @@ void SessionStore::deserializeLockStates(Deserializer& des, MetaStore& metaStore
       if (!des.good())
          break;
 
-      auto inode = metaStore.referenceFile(&info);
+      auto [inode, referenceRes] = metaStore.referenceFile(&info);
 
       des % inode->lockState();
 
@@ -583,14 +583,15 @@ bool SessionStore::clear()
          {
             SessionFile* sessionFile = *fileIt;
             unsigned accessFlags = sessionFile->getAccessFlags();
-            unsigned numHardlinks;
-            unsigned numInodeRefs;
+            unsigned numHardlinks; // ignored here
+            unsigned numInodeRefs; // ignored here
+            bool lastWriterClosed; // ignored here
 
             MetaFileHandle inode = sessionFile->releaseInode();
 
             EntryInfo* entryInfo = sessionFile->getEntryInfo();
             metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks,
-                  &numInodeRefs);
+                  &numInodeRefs, lastWriterClosed);
 
             delete sessionFile;
          }

@@ -51,9 +51,6 @@ SOURCES := \
    common/net/sock/ibv/No_IBVSocket.c \
    common/net/sock/StandardSocket.c \
    common/net/message/control/PeerInfoMsg.c \
-   common/net/message/helperd/GetHostByNameMsg.c \
-   common/net/message/helperd/LogMsg.c \
-   common/net/message/helperd/GetHostByNameRespMsg.c \
    common/net/message/SimpleIntMsg.c \
    common/net/message/NetMessage.c \
    common/net/message/session/locking/FLockEntryMsg.c \
@@ -82,6 +79,7 @@ SOURCES := \
    common/net/message/nodes/GetTargetMappingsRespMsg.c \
    common/net/message/nodes/HeartbeatMsgEx.c \
    common/net/message/nodes/RemoveNodeMsgEx.c \
+   common/net/message/nodes/GetStatesAndBuddyGroupsMsg.c \
    common/net/message/nodes/GetStatesAndBuddyGroupsRespMsg.c \
    common/net/message/nodes/RefreshTargetStatesMsgEx.c \
    common/net/message/nodes/GetNodesRespMsg.c \
@@ -154,7 +152,6 @@ SOURCES := \
    toolkit/StatFsCache.c \
    toolkit/NoAllocBufferStore.c \
    toolkit/InodeRefStore.c \
-   toolkit/ExternalHelperd.c \
    toolkit/BitStore.c \
    components/DatagramListener.c \
    components/InternodeSyncer.c \

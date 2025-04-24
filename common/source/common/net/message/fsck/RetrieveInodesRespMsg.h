@@ -1,5 +1,4 @@
-#ifndef RETRIEVEINODESRESPMSG_H
-#define RETRIEVEINODESRESPMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirInode.h>
 #include <common/fsck/FsckFileInode.h>
@@ -60,4 +59,3 @@ class RetrieveInodesRespMsg : public NetMessageSerdes<RetrieveInodesRespMsg>
 };
 
 
-#endif /*RETRIEVEINODESRESPMSG_H*/

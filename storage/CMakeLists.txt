@@ -56,6 +56,7 @@ add_library(
 	./source/net/message/storage/creating/UnlinkLocalFileMsgEx.h
 	./source/net/message/storage/creating/RmChunkPathsMsgEx.h
 	./source/net/message/storage/creating/UnlinkLocalFileMsgEx.cpp
+	./source/net/message/storage/chunkbalancing/CpChunkPathsMsgEx.cpp
 	./source/net/message/storage/mirroring/StorageResyncStartedMsgEx.cpp
 	./source/net/message/storage/mirroring/StorageResyncStartedMsgEx.h
 	./source/net/message/storage/mirroring/GetStorageResyncStatsMsgEx.cpp

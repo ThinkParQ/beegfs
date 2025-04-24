@@ -30,9 +30,6 @@
 
 
 #define SERIALIZATION_NICLISTELEM_NAME_SIZE  (16)
-#define SERIALIZATION_NICLISTELEM_SIZE       (8+SERIALIZATION_NICLISTELEM_NAME_SIZE) /*
-                                              8 = 4b ipAddr + 1b nicType + 3b alignment padding */
-
 
 bool __Serialization_deserializeNestedField(DeserializeCtx* ctx, DeserializeCtx* outCtx);
 

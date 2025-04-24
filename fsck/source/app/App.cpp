@@ -444,7 +444,7 @@ bool App::waitForMgmtNode()
 
    // choose a random udp port here
    unsigned udpListenPort = 0;
-   unsigned udpMgmtdPort = cfg->getConnMgmtdPortUDP();
+   unsigned udpMgmtdPort = cfg->getConnMgmtdPort();
    std::string mgmtdHost = cfg->getSysMgmtdHost();
 
    RegistrationDatagramListener regDGramLis(this->netFilter, this->localNicList, this->ackStore,

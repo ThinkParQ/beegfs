@@ -1,5 +1,4 @@
-#ifndef SESSION_H_
-#define SESSION_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/NumNodeID.h>
@@ -43,4 +42,3 @@ class Session
 };
 
 
-#endif /*SESSION_H_*/

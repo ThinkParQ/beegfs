@@ -1,5 +1,4 @@
-#ifndef COMMON_TOOLKIT_ENTRYIDTK_H
-#define COMMON_TOOLKIT_ENTRYIDTK_H
+#pragma once
 
 #include <string>
 #include <algorithm>
@@ -12,4 +11,3 @@ namespace EntryIdTk {
 
 }
 
-#endif

@@ -1,5 +1,4 @@
-#ifndef SYNCEDSTORAGEPATHS_H_
-#define SYNCEDSTORAGEPATHS_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/system/System.h>
@@ -99,4 +98,3 @@ class SyncedStoragePaths
 };
 
 
-#endif /* SYNCEDSTORAGEPATHS_H_ */

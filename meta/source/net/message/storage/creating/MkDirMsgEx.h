@@ -1,5 +1,4 @@
-#ifndef MKDIRMSGEX_H_
-#define MKDIRMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/MkDirMsg.h>
@@ -24,6 +23,10 @@ class MkDirMsgEx : public MirroredMessage<MkDirMsg, std::tuple<HashDirLock, File
       bool isMirrored() override { return getParentInfo()->getIsBuddyMirrored(); }
 
    private:
+      // Initial hard link count for a newly created directory (self and "." entry).
+      // Note: ".." entry increments the parent's link count, not this directory's.
+      static constexpr unsigned INITIAL_DIR_LINK_COUNT = 2;
+
       std::string entryID;
 
       std::unique_ptr<ResponseState> mkDirPrimary(ResponseContext& ctx);
@@ -48,4 +51,3 @@ class MkDirMsgEx : public MirroredMessage<MkDirMsg, std::tuple<HashDirLock, File
       EntryInfo newEntryInfo;
 };
 
-#endif /*MKDIRMSGEX_H_*/

@@ -103,7 +103,7 @@ extern void FhgfsInode_destroyUninit(FhgfsInode* this);
 
 extern FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry,
    int openFlags, bool allowRWHandle, LookupIntentInfoOut* lookupInfo,
-   FileHandleType* outHandleType, uint64_t* outVersion);
+   FileHandleType* outHandleType, uint32_t* outVersion);
 extern FhgfsOpsErr FhgfsInode_releaseHandle(FhgfsInode* this, FileHandleType handleType,
    struct dentry* dentry);
 extern bool FhgfsInode_hasWriteHandle(FhgfsInode* this);
@@ -177,6 +177,8 @@ static inline void FhgfsInode_updateEntryInfoUnlocked(FhgfsInode* this,
 
 static inline int FhgfsInode_getStripeCount(FhgfsInode* this);
 static inline StripePattern* FhgfsInode_getStripePattern(FhgfsInode* this);
+static inline void FhgfsInode_clearStripePattern(FhgfsInode* this);
+
 
 static inline int FhgfsInode_handleTypeToOpenFlags(FileHandleType handleType);
 
@@ -268,7 +270,11 @@ struct FhgfsInode
    AtomicInt noRemoteIsizeDecrease; // if set remote attributes won't decrease the i_size
 
    int flags; // protected by inode->i_lock
-   uint64_t version; // protected by entryInfoLock (which would subsume a more granular lock)
+   uint32_t fileVersion;  /* protected by entryInfoLock (which would subsume a more granular lock).
+                          used by native cache mode to track file contents change. */
+   uint32_t metaVersion;  /* protected by entryInfoLock (which would subsume a more granular lock).
+                          used as a way to invalidate the cache due to internal metadata changes 
+                          (like stripe pattern change) via lookup::revalidateIntent. */
    atomic_t modified; // tracks whether the inode data has been written since its last full flush
    atomic_t coRWInProg; //Coherent read/write in progress.
 };
@@ -515,6 +521,18 @@ int FhgfsInode_getStripeCount(FhgfsInode* this)
 StripePattern* FhgfsInode_getStripePattern(FhgfsInode* this)
 {
    return this->pattern;
+}
+
+/**
+ * Clear the stripe pattern of an inode.
+ * Should only be called if inode->i_count is 1. 
+ * After stripePattern is set to NULL, next operation should only be open. 
+ * Nothing should access the pattern ptr until open loads a new pattern.
+ * Note: This is called with a spin_lock held.
+ */
+void FhgfsInode_clearStripePattern(FhgfsInode* this)
+{
+   this->pattern=NULL;
 }
 
 /**

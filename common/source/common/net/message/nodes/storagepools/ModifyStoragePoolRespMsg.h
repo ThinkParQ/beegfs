@@ -1,5 +1,4 @@
-#ifndef COMMON_MODIFYSTORAGEPOOLRESPMSG_H_
-#define COMMON_MODIFYSTORAGEPOOLRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -23,4 +22,3 @@ class ModifyStoragePoolRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*COMMON_MODIFYSTORAGEPOOLRESPMSG_H_*/

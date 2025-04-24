@@ -1,5 +1,4 @@
-#ifndef LISTDIRFROMOFFSET_H_
-#define LISTDIRFROMOFFSET_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -88,4 +87,3 @@ class ListDirFromOffsetMsg : public NetMessageSerdes<ListDirFromOffsetMsg>
 };
 
 
-#endif /*LISTDIRFROMOFFSET_H_*/

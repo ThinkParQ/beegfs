@@ -18,7 +18,6 @@ endif
 
 override_dh_auto_build:
 	make -j$(NUMJOBS) common-all daemons utils
-	make -j$(NUMJOBS) -C java_lib/build
 
 # no build-runnable tests exist (yet)
 override_dh_auto_test:
@@ -27,38 +26,18 @@ override_dh_auto_test:
 override_dh_auto_install:
 
 override_dh_install:
-	@# common
-	install -D common_package/scripts/etc/beegfs/lib/start-stop-functions \
-		debian/beegfs-common/etc/beegfs/lib/start-stop-functions
-	install -D common_package/scripts/etc/beegfs/lib/init-multi-mode \
-		debian/beegfs-common/etc/beegfs/lib/init-multi-mode
 	@# libbeeggfs-ib
 	install -D common/build/libbeegfs_ib.so \
 		debian/libbeegfs-ib/opt/beegfs/lib/libbeegfs_ib.so
 	@# daemons
-	make -j$(NUMJOBS) DESTDIR=debian/beegfs-helperd helperd-install
 	make -j$(NUMJOBS) DESTDIR=debian/beegfs-meta meta-install
 	make -j$(NUMJOBS) DESTDIR=debian/beegfs-storage storage-install
-	make -j$(NUMJOBS) DESTDIR=debian/beegfs-mgmtd mgmtd-install
 	make -j$(NUMJOBS) DESTDIR=debian/beegfs-mon mon-install
 	@# setup scripts
 	install -D storage/build/dist/sbin/beegfs-setup-storage \
 		debian/beegfs-storage/opt/beegfs/sbin/beegfs-setup-storage
 	install -D meta/build/dist/sbin/beegfs-setup-meta \
 		debian/beegfs-meta/opt/beegfs/sbin/beegfs-setup-meta
-	install -D mgmtd/build/dist/sbin/beegfs-setup-mgmtd \
-		debian/beegfs-mgmtd/opt/beegfs/sbin/beegfs-setup-mgmtd
-	@# daemon init files
-	install -D storage/build/dist/etc/init.d/beegfs-storage.init debian/beegfs-storage.init
-	install -D meta/build/dist/etc/init.d/beegfs-meta.init debian/beegfs-meta.init
-	install -D mgmtd/build/dist/etc/init.d/beegfs-mgmtd.init debian/beegfs-mgmtd.init
-	install -D helperd/build/dist/etc/init.d/beegfs-helperd.init debian/beegfs-helperd.init
-	install -D mon/build/dist/etc/init.d/beegfs-mon.init debian/beegfs-mon.init
-	cat common_package/build/dist/etc/init.d/beegfs-service.init >> debian/beegfs-storage.init
-	cat common_package/build/dist/etc/init.d/beegfs-service.init >> debian/beegfs-meta.init
-	cat common_package/build/dist/etc/init.d/beegfs-service.init >> debian/beegfs-mgmtd.init
-	cat common_package/build/dist/etc/init.d/beegfs-service.init >> debian/beegfs-helperd.init
-	cat common_package/build/dist/etc/init.d/beegfs-service.init >> debian/beegfs-mon.init
 	@# daemon configs and defaults
 	install -D -m644 storage/build/dist/etc/default/beegfs-storage \
 		debian/beegfs-storage.default
@@ -67,45 +46,23 @@ override_dh_install:
 	install -D -m644 meta/build/dist/etc/default/beegfs-meta \
 		debian/beegfs-meta.default
 	install -D -m644 meta/build/dist/etc/beegfs-meta.conf \
-		debian/beegfs-meta/etc/beegfs/beegfs-meta.conf
-	install -D -m644 mgmtd/build/dist/etc/default/beegfs-mgmtd \
-		debian/beegfs-mgmtd.default
-	install -D -m644 mgmtd/build/dist/etc/beegfs-mgmtd.conf \
-		debian/beegfs-mgmtd/etc/beegfs/beegfs-mgmtd.conf
-	install -D -m644 helperd/build/dist/etc/default/beegfs-helperd \
-		debian/beegfs-helperd.default
-	install -D -m644 helperd/build/dist/etc/beegfs-helperd.conf \
-		debian/beegfs-helperd/etc/beegfs/beegfs-helperd.conf
+		debian/beegfs-meta/etc/beegfs/beegfs-meta.conf	
 	install -D -m644 mon/build/dist/etc/default/beegfs-mon \
 		debian/beegfs-mon.default
 	install -D -m644 mon/build/dist/etc/beegfs-mon.conf \
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.conf
 	install -D -m600 mon/build/dist/etc/beegfs-mon.auth \
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.auth
-	install -D -m644 event_listener/build/dist/etc/beegfs-eventlistener.conf \
-		debian/beegfs-utils/etc/beegfs/beegfs-eventlistener.conf
-	mkdir -p debian/beegfs-utils/usr/lib/systemd/system
-	cp event_listener/build/dist/usr/lib/systemd/system/beegfs-eventlistener.service \
-		debian/beegfs-utils/usr/lib/systemd/system
-	mkdir -p debian/beegfs-utils/etc/init.d
-	cp event_listener/build/dist/etc/init.d/beegfs-eventlistener.init \
-		debian/beegfs-utils/etc/init.d/beegfs-eventlistener
 	@# mon-grafana
 	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
 	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
 	@# utils
-	make -j$(NUMJOBS) DESTDIR=debian/beegfs-utils ctl-install fsck-install event_listener-install
+	make -j$(NUMJOBS) DESTDIR=debian/beegfs-utils fsck-install event_listener-install
 	mkdir -p debian/beegfs-utils/sbin
 	cp -a utils/scripts/fsck.beegfs debian/beegfs-utils/sbin
 	mkdir -p debian/beegfs-utils/usr/bin
-	cp -a utils/scripts/beegfs-* debian/beegfs-utils/usr/bin
 	mkdir -p debian/beegfs-utils/opt/beegfs/lib
-	cp java_lib/build/libjbeegfs.so java_lib/build/jbeegfs.jar \
-		debian/beegfs-utils/opt/beegfs/lib/
-	install -D -m644 utils/scripts/etc/bash_completion.d/beegfs-ctl \
-		debian/beegfs-utils/usr/share/bash-completion/completions/beegfs-ctl
 	mkdir -p debian/beegfs-utils/usr/sbin
-	ln -s /opt/beegfs/sbin/beegfs-ctl debian/beegfs-utils/usr/sbin/beegfs-ctl
 	ln -s /opt/beegfs/sbin/beegfs-fsck debian/beegfs-utils/usr/sbin/beegfs-fsck
 	@# utils-dev
 	mkdir -p debian/beegfs-utils-dev/usr/include
@@ -116,20 +73,6 @@ override_dh_install:
 	mkdir -p debian/beegfs-utils-dev/usr/share/doc/beegfs-utils-dev/examples/beegfs-event-listener/build
 	cp -a event_listener/build/Makefile \
 		debian/beegfs-utils-dev/usr/share/doc/beegfs-utils-dev/examples/beegfs-event-listener/build/Makefile
-	@# beeond-thirdparty-gpl
-	tar --strip-components=2 -xf beeond_thirdparty_gpl/source/parallel-20150122.tar.bz2 parallel-20150122/src/parallel
-	mkdir -p debian/beeond-thirdparty-gpl/opt/beegfs/thirdparty/parallel
-	mv parallel debian/beeond-thirdparty-gpl/opt/beegfs/thirdparty/parallel
-	@# beeond-thirdparty # does not build on most systems we support
-	@#make -j$(NUMJOBS) -C beeond_thirdparty/build
-	@#mkdir -p debian/beeond-thirdparty/opt/beegfs/thirdparty/pcopy
-	@#mkdir -p debian/beeond-thirdparty/usr/bin
-	@#install -D beeond_thirdparty/build/pcopy/pcp.bin debian/beeond-thirdparty/opt/beegfs/thirdparty/pcopy
-	@#install -D beeond_thirdparty/build/pcopy/pcp_cleanup debian/beeond-thirdparty/opt/beegfs/thirdparty/pcopy
-	@#install -D beeond_thirdparty/build/pcopy/pcp_run debian/beeond-thirdparty/opt/beegfs/thirdparty/pcopy
-	@#install -D beeond_thirdparty/build/pcopy/ssh.spawner debian/beeond-thirdparty/opt/beegfs/thirdparty/pcopy
-	@#cp beeond_thirdparty/build/pcopy/README.txt debian/beeond-thirdparty/opt/beegfs/thirdparty/pcopy/
-	@#ln -s /opt/beegfs/thirdparty/pcopy/pcp_run debian/beeond-thirdparty/usr/bin/beeond-pcopy
 	@# beeond
 	mkdir -p debian/beeond/opt/beegfs/lib
 	mkdir -p debian/beeond/opt/beegfs/sbin
@@ -161,6 +104,8 @@ override_dh_install:
 		debian/beegfs-client/etc/beegfs/beegfs-mounts.conf
 	install -D -m644 client_module/scripts/etc/beegfs/lib/init-multi-mode.beegfs-client \
 		debian/beegfs-client/etc/beegfs/lib/init-multi-mode.beegfs-client
+	install -D client_module/build/dist/sbin/mount.beegfs \
+		debian/beegfs-client/sbin/mount.beegfs
 	install -D client_module/build/dist/sbin/beegfs-setup-client \
 		debian/beegfs-client/opt/beegfs/sbin/beegfs-setup-client
 	install -D client_module/build/dist/etc/beegfs-client-mount-hook.example \
@@ -178,6 +123,8 @@ override_dh_install:
 		debian/beegfs-client-dkms/etc/beegfs/beegfs-client.conf
 	install -D -m644 client_module/build/dist/etc/beegfs-client-build.mk \
 		debian/beegfs-client-dkms/etc/beegfs/beegfs-client-build.mk
+	install -D client_module/build/dist/sbin/mount.beegfs \
+		debian/beegfs-client-dkms/sbin/mount.beegfs
 	@# client-dev
 	mkdir -p debian/beegfs-client-dev/usr/include
 	cp -a client_devel/include/beegfs debian/beegfs-client-dev/usr/include/
@@ -187,33 +134,39 @@ override_dh_install:
 	cp -a client_devel/build/dist/usr/share/doc/beegfs-client-devel/examples/* \
 		debian/beegfs-client-dev/usr/share/doc/beegfs-client-dev/examples/
 
-# automatic stripping works only with debhelper >= 9.20160114 (since deb9).
-# until that's the oldest version we support, strip manually. also remove the -dbg packages
-# from the control file when we switch.
+# Before dbgsym packages, package maintainers had to manually create their -dbg packages listed 
+# in the debian/control file. --dbgsym-migration=package-relation This option is used to migrate 
+# from a manual "-dbg" package (created with --dbg-package) to an automatic generated debug symbol package.
 override_dh_strip:
-	dh_strip -pbeegfs-helperd    --dbg-package=beegfs-helperd-dbg
-	dh_strip -pbeegfs-meta       --dbg-package=beegfs-meta-dbg
-	dh_strip -pbeegfs-mgmtd      --dbg-package=beegfs-mgmtd-dbg
-	dh_strip -pbeegfs-mon        --dbg-package=beegfs-mon-dbg
-	dh_strip -pbeegfs-storage    --dbg-package=beegfs-storage-dbg
-	dh_strip -pbeegfs-utils      --dbg-package=beegfs-utils-dbg
-
+	dh_strip -pbeegfs-meta       --dbgsym-migration='beegfs-meta-dbg (<< $(BEEGFS_VERSION)~)'
+	dh_strip -pbeegfs-mon        --dbgsym-migration='beegfs-mon-dbg (<< $(BEEGFS_VERSION)~)'
+	dh_strip -pbeegfs-storage    --dbgsym-migration='beegfs-storage-dbg (<< $(BEEGFS_VERSION)~)'
+	dh_strip -plibbeegfs-ib      --dbgsym-migration='libbeegfs-ib-dbg (<< $(BEEGFS_VERSION)~)'
+	
 # avoid auto-start because default config is not useful
 override_dh_installinit:
-	for component in storage meta mgmtd helperd mon; do \
+	for component in storage meta mon; do \
 		cp $$component/build/dist/usr/lib/systemd/system/beegfs-$$component.service debian/; \
 		install -D -m644 $$component/build/dist/usr/lib/systemd/system/beegfs-$$component@.service \
 			debian/beegfs-$$component/lib/systemd/system/beegfs-$$component@.service; \
-		dh_systemd_enable -p beegfs-$$component --no-enable --name=beegfs-$$component@ beegfs-$$component@.service; \
+		dh_installsystemd -p beegfs-$$component --no-enable --name=beegfs-$$component@ beegfs-$$component@.service; \
 	done
 	cp client_module/build/dist/usr/lib/systemd/system/beegfs-client.service debian/
 	cp client_module/build/dist/usr/lib/systemd/system/beegfs-client@.service debian/
-	dh_systemd_enable
+	dh_installsystemd
 	#
-	dh_installinit -pbeegfs-mgmtd         --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
-	dh_installinit -pbeegfs-mon           --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
-	dh_installinit -pbeegfs-storage       --no-restart-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
-	dh_installinit -pbeegfs-meta          --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
-	dh_installinit -pbeegfs-client        --no-restart-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
-	dh_installinit -pbeegfs-client-compat --no-restart-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
-	dh_installinit -pbeegfs-helperd       --no-restart-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
+	dh_installinit -pbeegfs-mon           --no-stop-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
+	dh_installinit -pbeegfs-storage       --no-stop-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
+	dh_installinit -pbeegfs-meta          --no-stop-on-upgrade --no-start -- start 90 2 3 4 5 . stop 90 0 1 6 .
+	dh_installinit -pbeegfs-client        --no-stop-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
+	dh_installinit -pbeegfs-client-compat --no-stop-on-upgrade --no-start -- start 99 2 3 4 5 . stop 99 0 1 6 .
+
+# Debhelper 12.3 and dwz on Debian 10 error out with "dwz: Too few files for multifile optimization."
+# We need to skip dh_dwz only for the beegfs-utils package.
+# This can be removed once we stop supporting Debian 10 (Buster). The issue is fixed in Debian 11 (Bullseye).
+override_dh_dwz:
+	for pkg in $(dh_listpackages); do \
+		if [ "$$pkg" != "beegfs-utils" ]; then \
+			dh_dwz -p $$pkg; \
+		fi \
+	done

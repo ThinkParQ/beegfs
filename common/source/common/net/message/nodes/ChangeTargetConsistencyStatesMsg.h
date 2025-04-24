@@ -1,5 +1,4 @@
-#ifndef CHANGETARGETCONSISTENCYSTATESMSG_H
-#define CHANGETARGETCONSISTENCYSTATESMSG_H
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/nodes/Node.h>
@@ -76,4 +75,3 @@ class ChangeTargetConsistencyStatesMsg
       }
 };
 
-#endif /*CHANGETARGETCONSISTENCYSTATESMSG_H*/

@@ -1,5 +1,4 @@
-#ifndef SESSIONLOCALFILE_H_
-#define SESSIONLOCALFILE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/Node.h>
@@ -283,4 +282,3 @@ class SessionLocalFile
       }
 };
 
-#endif /*SESSIONLOCALFILE_H_*/

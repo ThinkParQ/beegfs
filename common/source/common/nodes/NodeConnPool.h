@@ -1,5 +1,4 @@
-#ifndef NODECONNPOOL_H_
-#define NODECONNPOOL_H_
+#pragma once
 
 #include <common/app/config/ICommonConfig.h>
 #include <common/net/sock/NetworkInterfaceCard.h>
@@ -26,7 +25,6 @@ class Node;
 struct NodeConnPoolStats
 {
    unsigned numEstablishedStd;
-   unsigned numEstablishedSDP;
    unsigned numEstablishedRDMA;
 };
 
@@ -200,4 +198,3 @@ class NodeConnPool
       bool loadIpSourceMap();
 };
 
-#endif /*NODECONNPOOL_H_*/

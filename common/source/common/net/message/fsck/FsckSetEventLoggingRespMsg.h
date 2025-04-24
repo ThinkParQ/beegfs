@@ -1,5 +1,4 @@
-#ifndef FSCKSETEVENTLOGGINGRESPMSG_H
-#define FSCKSETEVENTLOGGINGRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/toolkit/ListTk.h>
@@ -38,4 +37,3 @@ class FsckSetEventLoggingRespMsg: public NetMessageSerdes<FsckSetEventLoggingRes
       }
 };
 
-#endif /*FSCKSETEVENTLOGGINGRESPMSG_H*/

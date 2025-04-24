@@ -1,5 +1,4 @@
-#ifndef FLOCKENTRYMSG_H_
-#define FLOCKENTRYMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -111,4 +110,3 @@ class FLockEntryMsg : public MirroredMessageBase<FLockEntryMsg>
       }
 };
 
-#endif /* FLOCKENTRYMSG_H_ */

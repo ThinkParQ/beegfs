@@ -1,5 +1,4 @@
-#ifndef REMOVENODEMSG_H_
-#define REMOVENODEMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/AcknowledgeableMsg.h>
@@ -46,4 +45,3 @@ class RemoveNodeMsg : public AcknowledgeableMsgSerdes<RemoveNodeMsg>
 };
 
 
-#endif /* REMOVENODEMSG_H_ */

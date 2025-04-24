@@ -1,5 +1,4 @@
-#ifndef REFRESHENTRYINFORESPMSG_H_
-#define REFRESHENTRYINFORESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class RefreshEntryInfoRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /* REFRESHENTRYINFORESPMSG_H_ */

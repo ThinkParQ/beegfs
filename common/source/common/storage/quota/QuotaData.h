@@ -1,5 +1,4 @@
-#ifndef QUOTADATA_H_
-#define QUOTADATA_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -333,4 +332,3 @@ inline Deserializer& operator%(Deserializer& des, QuotaDataMap& map)
 template<>
 struct MapSerializationHasLength<uint16_t, QuotaDataMap> : boost::true_type {};
 
-#endif /* QUOTADATA_H_ */

@@ -1,5 +1,4 @@
-#ifndef MATHTK_H_
-#define MATHTK_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -97,4 +96,3 @@ class MathTk
 };
 
 
-#endif /* MATHTK_H_ */

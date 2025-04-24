@@ -1,7 +1,6 @@
 #include <common/toolkit/SocketTk.h>
 #include <common/net/sock/StandardSocket.h>
 #include <common/net/sock/RDMASocket.h>
-#include <toolkit/ExternalHelperd.h>
 #include <common/Common.h>
 #include <common/toolkit/TimeTk.h>
 
@@ -155,36 +154,6 @@ int SocketTk_poll(PollState* state, int timeoutMS)
    return table_err ? table_err : numSocksWithREvents;
 }
 
-/**
- * Note: Name resolution is performed by asking the helper daemon.
- */
-bool SocketTk_getHostByName(struct ExternalHelperd* helperd, const char* hostname,
-   struct in_addr* outIPAddr)
-{
-   bool retVal = true;
-   char* resolveRes;
-
-   resolveRes = ExternalHelperd_getHostByName(helperd, hostname);
-
-   if(!resolveRes)
-   { // communication with helper daemon failed => maybe hostname is an IP string
-      return SocketTk_getHostByAddrStr(hostname, outIPAddr);
-   }
-
-   if(!strlen(resolveRes) )
-      return false; // hostname unknown
-
-
-   // we got an IP string
-
-   retVal = SocketTk_getHostByAddrStr(resolveRes, outIPAddr);
-
-
-   // clean-up
-   kfree(resolveRes);
-
-   return retVal;
-}
 
 /**
  * Note: Old kernel versions do not support validation of the IP string.

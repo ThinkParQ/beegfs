@@ -1,5 +1,4 @@
-#ifndef GETNODESMSGEX_H_
-#define GETNODESMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/GetNodesMsg.h>
 
@@ -9,4 +8,3 @@ class GetNodesMsgEx : public GetNodesMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*GETNODESMSGEX_H_*/

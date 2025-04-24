@@ -1,5 +1,4 @@
-#ifndef RESYNCRAWINODESRESPMSG_H_
-#define RESYNCRAWINODESRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class ResyncRawInodesRespMsg : public SimpleIntMsg
       FhgfsOpsErr getResult() { return static_cast<FhgfsOpsErr>(getValue()); }
 };
 
-#endif

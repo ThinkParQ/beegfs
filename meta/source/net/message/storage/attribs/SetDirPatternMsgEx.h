@@ -1,5 +1,4 @@
-#ifndef SETDIRPATTERNMSGEX_H_
-#define SETDIRPATTERNMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/attribs/SetDirPatternMsg.h>
@@ -36,4 +35,3 @@ class SetDirPatternMsgEx : public MirroredMessage<SetDirPatternMsg, FileIDLock>
 };
 
 
-#endif /*SETDIRPATTERNMSGEX_H_*/

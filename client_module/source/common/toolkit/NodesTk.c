@@ -127,8 +127,11 @@ bool NodesTk_downloadStatesAndBuddyGroups(App* app, Node* sourceNode, NodeType n
    GetStatesAndBuddyGroupsRespMsg* respMsgCast;
    RequestResponseArgs rrArgs;
 
+   Node* localNode = App_getLocalNode(app);
+   NumNodeID localNodeNumID = Node_getNumID(localNode);
+
    // prepare request
-   GetStatesAndBuddyGroupsMsg_init(&msg, nodeType);
+   GetStatesAndBuddyGroupsMsg_init(&msg, nodeType, localNodeNumID);
    RequestResponseArgs_prepare(&rrArgs, sourceNode, (NetMessage*)&msg,
       NETMSGTYPE_GetStatesAndBuddyGroupsResp);
 

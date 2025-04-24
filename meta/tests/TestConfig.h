@@ -1,5 +1,4 @@
-#ifndef TESTCONFIG_H_
-#define TESTCONFIG_H_
+#pragma once
 
 #include <app/config/Config.h>
 #include <common/app/log/LogContext.h>
@@ -31,4 +30,3 @@ class TestConfig: public ::testing::Test
       std::string emptyConfigFile;
 };
 
-#endif /* TESTCONFIG_H_ */

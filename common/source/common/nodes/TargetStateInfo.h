@@ -1,5 +1,4 @@
-#ifndef TARGETSTATEINFO_H_
-#define TARGETSTATEINFO_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/Time.h>
@@ -146,4 +145,3 @@ typedef std::map<uint16_t, TargetStateInfo> TargetStateInfoMap;
 typedef TargetStateInfoMap::iterator TargetStateInfoMapIter;
 typedef TargetStateInfoMap::const_iterator TargetStateInfoMapConstIter;
 
-#endif /* TARGETSTATEINFO_H_ */

@@ -1,5 +1,4 @@
-#ifndef STATSCOLLECTOR_H_
-#define STATSCOLLECTOR_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/app/AbstractApp.h>
@@ -50,4 +49,3 @@ class StatsCollector : public PThread
 
 
 
-#endif /* STATSCOLLECTOR_H_ */

@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILERDMARESPMSG_H_
-#define WRITELOCALFILERDMARESPMSG_H_
+#pragma once
 
 #ifdef BEEGFS_NVFS
 #include <common/net/message/SimpleInt64Msg.h>
@@ -19,4 +18,3 @@ class WriteLocalFileRDMARespMsg : public SimpleInt64Msg
 };
 #endif /* BEEGFS_NVFS */
 
-#endif /*WRITELOCALFILERDMARESPMSG_H_*/

@@ -1,5 +1,4 @@
-#ifndef FINDOWNERMSGEX_H_
-#define FINDOWNERMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/lookup/FindOwnerMsg.h>
 #include <common/storage/StorageDefinitions.h>
@@ -21,4 +20,3 @@ class FindOwnerMsgEx : public FindOwnerMsg
 };
 
 
-#endif /*FINDOWNERMSGEX_H_*/

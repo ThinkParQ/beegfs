@@ -1,5 +1,4 @@
-#ifndef COMMON_NODES_MIRRORBUDDYGROUPCREATOR_H_
-#define COMMON_NODES_MIRRORBUDDYGROUPCREATOR_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/MirrorBuddyGroupMapper.h>
@@ -74,4 +73,3 @@ class MirrorBuddyGroupCreator
                                 const UInt16List* usedMirrorBuddyGroups) const;
 };
 
-#endif /* COMMON_NODES_MIRRORBUDDYGROUPCREATOR_H_ */

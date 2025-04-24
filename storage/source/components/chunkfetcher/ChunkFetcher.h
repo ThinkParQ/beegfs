@@ -1,5 +1,4 @@
-#ifndef CHUNKFETCHER_H_
-#define CHUNKFETCHER_H_
+#pragma once
 
 #include <components/chunkfetcher/ChunkFetcherSlave.h>
 #include <common/toolkit/ListTk.h>
@@ -100,4 +99,3 @@ class ChunkFetcher
       }
 };
 
-#endif /* CHUNKFETCHER_H_ */

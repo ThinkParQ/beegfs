@@ -1,5 +1,4 @@
-#ifndef MINMAXSTORE_H_
-#define MINMAXSTORE_H_
+#pragma once
 
 #include <limits>
 
@@ -63,4 +62,3 @@ class MinMaxStore {
 
 };
 
-#endif // MINMAXSTORE_H_

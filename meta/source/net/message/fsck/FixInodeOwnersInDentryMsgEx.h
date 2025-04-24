@@ -1,5 +1,4 @@
-#ifndef FIXINODEOWNERSINDENTRYMSGEX_H
-#define FIXINODEOWNERSINDENTRYMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/FixInodeOwnersInDentryMsg.h>
@@ -11,4 +10,3 @@ class FixInodeOwnersInDentryMsgEx : public FixInodeOwnersInDentryMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*FIXINODEOWNERSINDENTRYMSGEX_H*/

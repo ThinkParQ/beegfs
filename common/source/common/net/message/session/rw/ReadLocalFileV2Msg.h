@@ -1,5 +1,4 @@
-#ifndef READLOCALFILEV2MSG_H_
-#define READLOCALFILEV2MSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -143,4 +142,3 @@ class ReadLocalFileV2Msg : public ReadLocalFileV2MsgBase, public NetMessageSerde
       }
 };
 
-#endif /*READLOCALFILEV2MSG_H_*/

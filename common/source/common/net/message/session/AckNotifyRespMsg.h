@@ -1,5 +1,4 @@
-#ifndef COMMON_ACKNOTIFYRESPMSG
-#define COMMON_ACKNOTIFYRESPMSG
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class AckNotifiyRespMsg : public SimpleIntMsg
       FhgfsOpsErr getResult() { return static_cast<FhgfsOpsErr>(getValue()); }
 };
 
-#endif

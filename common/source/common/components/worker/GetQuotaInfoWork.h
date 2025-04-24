@@ -1,5 +1,4 @@
-#ifndef GETQUOTAINFOWORK_H_
-#define GETQUOTAINFOWORK_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -66,4 +65,3 @@ class GetQuotaInfoWork: public Work
       void mergeQuotaInodeSupportUnlocked(QuotaInodeSupport inQuotaInodeSupport);
 };
 
-#endif /* GETQUOTAINFOWORK_H_ */

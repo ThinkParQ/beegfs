@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILEMSG_H_
-#define WRITELOCALFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -188,4 +187,3 @@ class WriteLocalFileMsg : public WriteLocalFileMsgBase, public NetMessageSerdes<
 
 };
 
-#endif /*WRITELOCALFILEMSG_H_*/

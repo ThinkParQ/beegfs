@@ -1,5 +1,4 @@
-#ifndef LOGRESPMSG_H_
-#define LOGRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class LogRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*LOGRESPMSG_H_*/

@@ -1,5 +1,4 @@
-#ifndef COMMON_BACKTRACE_H
-#define COMMON_BACKTRACE_H
+#pragma once
 
 /**
  * Helper class to easily log a fragment of the current backtrace inline.
@@ -52,4 +51,3 @@ std::ostream& operator<<(std::ostream& os, const Backtrace<LEN>& bt)
    return os;
 }
 
-#endif /* COMMON_BACKTRACE_H */

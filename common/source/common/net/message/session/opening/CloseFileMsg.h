@@ -1,5 +1,4 @@
-#ifndef CLOSEFILEMSG_H_
-#define CLOSEFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -111,4 +110,3 @@ class CloseFileMsg : public MirroredMessageBase<CloseFileMsg>
       }
 };
 
-#endif /*CLOSEFILEMSG_H_*/

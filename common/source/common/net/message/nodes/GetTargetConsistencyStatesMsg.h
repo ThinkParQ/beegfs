@@ -1,5 +1,4 @@
-#ifndef COMMON_GETTARGETCONSISTENCYSTATESMSG_H
-#define COMMON_GETTARGETCONSISTENCYSTATESMSG_H
+#pragma once
 
 class GetTargetConsistencyStatesMsg : public NetMessageSerdes<GetTargetConsistencyStatesMsg>
 {
@@ -23,4 +22,3 @@ class GetTargetConsistencyStatesMsg : public NetMessageSerdes<GetTargetConsisten
       }
 };
 
-#endif /* COMMON_GETTARGETCONSISTENCYSTATESMSG_H */

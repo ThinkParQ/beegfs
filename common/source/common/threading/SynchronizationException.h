@@ -1,5 +1,4 @@
-#ifndef SYNCHRONIZATIONEXCEPTION_H_
-#define SYNCHRONIZATIONEXCEPTION_H_
+#pragma once
 
 #include "common/toolkit/NamedException.h"
 #include "common/Common.h"
@@ -23,4 +22,3 @@ class SynchronizationException : public NamedException
 };
 */
 
-#endif /*SYNCHRONIZATIONEXCEPTION_H_*/

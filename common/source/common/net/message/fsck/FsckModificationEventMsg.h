@@ -1,5 +1,4 @@
-#ifndef FSCKMODIFICATIONEVENTMSG_H
-#define FSCKMODIFICATIONEVENTMSG_H
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -61,4 +60,3 @@ class FsckModificationEventMsg : public AcknowledgeableMsgSerdes<FsckModificatio
       }
 };
 
-#endif /*FSCKMODIFICATIONEVENTMSG_H*/

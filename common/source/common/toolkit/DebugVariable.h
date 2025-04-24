@@ -1,5 +1,4 @@
-#ifndef COMMON_DEBUGVARIABLE_H
-#define COMMON_DEBUGVARIABLE_H
+#pragma once
 
 #include <boost/lexical_cast.hpp>
 #include <stdlib.h>
@@ -15,4 +14,3 @@
    static const type name = value
 #endif
 
-#endif

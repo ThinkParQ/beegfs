@@ -1,5 +1,4 @@
-#ifndef TARGETCAPACITYPOOLS_H_
-#define TARGETCAPACITYPOOLS_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/DynamicPoolLimits.h>
@@ -168,4 +167,3 @@ class TargetCapacityPools
 
 };
 
-#endif /* TARGETCAPACITYPOOLS_H_ */

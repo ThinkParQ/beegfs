@@ -1,5 +1,4 @@
-#ifndef APP_H_
-#define APP_H_
+#pragma once
 
 #include <app/config/Config.h>
 #include <common/app/log/LogContext.h>
@@ -150,8 +149,8 @@ class App : public AbstractApp
       void initLogging();
       void initDataObjects();
       void initBasicNetwork();
-      void initLocalNodeIDs(std::string& outLocalNodeID, NumNodeID& outLocalNodeNumID);
-      void initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID);
+      void initLocalNodeIDs(NumNodeID& outLocalNodeNumID);
+      void initLocalNode(NumNodeID localNodeNumID);
       void initLocalNodeNumIDFile(NumNodeID localNodeNumID) ;
       void preinitStorage();
       void checkTargetsUUIDs();
@@ -163,7 +162,7 @@ class App : public AbstractApp
       void joinComponents();
 
       bool waitForMgmtNode();
-      bool preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID);
+      bool preregisterNode(NumNodeID& outLocalNodeNumID);
       boost::optional<std::map<uint16_t, std::unique_ptr<StorageTarget>>> preregisterTargets(
             const NumNodeID localNodeNumID);
       bool preregisterTarget(Node& mgmtNode, std::string targetID, uint16_t targetNumID,
@@ -186,7 +185,6 @@ class App : public AbstractApp
       bool openLibZfs();
       bool closeLibZfs();
 
-      bool checkEnterpriseFeatureUsage();
 
    public:
       /**
@@ -424,4 +422,3 @@ class App : public AbstractApp
 
 
 };
-#endif /*APP_H_*/

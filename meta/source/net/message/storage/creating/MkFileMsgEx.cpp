@@ -76,12 +76,13 @@ std::unique_ptr<MkFileMsgEx::ResponseState> MkFileMsgEx::executePrimary()
    if (isMsgHeaderFeatureFlagSet(MKFILEMSG_FLAG_STORAGEPOOLID))
    {
       mkRes = MsgHelperMkFile::mkFile(*dir, &mkDetails, &getPreferredNodes(),
-            getNumTargets(), getChunkSize(), NULL, &entryInfo, &inodeData, storagePoolId);
+            getNumTargets(), getChunkSize(), NULL, getRemoteStorageTarget(),
+            &entryInfo, &inodeData, storagePoolId);
    }
    else
    {
       mkRes = MsgHelperMkFile::mkFile(*dir, &mkDetails, &getPreferredNodes(),
-            getNumTargets(), getChunkSize(), NULL, &entryInfo, &inodeData);
+            getNumTargets(), getChunkSize(), NULL, getRemoteStorageTarget(), &entryInfo, &inodeData);
    }
 
    if (mkRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
@@ -91,10 +92,11 @@ std::unique_ptr<MkFileMsgEx::ResponseState> MkFileMsgEx::executePrimary()
 
    if (mkRes == FhgfsOpsErr_SUCCESS && Program::getApp()->getFileEventLogger() && getFileEvent())
    {
-         Program::getApp()->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  entryInfo.getEntryID(),
-                  entryInfo.getParentEntryID());
+      EventContext eventCtx = makeEventContext(&entryInfo, entryInfo.getParentEntryID(),
+         // This is not the secondary node if executePrimary() was called.
+         getMsgHeaderUserID(), "", this->inodeData.getInodeStatData()->getNumHardlinks(), false);
+
+      logEvent(Program::getApp()->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    return boost::make_unique<ResponseState>(mkRes, entryInfo);
@@ -112,7 +114,7 @@ std::unique_ptr<MkFileMsgEx::ResponseState> MkFileMsgEx::executeSecondary()
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS, entryInfo);
 
    FhgfsOpsErr mkRes = MsgHelperMkFile::mkFile(*dir, &mkDetails, &getPreferredNodes(),
-      getNumTargets(), getChunkSize(), stripePattern, &entryInfo, &inodeData);
+      getNumTargets(), getChunkSize(), stripePattern, getRemoteStorageTarget(), &entryInfo, &inodeData);
 
    if (mkRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
       fixInodeTimestamp(*dir, dirTimestamps);
@@ -128,6 +130,7 @@ void MkFileMsgEx::forwardToSecondary(ResponseContext& ctx)
    // same information
    setNewEntryID(newEntryID.c_str());
    setPattern(inodeData.getStripePattern());
+   setRemoteStorageTarget(getRemoteStorageTarget());
 
    sendToSecondary(ctx, *this, NETMSGTYPE_MkFileResp);
 }

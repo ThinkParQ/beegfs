@@ -1,5 +1,4 @@
-#ifndef LISTXATTRRESPMSG_H_
-#define LISTXATTRRESPMSG_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/net/message/NetMessage.h>
@@ -52,4 +51,3 @@ class ListXAttrRespMsg : public NetMessageSerdes<ListXAttrRespMsg>
       }
 };
 
-#endif /*LISTXATTRRESPMSG_H_*/

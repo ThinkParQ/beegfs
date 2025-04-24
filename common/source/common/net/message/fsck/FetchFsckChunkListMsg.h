@@ -1,5 +1,4 @@
-#ifndef FETCHFSCKCHUNKLISTMSG_H
-#define FETCHFSCKCHUNKLISTMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/toolkit/FsckTk.h>
@@ -43,4 +42,3 @@ class FetchFsckChunkListMsg: public NetMessageSerdes<FetchFsckChunkListMsg>
       }
 };
 
-#endif /*FETCHFSCKCHUNKLISTMSG_H*/

@@ -1,5 +1,4 @@
-#ifndef ACKMSGEX_H_
-#define ACKMSGEX_H_
+#pragma once
 
 #include <common/net/message/control/AckMsg.h>
 
@@ -12,4 +11,3 @@ class AckMsgEx : public AckMsg
 };
 
 
-#endif /* ACKMSGEX_H_ */

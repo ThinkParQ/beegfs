@@ -1,5 +1,4 @@
-#ifndef FSYNCLOCALFILERESPMSG_H_
-#define FSYNCLOCALFILERESPMSG_H_
+#pragma once
 
 #include "../SimpleInt64Msg.h"
 
@@ -18,4 +17,3 @@ class FSyncLocalFileRespMsg : public SimpleInt64Msg
 };
 
 
-#endif /*FSYNCLOCALFILERESPMSG_H_*/

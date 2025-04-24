@@ -1,5 +1,4 @@
-#ifndef STATRESPMSG_H_
-#define STATRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -82,4 +81,3 @@ class StatRespMsg : public NetMessageSerdes<StatRespMsg>
       }
 };
 
-#endif /*STATRESPMSG_H_*/

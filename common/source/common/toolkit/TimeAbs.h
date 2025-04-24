@@ -1,5 +1,4 @@
-#ifndef TIMEABS_H_
-#define TIMEABS_H_
+#pragma once
 
 #include <common/Common.h>
 #include <sys/time.h>
@@ -122,4 +121,3 @@ class TimeAbs
 
 };
 
-#endif /* TIMEABS_H_ */

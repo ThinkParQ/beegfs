@@ -1,5 +1,4 @@
-#ifndef TESTRWLOCK_H_
-#define TESTRWLOCK_H_
+#pragma once
 
 
 #include <common/threading/Condition.h>
@@ -229,4 +228,3 @@ class TestRWLock: public ::testing::Test
       void checkRandomExecutionOrderWriter(TestLockThread* threads, int threadID);
 };
 
-#endif /* TESTRWLOCK_H_ */

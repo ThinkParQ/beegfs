@@ -1,5 +1,4 @@
-#ifndef REGISTERTARGETMSG_H_
-#define REGISTERTARGETMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -67,4 +66,3 @@ class RegisterTargetMsg : public NetMessageSerdes<RegisterTargetMsg>
 };
 
 
-#endif /* REGISTERTARGETMSG_H_ */

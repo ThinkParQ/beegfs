@@ -83,6 +83,7 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
    MetaStore* metaStore = app->getMetaStore();
 
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
+   unsigned updatedLinkCount = 0;
 
    // reference directory where hardlink needs to be created
    DirInode* toDir = metaStore->referenceDir(getToDirInfo()->getEntryID(),
@@ -113,7 +114,7 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
 
    if (isLocalOwner)
    {
-      retVal = metaStore->makeNewHardlink(getFromInfo());
+      std::tie(retVal, updatedLinkCount) = metaStore->makeNewHardlink(getFromInfo());
    }
    else if (!isSecondary)
    {
@@ -158,6 +159,7 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
 
          // success
          retVal = res;
+         updatedLinkCount = moveFileInodeRespMsg->getHardlinkCount();
       } while (false);
    }
 
@@ -199,7 +201,7 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
 
       if (isLocalOwner)
       {
-        auto file = metaStore->referenceFile(getFromInfo());
+        auto [file, referenceRes] = metaStore->referenceFile(getFromInfo());
         if (file)
         {
            fixInodeTimestamp(*file, fileTimestamps, getFromInfo());
@@ -212,10 +214,9 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
 
    if (!isSecondary && retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
    {
-         app->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  getFromInfo()->getEntryID(),
-                  getFromInfo()->getParentEntryID());
+      EventContext eventCtx = makeEventContext(getFromInfo(), getFromInfo()->getParentEntryID(),
+         getMsgHeaderUserID(), "", updatedLinkCount, isSecondary);
+      logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    return boost::make_unique<ResponseState>(retVal);
@@ -227,7 +228,7 @@ FhgfsOpsErr HardlinkMsgEx::incDecRemoteLinkCount(NumNodeID const& ownerNodeID, b
    App* app = Program::getApp();
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
 
-   SettableFileAttribs dummyAttrib;
+   SettableFileAttribs dummyAttrib = {};
    SetAttrMsg msg(getFromInfo(), 0, &dummyAttrib);
 
    if (increment)

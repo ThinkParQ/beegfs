@@ -83,6 +83,8 @@ void Config::loadDefaults(bool addDashes)
    configMapRedefine("sysTargetOfflineTimeoutSecs","180");
    configMapRedefine("sysAllowUserSetPattern",     "false");
    configMapRedefine("sysFileEventLogTarget",      "");
+   configMapRedefine("sysFileEventPersistDirectory", "");
+   configMapRedefine("sysFileEventPersistSize", "0");
 
    configMapRedefine("runDaemonized",              "false");
 
@@ -206,6 +208,10 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
           tuneDisposalGCPeriod = StringTk::strToUInt(iter->second);
       else if (iter->first == std::string("sysFileEventLogTarget"))
          sysFileEventLogTarget = iter->second;
+      else if (iter->first == std::string("sysFileEventPersistDirectory"))
+         sysFileEventPersistDirectory = iter->second;
+      else if (iter->first == std::string("sysFileEventPersistSize"))
+         sysFileEventPersistSize = UnitTk::strHumanToInt64(iter->second);
       else if (iter->first == std::string("runDaemonized"))
          runDaemonized = StringTk::strToBool(iter->second);
       else if (iter->first == std::string("pidFile"))

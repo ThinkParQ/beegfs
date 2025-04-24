@@ -1,5 +1,4 @@
-#ifndef DELETECHUNKSRESPMSG_H
-#define DELETECHUNKSRESPMSG_H
+#pragma once
 
 #include <common/fsck/FsckChunk.h>
 #include <common/net/message/NetMessage.h>
@@ -38,4 +37,3 @@ class DeleteChunksRespMsg : public NetMessageSerdes<DeleteChunksRespMsg>
 };
 
 
-#endif /*DELETECHUNKSRESPMSG_H*/

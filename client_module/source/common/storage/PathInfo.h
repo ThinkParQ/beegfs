@@ -13,9 +13,12 @@
 #include <common/toolkit/StringTk.h>
 
 #define PATHINFO_FEATURE_ORIG         1 /* inidicate chunks are stored with origParentUID and
-                                          * and origParentEntryID */
+                                         * and origParentEntryID */
 #define PATHINFO_FEATURE_ORIG_UNKNOWN 2 /* indicates FEATURE_ORIG is unknown and needs to be
-                                          * requested from the meta-inode */
+                                         * requested from the meta-inode */
+#define PATHINFO_FEATURE_IS_STUB      4 /* indicates entry is a stub file.
+                                         * This flag not used in the client module but is added
+                                         * here for consistency with the C++ PathInfo implementation */
 
 struct PathInfo;
 typedef struct PathInfo PathInfo;

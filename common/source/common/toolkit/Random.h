@@ -1,5 +1,4 @@
-#ifndef RANDOM_H_
-#define RANDOM_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -46,4 +45,3 @@ class Random
       unsigned seed;
 };
 
-#endif /*RANDOM_H_*/

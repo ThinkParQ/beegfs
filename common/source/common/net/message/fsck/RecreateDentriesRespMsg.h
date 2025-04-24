@@ -1,5 +1,4 @@
-#ifndef RECREATEDENTRIESRESPMSG_H
-#define RECREATEDENTRIESRESPMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirEntry.h>
 #include <common/fsck/FsckFileInode.h>
@@ -60,4 +59,3 @@ class RecreateDentriesRespMsg : public NetMessageSerdes<RecreateDentriesRespMsg>
 };
 
 
-#endif /*RECREATEDENTRIESRESPMSG_H*/

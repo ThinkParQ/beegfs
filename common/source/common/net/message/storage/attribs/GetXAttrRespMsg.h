@@ -1,5 +1,4 @@
-#ifndef GETXATTRRESPMSG_H_
-#define GETXATTRRESPMSG_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/net/message/NetMessage.h>
@@ -51,4 +50,3 @@ class GetXAttrRespMsg : public NetMessageSerdes<GetXAttrRespMsg>
       }
 };
 
-#endif /*GETXATTRRESPMSG_H_*/

@@ -1,10 +1,8 @@
-#ifndef UNLINKFILEMSGEX_H_
-#define UNLINKFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/creating/UnlinkFileMsg.h>
 #include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
 #include <session/EntryLock.h>
-#include <storage/MetaStore.h>
 #include <net/message/MirroredMessage.h>
 
 class UnlinkFileMsgEx : public MirroredMessage<UnlinkFileMsg,
@@ -23,8 +21,18 @@ class UnlinkFileMsgEx : public MirroredMessage<UnlinkFileMsg,
       bool isMirrored() override { return getParentInfo()->getIsBuddyMirrored(); }
 
    private:
-      std::unique_ptr<ResponseState> executePrimary(ResponseContext& ctx);
-      std::unique_ptr<ResponseState> executeSecondary(ResponseContext& ctx);
+      /**
+       * Execute unlink operation on primary and secondary metadata nodes.
+       * Primary handles metadata removal, chunk cleanup, and event logging.
+       * Secondary handles only metadata operations.
+       *
+       * @param ctx Response context
+       * @param dir Parent directory reference. Functions guarantee directory reference
+       *            release before return, including error paths.
+       * @return Response state containing operation result.
+       */
+      std::unique_ptr<ResponseState> executePrimary(ResponseContext& ctx, DirInode& dir);
+      std::unique_ptr<ResponseState> executeSecondary(ResponseContext& ctx, DirInode& dir);
 
       void forwardToSecondary(ResponseContext& ctx) override;
 
@@ -35,5 +43,3 @@ class UnlinkFileMsgEx : public MirroredMessage<UnlinkFileMsg,
 
       const char* mirrorLogContext() const override { return "UnlinkFileMsgEx/forward"; }
 };
-
-#endif /*UNLINKFILEMSGEX_H_*/

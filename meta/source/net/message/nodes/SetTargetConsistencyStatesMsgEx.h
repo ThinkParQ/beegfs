@@ -1,5 +1,4 @@
-#ifndef SETTARGETCONSISTENCYSTATESMSGEX_H
-#define SETTARGETCONSISTENCYSTATESMSGEX_H
+#pragma once
 
 #include <common/net/message/nodes/SetTargetConsistencyStatesMsg.h>
 
@@ -9,4 +8,3 @@ class SetTargetConsistencyStatesMsgEx : public SetTargetConsistencyStatesMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* SETTARGETCONSISTENCYSTATESMSGEX_H */

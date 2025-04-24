@@ -1,5 +1,4 @@
-#ifndef TARGETMAPPER_H_
-#define TARGETMAPPER_H_
+#pragma once
 
 #include <common/nodes/StoragePoolStore.h>
 #include <common/nodes/TargetCapacityPools.h>
@@ -75,4 +74,3 @@ class TargetMapper
       }
 };
 
-#endif /* TARGETMAPPER_H_ */

@@ -1,5 +1,4 @@
-#ifndef BUDDYCOMMTK_H_
-#define BUDDYCOMMTK_H_
+#pragma once
 
 #include <string>
 
@@ -24,4 +23,3 @@ namespace BuddyCommTk
    bool getBuddyNeedsResync();
 };
 
-#endif

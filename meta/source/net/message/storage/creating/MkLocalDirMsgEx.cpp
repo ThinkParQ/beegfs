@@ -38,6 +38,8 @@ std::unique_ptr<MirroredMessageResponseState> MkLocalDirMsgEx::executeLocally(Re
    MetaStore* metaStore = app->getMetaStore();
    StripePattern& pattern = getPattern();
 
+   RemoteStorageTarget* rstInfo = getRemoteStorageTarget();
+
    EntryInfo *entryInfo = getEntryInfo();
    NumNodeID parentNodeID = getParentNodeID();
 
@@ -51,6 +53,16 @@ std::unique_ptr<MirroredMessageResponseState> MkLocalDirMsgEx::executeLocally(Re
    newDir.setParentInfoInitial(entryInfo->getParentEntryID(), parentNodeID);
 
    FhgfsOpsErr mkRes = metaStore->makeDirInode(newDir, getDefaultACLXAttr(), getAccessACLXAttr() );
+
+   if (!rstInfo->hasInvalidVersion() && (mkRes == FhgfsOpsErr_SUCCESS))
+   {
+      FhgfsOpsErr setRstRes = newDir.setRemoteStorageTarget(*rstInfo);
+      if (setRstRes != FhgfsOpsErr_SUCCESS)
+      {
+         LogContext("MkLocalDir").log(Log_WARNING, "Failed to set remote storage targets for "
+            "dirID: " + newDir.getID() + ". RST might be invalid.");
+      }
+   }
 
    if (mkRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
       fixInodeTimestamp(newDir, dirTimestamps);

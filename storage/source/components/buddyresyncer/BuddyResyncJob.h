@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCJOB_H_
-#define BUDDYRESYNCJOB_H_
+#pragma once
 
 #include <common/storage/mirroring/BuddyResyncJobStatistics.h>
 #include <components/buddyresyncer/BuddyResyncerDirSyncSlave.h>
@@ -89,4 +88,3 @@ typedef std::map<uint16_t, BuddyResyncJob*> BuddyResyncJobMap; //mapping: target
 typedef BuddyResyncJobMap::iterator BuddyResyncJobMapIter;
 
 
-#endif /* BUDDYRESYNCJOB_H_ */

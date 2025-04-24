@@ -1,5 +1,4 @@
-#ifndef COMMON_GETMETARESYNCJOBSTATSMSG_H
-#define COMMON_GETMETARESYNCJOBSTATSMSG_H
+#pragma once
 
 #include <common/net/message/SimpleMsg.h>
 
@@ -9,4 +8,3 @@ class GetMetaResyncStatsMsg : public SimpleMsg
       GetMetaResyncStatsMsg() : SimpleMsg(NETMSGTYPE_GetMetaResyncStats) { }
 };
 
-#endif /* COMMON_GETMETARESYNCJOBSTATSMSG_H */

@@ -1,5 +1,4 @@
-#ifndef GETQUOTAINFOMSGEX_H_
-#define GETQUOTAINFOMSGEX_H_
+#pragma once
 
 
 #include <common/net/message/storage/quota/GetQuotaInfoMsg.h>
@@ -13,4 +12,3 @@ class GetQuotaInfoMsgEx : public GetQuotaInfoMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* GETQUOTAINFOMSGEX_H_ */

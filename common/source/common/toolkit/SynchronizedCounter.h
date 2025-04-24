@@ -1,5 +1,4 @@
-#ifndef SYNCHRONIZEDCOUNTER_H_
-#define SYNCHRONIZEDCOUNTER_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Mutex.h>
@@ -57,4 +56,3 @@ class SynchronizedCounter
       }
 };
 
-#endif /*SYNCHRONIZEDCOUNTER_H_*/

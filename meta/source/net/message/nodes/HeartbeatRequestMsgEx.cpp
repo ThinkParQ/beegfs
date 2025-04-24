@@ -13,9 +13,9 @@ bool HeartbeatRequestMsgEx::processIncoming(ResponseContext& ctx)
    NumNodeID rootNodeID = app->getMetaRoot().getID();
    NicAddressList nicList(localNode.getNicList());
 
-   HeartbeatMsg hbMsg(localNode.getID(), localNodeNumID, NODETYPE_Meta, &nicList);
+   HeartbeatMsg hbMsg(localNode.getAlias(), localNodeNumID, NODETYPE_Meta, &nicList);
    hbMsg.setRootNumID(rootNodeID);
-   hbMsg.setPorts(cfg->getConnMetaPortUDP(), cfg->getConnMetaPortTCP() );
+   hbMsg.setPorts(cfg->getConnMetaPort(), cfg->getConnMetaPort() );
 
    ctx.sendResponse(hbMsg);
 

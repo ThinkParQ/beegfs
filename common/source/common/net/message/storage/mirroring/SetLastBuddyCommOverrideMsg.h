@@ -1,5 +1,4 @@
-#ifndef SETLASTBUDDYCOMMOVERRIDEMSG_H_
-#define SETLASTBUDDYCOMMOVERRIDEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -57,4 +56,3 @@ class SetLastBuddyCommOverrideMsg : public NetMessageSerdes<SetLastBuddyCommOver
 
 };
 
-#endif /*SETLASTBUDDYCOMMOVERRIDEMSG_H_*/

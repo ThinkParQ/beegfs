@@ -1,5 +1,4 @@
-#ifndef OPCOUNTER_H_
-#define OPCOUNTER_H_
+#pragma once
 
 #include <common/toolkit/StringTk.h>
 #include <common/Common.h>
@@ -153,4 +152,3 @@ class StorageOpCounter : public OpCounter
 };
 
 
-#endif /* OPCOUNTER_H_ */

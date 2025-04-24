@@ -1,5 +1,4 @@
-#ifndef UPDATEDIRPARENTMSGEX1_H_
-#define UPDATEDIRPARENTMSGEX1_H_
+#pragma once
 
 #include <storage/MetaStore.h>
 #include <common/storage/StorageErrors.h>
@@ -36,4 +35,3 @@ class UpdateDirParentMsgEx : public MirroredMessage<UpdateDirParentMsg, FileIDLo
 };
 
 
-#endif /*UPDATEDIRPARENTMSGEX1_H_*/

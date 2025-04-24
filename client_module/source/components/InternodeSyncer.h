@@ -17,7 +17,6 @@
 #include <components/DatagramListener.h>
 #include <net/filesystem/RemotingIOInfo.h>
 #include <nodes/NodeStoreEx.h>
-#include <toolkit/ExternalHelperd.h>
 
 
 /*
@@ -156,7 +155,6 @@ struct InternodeSyncer
    Config* cfg;
 
    DatagramListener* dgramLis;
-   ExternalHelperd* helperd;
 
    NodeStoreEx* mgmtNodes;
    NodeStoreEx* metaNodes;

@@ -1,5 +1,4 @@
-#ifndef CLOSECHUNKFILEMSGEX_H_
-#define CLOSECHUNKFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/session/opening/CloseChunkFileMsg.h>
 
@@ -28,4 +27,3 @@ class CloseChunkFileMsgEx : public CloseChunkFileMsg
       std::pair<FhgfsOpsErr, DynamicAttribs> close(ResponseContext& ctx);
 };
 
-#endif /*CLOSECHUNKFILEMSGEX_H_*/

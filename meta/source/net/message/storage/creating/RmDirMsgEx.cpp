@@ -132,10 +132,9 @@ std::unique_ptr<RmDirMsgEx::ResponseState> RmDirMsgEx::rmDir(ResponseContext& ct
 
    if (!isSecondary && retVal == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
    {
-         app->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  outDelEntryInfo.getEntryID(),
-                  outDelEntryInfo.getParentEntryID());
+      EventContext eventCtx = makeEventContext(&outDelEntryInfo, outDelEntryInfo.getParentEntryID(),
+         getMsgHeaderUserID(), "", 0, isSecondary);
+      logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    if (retVal == FhgfsOpsErr_SUCCESS && modEventLoggingEnabled)

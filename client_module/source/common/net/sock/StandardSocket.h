@@ -1,7 +1,6 @@
 #ifndef OPEN_STANDARDSOCKET_H_
 #define OPEN_STANDARDSOCKET_H_
 
-#include <common/external/sdp_inet.h>
 #include <common/toolkit/StringTk.h>
 #include <common/toolkit/Time.h>
 #include <common/Common.h>
@@ -17,7 +16,6 @@ extern __must_check bool StandardSocket_init(StandardSocket* this, int domain, i
 extern StandardSocket* StandardSocket_construct(int domain, int type, int protocol);
 extern StandardSocket* StandardSocket_constructUDP(void);
 extern StandardSocket* StandardSocket_constructTCP(void);
-extern StandardSocket* StandardSocket_constructSDP(void);
 extern void _StandardSocket_uninit(Socket* this);
 
 int StandardSocket_getSoRcvBuf(StandardSocket* this);

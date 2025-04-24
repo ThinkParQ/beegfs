@@ -1,5 +1,4 @@
-#ifndef RETRIEVEFSIDSMSGEX_H
-#define RETRIEVEFSIDSMSGEX_H
+#pragma once
 
 #include <common/net/message/fsck/RetrieveFsIDsMsg.h>
 #include <common/net/message/fsck/RetrieveFsIDsRespMsg.h>
@@ -10,4 +9,3 @@ class RetrieveFsIDsMsgEx : public RetrieveFsIDsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*RETRIEVEFSIDSMSGEX_H*/

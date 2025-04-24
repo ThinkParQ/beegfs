@@ -1,5 +1,4 @@
-#ifndef COMMON_UNIXCONNWORKER_H_
-#define COMMON_UNIXCONNWORKER_H_
+#pragma once
 
 
 #include <common/components/ComponentInitException.h>
@@ -51,4 +50,3 @@ class UnixConnWorker : public PThread
       }
 };
 
-#endif /* COMMON_UNIXCONNWORKER_H_ */

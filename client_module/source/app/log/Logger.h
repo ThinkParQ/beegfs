@@ -9,7 +9,6 @@
 #include <common/threading/Mutex.h>
 #include <common/Common.h>
 #include <common/Common.h>
-#include <toolkit/ExternalHelperd.h>
 
 
 #define LOGGER_LOGBUF_SIZE          1000 /* max log message length */
@@ -85,15 +84,11 @@ extern void Logger_logTopErrFormatted(Logger* this, LogTopic logTopic, const cha
 extern LogLevel Logger_getLogLevel(Logger* this);
 extern LogLevel Logger_getLogTopicLevel(Logger* this, LogTopic logTopic);
 
-extern void __Logger_logTopGrantedUnlocked( Logger* this, LogTopic logTopic, LogLevel level,
-   const char* context, const char* msg);
 extern void __Logger_logTopFormattedGranted(Logger* this, LogTopic logTopic, LogLevel level,
    const char* context, const char* msgFormat, va_list args);
 
 extern bool __Logger_checkThreadMultiLock(Logger* this);
 extern void __Logger_setCurrentOutputPID(Logger* this, pid_t pid);
-extern void __Logger_logReachableLoggerd(Logger* this);
-extern void __Logger_logUnreachableLoggerd(Logger* this);
 
 
 // static
@@ -146,7 +141,7 @@ typedef signed char LogTopicLevels[LogTopic_LAST]; /* array for per-topic log le
 
 
 /**
- *  This is the general logger class. It can to log to helperd or to syslog.
+ *  This is the general logger class.
  */
 struct Logger
 {
@@ -160,9 +155,6 @@ struct Logger
 
    Mutex multiLockMutex; // to avoid multiple locking of the outputMutex by the same thread
    pid_t currentOutputPID; // pid of outputMutex holder (see LOGGER_PID_NOCURRENTOUTPUT)
-
-   struct Node* loggerdNode; // can be NULL (e.g. during app destruction)
-   bool loggerdReachable;
 
    char* logFormattedBuf; // for logging functions with variable argument list
    char* logContextBuf; // for extended context logging

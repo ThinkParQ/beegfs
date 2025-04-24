@@ -1,5 +1,4 @@
-#ifndef STORAGEBENCHSLAVE_H_
-#define STORAGEBENCHSLAVE_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/benchmark/StorageBench.h>
@@ -144,4 +143,3 @@ class StorageBenchSlave : public PThread
       }
 };
 
-#endif /* STORAGEBENCHSLAVE_H_ */

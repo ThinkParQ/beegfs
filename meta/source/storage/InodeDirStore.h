@@ -1,5 +1,4 @@
-#ifndef INODEDIRSTORE_H_
-#define INODEDIRSTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Mutex.h>
@@ -93,4 +92,3 @@ class InodeDirStore
       bool cacheSweepUnlocked(bool isSyncSweep);
 };
 
-#endif /*INODEDIRSTORE_H_*/

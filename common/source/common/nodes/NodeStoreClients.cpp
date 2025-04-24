@@ -33,7 +33,7 @@ NodeStoreResult NodeStoreClients::addOrUpdateNode(NodeHandle node)
 NodeStoreResult NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* outNodeNumID)
 {
    NumNodeID nodeNumID = node->getNumID();
-   std::string nodeID = node->getID();
+   std::string nodeID = node->getAlias();
 
    const std::lock_guard<Mutex> lock(mutex);
 
@@ -58,11 +58,11 @@ NodeStoreResult NodeStoreClients::addOrUpdateNodeEx(NodeHandle node, NumNodeID* 
       Node& active = *activeIter->second;
       NicAddressList nicList(node->getNicList());
 
-      if (unlikely(active.getID() != nodeID))
+      if (unlikely(active.getAlias() != nodeID))
       { // bad: numeric ID collision for two different node string IDs
          LogContext(__func__).logErr(
             std::string("Numeric ID collision for two different string IDs: ") + nodeID + " / "
-               + active.getID());
+               + active.getAlias());
 
          nodeNumID = NumNodeID(); // set to invalid ID, so caller hopefully checks outNodeNumID
       }

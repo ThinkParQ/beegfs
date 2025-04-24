@@ -182,7 +182,7 @@ void Cassandra::insertMetaNodeData(std::shared_ptr<Node> node, const MetaNodeDat
    else
       statement << ") ";
    statement << "VALUES (";
-   statement << "TOTIMESTAMP(NOW()), " << node->getNumID() << ", '" << node->getID() << "', ";
+   statement << "TOTIMESTAMP(NOW()), " << node->getNumID() << ", '" << node->getAlias() << "', ";
    statement << std::boolalpha << data.isResponding;
    if (data.isResponding)
       statement << ", " << data.indirectWorkListSize << ", " << data.directWorkListSize << ") ";
@@ -204,7 +204,7 @@ void Cassandra::insertStorageNodeData(std::shared_ptr<Node> node,
    else
       statement << ") ";
    statement << "VALUES (";
-   statement << "TOTIMESTAMP(NOW()), " << node->getNumID() << ", '" << node->getID() << "', ";
+   statement << "TOTIMESTAMP(NOW()), " << node->getNumID() << ", '" << node->getAlias() << "', ";
    statement << std::boolalpha << data.isResponding;
    if (data.isResponding)
       statement << ", " << data.indirectWorkListSize << ", " << data.directWorkListSize << ", "
@@ -224,7 +224,7 @@ void Cassandra::insertHighResMetaNodeData(std::shared_ptr<Node> node,
    statement << "INSERT INTO highResMeta ";
    statement << "(time, nodeNumID, nodeID, workRequests, ";
    statement << "queuedRequests, netSendBytes, netRecvBytes) VALUES (";
-   statement << data.rawVals.statsTimeMS << ", " << node->getNumID() << ", '" << node->getID() << "', ";
+   statement << data.rawVals.statsTimeMS << ", " << node->getNumID() << ", '" << node->getAlias() << "', ";
    statement << data.incVals.workRequests << ", " << data.rawVals.queuedRequests << ", ";
    statement << data.incVals.netSendBytes << ", " << data.incVals.netRecvBytes << ") ";
    statement << "USING TTL " << config.TTLSecs << ";";
@@ -239,7 +239,7 @@ void Cassandra::insertHighResStorageNodeData(std::shared_ptr<Node> node,
    statement << "INSERT INTO highResStorage ";
    statement << "(time, nodeNumID, nodeID, workRequests, ";
    statement << "queuedRequests, diskWriteBytes, diskReadBytes, netSendBytes, netRecvBytes) VALUES (";
-   statement << data.rawVals.statsTimeMS << ", " << node->getNumID() << ", '" << node->getID() << "', ";
+   statement << data.rawVals.statsTimeMS << ", " << node->getNumID() << ", '" << node->getAlias() << "', ";
    statement << data.incVals.workRequests << ", " << data.rawVals.queuedRequests << ", ";
    statement << data.incVals.diskWriteBytes << ", " << data.incVals.diskReadBytes << ", ";
    statement << data.incVals.netSendBytes << ", " << data.incVals.netRecvBytes << ") ";
@@ -255,7 +255,7 @@ void Cassandra::insertStorageTargetsData(std::shared_ptr<Node> node,
    statement << "INSERT INTO storageTargetData ";
    statement << "(time, nodeNumID, nodeID, storageTargetID, ";
    statement << "diskSpaceTotal, diskSpaceFree, inodesTotal, inodesFree) VALUES (";
-   statement << "TOTIMESTAMP(NOW()), " << node->getNumID() << ", '" << node->getID() << "', ";
+   statement << "TOTIMESTAMP(NOW()), " << node->getNumID() << ", '" << node->getAlias() << "', ";
    statement << data.getTargetID() << ", ";
    statement << data.getDiskSpaceTotal() << ", " << data.getDiskSpaceFree() << ", ";
    statement << data.getInodesTotal() << ", " << data.getInodesFree() << ") ";

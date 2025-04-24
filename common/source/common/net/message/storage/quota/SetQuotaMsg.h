@@ -1,5 +1,4 @@
-#ifndef SETQUOTAMSG_H_
-#define SETQUOTAMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -52,4 +51,3 @@ class SetQuotaMsg: public NetMessageSerdes<SetQuotaMsg>
       }
 };
 
-#endif /* SETQUOTAMSG_H_ */

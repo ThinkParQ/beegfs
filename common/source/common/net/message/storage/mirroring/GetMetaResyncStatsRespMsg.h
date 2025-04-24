@@ -1,5 +1,4 @@
-#ifndef COMMON_GETMETARESYNCSTATSRESPMSG_H
-#define COMMON_GETMETARESYNCSTATSRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/mirroring/BuddyResyncJobStatistics.h>
@@ -36,4 +35,3 @@ class GetMetaResyncStatsRespMsg : public NetMessageSerdes<GetMetaResyncStatsResp
       }
 };
 
-#endif /* COMMON_GETMETARESYNCSTATSRESPMSG_H */

@@ -1,5 +1,4 @@
-#ifndef REMOVEBUDDYGROUPRESPMSG_H_
-#define REMOVEBUDDYGROUPRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -29,4 +28,3 @@ class RemoveBuddyGroupRespMsg : public NetMessageSerdes<RemoveBuddyGroupRespMsg>
       FhgfsOpsErr getResult() const { return result; }
 };
 
-#endif

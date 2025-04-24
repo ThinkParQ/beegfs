@@ -1,5 +1,4 @@
-#ifndef MSGHELPERLOCKENTRY_H_
-#define MSGHELPERLOCKENTRY_H_
+#pragma once
 
 #include <common/storage/EntryInfo.h>
 #include <common/storage/StorageErrors.h>
@@ -26,4 +25,3 @@ class MsgHelperLocking
 };
 
 
-#endif /* MSGHELPERLOCKENTRY_H_ */

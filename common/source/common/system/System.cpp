@@ -9,10 +9,11 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
-
+#include <boost/format.hpp>
 
 Mutex System::strerrorMutex;
 
@@ -365,6 +366,49 @@ uint64_t System::getUsableMemorySize()
 
    return memFree+memCached;
 }
+
+/*
+ * Public method to get the device path for a file system mounted at mountpoint
+ *
+ * @param mountpoint the mountpoint to get the file system UUID for
+ * @return string the device path for the device that holds the file system mounted at mountpoint
+ */
+ std::string System::getDevicePathFromMountpoint(std::string mountpoint) {
+   // Find out device numbers of underlying device
+   struct stat st;
+
+   if (stat(mountpoint.c_str(), &st)) {
+      throw InvalidConfigException("Could not stat mountpoint directory: " + mountpoint);
+   }
+
+   // look for the device path
+   std::ifstream mountInfo("/proc/self/mountinfo");
+
+   if (!mountInfo) {
+      throw InvalidConfigException("Could not open /proc/self/mountinfo");
+   }
+
+   auto majmin_f = boost::format("%1%:%2%") % major(st.st_dev) % minor(st.st_dev);
+
+   std::string line, device_path, device_majmin;
+   while (std::getline(mountInfo, line)) {
+      std::istringstream is(line);
+      std::string dummy;
+      is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;
+
+      if (majmin_f.str() == device_majmin)
+         break;
+
+      device_path = "";
+   }
+
+   if (device_path.empty()) {
+      throw InvalidConfigException("Determined the underlying device for directory " + mountpoint + " is " + majmin_f.str() + " but could not find that device in /proc/self/mountinfo");
+   }
+
+   return device_path;
+}
+
 
 /*
  * resolves the given UID (user ID) to the user name.

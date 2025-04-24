@@ -1,5 +1,4 @@
-#ifndef GENERICDEBUGMSGEX_H_
-#define GENERICDEBUGMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/GenericDebugMsg.h>
 
@@ -23,4 +22,3 @@ class GenericDebugMsgEx : public GenericDebugMsg
       std::string processOpSetRejectionRate(std::istringstream& commandStream);
 };
 
-#endif /* GENERICDEBUGMSGEX_H_ */

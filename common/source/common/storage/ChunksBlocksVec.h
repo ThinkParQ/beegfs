@@ -1,5 +1,4 @@
-#ifndef CHUNKBLOCKSVEC_H_
-#define CHUNKBLOCKSVEC_H_
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 #include <common/app/log/LogContext.h>
@@ -91,4 +90,3 @@ class ChunksBlocksVec
 };
 
 
-#endif /* CHUNKBLOCKSVEC_H_ */

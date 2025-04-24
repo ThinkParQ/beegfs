@@ -1,12 +1,48 @@
 # BeeGFS Parallel File System
-BeeGFS (formerly FhGFS) is the leading parallel cluster file system,
-developed with a strong focus on performance and designed for very easy
-installation and management.
-If I/O intensive workloads are your problem, BeeGFS is the solution.
+BeeGFS (formerly FhGFS) is the leading parallel cluster file system, developed with a strong focus
+on performance and designed for very easy installation and management. If I/O intensive workloads
+are your problem, BeeGFS is the solution.
 
 Homepage: https://www.beegfs.io
 
-# Build Instructions
+Documentation: https://doc.beegfs.io/
+
+# Getting Started with BeeGFS
+
+## How do I download BeeGFS?
+
+If you don't need/want to build BeeGFS from sources, prebuilt packages for both x86 and ARM [are
+available](https://www.beegfs.io/c/download/) for many popular Linux distributions.
+
+## How do I build BeeGFS from sources?
+
+Prior to BeeGFS 8, all development happened in a private Git repository, with the source code for
+each release squashed into a single commit in the public Git repository. As part of BeeGFS 8, the
+opportunity came up to rewrite some components and make the full history of the new components
+public. For this to happen the source code is split across these repositories:
+
+* `beegfs` - The main public repository containing all original C/C++ components, notably the
+  Metadata and Storage services along with the Client kernel module and file system checker.
+* `beegfs-rust` - New BeeGFS components written in Rust, notably the Management service.
+* `beegfs-go` - New BeeGFS components written in Go, notably the BeeGFS command-line tool (CTL).
+* `protobuf` - Common protocol buffer and gRPC service definitions along with generated library code
+  to interact with new BeeGFS services from multiple languages including C++, Go, Rust, etc.
+  * For Go, comprehensive libraries for fully managing BeeGFS can be found in `beegfs-go`.
+
+It is only necessary to clone the repo(s) containing the component(s) you wish to modify or build
+from sources. If you wanted to build everything you would need to clone all three repositories:
+
+* `git clone git@github.com:ThinkParQ/beegfs.git`
+* `git clone git@github.com:ThinkParQ/beegfs-rust.git`
+* `git clone git@github.com:ThinkParQ/beegfs-go.git`
+
+Then refer to each repositories' README for directions on how to get started including installing any
+prerequisites and building packaged or unpackaged binaries for the components provided by that repo.
+
+Note: It is not necessary to clone the `protobuf` repo to build BeeGFS from sources. This is only
+needed to modify the protocol buffers or develop an application that integrates with BeeGFS.
+
+# Getting Started with BeeGFS C/C++ Components (this repo)
 
 ## Prerequisites
 Before building BeeGFS, install the following dependency packages:
@@ -15,7 +51,7 @@ Before building BeeGFS, install the following dependency packages:
 ```
 $ yum install libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config \
   rpm-build xfsprogs-devel zlib-devel gcc-c++ gcc \
-  redhat-lsb-core java-devel unzip libcurl-devel elfutils-libelf-devel kernel-devel \
+  redhat-lsb-core unzip libcurl-devel elfutils-libelf-devel kernel-devel \
   libblkid-devel libnl3-devel
 ```
 
@@ -141,8 +177,8 @@ $ make DISTCC=distcc
 ```
 
 # Setup Instructions
-A detailed guide on how to configure a BeeGFS system can be found in
-the BeeGFS wiki: https://www.beegfs.io/wiki/
+Detailed guides on how to configure BeeGFS can be found at
+[doc.beegfs.io](https://doc.beegfs.io/latest/index.html)
 
 # Share your thoughts
 Of course, we are curious about what you are doing with the BeeGFS sources, so

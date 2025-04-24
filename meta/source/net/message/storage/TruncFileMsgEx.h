@@ -1,5 +1,4 @@
-#ifndef TRUNCFILEMSGEX_H_
-#define TRUNCFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/TruncFileMsg.h>
 #include <common/net/message/storage/TruncFileRespMsg.h>
@@ -33,4 +32,3 @@ class TruncFileMsgEx : public MirroredMessage<TruncFileMsg, FileIDLock>
 };
 
 
-#endif /*TRUNCFILEMSGEX_H_*/

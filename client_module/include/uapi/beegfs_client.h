@@ -8,7 +8,7 @@
                                  BEEGFS_IOCTL_TEST_STRING that is exchanged, but that is no problem
                                  in this particular case and so we keep it for compatibility */
 #define BEEGFS_IOCTL_MOUNTID_BUFLEN     256
-#define BEEGFS_IOCTL_NODESTRID_BUFLEN   256
+#define BEEGFS_IOCTL_NODEALIAS_BUFLEN   256 // The alias (formerly string ID) buffer length.
 #define BEEGFS_IOCTL_NODETYPE_BUFLEN    16
 #define BEEGFS_IOCTL_FILENAME_MAXLEN    256 // max supported filename len (incl terminating zero)
 
@@ -221,8 +221,8 @@ struct BeegfsIoctl_GetStripeTarget_Arg
 
    uint16_t outTargetNumID; // (out-value) numeric ID of target with given index
    uint16_t outNodeNumID;   // (out-value) numeric ID of node to which this target is mapped
-   char outNodeStrID[BEEGFS_IOCTL_NODESTRID_BUFLEN]; /* (out-value) string ID of node to which this
-                                                       target is mapped */
+   char outNodeAlias[BEEGFS_IOCTL_NODEALIAS_BUFLEN]; /* (out-value) alias (formerly string ID) of the node
+                                                       to which this target is mapped */
 };
 
 struct BeegfsIoctl_GetStripeTargetV2_Arg
@@ -239,8 +239,8 @@ struct BeegfsIoctl_GetStripeTargetV2_Arg
    uint32_t primaryNodeID; // node ID of target (if unmirrored) or primary target (if mirrored)
    uint32_t secondaryNodeID; // node ID of secondary target, or 0 if unmirrored
 
-   char primaryNodeStrID[BEEGFS_IOCTL_NODESTRID_BUFLEN];
-   char secondaryNodeStrID[BEEGFS_IOCTL_NODESTRID_BUFLEN];
+   char primaryNodeAlias[BEEGFS_IOCTL_NODEALIAS_BUFLEN];
+   char secondaryNodeAlias[BEEGFS_IOCTL_NODEALIAS_BUFLEN];
 };
 
 /* used to pass information for file creation with stripe hints */

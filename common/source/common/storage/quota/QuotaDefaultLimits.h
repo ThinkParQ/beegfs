@@ -1,5 +1,4 @@
-#ifndef COMMON_QUOTADEFAULTLIMITS_H_
-#define COMMON_QUOTADEFAULTLIMITS_H_
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 #include <string>
@@ -109,4 +108,3 @@ class QuotaDefaultLimits
       }
 };
 
-#endif /* COMMON_QUOTADEFAULTLIMITS_H_ */

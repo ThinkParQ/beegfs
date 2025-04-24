@@ -1,5 +1,4 @@
-#ifndef MOVINGFILEINSERTRESPMSG_H_
-#define MOVINGFILEINSERTRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/striping/StripePattern.h>
@@ -70,4 +69,3 @@ class MovingFileInsertRespMsg : public NetMessageSerdes<MovingFileInsertRespMsg>
       }
 };
 
-#endif /*MOVINGFILEINSERTRESPMSG_H_*/

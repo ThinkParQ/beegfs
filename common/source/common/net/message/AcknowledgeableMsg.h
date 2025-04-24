@@ -1,5 +1,4 @@
-#ifndef ACKNOWLEDGEABLEMSG_H_
-#define ACKNOWLEDGEABLEMSG_H_
+#pragma once
 
 #include "NetMessage.h"
 #include <common/net/message/control/AckMsg.h>
@@ -86,4 +85,3 @@ class AcknowledgeableMsgSerdes : public AcknowledgeableMsg
       }
 };
 
-#endif /* ACKNOWLEDGEABLEMSG_H_ */

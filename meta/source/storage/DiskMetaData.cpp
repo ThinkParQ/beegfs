@@ -362,7 +362,10 @@ void DiskMetaData::serializeDentryV4(Serializer& ser)
       % stripePattern;
 
    if (inodeData->getInodeFeatureFlags() & FILEINODE_FEATURE_HAS_VERSIONS)
-      ser % inodeData->getVersion();
+   {
+      ser % inodeData->getFileVersion();
+      ser % inodeData->getMetaVersion();
+   }
 }
 
 /**
@@ -427,8 +430,10 @@ void DiskMetaData::deserializeDentryV4(Deserializer& des)
    }
 
    if (inodeFeatureFlags & FILEINODE_FEATURE_HAS_VERSIONS)
-      des % inodeData->version;
-
+   {
+      des % inodeData->fileVersion;
+      des % inodeData->metaVersion;
+   }
    inodeData->addInodeFeatureFlag(FILEINODE_FEATURE_HAS_VERSIONS);
 
    // sanity checks
@@ -456,7 +461,18 @@ void DiskMetaData::serializeDentryV6(Serializer& ser)
    uint32_t inodeFeatureFlags   = inodeData->getInodeFeatureFlags();
 
    ser % inodeFeatureFlags;
-   ser.skip(4); // unused (4 bytes) for 8 byte alignment
+
+   if (inodeFeatureFlags & FILEINODE_FEATURE_HAS_DATA_STATE)
+   {
+      ser % inodeData->getFileDataState();
+      ser.skip(3); // unused (3 bytes) for 8 byte alignment
+   }
+   else
+   {
+      // unused, for alignment
+      ser.skip(4);
+   }
+
    ser % statData->serializeAs(StatDataFormat_FILEINODE);
 
    if (inodeFeatureFlags & FILEINODE_FEATURE_HAS_ORIG_UID)
@@ -470,8 +486,12 @@ void DiskMetaData::serializeDentryV6(Serializer& ser)
       % stripePattern;
 
    if (inodeData->getInodeFeatureFlags() & FILEINODE_FEATURE_HAS_VERSIONS)
-      ser % inodeData->getVersion();
+   {
+      ser % inodeData->getFileVersion();
+      ser % inodeData->getMetaVersion();
+   }
 }
+      
 
 /**
  * Deserialize dentries, which have the V5 or V6 format. Both include inlined inodes and have the
@@ -501,8 +521,21 @@ void DiskMetaData::deserializeDentryV5V6(Deserializer& des, bool hasStoragePool)
       this->inodeData->setInodeFeatureFlags(inodeFeatureFlags);
    }
 
-   // unused, for alignment
-   des.skip(4);
+   if (inodeFeatureFlags & FILEINODE_FEATURE_HAS_DATA_STATE)
+   {
+      uint8_t state;
+
+      des % state;
+      this->inodeData->setFileDataState(state);
+
+      // unused, for alignment
+      des.skip(3);
+   }
+   else
+   {
+      // unused, for alignment
+      des.skip(4);
+   }
 
    StatData* statData = this->inodeData->getInodeStatData();
 
@@ -558,8 +591,10 @@ void DiskMetaData::deserializeDentryV5V6(Deserializer& des, bool hasStoragePool)
    }
 
    if (inodeFeatureFlags & FILEINODE_FEATURE_HAS_VERSIONS)
-      des % inodeData->version;
-
+   {
+      des % inodeData->fileVersion;
+      des % inodeData->metaVersion;
+   }
    inodeData->addInodeFeatureFlag(FILEINODE_FEATURE_HAS_VERSIONS);
 }
 
@@ -789,7 +824,7 @@ unsigned DiskMetaData::getSupportedDentryV5FileInodeFeatureFlags()
 {
    return FILEINODE_FEATURE_MIRRORED | FILEINODE_FEATURE_BUDDYMIRRORED |
       FILEINODE_FEATURE_HAS_ORIG_PARENTID | FILEINODE_FEATURE_HAS_ORIG_UID |
-      FILEINODE_FEATURE_HAS_VERSIONS;
+      FILEINODE_FEATURE_HAS_VERSIONS | FILEINODE_FEATURE_HAS_RST | FILEINODE_FEATURE_HAS_DATA_STATE;
 }
 
 /**
@@ -798,7 +833,7 @@ unsigned DiskMetaData::getSupportedDentryV5FileInodeFeatureFlags()
 unsigned DiskMetaData::getSupportedDirInodeFeatureFlags()
 {
    return DIRINODE_FEATURE_EARLY_SUBDIRS | DIRINODE_FEATURE_MIRRORED | DIRINODE_FEATURE_STATFLAGS |
-      DIRINODE_FEATURE_BUDDYMIRRORED;
+      DIRINODE_FEATURE_BUDDYMIRRORED | DIRINODE_FEATURE_HAS_RST;
 }
 
 /**

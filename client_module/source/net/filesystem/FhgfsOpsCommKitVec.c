@@ -79,6 +79,9 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
       in case of buddy-mirroring, because we need the mirror group ID for the msg and for retries */
 
    loff_t offset = FhgfsOpsCommKitVec_getOffset(comm);
+   // nodeAndType is not set until later after calling NodeStoreEx_referenceNodeByTargetID. 
+   // Don't use it before then!
+   NodeString nodeAndType;
 
    comm->read.reqLen = FhgfsOpsCommKitVec_getRemainingDataSize(comm);
 
@@ -114,6 +117,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
       goto outErr;
    }
 
+   Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
    connPool = Node_getConnPool(comm->node);
 
    // connect
@@ -124,16 +128,14 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
       {
          Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_DEBUG,
             commHelper->logContext, "Connect to server canceled by pending signal: %s",
-            Node_getNodeIDWithTypeStr(comm->node) );
-
+            nodeAndType.buf);
          comm->nodeResult = FhgfsOpsErr_INTERRUPTED;
       }
       else
       {
          Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING,
             commHelper->logContext, "Unable to connect to server: %s",
-            Node_getNodeIDWithTypeStr(comm->node) );
-
+            nodeAndType.buf);
       }
 
       needCleanup = true;
@@ -142,7 +144,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
       "Acquire read node: %s offset: %lli size: %zu",
-      Node_getNodeIDWithTypeStr(comm->node), offset, comm->read.reqLen);
+      nodeAndType.buf, offset, comm->read.reqLen);
 
    // prepare message
    ReadLocalFileV2Msg_initFromSession(&readMsg, localNodeNumID,
@@ -187,7 +189,7 @@ void __FhgfsOpsCommKitVec_readfileStagePREPARE(CommKitVecHelper* commHelper,
    if(unlikely(sendRes <= 0) )
    {
       Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING, commHelper->logContext,
-         "Failed to send message to %s: %s", Node_getNodeIDWithTypeStr(comm->node),
+         "Failed to send message to %s: %s", nodeAndType.buf,
          Socket_getPeername(comm->sock) );
 
       isSocketException = true;
@@ -221,6 +223,8 @@ void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
    bool needCleanup = false;
 
    Config* cfg = App_getConfig(commHelper->app);
+   NodeString alias;
+   Node_copyAlias(comm->node, &alias);
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__, "enter");
 
@@ -228,9 +232,11 @@ void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
 
    if(unlikely(recvRes <= 0) )
    { // error
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
       Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING, commHelper->logContext,
          "Failed to receive length info from %s: %s",
-         Node_getNodeIDWithTypeStr(comm->node), Socket_getPeername(comm->sock) );
+         nodeAndType.buf, Socket_getPeername(comm->sock) );
 
       isSocketException = true;
       goto outErr;
@@ -240,7 +246,7 @@ void __FhgfsOpsCommKitVec_readfileStageRECVHEADER(CommKitVecHelper* commHelper,
    Serialization_deserializeInt64(&ctx, &lengthInfo);
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, commHelper->logContext,
-      "Received lengthInfo from %s: %lld", Node_getID(comm->node), (long long)lengthInfo);
+      "Received lengthInfo from %s: %lld", alias.buf, (long long)lengthInfo);
 
 #if (BEEGFS_COMMKIT_DEBUG & COMMKIT_DEBUG_READ_HEADER)
    if (recvRes > 0 && jiffies % CommKitErrorInjectRate == 0)
@@ -413,6 +419,8 @@ void __FhgfsOpsCommKitVec_handleReadError(CommKitVecHelper* commHelper, FhgfsCom
    }
    else
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
       if (recvRes > 0)
       {  /* requestLength < pageLength && comm->read.receivedLength < comm->read.serverSize */
          comm->nodeResult = -FhgfsOpsErr_INTERNAL;
@@ -421,20 +429,20 @@ void __FhgfsOpsCommKitVec_handleReadError(CommKitVecHelper* commHelper, FhgfsCom
       { // timeout
          Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
             "Communication timeout in RECVDATA stage. Node: %s",
-            Node_getNodeIDWithTypeStr(comm->node) );
+            nodeAndType.buf);
          comm->nodeResult = -FhgfsOpsErr_COMMUNICATION;
       }
       else
       { // error
          Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
             "Communication error in RECVDATA stage. Node: %s (recv result: %lld)",
-            Node_getNodeIDWithTypeStr(comm->node), (long long)recvRes);
+            nodeAndType.buf, (long long)recvRes);
 
          comm->nodeResult = -FhgfsOpsErr_INTERNAL;
       }
 
       Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_SPAM, commHelper->logContext,
-         "Request details: missingLength of %s: %lld", Node_getNodeIDWithTypeStr(comm->node),
+         "Request details: missingLength of %s: %lld", nodeAndType.buf,
          (long long)missingPgLen);
    }
 
@@ -453,9 +461,12 @@ void __FhgfsOpsCommKitVec_readfileStageSOCKETEXCEPTION(CommKitVecHelper* commHel
    size_t remainingDataSize = FhgfsOpsCommKitVec_getRemainingDataSize(comm);
    loff_t offset            = FhgfsOpsCommKitVec_getOffset(comm);
 
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
+
    Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, commHelper->logContext,
       "%s: Sent request: node: %s; fileHandleID: %s; offset: %lld; size: %zd",
-      logCommErrTxt, Node_getNodeIDWithTypeStr(comm->node), commHelper->ioInfo->fileHandleID,
+      logCommErrTxt, nodeAndType.buf, commHelper->ioInfo->fileHandleID,
       (long long) offset, remainingDataSize );
 
    NodeConnPool_invalidateStreamSocket(Node_getConnPool(comm->node), comm->sock);
@@ -482,8 +493,10 @@ void __FhgfsOpsCommKitVec_readfileStageCLEANUP(CommKitVecHelper* commHelper,
 
    if (comm->sock)
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
-         "Release socket, read node: %s", Node_getNodeIDWithTypeStr(comm->node) );
+         "Release socket, read node: %s", nodeAndType.buf);
 
       NodeConnPool_releaseStreamSocket(Node_getConnPool(comm->node), comm->sock);
       comm->sock = NULL;
@@ -606,6 +619,10 @@ void __FhgfsOpsCommKitVec_writefileStagePREPARE(CommKitVecHelper* commHelper,
    size_t remainingDataSize = FhgfsOpsCommKitVec_getRemainingDataSize(comm);
    loff_t offset            = FhgfsOpsCommKitVec_getOffset(comm);
 
+   // nodeAndType is not set until later after calling NodeStoreEx_referenceNodeByTargetID. 
+   // Don't use it before then!
+   NodeString nodeAndType;
+
    comm->sock = NULL;
    comm->nodeResult = -FhgfsOpsErr_COMMUNICATION;
 
@@ -635,27 +652,30 @@ void __FhgfsOpsCommKitVec_writefileStagePREPARE(CommKitVecHelper* commHelper,
       goto outErr;
    }
 
+   Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
    connPool = Node_getConnPool(comm->node);
 
    // connect
    comm->sock = NodeConnPool_acquireStreamSocketEx(connPool, true, NULL);
    if(!comm->sock)
    {  // connection error
-      if (fatal_signal_pending(current))
+      if (fatal_signal_pending(current)) {
          Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_DEBUG,
             commHelper->logContext, "Connect to server canceled by pending signal: %s",
-            Node_getNodeIDWithTypeStr(comm->node) );
-      else
+            nodeAndType.buf);
+      }
+      else {
          Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING,
             commHelper->logContext, "Unable to connect to server: %s",
-            Node_getNodeIDWithTypeStr(comm->node) );
+            nodeAndType.buf);
+      }
 
       goto outErr;
    }
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_SPAM, __func__,
       "Acquire write state: node: %s offset: %lld size: %zd",
-      Node_getNodeIDWithTypeStr(comm->node), (long long) offset, remainingDataSize);
+      nodeAndType.buf, (long long) offset, remainingDataSize);
 
    // prepare message
    WriteLocalFileMsg_initFromSession(&writeMsg, localNodeNumID,
@@ -725,8 +745,10 @@ void __FhgfsOpsCommKitVec_writefileStageSENDHEADER(CommKitVecHelper* commHelper,
 
    if(unlikely(sendRes <= 0) )
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
       Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING, commHelper->logContext,
-         "Failed to send message to %s: %s", Node_getNodeIDWithTypeStr(comm->node),
+         "Failed to send message to %s: %s", nodeAndType.buf,
          Socket_getPeername(comm->sock) );
 
       goto outErr;
@@ -800,6 +822,8 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
 
       if (unlikely(sendDataPartRes <= 0) )
       {
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
          if(sendDataPartRes == -EFAULT)
          { // bad buffer address given
             Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_DEBUG,
@@ -813,17 +837,18 @@ void __FhgfsOpsCommKitVec_writefileStageSENDDATA(CommKitVecHelper* commHelper,
          Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
             "Communication error in SENDDATA stage. "
             "Node: %s; Request details: %zu/%u pages",
-            Node_getNodeIDWithTypeStr(comm->node), vecIdx, FhgfsChunkPageVec_getSize(pageVec) );
-
+            nodeAndType.buf, vecIdx, FhgfsChunkPageVec_getSize(pageVec) );
 
          goto outErr;
       }
 
       if (sendDataPartRes < dataLength)
       {
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
          Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
             "Error/Bug: Node: %s; Less data sent than requested; Request details: %zu/%u pages",
-            Node_getNodeIDWithTypeStr(comm->node), vecIdx, FhgfsChunkPageVec_getSize(pageVec) );
+            nodeAndType.buf, vecIdx, FhgfsChunkPageVec_getSize(pageVec) );
 
          goto outErr;
       }
@@ -863,11 +888,14 @@ void __FhgfsOpsCommKitVec_writefileStageRECV(CommKitVecHelper* commHelper,
    if(unlikely(respRes <= 0) )
    { // receive failed
       // note: signal pending log msg will be printed in stage SOCKETEXCEPTION, so no need here
-      if (!fatal_signal_pending(current))
+      if (!fatal_signal_pending(current)) {
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
          Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING,
             commHelper->logContext,
-            "Receive failed from: %s @ %s", Node_getNodeIDWithTypeStr(comm->node),
+            "Receive failed from: %s @ %s", nodeAndType.buf,
             Socket_getPeername(comm->sock) );
+      }
 
       isSocketException = true;
       goto outErr;
@@ -883,10 +911,12 @@ void __FhgfsOpsCommKitVec_writefileStageRECV(CommKitVecHelper* commHelper,
 
       if(unlikely(!deserRes) )
       { // response invalid
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
          Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_WARNING,
             commHelper->logContext,
             "Received invalid response from %s. Expected type: %d. Disconnecting: %s",
-            Node_getNodeIDWithTypeStr(comm->node), NETMSGTYPE_WriteLocalFileResp,
+            nodeAndType.buf, NETMSGTYPE_WriteLocalFileResp,
             Socket_getPeername(comm->sock) );
 
          isSocketException = true;
@@ -920,13 +950,15 @@ void __FhgfsOpsCommKitVec_writefileStageSOCKETEXCEPTION(CommKitVecHelper* commHe
 {
    const char* logCommInterruptedTxt = "Communication interrupted by signal";
    const char* logCommErrTxt = "Communication error";
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
 
    LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, __func__, "enter");
 
    if (fatal_signal_pending(current))
    { // interrupted by signal
       Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_NOTICE, commHelper->logContext,
-         "%s. Node: %s", logCommInterruptedTxt, Node_getNodeIDWithTypeStr(comm->node) );
+         "%s. Node: %s", logCommInterruptedTxt, nodeAndType.buf);
    }
    else
    { // "normal" connection error
@@ -934,11 +966,11 @@ void __FhgfsOpsCommKitVec_writefileStageSOCKETEXCEPTION(CommKitVecHelper* commHe
       loff_t offset            = FhgfsOpsCommKitVec_getOffset(comm);
 
       Logger_logTopErrFormatted(commHelper->log, LogTopic_COMMKIT, commHelper->logContext,
-         "%s. Node: %s", logCommErrTxt, Node_getNodeIDWithTypeStr(comm->node) );
+         "%s. Node: %s", logCommErrTxt, nodeAndType.buf);
 
       Logger_logTopFormatted(commHelper->log, LogTopic_COMMKIT, Log_DEBUG, commHelper->logContext,
          "Sent request: node: %s; fileHandleID: %s; offset: %lld; size: %zu",
-         Node_getNodeIDWithTypeStr(comm->node), commHelper->ioInfo->fileHandleID,
+         nodeAndType.buf, commHelper->ioInfo->fileHandleID,
          (long long)offset, remainingDataSize);
    }
 
@@ -965,8 +997,10 @@ void __FhgfsOpsCommKitVec_writefileStageCLEANUP(CommKitVecHelper* commHelper,
 
    if (comm->sock)
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(comm->node, &nodeAndType);
       LOG_DEBUG_TOP_FORMATTED(commHelper->log, LogTopic_COMMKIT, 5, __func__,
-         "Release write node: %s", Node_getNodeIDWithTypeStr(comm->node) );
+         "Release write node: %s", nodeAndType.buf);
 
       NodeConnPool_releaseStreamSocket(Node_getConnPool(comm->node), comm->sock);
       comm->sock = NULL;

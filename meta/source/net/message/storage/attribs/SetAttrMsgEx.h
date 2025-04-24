@@ -1,5 +1,4 @@
-#ifndef SETATTRMSGEX_H_
-#define SETATTRMSGEX_H_
+#pragma once
 
 #include <storage/MetaStore.h>
 #include <common/storage/StorageErrors.h>
@@ -37,4 +36,3 @@ class SetAttrMsgEx : public MirroredMessage<SetAttrMsg, std::tuple<FileIDLock, F
 };
 
 
-#endif /*SETATTRMSGEX_H_*/

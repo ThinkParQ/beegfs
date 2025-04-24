@@ -1,8 +1,8 @@
-#ifndef MOVEFILEINODEMSG_H_
-#define MOVEFILEINODEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
+#include <common/storage/StatData.h>
 
 class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
 {
@@ -30,9 +30,9 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
       template<typename This, typename Ctx>
       static void serialize(This obj, Ctx& ctx)
       {
-         ctx % obj->moveMode;
-         ctx % obj->createHardlink;
          ctx
+            % obj->moveMode
+            % obj->createHardlink
             % serdes::backedPtr(obj->fromFileInfoPtr, obj->fromFileInfo);
       }
 
@@ -49,7 +49,6 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
       EntryInfo fromFileInfo;
 
    public:
-
       FileInodeMode getMode() const
       {
          return static_cast<FileInodeMode>(this->moveMode);
@@ -65,5 +64,3 @@ class MoveFileInodeMsg : public MirroredMessageBase<MoveFileInodeMsg>
          return this->fromFileInfoPtr;
       }
 };
-
-#endif /* MOVEFILEINODEMSG_H_ */

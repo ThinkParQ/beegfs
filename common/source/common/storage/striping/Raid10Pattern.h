@@ -1,5 +1,4 @@
-#ifndef RAID10PATTERN_H_
-#define RAID10PATTERN_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/nodes/StoragePoolStore.h>
@@ -157,4 +156,3 @@ class Raid10Pattern : public StripePattern
 
 };
 
-#endif /* RAID10PATTERN_H_ */

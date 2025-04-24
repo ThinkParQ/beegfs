@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILEMSGEX_H_
-#define WRITELOCALFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/session/rw/WriteLocalFileMsg.h>
 #include <common/net/message/session/rw/WriteLocalFileRespMsg.h>
@@ -212,4 +211,3 @@ class WriteLocalFileMsgSender : public WriteLocalFileMsg
 typedef WriteLocalFileMsgExBase<WriteLocalFileMsgSender,
                                 WriteLocalFileMsgSender::WriteState> WriteLocalFileMsgEx;
 
-#endif /*WRITELOCALFILEMSGEX_H_*/

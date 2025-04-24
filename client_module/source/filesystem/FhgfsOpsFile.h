@@ -54,7 +54,7 @@ extern int FhgfsOps_readdirIncremental(struct file* file, void* buf, filldir_t f
 
 extern int FhgfsOps_open(struct inode* inode, struct file* file);
 extern int FhgfsOps_openReferenceHandle(App* app, struct inode* inode, struct file* file,
-   unsigned openFlags, LookupIntentInfoOut* lookupInfo, uint64_t* outVersion);
+   unsigned openFlags, LookupIntentInfoOut* lookupInfo, uint32_t* outVersion);
 extern int FhgfsOps_release(struct inode* inode, struct file* file);
 
 

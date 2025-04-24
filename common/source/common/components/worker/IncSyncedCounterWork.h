@@ -1,5 +1,4 @@
-#ifndef INCSYNCEDCOUNTERWORK_H
-#define INCSYNCEDCOUNTERWORK_H
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/Work.h>
@@ -31,4 +30,3 @@ class IncSyncedCounterWork : public Work
       SynchronizedCounter* counter;
 };
 
-#endif /* INCSYNCEDCOUNTERWORK_H */

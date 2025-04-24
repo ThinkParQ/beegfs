@@ -1,5 +1,4 @@
-#ifndef DECATOMICWORK_H
-#define DECATOMICWORK_H
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/Work.h>
@@ -32,4 +31,3 @@ class DecAtomicWork : public Work
       Atomic<TemplateType>* atomicValue;
 };
 
-#endif /* DECATOMICWORK_H */

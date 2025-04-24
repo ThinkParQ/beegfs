@@ -1,5 +1,4 @@
-#ifndef GENERICDEBUGMSG_H_
-#define GENERICDEBUGMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleStringMsg.h>
 #include <common/Common.h>
@@ -34,4 +33,3 @@ class GenericDebugMsg : public SimpleStringMsg
 };
 
 
-#endif /* GENERICDEBUGMSG_H_ */

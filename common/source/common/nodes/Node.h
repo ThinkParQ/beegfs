@@ -1,5 +1,4 @@
-#ifndef NODE_H_
-#define NODE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/NumNodeID.h>
@@ -10,8 +9,10 @@
 
 #include "NodeConnPool.h"
 #include "NodeType.h"
+#include "common/net/sock/NetworkInterfaceCard.h"
 
 #include <mutex>
+#include <shared_mutex>
 
 // forward declaration
 class Node;
@@ -75,21 +76,28 @@ class Node
 
 
    private:
-      std::string id; // string ID, generated locally on each node
+      std::string alias; // alias (formerly known as the string ID until b8.0), set by mgmtd
       NumNodeID numID; // numeric ID, assigned by mgmtd server store
 
       NodeConnPool* connPool;
       unsigned short portUDP;
 
       Time lastHeartbeatT; // last heartbeat receive time
+      mutable std::shared_mutex aliasMutex;
 
 
    public:
       // getters & setters
 
-      const std::string& getID()
+      std::string getAlias() const
       {
-         return id;
+         std::shared_lock lock(aliasMutex);
+         return alias;
+      }
+
+      void setAlias(std::string alias) {
+         std::unique_lock lock(aliasMutex);
+         this->alias = alias;
       }
 
       NumNodeID getNumID() const
@@ -155,6 +163,7 @@ class Node
                PadFieldTo<Deserializer> pad(des, 8);
 
                NicAddressList nicList;
+               NicAddressList* nicListDummyPtr;
                char nodeType = 0;
                unsigned fhgfsVersion = 0;
                BitStore nodeFeatureFlags;
@@ -166,7 +175,7 @@ class Node
                des
                   % nodeFeatureFlags
                   % serdes::stringAlign4(nodeID)
-                  % nicList
+                  % serdesNicAddressList(nicListDummyPtr, nicList)
                   % fhgfsVersion
                   % nodeNumID
                   % portUDP
@@ -245,7 +254,7 @@ inline Serializer& operator%(Serializer& ser, const std::vector<NodeHandle>& nod
       Node& node = **it;
 
       ser
-         % node.getID()
+         % node.getAlias()
          % node.getNicList()
          % node.getNumID()
          % node.getPortUDP()
@@ -262,4 +271,3 @@ inline Deserializer& operator%(Deserializer& des, std::vector<NodeHandle>& nodes
    return des % mod;
 }
 
-#endif /*NODE_H_*/

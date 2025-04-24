@@ -2,8 +2,7 @@
  * Main purpose is to convert NetMessage defines into a string
  */
 
-#ifndef NETMESSAGELOGHELPER_H_
-#define NETMESSAGELOGHELPER_H_
+#pragma once
 
 #include <common/net/message/NetMessageTypes.h>
 
@@ -180,6 +179,16 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_MoveFileInodeResp: return "MoveFileInodeResp(2120)";
       case NETMSGTYPE_UnlinkLocalFileInode: return "UnlinkLocalFileInode (2121)";
       case NETMSGTYPE_UnlinkLocalFileInodeResp: return "UnlinkLocalFileInodeResp (2122)";
+      case NETMSGTYPE_SetFilePattern: return "SetFilePattern (2123)";
+      case NETMSGTYPE_SetFilePatternResp: return "SetFilePatternResp (2124)";
+      case NETMSGTYPE_CpChunkPaths: return "CpChunkPaths (2125)";
+      case NETMSGTYPE_CpChunkPathsResp: return "CpChunkPathsResp (2126)";
+      case NETMSGTYPE_ChunkBalance: return "StartChunkBalance (2127)";
+      case NETMSGTYPE_ChunkBalanceResp: return "StartChunkBalanceResp (2128)";
+      case NETMSGTYPE_StripePatternUpdate: return "StripePatternUpdate (2129)";
+      case NETMSGTYPE_StripePatternUpdateResp: return "StripePatternUpdateResp (2130)";
+      case NETMSGTYPE_SetFileDataState: return "SetFileDataState (2131)";
+      case NETMSGTYPE_SetFileDataStateResp: return "SetFileDataStateResp (2132)";
       case NETMSGTYPE_OpenFile: return "OpenFile (3001)";
       case NETMSGTYPE_OpenFileResp: return "OpenFileResp (3002)";
       case NETMSGTYPE_CloseFile: return "CloseFile (3003)";
@@ -220,10 +229,6 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_AuthenticateChannel: return "AuthenticateChannel (4007)";
       case NETMSGTYPE_GenericResponse: return "GenericResponse (4009)";
       case NETMSGTYPE_PeerInfo: return "PeerInfo (4011)";
-      case NETMSGTYPE_Log: return "Log (5001)";
-      case NETMSGTYPE_LogResp: return "LogResp (5002)";
-      case NETMSGTYPE_GetHostByName: return "GetHostByName (5003)";
-      case NETMSGTYPE_GetHostByNameResp: return "GetHostByNameResp (5004)";
       case NETMSGTYPE_GetNodesFromRootMetaNode: return "GetNodesFromRootMetaNode (6001)";
       case NETMSGTYPE_SendNodesList: return "SendNodesList (6002)";
       case NETMSGTYPE_RequestMetaData: return "RequestMetaData (6003)";
@@ -278,4 +283,3 @@ inline std::string netMessageTypeToStr(int type)
    return "unknown (" + std::to_string(type) + ")";
 }
 
-#endif /* NETMESSAGELOGHELPER_H_ */

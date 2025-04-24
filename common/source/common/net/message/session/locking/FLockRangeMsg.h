@@ -1,5 +1,4 @@
-#ifndef FLOCKRANGEMSG_H_
-#define FLOCKRANGEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -116,4 +115,3 @@ class FLockRangeMsg : public MirroredMessageBase<FLockRangeMsg>
       }
 };
 
-#endif /* FLOCKRANGEMSG_H_ */

@@ -1,5 +1,4 @@
-#ifndef LISTCHUNKDIRINCREMENTALRESPMSG_H_
-#define LISTCHUNKDIRINCREMENTALRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/Common.h>
@@ -68,4 +67,3 @@ class ListChunkDirIncrementalRespMsg : public NetMessageSerdes<ListChunkDirIncre
 
 };
 
-#endif /*LISTCHUNKDIRINCREMENTALRESPMSG_H_*/

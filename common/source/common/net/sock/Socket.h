@@ -1,12 +1,10 @@
-#ifndef SOCKET_H_
-#define SOCKET_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/system/System.h>
 #include <common/toolkit/HighResolutionStats.h>
 #include <common/toolkit/Time.h>
 #include <common/toolkit/StringTk.h>
-#include <common/external/sdp_inet.h>
 #include "Channel.h"
 #include "NetworkInterfaceCard.h"
 #include "SocketException.h"
@@ -16,9 +14,6 @@
 #include "SocketTimeoutException.h"
 
 #include <sched.h>
-
-
-#define PF_SDP    AF_INET_SDP // the Sockets Direct Protocol (Family)
 
 
 class Socket : public Channel
@@ -186,4 +181,3 @@ class Socket : public Channel
 };
 
 
-#endif /*SOCKET_H_*/

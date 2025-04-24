@@ -154,19 +154,20 @@ FhgfsOpsErr MetaStore::unlinkOverwrittenEntryUnlocked(DirInode& parentDir,
    DirEntry* overWrittenEntry, std::unique_ptr<FileInode>* outInode)
 {
    FhgfsOpsErr unlinkRes;
+   unsigned outNumHardlinks;  // Not used here!
 
    if (overWrittenEntry->getIsInodeInlined() )
    {
       /* We advise the calling code not to try to delete the entryName dentry,
        * as renameEntryUnlocked() already did that */
       unlinkRes = unlinkDirEntryWithInlinedInodeUnlocked("", parentDir, overWrittenEntry,
-            DirEntry_UNLINK_ID, outInode);
+            DirEntry_UNLINK_ID, outInode, outNumHardlinks);
    }
    else
    {
       // And also do not try to delete the dir-entry-by-name here.
       unlinkRes = unlinkDentryAndInodeUnlocked("", parentDir, overWrittenEntry,
-         DirEntry_UNLINK_ID, outInode);
+         DirEntry_UNLINK_ID, outInode, outNumHardlinks);
    }
 
    return unlinkRes;
@@ -224,13 +225,14 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
       // only try to referece file inode for inlined inode(s)
       if (fromEntry->getIsInodeInlined())
       {
-         fromFileInode = referenceFileUnlocked(dir, &fromEntryInfo);
+         FhgfsOpsErr referenceRes;
+         std::tie(fromFileInode, referenceRes) = referenceFileUnlocked(dir, &fromEntryInfo);
          if (!fromFileInode)
          {
             /* Note: The inode might be exclusively locked and a remote rename op might be in progress.
              *       If that fails we should actually continue with our rename. That will be solved
              *       in the future by using hardlinks for remote renaming. */
-            return FhgfsOpsErr_PATHNOTEXISTS;
+            return referenceRes;
          }
       }
    }
@@ -342,18 +344,13 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
 {
    // note: we do not allow newEntry to be a file if the old entry was a directory (and vice versa)
    const char* logContext = "rename(): Insert remote entry";
-
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
-
    outUnlinkedInode->reset();
 
    SafeRWLock safeMetaStoreLock(&rwlock, SafeRWLock_READ); // L O C K
-
-   // toParent exists
    SafeRWLock toParentMutexLock(&toParent.rwlock, SafeRWLock_WRITE); // L O C K ( T O )
 
-
-   DirEntry* overWrittenEntry = toParent.dirEntryCreateFromFileUnlocked(newEntryName);
+   std::unique_ptr<DirEntry> overWrittenEntry(toParent.dirEntryCreateFromFileUnlocked(newEntryName));
    if (overWrittenEntry)
    {
       const std::string& parentID = overWrittenEntry->getID();
@@ -361,7 +358,6 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
       bool isSameInode;
 
       FhgfsOpsErr checkRes = checkRenameOverwrite(fromFileInfo, overWriteInfo, isSameInode);
-
       if ((checkRes != FhgfsOpsErr_SUCCESS)  || ((checkRes == FhgfsOpsErr_SUCCESS) && isSameInode) )
       {
          retVal = checkRes;
@@ -369,7 +365,7 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
       }
 
       // only unlink the dir-entry-name here, so we can still restore it from dir-entry-id
-      FhgfsOpsErr unlinkRes = toParent.unlinkDirEntryUnlocked(newEntryName, overWrittenEntry,
+      FhgfsOpsErr unlinkRes = toParent.unlinkDirEntryUnlocked(newEntryName, overWrittenEntry.get(),
          DirEntry_UNLINK_FILENAME);
       if (unlikely(unlinkRes != FhgfsOpsErr_SUCCESS) )
       {
@@ -407,6 +403,14 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
       else
          inode->setIsBuddyMirrored(false);
 
+      // deserialize RSTs and set in inode object
+      if (inode->getIsRstAvailable())
+      {
+         RemoteStorageTarget rstInfo;
+         des % rstInfo;
+         inode->setRemoteStorageTargetUnpersistent(rstInfo);
+      }
+
       // destructs inode
       retVal = mkMetaFileUnlocked(toParent, newEntryName, fromFileInfo, inode);
    }
@@ -422,7 +426,7 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
       // unlink overwritten entry if it had an inlined inode (non-inlined inodes will be unlinked later)
       bool unlinkedWasInlined = overWrittenEntry->getIsInodeInlined();
 
-      FhgfsOpsErr unlinkRes = unlinkOverwrittenEntryUnlocked(toParent, overWrittenEntry,
+      FhgfsOpsErr unlinkRes = unlinkOverwrittenEntryUnlocked(toParent, overWrittenEntry.get(),
          outUnlinkedInode);
 
       EntryInfo unlinkEntryInfo;
@@ -437,7 +441,7 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
       {
          unlinkRes = unlinkInodeLater(&unlinkEntryInfo, unlinkedWasInlined);
          if (unlinkRes == FhgfsOpsErr_AGAIN)
-            unlinkRes = unlinkOverwrittenEntry(toParent, overWrittenEntry, outUnlinkedInode);
+            unlinkRes = unlinkOverwrittenEntry(toParent, overWrittenEntry.get(), outUnlinkedInode);
 
          if (unlinkRes != FhgfsOpsErr_SUCCESS && unlinkRes != FhgfsOpsErr_PATHNOTEXISTS)
             LogContext(logContext).logErr("Failed to unlink overwritten entry:"
@@ -447,26 +451,18 @@ FhgfsOpsErr MetaStore::moveRemoteFileInsert(EntryInfo* fromFileInfo, DirInode& t
                " Error: "         + boost::lexical_cast<std::string>(unlinkRes));
       }
 
-      delete overWrittenEntry;
       return retVal;
    }
-   else
-   if (overWrittenEntry)
+   else if (overWrittenEntry)
    {
       // TODO: Restore the overwritten entry
    }
 
 outUnlock:
-
    toParentMutexLock.unlock(); // U N L O C K ( T O )
-
    safeMetaStoreLock.unlock();
-
-   SAFE_DELETE(overWrittenEntry);
-
    return retVal;
 }
-
 
 /**
  * Copies (serializes) the original file object to a buffer.
@@ -523,11 +519,8 @@ void MetaStore::moveRemoteFileComplete(DirInode& dir, const std::string& entryID
    else
    {
       SafeRWLock safeDirLock(&dir.rwlock, SafeRWLock_READ);
-
       dir.fileStore.moveRemoteComplete(entryID);
-
       safeDirLock.unlock();
-
    }
 
    safeLock.unlock(); // U N L O C K

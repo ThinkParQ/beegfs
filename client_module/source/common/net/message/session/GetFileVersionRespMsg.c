@@ -7,7 +7,7 @@ static bool GetFileVersionRespMsg_deserializePayload(NetMessage* this, Deseriali
    int result;
 
    if (!Serialization_deserializeInt(ctx, &result) ||
-         !Serialization_deserializeUInt64(ctx, &msg->version))
+         !Serialization_deserializeUInt(ctx, &msg->version))
       return false;
 
    msg->result = result;

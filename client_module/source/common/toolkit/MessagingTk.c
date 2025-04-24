@@ -74,8 +74,10 @@ FhgfsOpsErr MessagingTk_requestResponseWithRRArgsSock(App* app,
          if(currentRetryNum == 1 // log retry message only on first retry (to not spam the log)
             && !(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_RETRY) )
          {
+            NodeString nodeAndType;
+            Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
             Logger_logFormatted(log, Log_NOTICE, logContext,
-               "Retrying communication with node: %s", Node_getNodeIDWithTypeStr(rrArgs->node) );
+               "Retrying communication with node: %s", nodeAndType.buf);
             Logger_logFormatted(log, Log_DEBUG, logContext,
                "Message type: %hu", NetMessage_getMsgType(rrArgs->requestMsg) );
          }
@@ -446,8 +448,10 @@ FhgfsOpsErr __MessagingTk_requestResponseNodeRetry(App* app, RequestResponseNode
             && !(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_RETRY) )
          {
             Logger* log = App_getLogger(app);
+            NodeString nodeAndType;
+            Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
             Logger_logFormatted(log, Log_NOTICE, logContext,
-               "Retrying communication with node: %s", Node_getNodeIDWithTypeStr(rrArgs->node) );
+               "Retrying communication with node: %s", nodeAndType.buf);
             Logger_logFormatted(log, Log_DEBUG, logContext,
                "Message type: %hu", NetMessage_getMsgType(rrArgs->requestMsg) );
          }
@@ -535,8 +539,10 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
       if(!(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_CONNESTABLISHFAILED) &&
             !fatal_signal_pending(current))
       { // only log once and only if user didn't manually interrupt with signal (to avoid log spam)
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
          Logger_logFormatted(log, Log_WARNING, logContext,
-            "Unable to connect to: %s", Node_getNodeIDWithTypeStr(rrArgs->node) );
+            "Unable to connect to: %s", nodeAndType.buf);
          Logger_logFormatted(log, Log_DEBUG, logContext,
             "Message type: %hu", NetMessage_getMsgType(rrArgs->requestMsg) );
 
@@ -602,19 +608,24 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
    { // error
       if(!(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_COMMERR) )
       {
-         if (fatal_signal_pending(current))
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
+         if (fatal_signal_pending(current)){
             Logger_logFormatted(log, Log_NOTICE, logContext,
                "Receive interrupted by signal. Node: %s @ %s",
-               Node_getNodeIDWithTypeStr(rrArgs->node), Socket_getPeername(sock) );
+               nodeAndType.buf, Socket_getPeername(sock) );
+         }
          else
-         if(respRes == -ETIMEDOUT)
+         if(respRes == -ETIMEDOUT) {
             Logger_logFormatted(log, Log_WARNING, logContext,
                "Receive timed out from %s @ %s",
-               Node_getNodeIDWithTypeStr(rrArgs->node), Socket_getPeername(sock) );
-         else
+               nodeAndType.buf, Socket_getPeername(sock) );
+         }
+         else {
             Logger_logFormatted(log, Log_WARNING, logContext,
                "Receive failed from %s @ %s (recv result: %zi)",
-               Node_getNodeIDWithTypeStr(rrArgs->node), Socket_getPeername(sock), respRes);
+               nodeAndType.buf, Socket_getPeername(sock), respRes);
+         }
 
          Logger_logFormatted(log, Log_DEBUG, logContext,
             "Expected response type: %u", rrArgs->respMsgType);
@@ -650,10 +661,12 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
 
    if(unlikely(NetMessage_getMsgType(rrArgs->outRespMsg) != rrArgs->respMsgType) )
    { // response invalid (wrong msgType)
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
       Logger_logErrFormatted(log, logContext,
          "Received invalid response type: %hu; expected: %d. Disconnecting: %s (%s)",
          NetMessage_getMsgType(rrArgs->outRespMsg), rrArgs->respMsgType,
-         Node_getNodeIDWithTypeStr(rrArgs->node), Socket_getPeername(sock) );
+         nodeAndType.buf, Socket_getPeername(sock) );
 
       retVal = FhgfsOpsErr_INTERNAL;
       goto socket_invalidate;
@@ -673,9 +686,11 @@ FhgfsOpsErr __MessagingTk_requestResponseWithRRArgsComm(App* app,
    {
       if(!(rrArgs->logFlags & REQUESTRESPONSEARGS_LOGFLAG_COMMERR) )
       {
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
          Logger_logErrFormatted(log, logContext,
             "Communication error: Node: %s (comm result: %lld; message type: %hu)",
-            Node_getNodeIDWithTypeStr(rrArgs->node),
+            nodeAndType.buf,
             (long long)( (sendRes <= 0) ? sendRes : respRes),
             NetMessage_getMsgType(rrArgs->requestMsg) );
 
@@ -732,6 +747,8 @@ FhgfsOpsErr __MessagingTk_handleGenericResponse(App* app, RequestResponseArgs* r
    FhgfsOpsErr retVal;
 
    GenericResponseMsg* genericResp = (GenericResponseMsg*)rrArgs->outRespMsg;
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(rrArgs->node, &nodeAndType);
 
    *wasIndirectCommErr = false;
 
@@ -745,7 +762,7 @@ FhgfsOpsErr __MessagingTk_handleGenericResponse(App* app, RequestResponseArgs* r
 
             Logger_logFormatted(log, Log_NOTICE, logContext,
                "Peer is asking for a retry: %s; Reason: %s",
-               Node_getNodeIDWithTypeStr(rrArgs->node),
+               nodeAndType.buf,
                GenericResponseMsg_getLogStr(genericResp) );
             Logger_logFormatted(log, Log_DEBUG, logContext,
                "Message type: %hu", NetMessage_getMsgType(rrArgs->requestMsg) );
@@ -762,7 +779,7 @@ FhgfsOpsErr __MessagingTk_handleGenericResponse(App* app, RequestResponseArgs* r
 
             Logger_logFormatted(log, Log_NOTICE, logContext,
                "Peer reported indirect communication error: %s; Reason: %s",
-               Node_getNodeIDWithTypeStr(rrArgs->node),
+               nodeAndType.buf,
                GenericResponseMsg_getLogStr(genericResp) );
             Logger_logFormatted(log, Log_DEBUG, logContext,
                "Message type: %hu", NetMessage_getMsgType(rrArgs->requestMsg) );
@@ -794,7 +811,7 @@ FhgfsOpsErr __MessagingTk_handleGenericResponse(App* app, RequestResponseArgs* r
       {
          Logger_logFormatted(log, Log_NOTICE, logContext,
             "Peer replied with unknown control code: %s; Code: %u; Reason: %s",
-            Node_getNodeIDWithTypeStr(rrArgs->node),
+            nodeAndType.buf,
             (unsigned)GenericResponseMsg_getControlCode(genericResp),
             GenericResponseMsg_getLogStr(genericResp) );
          Logger_logFormatted(log, Log_DEBUG, logContext,

@@ -1,5 +1,4 @@
-#ifndef NODECAPACITYPOOLS_H_
-#define NODECAPACITYPOOLS_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/TargetCapacityPools.h>
@@ -124,4 +123,3 @@ class NodeCapacityPools
 };
 
 
-#endif /* NODECAPACITYPOOLS_H_ */

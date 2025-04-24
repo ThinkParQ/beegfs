@@ -74,17 +74,18 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
       }
    }
 
-   if (!isSecondary && app->getFileEventLogger())
+   if (!isSecondary && app->getFileEventLogger() && getFileEvent())
    {
-      if (getFileEvent())
-      {
-         app->getFileEventLogger()->log(
-                                     *getFileEvent(),
-                                     entryInfo->getEntryID(),
-                                     entryInfo->getParentEntryID(),
-                                     "",
-                                     inode->getNumHardlinks() > 1);
-      }
+      EventContext eventCtx = makeEventContext(
+         entryInfo,
+         entryInfo->getParentEntryID(),
+         getMsgHeaderUserID(),
+         "",
+         inode->getNumHardlinks(),
+         isSecondary
+      );
+
+      logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    // success => insert session

@@ -1,5 +1,4 @@
-#ifndef POLLABLE_H_
-#define POLLABLE_H_
+#pragma once
 
 class Pollable
 {
@@ -12,4 +11,3 @@ class Pollable
       virtual int getFD() const = 0;
 };
 
-#endif /*POLLABLE_H_*/

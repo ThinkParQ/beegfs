@@ -1,5 +1,4 @@
-#ifndef BUMPFILEVERSIONMSGEX_H
-#define BUMPFILEVERSIONMSGEX_H
+#pragma once
 
 #include <common/net/message/session/BumpFileVersionMsg.h>
 #include <common/net/message/session/BumpFileVersionRespMsg.h>
@@ -31,4 +30,3 @@ class BumpFileVersionMsgEx : public MirroredMessage<BumpFileVersionMsg, FileIDLo
       const char* mirrorLogContext() const override { return "BumpFileVersionMsgEx/forward"; }
 };
 
-#endif

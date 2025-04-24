@@ -1,5 +1,4 @@
-#ifndef GETCHUNKFILEATTRIBSWORK_H_
-#define GETCHUNKFILEATTRIBSWORK_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/net/sock/Socket.h>
@@ -63,4 +62,3 @@ class GetChunkFileAttribsWork : public Work
 
 };
 
-#endif /* GETCHUNKFILEATTRIBSWORK_H_ */

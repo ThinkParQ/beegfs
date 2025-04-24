@@ -1,5 +1,4 @@
-#ifndef GETNODECAPACITYPOOLSMSGEX_H_
-#define GETNODECAPACITYPOOLSMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/GetNodeCapacityPoolsMsg.h>
 
@@ -9,4 +8,3 @@ class GetNodeCapacityPoolsMsgEx : public GetNodeCapacityPoolsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* GETNODECAPACITYPOOLSMSGEX_H_ */

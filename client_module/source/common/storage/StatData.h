@@ -33,7 +33,7 @@ struct StatData
 
       SettableFileAttribs settableFileAttribs;
 
-      unsigned contentsVersion; // inc'ed when file contents are modified (for cache invalidation)
+      unsigned metaVersion; // inc'ed when internal metadata is modified (for cache invalidation)
 
 };
 
@@ -55,6 +55,7 @@ void StatData_getOsStat(StatData* this, fhgfs_stat* outOsStat)
 
    outOsStat->ctime.tv_sec   = this->attribChangeTimeSecs;
    outOsStat->ctime.tv_nsec  = 0;
+   outOsStat->metaVersion = this->metaVersion;
 }
 
 #endif /* STATDATA_H_ */

@@ -1,5 +1,4 @@
-#ifndef SETDIRPATTERNRESPMSG_H_
-#define SETDIRPATTERNRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -31,4 +30,3 @@ class SetDirPatternRespMsg : public SimpleIntMsg
 };
 
 
-#endif /*SETDIRPATTERNRESPMSG_H_*/

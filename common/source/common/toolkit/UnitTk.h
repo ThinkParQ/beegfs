@@ -1,5 +1,4 @@
-#ifndef UNITTK_H_
-#define UNITTK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/storage/quota/Quota.h>
@@ -49,4 +48,3 @@ class UnitTk
 };
 
 
-#endif /* UNITTK_H_ */

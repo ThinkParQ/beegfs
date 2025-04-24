@@ -2,8 +2,7 @@
  * Dentry information stored on disk
  */
 
-#ifndef DENTRYSTOREDATA_H_
-#define DENTRYSTOREDATA_H_
+#pragma once
 
 
 #include <common/storage/StorageDefinitions.h>
@@ -102,4 +101,3 @@ class DentryStoreData
 };
 
 
-#endif /* DENTRYSTOREDATA_H_ */

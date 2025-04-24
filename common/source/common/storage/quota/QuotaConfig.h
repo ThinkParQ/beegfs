@@ -1,5 +1,4 @@
-#ifndef QUOTACONFIG_H_
-#define QUOTACONFIG_H_
+#pragma once
 
 
 #include <common/storage/quota/QuotaData.h>
@@ -25,4 +24,3 @@ struct QuotaConfig
 };
 
 
-#endif /* QUOTACONFIG_H_ */

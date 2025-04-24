@@ -1,8 +1,8 @@
-#ifndef MKFILEWITHPATTERNMSG_H_
-#define MKFILEWITHPATTERNMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/striping/StripePattern.h>
+#include <common/storage/RemoteStorageTarget.h>
 #include <common/storage/EntryInfo.h>
 #include <common/storage/Path.h>
 
@@ -16,7 +16,7 @@ class MkFileWithPatternMsg : public MirroredMessageBase<MkFileWithPatternMsg>
        */
       MkFileWithPatternMsg(const EntryInfo* parentInfo, const std::string& newFileName,
          const unsigned userID, const unsigned groupID, const int mode, const int umask,
-         StripePattern* pattern)
+         StripePattern* pattern, RemoteStorageTarget* rst)
           : BaseType(NETMSGTYPE_MkFileWithPattern),
             newFileName(newFileName.c_str()),
             newFileNameLen(newFileName.length()),
@@ -25,7 +25,8 @@ class MkFileWithPatternMsg : public MirroredMessageBase<MkFileWithPatternMsg>
             mode(mode),
             umask(umask),
             parentInfoPtr(parentInfo),
-            pattern(pattern)
+            pattern(pattern),
+            rstPtr(rst)
       {
       }
 
@@ -46,7 +47,8 @@ class MkFileWithPatternMsg : public MirroredMessageBase<MkFileWithPatternMsg>
             % obj->umask
             % serdes::backedPtr(obj->parentInfoPtr, obj->parentInfo)
             % serdes::rawString(obj->newFileName, obj->newFileNameLen, 4)
-            % serdes::backedPtr(obj->pattern, obj->parsed.pattern);
+            % serdes::backedPtr(obj->pattern, obj->parsed.pattern)
+            % serdes::backedPtr(obj->rstPtr, obj->rst);
       }
 
    private:
@@ -60,11 +62,13 @@ class MkFileWithPatternMsg : public MirroredMessageBase<MkFileWithPatternMsg>
       int32_t umask;
 
       // for serialization
-      const EntryInfo* parentInfoPtr; // not owned by this object!
-      StripePattern* pattern; // not owned by this object!
+      const EntryInfo* parentInfoPtr;  // not owned by this object!
+      StripePattern* pattern;          // not owned by this object!
+      RemoteStorageTarget* rstPtr;     // not owned by this object!
 
       // for deserialization
       EntryInfo parentInfo;
+      RemoteStorageTarget rst;
       struct {
          std::unique_ptr<StripePattern> pattern;
       } parsed;
@@ -73,6 +77,11 @@ class MkFileWithPatternMsg : public MirroredMessageBase<MkFileWithPatternMsg>
       StripePattern& getPattern()
       {
          return *pattern;
+      }
+
+      RemoteStorageTarget* getRemoteStorageTarget()
+      {
+         return &this->rst;
       }
 
       // getters & setters
@@ -108,4 +117,3 @@ class MkFileWithPatternMsg : public MirroredMessageBase<MkFileWithPatternMsg>
 
 };
 
-#endif /* MKFILEWITHPATTERNMSG_H_ */

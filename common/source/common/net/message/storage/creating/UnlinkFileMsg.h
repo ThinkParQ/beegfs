@@ -1,5 +1,4 @@
-#ifndef UNLINKFILEMSG_H_
-#define UNLINKFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -92,4 +91,3 @@ class UnlinkFileMsg : public MirroredMessageBase<UnlinkFileMsg>
 };
 
 
-#endif /*UNLINKFILEMSG_H_*/

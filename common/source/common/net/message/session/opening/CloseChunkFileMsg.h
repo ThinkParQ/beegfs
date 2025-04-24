@@ -1,5 +1,4 @@
-#ifndef CLOSECHUNKFILEMSG_H_
-#define CLOSECHUNKFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -92,4 +91,3 @@ class CloseChunkFileMsg : public NetMessageSerdes<CloseChunkFileMsg>
 };
 
 
-#endif /*CLOSECHUNKFILEMSG_H_*/

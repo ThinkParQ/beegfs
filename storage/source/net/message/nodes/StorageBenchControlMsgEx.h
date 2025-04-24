@@ -1,5 +1,4 @@
-#ifndef STORAGEBENCHCONTROLMSGEX_H_
-#define STORAGEBENCHCONTROLMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/StorageBenchControlMsg.h>
 #include <common/Common.h>
@@ -10,4 +9,3 @@ class StorageBenchControlMsgEx: public StorageBenchControlMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* STORAGEBENCHCONTROLMSGEX_H_ */

@@ -7,7 +7,7 @@
  * @param nicList an internal copy will be created
  * @param localRdmaNicList an internal copy will be created
  */
-void Node_init(Node* this, struct App* app, const char* nodeID, NumNodeID nodeNumID,
+void Node_init(Node* this, struct App* app, const char* alias, NumNodeID nodeNumID,
    unsigned short portUDP, unsigned short portTCP, NicAddressList* nicList,
    NicAddressList* localRdmaNicList)
 {
@@ -18,10 +18,13 @@ void Node_init(Node* this, struct App* app, const char* nodeID, NumNodeID nodeNu
    this->isActive = false;
    kref_init(&this->references);
 
-   this->id = StringTk_strDup(nodeID);
    this->numID = nodeNumID;
-   this->nodeType = NODETYPE_Invalid; // set by NodeStore::addOrUpdate()
-   this->nodeIDWithTypeStr = NULL; // will by initialized on demand by getNodeIDWithTypeStr()
+   RWLock_init(&this->aliasAndTypeMu);
+   this->alias = NULL;
+   this->nodeAliasWithTypeStr = NULL;
+   this->nodeType = NODETYPE_Invalid;
+   // We don't know the node type at this stage, it is set later.
+   Node_setNodeAliasAndType(this, alias, NODETYPE_Invalid);
 
    this->portUDP = portUDP;
 
@@ -46,10 +49,8 @@ Node* Node_construct(struct App* app, const char* nodeID, NumNodeID nodeNumID,
 void Node_uninit(Node* this)
 {
    SAFE_DESTRUCT(this->connPool, NodeConnPool_destruct);
-
-   SAFE_KFREE(this->nodeIDWithTypeStr);
-   SAFE_KFREE(this->id);
-
+   SAFE_KFREE(this->alias);
+   SAFE_KFREE(this->nodeAliasWithTypeStr);
    Mutex_uninit(&this->mutex);
 }
 
@@ -131,11 +132,6 @@ const char* Node_nodeTypeToStr(NodeType nodeType)
          return "beegfs-mgmtd";
       } break;
 
-      case NODETYPE_Helperd:
-      {
-         return "beegfs-helperd";
-      } break;
-
       default:
       {
          return "<unknown>";
@@ -143,43 +139,76 @@ const char* Node_nodeTypeToStr(NodeType nodeType)
    }
 }
 
-/**
- * Returns the node type dependent ID (numeric ID for servers and string ID for clients) and the
- * node type in a human-readable string.
- *
- * This is intendened as a convenient way to get a string with node ID and type for log messages.
- *
- * @return string is alloc'ed on demand and remains valid until Node_uninit() or _setNodeType() is
- * called; caller may not free the string.
- */
-const char* Node_getNodeIDWithTypeStr(Node* this)
-{
-   const char* retVal;
+inline void putToNodeString(char *from, NodeString *outStr) {
+   int result;
+   result = snprintf(outStr->buf, sizeof outStr->buf, "%s", from);
+   if (unlikely(result < 0)) {
+      snprintf(outStr->buf, sizeof(outStr->buf), "<error determining alias>");
+   } else if (unlikely((size_t) result >= sizeof outStr->buf)) {
+      memcpy(outStr->buf + sizeof outStr->buf - 4, "...\0", 4);
+   }
+}
 
-   Mutex_lock(&this->mutex); // L O C K
+void Node_copyAlias(Node *this, NodeString *outStr) {
+   RWLock_readLock(&this->aliasAndTypeMu);
+   putToNodeString(this->alias, outStr);
+   RWLock_readUnlock(&this->aliasAndTypeMu);
+}
 
-   /* we alloc the string here on demand. it gets freed either by _uninit() or when _setNodeType()
-      is called */
+void Node_copyAliasWithTypeStr(Node *this, NodeString *outStr) {
+   RWLock_readLock(&this->aliasAndTypeMu);
+   putToNodeString(this->nodeAliasWithTypeStr, outStr);
+   RWLock_readUnlock(&this->aliasAndTypeMu);
+}
 
-   if(!this->nodeIDWithTypeStr)
-   { // not initialized yet => alloc and init
+bool Node_setNodeAliasAndType(Node* this, const char *aliasInput, NodeType nodeTypeInput) {
+   char *alias = NULL;
+   char *aliasAndTypeStr = NULL;
+   bool err = false;
 
-      if(this->nodeType == NODETYPE_Client)
-         this->nodeIDWithTypeStr = kasprintf(GFP_NOFS, "%s %s",
-            Node_getNodeTypeStr(this), this->id);
-      else
-      {
-         const char* nodeID = NumNodeID_str(&this->numID);
+   if (!aliasInput && nodeTypeInput == NODETYPE_Invalid) {
+       return true; // Nothing to do, return early.
+   }
 
-         this->nodeIDWithTypeStr = kasprintf(GFP_NOFS, "%s %s [ID: %s]",
-            Node_getNodeTypeStr(this), this->id, nodeID);
-         kfree(nodeID);
+   if (aliasInput) {
+      alias = StringTk_strDup(aliasInput);
+      if (!alias) {
+         return false;
       }
    }
 
-   retVal = this->nodeIDWithTypeStr;
+   RWLock_writeLock(&this->aliasAndTypeMu);
+   {
+      const char *nextAlias = alias ? alias : this->alias;
+      NodeType nextNodeType = nodeTypeInput != NODETYPE_Invalid ? nodeTypeInput : this->nodeType;
+      if (nextNodeType == NODETYPE_Client) {
+         aliasAndTypeStr = kasprintf(GFP_NOFS, "%s [%s:?]", nextAlias, Node_nodeTypeToStr(nextNodeType));
+      }
+      else {
+         aliasAndTypeStr = kasprintf(GFP_NOFS, "%s [%s:%u]", nextAlias, Node_nodeTypeToStr(nextNodeType), this->numID.value);
+      }
+      if (!aliasAndTypeStr) {
+         err = true;
+      }
+   }
+   if (! err) {
+      if (alias) {
+         swap(this->alias, alias);
+      }
+      if (nodeTypeInput != NODETYPE_Invalid) {
+          swap(this->nodeType, nodeTypeInput);
+      }
+      if (aliasAndTypeStr) {
+         swap(this->nodeAliasWithTypeStr, aliasAndTypeStr);
+      }
+   }
+   RWLock_writeUnlock(&this->aliasAndTypeMu);
 
-   Mutex_unlock(&this->mutex); // U N L O C K
-
-   return retVal;
+   if (alias) {
+      kfree(alias);
+   }
+   if (aliasAndTypeStr) {
+      kfree(aliasAndTypeStr);
+   }
+   return ! err;
 }

@@ -1,5 +1,4 @@
-#ifndef REFRESHTARGETSTATESMSG_H_
-#define REFRESHTARGETSTATESMSG_H_
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/Common.h>
@@ -18,4 +17,3 @@ class RefreshTargetStatesMsg : public AcknowledgeableMsgSerdes<RefreshTargetStat
 };
 
 
-#endif /* REFRESHTARGETSTATESMSG_H_ */

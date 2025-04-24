@@ -1,5 +1,4 @@
-#ifndef COMMON_GETSTORAGEPOOLSMSG_H_
-#define COMMON_GETSTORAGEPOOLSMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleMsg.h>
 
@@ -11,4 +10,3 @@ class GetStoragePoolsMsg : public SimpleMsg
 };
 
 
-#endif /*COMMON_GETSTORAGEPOOLSMSG_H_*/

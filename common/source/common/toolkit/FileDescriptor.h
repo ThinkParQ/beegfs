@@ -1,5 +1,4 @@
-#ifndef FILEDESCRIPTOR_H_
-#define FILEDESCRIPTOR_H_
+#pragma once
 
 #include <common/Common.h>
 #include "poll/Pollable.h"
@@ -81,4 +80,3 @@ class FileDescriptor : public Pollable
       }
 };
 
-#endif /*FILEDESCRIPTOR_H_*/

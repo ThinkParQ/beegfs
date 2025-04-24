@@ -1,5 +1,4 @@
-#ifndef NODESTORE_H_
-#define NODESTORE_H_
+#pragma once
 
 /**
  * New code should not use type NodeStore and this header file!
@@ -17,4 +16,3 @@ typedef class NodeStoreServers NodeStore;
 
 
 
-#endif /* NODESTORE_H_ */

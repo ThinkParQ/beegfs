@@ -1,5 +1,4 @@
-#ifndef RECREATEDENTRIESMSG_H
-#define RECREATEDENTRIESMSG_H
+#pragma once
 
 #include <common/fsck/FsckFsID.h>
 #include <common/net/message/NetMessage.h>
@@ -37,4 +36,3 @@ class RecreateDentriesMsg : public NetMessageSerdes<RecreateDentriesMsg>
 };
 
 
-#endif /*RECREATEDENTRIESMSG_H*/

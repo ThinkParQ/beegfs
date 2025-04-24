@@ -2,7 +2,7 @@ SHELL = /bin/bash
 
 EXE = beegfs-event-listener
 
-CXXFLAGS = -std=c++0x -I ../include
+CXXFLAGS = -std=c++17 -I ../include
 LDFLAGS =
 
 SOURCES = $(shell find ../source -name '*.cpp')

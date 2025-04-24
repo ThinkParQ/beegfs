@@ -1,5 +1,4 @@
-#ifndef STORAGEBENCH_H_
-#define STORAGEBENCH_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -72,4 +71,3 @@ enum StorageBenchStatus
 #define STORAGEBENCHSTATUS_IS_ACTIVE(status) ( (status == StorageBenchStatus_RUNNING) || \
    (status == StorageBenchStatus_FINISHING) || (status == StorageBenchStatus_STOPPING) )
 
-#endif /* STORAGEBENCH_H_ */

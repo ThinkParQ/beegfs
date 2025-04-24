@@ -3,8 +3,7 @@
  *
  */
 
-#ifndef OPCOUNTERTYPES_H_
-#define OPCOUNTERTYPES_H_
+#pragma once
 
 #include <common/toolkit/StringTk.h>
 
@@ -180,4 +179,3 @@ class OpToStringMapping
       }
 };
 
-#endif /* OPCOUNTERTYPES_H_ */

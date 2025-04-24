@@ -1,5 +1,4 @@
-#ifndef DELETECHUNKSMSGEX_H
-#define DELETECHUNKSMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/DeleteChunksMsg.h>
@@ -11,4 +10,3 @@ class DeleteChunksMsgEx : public DeleteChunksMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*DELETECHUNKSMSGEX_H*/

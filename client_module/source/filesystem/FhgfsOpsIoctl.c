@@ -253,7 +253,7 @@ static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp
    char* fileName = vmalloc(BEEGFS_IOCTL_CFG_MAX_PATH);
 
    Node* localNode = App_getLocalNode(app);
-   char* localNodeID = Node_getID(localNode);
+   NodeString alias;
 
    int cpRes;
    int cfgFileStrLen;
@@ -264,9 +264,8 @@ static long FhgfsOpsIoctl_getRuntimeCfgFile(struct file *file, void __user *argp
       vfree(fileName);
       return -EINVAL;
    }
-
-   cfgFileStrLen = scnprintf(fileName, BEEGFS_IOCTL_CFG_MAX_PATH, "/proc/fs/beegfs/%s/config",
-      localNodeID);
+   Node_copyAlias(localNode, &alias);
+   cfgFileStrLen = scnprintf(fileName, BEEGFS_IOCTL_CFG_MAX_PATH, "/proc/fs/beegfs/%s/config", alias.buf);
    if (cfgFileStrLen <= 0)
    {
       Logger_logFormatted(log, Log_WARNING, logContext, "buffer too small");
@@ -313,7 +312,7 @@ static long FhgfsOpsIoctl_testIsFhGFS(struct file *file, void __user *argp)
 }
 
 /**
- * Get the mountID aka clientID aka nodeID of client mount aka sessionID.
+ * Get the mountID aka clientID aka nodeID of client mount aka sessionID (aka alias :)
  */
 static long FhgfsOpsIoctl_getMountID(struct file *file, void __user *argp)
 {
@@ -322,22 +321,23 @@ static long FhgfsOpsIoctl_getMountID(struct file *file, void __user *argp)
    Logger* log = App_getLogger(app);
    const char* logContext = __func__;
 
-   Node* localNode = App_getLocalNode(app);
-   const char* mountID = Node_getID(localNode);
-   size_t mountIDStrLen = strlen(mountID);
-
    int cpRes;
+
+   Node* localNode = App_getLocalNode(app);
+   NodeString mountID;
+   size_t mountIDStrLen;
+   Node_copyAlias(localNode, &mountID);
+   mountIDStrLen = strlen(mountID.buf);
 
    if(unlikely(mountIDStrLen > BEEGFS_IOCTL_MOUNTID_BUFLEN) )
    {
       Logger_logFormatted(log, Log_WARNING, logContext,
          "unexpected: mountID too large for buffer (%d vs %d)",
          (int)BEEGFS_IOCTL_MOUNTID_BUFLEN, (int)mountIDStrLen+1);
-
       return -ENOBUFS;
    }
 
-   cpRes = copy_to_user(argp, mountID, mountIDStrLen+1); // (also calls access_ok)
+   cpRes = copy_to_user(argp, mountID.buf, mountIDStrLen+1); // (also calls access_ok)
    if(cpRes)
    { // result >0 is number of uncopied bytes
       LOG_DEBUG_FORMATTED(log, Log_WARNING, logContext, "copy_to_user failed()");
@@ -407,6 +407,7 @@ static long FhgfsOpsIoctl_getStripeInfo(struct file *file, void __user *argp)
 static long resolveNodeToString(NodeStoreEx* nodes, uint32_t nodeID,
    char __user* nodeStrID, Logger* log)
 {
+   NodeString nodeAlias;
    NumNodeID numID = { nodeID };
    size_t nodeIDLen;
    long retVal = 0;
@@ -425,14 +426,15 @@ static long resolveNodeToString(NodeStoreEx* nodes, uint32_t nodeID,
       return 0;
    }
 
-   nodeIDLen = strlen(node->id) + 1;
-   if (nodeIDLen > BEEGFS_IOCTL_NODESTRID_BUFLEN)
+   Node_copyAlias(node, &nodeAlias);
+   nodeIDLen = strlen(nodeAlias.buf) + 1;
+   if (nodeIDLen > BEEGFS_IOCTL_NODEALIAS_BUFLEN)
    { // nodeID too large for buffer
       retVal = -ENOBUFS;
       goto out;
    }
 
-   if (copy_to_user(nodeStrID, node->id, nodeIDLen))
+   if (copy_to_user(nodeStrID, nodeAlias.buf, nodeIDLen))
       retVal = -EFAULT;
 
 out:
@@ -534,7 +536,7 @@ static long FhgfsOpsIoctl_getStripeTarget(struct file *file, void __user *argp)
       return -EFAULT;
 
    retVal = getStripePatternImpl(file, wantedTargetIndex, &targetOrGroup, &primaryTarget,
-         &secondaryTarget, &primaryNodeID, &secondaryNodeID, arg->outNodeStrID, NULL);
+         &secondaryTarget, &primaryNodeID, &secondaryNodeID, arg->outNodeAlias, NULL);
    if (retVal)
       return retVal;
 
@@ -565,8 +567,8 @@ static long FhgfsOpsIoctl_getStripeTargetV2(struct file *file, void __user *argp
       return -EFAULT;
 
    retVal = getStripePatternImpl(file, wantedTargetIndex, &targetOrGroup, &primaryTarget,
-         &secondaryTarget, &primaryNodeID, &secondaryNodeID, arg->primaryNodeStrID,
-         arg->secondaryNodeStrID);
+         &secondaryTarget, &primaryNodeID, &secondaryNodeID, arg->primaryNodeAlias,
+         arg->secondaryNodeAlias);
    if (retVal)
       return retVal;
 
@@ -970,6 +972,7 @@ static long FhgfsOpsIoctl_pingNode(struct file *file, void __user *argp)
    NoAllocBufferStore* bufStore = App_getMsgBufStore(app);
    NodeStoreEx* nodeStore;
    Node* node;
+   NodeString alias;
    NodeConnPool* connPool;
    Socket* sock = NULL;
    struct BeegfsIoctl_PingNode_Arg __user *pingArg = argp;
@@ -1033,7 +1036,8 @@ static long FhgfsOpsIoctl_pingNode(struct file *file, void __user *argp)
       return -EINVAL;
    }
 
-   StringTk_strncpyTerminated(ping.results.outNode, Node_getID(node),
+   Node_copyAlias(node, &alias);
+   StringTk_strncpyTerminated(ping.results.outNode, alias.buf,
       sizeof(ping.results.outNode));
 
    connPool = Node_getConnPool(node);

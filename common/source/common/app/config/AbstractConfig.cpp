@@ -3,6 +3,7 @@
 #include <common/app/log/LogContext.h>
 #include <common/app/log/Logger.h>
 #include "AbstractConfig.h"
+#include "common/toolkit/HashTk.h"
 
 
 #define ABSTRACTCONF_AUTHFILE_READSIZE 1024 // max amount of data that we read from auth file
@@ -68,15 +69,16 @@ void AbstractConfig::loadDefaults(bool addDashes)
    configMapRedefine("logNumRotatedFiles",       "2", addDashes);
 
    configMapRedefine("connPortShift",              "0", addDashes);
-   configMapRedefine("connClientPortUDP",          "8004", addDashes);
-   configMapRedefine("connStoragePortUDP",         "8003", addDashes);
-   configMapRedefine("connMetaPortUDP",            "8005", addDashes);
-   configMapRedefine("connMonPortUDP",           "8007", addDashes);
-   configMapRedefine("connMgmtdPortUDP",           "8008", addDashes);
-   configMapRedefine("connStoragePortTCP",         "8003", addDashes);
-   configMapRedefine("connMetaPortTCP",            "8005", addDashes);
-   configMapRedefine("connHelperdPortTCP",         "8006", addDashes);
-   configMapRedefine("connMgmtdPortTCP",           "8008", addDashes);
+
+   // To be able to merge these with the legacy settings later, we set them to -1 here. Otherwise it
+   // is impossible to detect if they have actually been set or just loaded the default.
+   // The actual default values are applied during the post processing in applyConfigMap.
+   configMapRedefine("connClientPort",             "-1", addDashes); // 8004
+   configMapRedefine("connStoragePort",            "-1", addDashes); // 8003
+   configMapRedefine("connMetaPort",               "-1", addDashes); // 8005
+   configMapRedefine("connMonPort",                "-1", addDashes); // 8007
+   configMapRedefine("connMgmtdPort",              "-1", addDashes); // 8008
+
    configMapRedefine("connUseRDMA",                "true", addDashes);
    configMapRedefine("connBacklogTCP",             "64", addDashes);
    configMapRedefine("connMaxInternodeNum",        "6", addDashes);
@@ -111,6 +113,18 @@ void AbstractConfig::loadDefaults(bool addDashes)
  */
 void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
 {
+   // Deprecated separate port settings. These are post processed below and merged into the new
+   // combined settings.
+   int connClientPortUDP = -1;
+   int connMgmtdPortUDP = -1;
+   int connMetaPortUDP = -1;
+   int connStoragePortUDP = -1;
+   int connMonPortUDP = -1;
+   int connClientPortTCP = -1;
+   int connMgmtdPortTCP = -1;
+   int connMetaPortTCP = -1;
+   int connStoragePortTCP = -1;
+   int connMonPortTCP = -1;
 
    for (StringMapIter iter = configMap.begin(); iter != configMap.end();)
    {
@@ -130,6 +144,16 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          logNumRotatedFiles = StringTk::strToInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "connPortShift", addDashes))
          connPortShift = StringTk::strToInt(iter->second);
+      else if (testConfigMapKeyMatch(iter, "connClientPort", addDashes))
+         assignKeyIfNotZero(iter, connClientPort, enableException);
+      else if (testConfigMapKeyMatch(iter, "connStoragePort", addDashes))
+         assignKeyIfNotZero(iter, connStoragePort, enableException);
+      else if (testConfigMapKeyMatch(iter, "connMetaPort", addDashes))
+         assignKeyIfNotZero(iter, connMetaPort, enableException);
+      else if (testConfigMapKeyMatch(iter, "connMonPort", addDashes))
+         assignKeyIfNotZero(iter, connMonPort, enableException);
+      else if (testConfigMapKeyMatch(iter, "connMgmtdPort", addDashes))
+         assignKeyIfNotZero(iter, connMgmtdPort, enableException);
       else if (testConfigMapKeyMatch(iter, "connClientPortUDP", addDashes))
          assignKeyIfNotZero(iter, connClientPortUDP, enableException);
       else if (testConfigMapKeyMatch(iter, "connStoragePortUDP", addDashes))
@@ -144,8 +168,6 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          assignKeyIfNotZero(iter, connStoragePortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMetaPortTCP", addDashes))
          assignKeyIfNotZero(iter, connMetaPortTCP, enableException);
-      else if (testConfigMapKeyMatch(iter, "connHelperdPortTCP", addDashes))
-         assignKeyIfNotZero(iter, connHelperdPortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connMgmtdPortTCP", addDashes))
          assignKeyIfNotZero(iter, connMgmtdPortTCP, enableException);
       else if (testConfigMapKeyMatch(iter, "connUseRDMA", addDashes))
@@ -259,6 +281,40 @@ void AbstractConfig::applyConfigMap(bool enableException, bool addDashes)
          iter = eraseFromConfigMap(iter);
       }
    }
+
+   auto processPortSettings = [&](const std::string& name, int& setting, const int& tcp, const int& udp, const int def) {
+      if(setting == -1) {
+         if(tcp != -1 && udp != -1 && tcp != udp) {
+            throw InvalidConfigException("Deprecated config arguments '" + name + "UDP' and \
+'" + name + "TCP' set to different values, which is no longer allowed. Please use the new '" + name + "' \
+setting instead.");
+         }
+
+         // Set the new setting using the old values
+         if(tcp != -1) {
+            setting = tcp;
+            // TODO Doesn't work as the logger isn't initialized yet: https://github.com/ThinkParQ/beegfs-core/issues/4033
+            LOG(GENERAL, WARNING, "Using deprecated config argument '" + name + "TCP'");
+         } else if(udp != -1) {
+            setting = udp;
+            // TODO Doesn't work as the logger isn't initialized yet: https://github.com/ThinkParQ/beegfs-core/issues/4033
+            LOG(GENERAL, WARNING, "Using deprecated config argument '" + name + "UDP'");
+         } else {
+            setting = def;
+         }
+      } else {
+         if(tcp != -1 || udp != -1) {
+            throw InvalidConfigException("Deprecated config arguments '" + name + "UDP/TCP' set along with the new \
+'" + name + "' setting. Please use only the new setting.");
+         }
+      }
+   };
+
+   processPortSettings("connClientPort", this->connClientPort, connClientPortTCP, connClientPortUDP, 8004);
+   processPortSettings("connStoragePort", this->connStoragePort, connStoragePortTCP, connStoragePortUDP, 8003);
+   processPortSettings("connMetaPort", this->connMetaPort, connMetaPortTCP, connMetaPortUDP, 8005);
+   processPortSettings("connMonPort", this->connMonPort, connMonPortTCP, connMonPortUDP, 8007);
+   processPortSettings("connMgmtdPort", this->connMgmtdPort, connMgmtdPortTCP, connMgmtdPortUDP, 8008);
 }
 
 void AbstractConfig::initImplicitVals()
@@ -309,15 +365,14 @@ void AbstractConfig::initInterfacesList(const std::string& connInterfacesFile,
  */
 void AbstractConfig::initConnAuthHash(const std::string& connAuthFile, uint64_t* outConnAuthHash)
 {
-   if(connAuthFile.empty())
-   {
-      if (connDisableAuthentication) {
-         *outConnAuthHash = 0;
-         return; // connAuthFile explicitly disabled => no hash to be generated
-      }
-      else
-         throw ConnAuthFileException("No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
+   if (connDisableAuthentication) {
+      *outConnAuthHash = 0;
+      return; // connAuthFile explicitly disabled => no hash to be generated
    }
+
+   // Connection authentication not explicitly disabled, so bail if connAuthFile is not configured
+   if(connAuthFile.empty())
+      throw ConnAuthFileException("No connAuthFile configured. Using BeeGFS without connection authentication is considered insecure and is not recommended. If you really want or need to run BeeGFS without connection authentication, please set connDisableAuthentication to true.");
 
    // open file...
 
@@ -347,13 +402,13 @@ void AbstractConfig::initConnAuthHash(const std::string& connAuthFile, uint64_t*
 
    if(fd == -1)
    {
-      throw InvalidConfigException("Unable to open auth file: " + connAuthFile + " "
+      throw ConnAuthFileException("Unable to open auth file: " + connAuthFile + " "
             "(SysErr: " + System::getErrString(errCode) + ")");
    }
 
    // load file contents...
 
-   char buf[ABSTRACTCONF_AUTHFILE_READSIZE];
+   unsigned char buf[ABSTRACTCONF_AUTHFILE_READSIZE];
 
    const ssize_t readRes = read(fd, buf, ABSTRACTCONF_AUTHFILE_READSIZE);
 
@@ -373,15 +428,7 @@ void AbstractConfig::initConnAuthHash(const std::string& connAuthFile, uint64_t*
 
 
    // hash file contents
-   // (hsieh hash only generates 32bit hashes, so we make two hashes for 64 bits)
-
-   int len1stHalf = readRes / 2;
-   int len2ndHalf = readRes - len1stHalf;
-
-   const uint64_t high = BufferTk::hash32(buf, len1stHalf);
-   const uint64_t low  = BufferTk::hash32(&buf[len1stHalf], len2ndHalf);
-
-   *outConnAuthHash = (high << 32) | low;
+   *outConnAuthHash = HashTk::authHash(buf, readRes);
 }
 
 /**
@@ -455,7 +502,7 @@ void AbstractConfig::assignKeyIfNotZero(const StringMapIter& it, int& intVal, bo
 {
    const int tempVal = StringTk::strToInt(it->second);
 
-   if (tempVal <= 0) {
+   if (tempVal == 0) {
       if (enableException) {
          throw InvalidConfigException("Invalid or unset configuration variable: " + (it->first));
       }

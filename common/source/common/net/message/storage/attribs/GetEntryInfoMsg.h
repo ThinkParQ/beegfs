@@ -1,5 +1,4 @@
-#ifndef GETENTRYINFOMSG_H_
-#define GETENTRYINFOMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -44,4 +43,3 @@ class GetEntryInfoMsg : public MirroredMessageBase<GetEntryInfoMsg>
       }
 };
 
-#endif /*GETENTRYINFOMSG_H_*/

@@ -1,5 +1,4 @@
-#ifndef GETCHUNKFILEATTRIBSRESPMSG_H_
-#define GETCHUNKFILEATTRIBSRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/Common.h>
@@ -81,4 +80,3 @@ class GetChunkFileAttribsRespMsg : public NetMessageSerdes<GetChunkFileAttribsRe
 
 };
 
-#endif /*GETCHUNKFILEATTRIBSRESPMSG_H_*/

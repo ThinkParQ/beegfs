@@ -282,13 +282,15 @@ void SessionFileStore::performAsyncCleanup(EntryInfo* entryInfo,
    App* app = Program::getApp();
    MetaStore* metaStore = app->getMetaStore();
 
-   unsigned numHardlinks;
-   unsigned numInodeRefs;
+   unsigned numHardlinks; // ignored here
+   unsigned numInodeRefs; // ignored here
+   bool lastWriterClosed; // ignored here
 
    LOG_DEBUG(logContext, Log_NOTICE, "Performing async cleanup of file session");
    IGNORE_UNUSED_VARIABLE(logContext);
 
-   metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks, &numInodeRefs);
+   metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks, &numInodeRefs,
+      lastWriterClosed);
 
    /* note: we ignore closing storage server files here (e.g. because we don't have the sessionID
       and fileHandleID at hand) and unlinking of disposable files (disposal can still be triggered

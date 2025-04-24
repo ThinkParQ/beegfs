@@ -1,5 +1,4 @@
-#ifndef REFRESHSESSIONMSG_H_
-#define REFRESHSESSIONMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -42,4 +41,3 @@ class RefreshSessionMsg : public NetMessageSerdes<RefreshSessionMsg>
 
 };
 
-#endif /* REFRESHSESSIONMSG_H_ */

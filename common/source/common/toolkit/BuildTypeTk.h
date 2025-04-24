@@ -1,5 +1,4 @@
-#ifndef BUILDTYPETK_H_
-#define BUILDTYPETK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/app/config/InvalidConfigException.h>
@@ -48,4 +47,3 @@ class BuildTypeTk
 };
 
 
-#endif /* BUILDTYPETK_H_ */

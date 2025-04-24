@@ -1,5 +1,4 @@
-#ifndef CHUNKLOCKSTORE_H_
-#define CHUNKLOCKSTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Condition.h>
@@ -154,4 +153,3 @@ class ChunkLockStore
       }
 };
 
-#endif /*CHUNKLOCKSTORE_H_*/

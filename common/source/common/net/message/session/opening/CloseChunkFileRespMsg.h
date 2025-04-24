@@ -1,5 +1,4 @@
-#ifndef CLOSECHUNKFILERESPMSG_H_
-#define CLOSECHUNKFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StorageErrors.h>
@@ -81,4 +80,3 @@ class CloseChunkFileRespMsg : public NetMessageSerdes<CloseChunkFileRespMsg>
 
 };
 
-#endif /*CLOSECHUNKFILERESPMSG_H_*/

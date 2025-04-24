@@ -1,5 +1,4 @@
-#ifndef ACKMSG_H_
-#define ACKMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleStringMsg.h>
 
@@ -17,4 +16,3 @@ class AckMsg : public SimpleStringMsg
       }
 };
 
-#endif /* ACKMSG_H_ */

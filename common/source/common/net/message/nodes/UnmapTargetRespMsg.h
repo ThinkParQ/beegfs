@@ -1,5 +1,4 @@
-#ifndef UNMAPTARGETRESPMSG_H_
-#define UNMAPTARGETRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleIntMsg.h>
@@ -23,4 +22,3 @@ class UnmapTargetRespMsg : public SimpleIntMsg
 };
 
 
-#endif /* UNMAPTARGETRESPMSG_H_ */

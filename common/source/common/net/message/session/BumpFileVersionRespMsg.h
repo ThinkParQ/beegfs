@@ -1,5 +1,4 @@
-#ifndef BUMPFILEVERSIONRESPMSG_H
-#define BUMPFILEVERSIONRESPMSG_H
+#pragma once
 
 #include "../SimpleIntMsg.h"
 
@@ -17,4 +16,3 @@ class BumpFileVersionRespMsg : public SimpleIntMsg
 };
 
 
-#endif

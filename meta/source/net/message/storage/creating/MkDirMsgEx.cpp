@@ -235,10 +235,10 @@ std::unique_ptr<MkDirMsgEx::ResponseState> MkDirMsgEx::mkDirPrimary(ResponseCont
       {
          if (app->getFileEventLogger() && getFileEvent())
          {
-            app->getFileEventLogger()->log(
-                                          *getFileEvent(),
-                                          newEntryInfo.getEntryID(),
-                                          newEntryInfo.getParentEntryID());
+            EventContext eventCtx = makeEventContext(&newEntryInfo, newEntryInfo.getParentEntryID(),
+               // This is not the secondary node if mkDirPrimary() was called.
+               getMsgHeaderUserID(), "", INITIAL_DIR_LINK_COUNT, false);
+            logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
          }
       }
    }
@@ -311,14 +311,18 @@ FhgfsOpsErr MkDirMsgEx::mkRemoteDirInode(DirInode& parentDir, const std::string&
    StripePattern* pattern = parentDir.getStripePatternClone();
    NumNodeID ownerNodeID = entryInfo->getOwnerNodeID();
 
+   RemoteStorageTarget rstInfo;
+   if (parentDir.getIsRstAvailable())
+      rstInfo.set(parentDir.getRemoteStorageTargetInfo());
+
    LOG_DEBUG(logContext, Log_DEBUG,
       "Creating dir inode at metadata node: " + ownerNodeID.str() + "; dirname: " + name);
 
    // prepare request
 
    NumNodeID parentNodeID = app->getLocalNode().getNumID();
-   MkLocalDirMsg mkMsg(entryInfo, getUserID(), getGroupID(), getMode(), pattern, parentNodeID,
-      defaultACLXAttr, accessACLXAttr);
+   MkLocalDirMsg mkMsg(entryInfo, getUserID(), getGroupID(), getMode(), pattern, &rstInfo,
+      parentNodeID, defaultACLXAttr, accessACLXAttr);
 
    RequestResponseArgs rrArgs(NULL, &mkMsg, NETMSGTYPE_MkLocalDirResp);
 

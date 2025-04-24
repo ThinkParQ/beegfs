@@ -1,5 +1,4 @@
-#ifndef REGISTRATIONDATAGRAMLISTENER_H_
-#define REGISTRATIONDATAGRAMLISTENER_H_
+#pragma once
 
 #include <common/components/AbstractDatagramListener.h>
 #include <common/Common.h>
@@ -26,4 +25,3 @@ class RegistrationDatagramListener : public AbstractDatagramListener
 
 };
 
-#endif /* REGISTRATIONDATAGRAMLISTENER_H_ */

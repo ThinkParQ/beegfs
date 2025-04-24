@@ -1,5 +1,4 @@
-#ifndef MSGHELPERCLOSE_H_
-#define MSGHELPERCLOSE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <storage/MetaStore.h>
@@ -9,7 +8,7 @@ class MsgHelperClose
    public:
       static FhgfsOpsErr closeFile(const NumNodeID sessionID, const std::string& fileHandleID,
          EntryInfo* entryInfo, int maxUsedNodeIndex, unsigned msgUserID,
-         bool* outUnlinkDisposalFile, bool* outModificationEventsMissed,
+         bool* outUnlinkDisposalFile, unsigned* outNumHardlinks, bool& outLastWriterClosed,
          DynamicFileAttribsVec* dynAttribs = NULL, MirroredTimestamps* timestamps = NULL);
       static FhgfsOpsErr closeSessionFile(const NumNodeID sessionID, const std::string& fileHandleID,
          EntryInfo* entryInfo, unsigned* outAccessFlags, MetaFileHandle& outCloseInode);
@@ -35,4 +34,3 @@ class MsgHelperClose
       // inliners
 };
 
-#endif /* MSGHELPERCLOSE_H_ */

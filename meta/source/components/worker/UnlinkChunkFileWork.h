@@ -1,5 +1,4 @@
-#ifndef UNLINKCHUNKFILEWORK_H_
-#define UNLINKCHUNKFILEWORK_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/net/sock/Socket.h>
@@ -61,4 +60,3 @@ class UnlinkChunkFileWork : public Work
       }
 };
 
-#endif /* UNLINKCHUNKFILEWORK_H_ */

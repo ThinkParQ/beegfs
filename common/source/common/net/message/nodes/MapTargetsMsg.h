@@ -1,5 +1,4 @@
-#ifndef MAPTARGETSMSG_H_
-#define MAPTARGETSMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/AcknowledgeableMsg.h>
@@ -59,4 +58,3 @@ class MapTargetsMsg : public AcknowledgeableMsgSerdes<MapTargetsMsg>
       } parsed;
 };
 
-#endif /* MAPTARGETSMSG_H_ */

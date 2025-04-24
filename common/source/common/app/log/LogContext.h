@@ -1,5 +1,4 @@
-#ifndef LOGCONTEXT_H_
-#define LOGCONTEXT_H_
+#pragma once
 
 #include <common/app/log/Logger.h>
 #include <common/app/AbstractApp.h>
@@ -118,4 +117,3 @@ class LogContext
 
 };
 
-#endif /*LOGCONTEXT_H_*/

@@ -47,11 +47,6 @@ StreamListener::~StreamListener()
 
    if(epollFD != -1)
       close(epollFD);
-
-
-   //SAFE_DELETE(tcpListenSock); // deleted through pollList now
-   //SAFE_DELETE(sdpListenSock); // deleted through pollList now
-   //SAFE_DELETE(rdmaListenSock); // deleted through pollList now
 }
 
 bool StreamListener::initSockReturnPipe()
@@ -78,7 +73,6 @@ bool StreamListener::initSocks(unsigned short listenPort, NicListCapabilities* l
    auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
 
    rdmaListenSock = NULL;
-   sdpListenSock = NULL;
    tcpListenSock = NULL;
 
 
@@ -110,39 +104,6 @@ bool StreamListener::initSocks(unsigned short listenPort, NicListCapabilities* l
       catch(SocketException& e)
       {
          log.logErr(std::string("RDMA socket: ") + e.what() );
-         return false;
-      }
-   }
-
-   // SDP
-
-   if(localNicCaps->supportsSDP)
-   { // SDP usage is enabled
-      try
-      {
-         sdpListenSock = new StandardSocket(PF_SDP, SOCK_STREAM);
-         sdpListenSock->setSoReuseAddr(true);
-         sdpListenSock->bind(listenPort);
-         sdpListenSock->listen();
-
-         pollList.add(sdpListenSock);
-
-         struct epoll_event epollEvent;
-         epollEvent.events = EPOLLIN;
-         epollEvent.data.ptr = sdpListenSock;
-         if(epoll_ctl(epollFD, EPOLL_CTL_ADD, sdpListenSock->getFD(), &epollEvent) == -1)
-         {
-            log.logErr(std::string("Unable to add SDP listen sock to epoll set: ") +
-               System::getErrString() );
-            return false;
-         }
-
-         log.log(Log_NOTICE, std::string("Listening for SDP connections: Port ") +
-            StringTk::intToStr(listenPort) );
-      }
-      catch(SocketException& e)
-      {
-         log.logErr(std::string("SDP socket: ") + e.what() );
          return false;
       }
    }
@@ -209,7 +170,6 @@ void StreamListener::listenLoop()
    // (just to have 'em on the stack)
    const int epollFD = this->epollFD;
    RDMASocket* rdmaListenSock = this->rdmaListenSock;
-   StandardSocket* sdpListenSock = this->sdpListenSock;
    StandardSocket* tcpListenSock = this->tcpListenSock;
    FileDescriptor* sockReturnPipeReadEnd = this->sockReturnPipe->getReadFD();
 
@@ -252,9 +212,6 @@ void StreamListener::listenLoop()
 
          if(unlikely(currentPollable == rdmaListenSock) )
             onIncomingRDMAConnection(rdmaListenSock);
-         else
-         if(unlikely(currentPollable == sdpListenSock) )
-            onIncomingStandardConnection(sdpListenSock);
          else
          if(unlikely(currentPollable == tcpListenSock) )
             onIncomingStandardConnection(tcpListenSock);

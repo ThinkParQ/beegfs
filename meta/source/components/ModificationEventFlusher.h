@@ -1,5 +1,4 @@
-#ifndef MODIFICATIONEVENTFLUSHER_H
-#define MODIFICATIONEVENTFLUSHER_H
+#pragma once
 
 #include <app/App.h>
 #include <common/components/worker/Worker.h>
@@ -183,4 +182,3 @@ class ModificationEventFlusher: public PThread
       }
 };
 
-#endif /* MODIFICATIONEVENTFLUSHER_H */

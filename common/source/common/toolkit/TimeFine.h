@@ -1,5 +1,4 @@
-#ifndef TIMEFINE_H_
-#define TIMEFINE_H_
+#pragma once
 
 #include <common/toolkit/Time.h>
 #include <common/Common.h>
@@ -43,4 +42,3 @@ class TimeFine : public Time
 
 };
 
-#endif /* TIMEFINE_H_ */

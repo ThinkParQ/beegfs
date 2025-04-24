@@ -1,5 +1,4 @@
-#ifndef UNLINKLOCALFILEINODEMSG_H_
-#define UNLINKLOCALFILEINODEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -46,4 +45,3 @@ class UnlinkLocalFileInodeMsg : public MirroredMessageBase<UnlinkLocalFileInodeM
       bool supportsMirroring() const { return true; }
 };
 
-#endif /* UNLINKLOCALFILEINODEMSG_H_ */

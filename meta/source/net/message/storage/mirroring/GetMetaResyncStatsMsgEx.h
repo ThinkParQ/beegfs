@@ -1,5 +1,4 @@
-#ifndef META_GETMETARESYNCJOBSTATSMSGEX_H
-#define META_GETMETARESYNCJOBSTATSMSGEX_H
+#pragma once
 
 #include <common/net/message/storage/mirroring/GetMetaResyncStatsMsg.h>
 
@@ -9,4 +8,3 @@ class GetMetaResyncStatsMsgEx : public GetMetaResyncStatsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* META_GETMETARESYNCJOBSTATSMSGEX_H */

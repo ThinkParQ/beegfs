@@ -453,7 +453,7 @@
           "measurement": "meta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) =>    r.nodeID == \"${metaID}\" and     r._measurement == \"meta\" and    r._field == \"isResponding\")  \r\n|> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)  \r\n|> yield(name: \"last\")  \r\n|> keep(columns: [\"_time\",\"_value\"])",
+          "query": "from(bucket: \"${bucket}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) =>    r.nodeNumID == \"${metaID}\" and     r._measurement == \"meta\" and    r._field == \"isResponding\")  \r\n|> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)  \r\n|> yield(name: \"last\")  \r\n|> keep(columns: [\"_time\",\"_value\"])",
           "rawQuery": false,
           "refId": "A",
           "resultFormat": "time_series",
@@ -1045,7 +1045,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "netRecvBytes"
+              "options": "Received"
             },
             "properties": [
               {
@@ -1064,7 +1064,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "netSendBytes"
+              "options": "Send"
             },
             "properties": [
               {
@@ -1132,7 +1132,7 @@
           "measurement": "highResMeta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"netRecvBytes\")\r\n  |> aggregateWindow(every: 10s, fn: max, createEmpty: false)\r\n  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeNumID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"netRecvBytes\")\r\n  |> group(columns: [\"nodeNumID\"], mode: \"by\")\r\n  |> aggregateWindow(every: 10s, fn: max, createEmpty: false)\r\n  |> rename(columns: {_value: \"Received\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -1181,7 +1181,7 @@
           "measurement": "highResMeta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"netSendBytes\")\r\n  |> aggregateWindow(every: 10s, fn: max, createEmpty: false)\r\n  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeNumID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"netSendBytes\")\r\n  |> group(columns: [\"nodeNumID\"], mode: \"by\")\r\n  |> aggregateWindow(every: 10s, fn: max, createEmpty: false)\r\n  |> rename(columns: {_value: \"Send\"})",
           "refId": "B",
           "resultFormat": "time_series",
           "select": [
@@ -1269,7 +1269,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "workRequests"
+              "options": "Processed"
             },
             "properties": [
               {
@@ -1288,7 +1288,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "queuedRequests"
+              "options": "Queued"
             },
             "properties": [
               {
@@ -1352,7 +1352,7 @@
           "measurement": "highResMeta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"workRequests\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeNumID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"workRequests\")\r\n  |> group(columns: [\"nodeNumID\"], mode: \"by\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> rename(columns: {_value: \"Processed\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -1401,7 +1401,7 @@
           "measurement": "highResMeta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"queuedRequests\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeNumID == \"${metaID}\" and \r\n    r._measurement == \"highResMeta\" and\r\n    r._field == \"queuedRequests\")\r\n  |> group(columns: [\"nodeNumID\"], mode: \"by\") \r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> rename(columns: {_value: \"Queued\"})",
           "refId": "B",
           "resultFormat": "time_series",
           "select": [
@@ -1489,7 +1489,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "directWorkListSize"
+              "options": "Direct"
             },
             "properties": [
               {
@@ -1508,7 +1508,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "indirectWorkListSize"
+              "options": "Indirect"
             },
             "properties": [
               {
@@ -1572,7 +1572,7 @@
           "measurement": "meta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeID == \"${metaID}\" and \r\n    r._measurement == \"meta\" and\r\n    r._field == \"directWorkListSize\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeNumID == \"${metaID}\" and \r\n    r._measurement == \"meta\" and\r\n    r._field == \"directWorkListSize\")\r\n  |> group(columns: [\"nodeNumID\"], mode: \"by\") \r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> rename(columns: {_value: \"Direct\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -1621,7 +1621,7 @@
           "measurement": "meta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeID == \"${metaID}\" and \r\n    r._measurement == \"meta\" and\r\n    r._field == \"indirectWorkListSize\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)\r\n  |> filter(fn: (r) =>\r\n    r.nodeNumID == \"${metaID}\" and \r\n    r._measurement == \"meta\" and\r\n    r._field == \"indirectWorkListSize\")\r\n  |> group(columns: [\"nodeNumID\"], mode: \"by\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)\r\n  |> rename(columns: {_value: \"Indirect\"})",
           "refId": "B",
           "resultFormat": "time_series",
           "select": [
@@ -2685,14 +2685,14 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.measurementTagValues(\r\n  bucket: \"${bucket}\",\r\n  tag: \"nodeID\",\r\n  measurement: \"meta\"\r\n)",
+        "definition": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.measurementTagValues(\r\n  bucket: \"${bucket}\",\r\n  tag: \"nodeNumID\",\r\n  measurement: \"meta\"\r\n)",
         "hide": 0,
         "includeAll": false,
         "label": "Meta ID",
         "multi": false,
         "name": "metaID",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.measurementTagValues(\r\n  bucket: \"${bucket}\",\r\n  tag: \"nodeID\",\r\n  measurement: \"meta\"\r\n)",
+        "query": "import \"influxdata/influxdb/schema\"\r\n\r\nschema.measurementTagValues(\r\n  bucket: \"${bucket}\",\r\n  tag: \"nodeNumID\",\r\n  measurement: \"meta\"\r\n)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -2745,13 +2745,14 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${metaID}\" and     r._measurement == \"meta\" and    r._field == \"hostnameid\") |> last()",
-        "hide": 2,
+        "definition": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${metaID}\" and     r._measurement == \"meta\" and    r._field == \"hostnameid\") |> last()",
+        "hide": 0,
         "includeAll": false,
+        "label": "Meta Host",
         "multi": false,
         "name": "hostmeta",
         "options": [],
-        "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${metaID}\" and     r._measurement == \"meta\" and    r._field == \"hostnameid\") |> last()",
+        "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${metaID}\" and     r._measurement == \"meta\" and    r._field == \"hostnameid\") |> last()",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

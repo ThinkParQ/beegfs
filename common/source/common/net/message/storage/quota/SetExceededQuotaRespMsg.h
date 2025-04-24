@@ -1,5 +1,4 @@
-#ifndef SETEXCEEDEDQUOTARESPMSG_H_
-#define SETEXCEEDEDQUOTARESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/SimpleIntMsg.h>
@@ -21,4 +20,3 @@ class SetExceededQuotaRespMsg: public SimpleIntMsg
       }
 };
 
-#endif /* SETEXCEEDEDQUOTARESPMSG_H_ */

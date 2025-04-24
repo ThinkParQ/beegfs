@@ -1,5 +1,4 @@
-#ifndef FSCKFSIDS_H_
-#define FSCKFSIDS_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/NumNodeID.h>
@@ -121,4 +120,3 @@ class FsckFsID
 template<>
 struct ListSerializationHasLength<FsckFsID> : boost::false_type {};
 
-#endif /* FSCKFSIDS_H_ */

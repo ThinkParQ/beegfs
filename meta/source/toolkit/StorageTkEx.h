@@ -1,5 +1,4 @@
-#ifndef STORAGETKEX_H_
-#define STORAGETKEX_H_
+#pragma once
 
 #include <app/config/Config.h>
 #include <common/Common.h>
@@ -59,4 +58,3 @@ class StorageTkEx
       }
 };
 
-#endif /*STORAGETKEX_H_*/

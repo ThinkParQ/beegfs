@@ -1,5 +1,4 @@
-#ifndef LISTDIRFROMOFFSETMSGEX_H_
-#define LISTDIRFROMOFFSETMSGEX_H_
+#pragma once
 
 #include <storage/MetaStore.h>
 #include <common/storage/EntryInfo.h>
@@ -19,4 +18,3 @@ class ListDirFromOffsetMsgEx : public ListDirFromOffsetMsg
 };
 
 
-#endif /*LISTDIRFROMOFFSETMSGEX_H_*/

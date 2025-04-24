@@ -97,7 +97,7 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
    outAddr->ibdev = NULL;
 #endif
    // name
-   strcpy(outAddr->name, dev->name);
+   strncpy(outAddr->name, dev->name, IFNAMSIZ);
 
 
    // SIOCGIFFLAGS:
@@ -115,14 +115,8 @@ bool __NIC_fillNicAddress(struct net_device* dev, NicAddrType_t nicType, NicAddr
    {
       case ARPHRD_LOOPBACK:
          return false;
-
       default:
-      {
-         // make sure we allow SDP for IB only (because an SDP socket domain is valid for other
-         // NIC types as well, but cannot connect between different NIC types
-         if( (nicType == NICADDRTYPE_SDP) && (ifr.ifr_hwaddr.sa_family != ARPHRD_INFINIBAND) )
-            return false;
-      } break;
+         break;
    }
 
 
@@ -170,7 +164,6 @@ const char* NIC_nicTypeToString(NicAddrType_t nicType)
    {
       case NICADDRTYPE_RDMA: return "RDMA";
       case NICADDRTYPE_STANDARD: return "TCP";
-      case NICADDRTYPE_SDP: return "SDP";
 
       default: return "<unknown>";
    }
@@ -192,9 +185,6 @@ char* NIC_nicAddrToString(NicAddress* nicAddr)
    if(nicAddr->nicType == NICADDRTYPE_RDMA)
       typeStr = "RDMA";
    else
-   if(nicAddr->nicType == NICADDRTYPE_SDP)
-      typeStr = "SDP";
-   else
    if(nicAddr->nicType == NICADDRTYPE_STANDARD)
       typeStr = "TCP";
    else
@@ -203,25 +193,6 @@ char* NIC_nicAddrToString(NicAddress* nicAddr)
    snprintf(nicAddrStr, NIC_STRING_LEN, "%s[ip addr: %s; type: %s]", nicAddr->name, ipStr, typeStr);
 
    return nicAddrStr;
-}
-
-bool NIC_supportsSDP(NicAddressList* nicList)
-{
-   bool sdpSupported = false;
-
-   NicAddressListIter iter;
-   NicAddressListIter_init(&iter, nicList);
-
-   for( ; !NicAddressListIter_end(&iter); NicAddressListIter_next(&iter) )
-   {
-      if(NicAddressListIter_value(&iter)->nicType == NICADDRTYPE_SDP)
-      {
-         sdpSupported = true;
-         break;
-      }
-   }
-
-   return sdpSupported;
 }
 
 bool NIC_supportsRDMA(NicAddressList* nicList)
@@ -245,21 +216,9 @@ bool NIC_supportsRDMA(NicAddressList* nicList)
 
 void NIC_supportedCapabilities(NicAddressList* nicList, NicListCapabilities* outCapabilities)
 {
-   outCapabilities->supportsSDP = NIC_supportsSDP(nicList);
    outCapabilities->supportsRDMA = NIC_supportsRDMA(nicList);
 }
 
-
-bool __NIC_checkSDPAvailable(void)
-{
-   Socket* sock = (Socket*)StandardSocket_construct(PF_SDP, SOCK_STREAM, 0);
-   if(!sock)
-      return false;
-
-   Socket_virtualDestruct(sock);
-
-   return true;
-}
 
 /**
  * Checks a list of TCP/IP interfaces for RDMA-capable interfaces.

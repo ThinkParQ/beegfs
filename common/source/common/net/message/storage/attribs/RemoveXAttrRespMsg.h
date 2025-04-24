@@ -1,5 +1,4 @@
-#ifndef REMOVEXATTRRESPMSG_H_
-#define REMOVEXATTRRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -11,4 +10,3 @@ class RemoveXAttrRespMsg : public SimpleIntMsg
       RemoveXAttrRespMsg() : SimpleIntMsg(NETMSGTYPE_RemoveXAttrResp) {}
 };
 
-#endif /*REMOVEXATTRRESPMSG_H_*/

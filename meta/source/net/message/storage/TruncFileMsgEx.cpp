@@ -32,34 +32,38 @@ std::unique_ptr<MirroredMessageResponseState> TruncFileMsgEx::executeLocally(Res
             dynAttribs);
       if (truncRes == FhgfsOpsErr_SUCCESS && (shouldFixTimestamps() || getFileEvent()))
       {
-         auto inode = metaStore->referenceFile(getEntryInfo());
-         bool hasMissedEvents = true;
-         if (inode)
+         auto [inode, referenceRes] = metaStore->referenceFile(getEntryInfo());
+         unsigned numHardlinks = 0;
+
+         if (likely(inode))
          {
             if (shouldFixTimestamps())
                fixInodeTimestamp(*inode, mirroredTimestamps, nullptr);
 
-            hasMissedEvents = inode->getNumHardlinks() > 1;
-
+            numHardlinks = inode->getNumHardlinks();
             metaStore->releaseFile(getEntryInfo()->getParentEntryID(), inode);
          }
 
          if (app->getFileEventLogger() && getFileEvent())
          {
-               app->getFileEventLogger()->log(
-                        *getFileEvent(),
-                        getEntryInfo()->getEntryID(),
-                        getEntryInfo()->getParentEntryID(),
-                        "",
-                        hasMissedEvents);
+            EventContext eventCtx = makeEventContext(
+               getEntryInfo(),
+               getEntryInfo()->getParentEntryID(),
+               getMsgHeaderUserID(),
+               "",
+               numHardlinks,
+               isSecondary
+            );
+
+            logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
          }
       }
       return boost::make_unique<ResponseState>(truncRes);
    }
 
-   MetaFileHandle inode = metaStore->referenceFile(getEntryInfo());
+   auto [inode, referenceRes] = metaStore->referenceFile(getEntryInfo());
    if(!inode)
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+      return boost::make_unique<ResponseState>(referenceRes);
 
    inode->setDynAttribs(dynAttribs);
    if (shouldFixTimestamps())

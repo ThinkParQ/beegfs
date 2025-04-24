@@ -1,5 +1,4 @@
-#ifndef META_NET_MESSAGE_MIRROREDMESSAGE_H
-#define META_NET_MESSAGE_MIRROREDMESSAGE_H
+#pragma once
 
 #include <app/App.h>
 #include <common/app/log/Logger.h>
@@ -444,4 +443,3 @@ class MirroredMessage : public BaseT
       }
 };
 
-#endif

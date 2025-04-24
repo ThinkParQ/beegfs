@@ -21,7 +21,7 @@ bool __HeartbeatRequestMsgEx_processIncoming(NetMessage* this, struct App* app,
 
    Config* cfg = App_getConfig(app);
    Node* localNode = App_getLocalNode(app);
-   const char* localNodeID = Node_getID(localNode);
+   NodeString alias;
    NumNodeID localNodeNumID = Node_getNumID(localNode);
    NicAddressList nicList;
 
@@ -31,8 +31,9 @@ bool __HeartbeatRequestMsgEx_processIncoming(NetMessage* this, struct App* app,
    ssize_t sendRes;
 
    Node_cloneNicList(localNode, &nicList);
-   HeartbeatMsgEx_initFromNodeData(&hbMsg, localNodeID, localNodeNumID, NODETYPE_Client, &nicList);
-   HeartbeatMsgEx_setPorts(&hbMsg, Config_getConnClientPortUDP(cfg), 0);
+   Node_copyAlias(localNode, &alias);
+   HeartbeatMsgEx_initFromNodeData(&hbMsg, alias.buf, localNodeNumID, NODETYPE_Client, &nicList);
+   HeartbeatMsgEx_setPorts(&hbMsg, Config_getConnClientPort(cfg), 0);
 
    respLen = NetMessage_getMsgLength( (NetMessage*)&hbMsg);
    serializeRes = NetMessage_serialize( (NetMessage*)&hbMsg, respBuf, bufLen);

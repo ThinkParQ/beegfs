@@ -1,5 +1,4 @@
-#ifndef CHUNKDIR_H_
-#define CHUNKDIR_H_
+#pragma once
 
 #include <string>
 
@@ -50,4 +49,3 @@ class ChunkDir
 
 };
 
-#endif /*CHUNKDIR_H_*/

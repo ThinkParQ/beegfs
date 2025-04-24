@@ -15,5 +15,14 @@ bool RegisterNodeRespMsg_deserializePayload(NetMessage* this, DeserializeCtx* ct
    if(!NumNodeID_deserialize(ctx, &thisCast->nodeNumID) )
       return false;
 
+   // GRPC Port
+   if(!Serialization_deserializeUShort(ctx, &thisCast->grpcPort) )
+      return false;
+
+   // fsUUID
+   if(!Serialization_deserializeStr(ctx, &thisCast->fsUUIDLen,
+         &thisCast->fsUUID) )
+      return false;
+
    return true;
 }

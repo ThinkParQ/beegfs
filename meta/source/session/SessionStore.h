@@ -1,5 +1,4 @@
-#ifndef META_SESSIONSTORE_H
-#define META_SESSIONSTORE_H
+#pragma once
 
 #include <common/nodes/Node.h>
 #include <common/toolkit/ObjectReferencer.h>
@@ -96,4 +95,3 @@ class SessionStore
       }
 };
 
-#endif /* META_SESSIONSTORE_H */

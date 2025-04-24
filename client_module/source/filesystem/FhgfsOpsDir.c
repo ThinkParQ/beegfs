@@ -115,7 +115,6 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    }
 
    // active dentry => remote-stat and local-compare
-
    isValid = __FhgfsOps_revalidateIntent(parentDentry, dentry );
 
 cleanup_put_parent:
@@ -156,7 +155,6 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
    bool cacheValid = FhgfsInode_isCacheValid(fhgfsInode, inode->i_mode, cfg);
    int isValid = 0; // quasi-boolean (return value)
    bool needDrop = false;
-
    FhgfsIsizeHints iSizeHints;
 
 
@@ -175,6 +173,8 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
    { // any file or directory except our mount root
       const EntryInfo* parentInfo;
       EntryInfo* entryInfo;
+      uint32_t  metaVersion;
+
 
       FhgfsOpsErr remotingRes;
       LookupIntentInfoIn inInfo; // input data for combo-request
@@ -187,9 +187,11 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
 
       parentInfo = FhgfsInode_getEntryInfo(parentFhgfsInode);
       entryInfo  = &fhgfsInode->entryInfo;
+      metaVersion = fhgfsInode->metaVersion;
 
       LookupIntentInfoIn_init(&inInfo, parentInfo, entryName);
       LookupIntentInfoIn_addEntryInfo(&inInfo, entryInfo);
+      LookupIntentInfoIn_addMetaVersion(&inInfo, metaVersion);
 
       LookupIntentInfoOut_prepare(&outInfo, NULL, &fhgfsStat);
 
@@ -208,22 +210,31 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
          goto out;
       }
 
-      if (outInfo.revalidateRes != FhgfsOpsErr_SUCCESS)
+      if (outInfo.revalidateRes == FhgfsOpsErr_PATHNOTEXISTS)
       {
          if(unlikely(!(outInfo.responseFlags & LOOKUPINTENTRESPMSG_FLAG_REVALIDATE) ) )
             Logger_logErrFormatted(log, logContext, "Unexpected revalidate info missing: %s",
                entryInfo->fileName);
-
          needDrop = true;
          goto out;
       }
 
       // check the stat result here and set fhgfsStatPtr accordingly
-      if(outInfo.statRes == FhgfsOpsErr_SUCCESS)
+      if (outInfo.statRes == FhgfsOpsErr_SUCCESS)
          fhgfsStatPtr = &fhgfsStat; // successful, so we can use existing stat values
-      else
-      if(outInfo.statRes == FhgfsOpsErr_NOTOWNER)
+      else if (outInfo.statRes == FhgfsOpsErr_NOTOWNER)
          fhgfsStatPtr = NULL; // stat values not available
+      else if (outInfo.statRes == FhgfsOpsErr_INTERNAL 
+         && outInfo.revalidateRes == FhgfsOpsErr_METAVERSIONMISMATCH
+         && Config_getSysCacheInvalidationVersion(cfg) )
+      {
+         // case when we want to invalidate the inode cache due to inode version change
+         // this case will not drop the dentry 
+         // must goto out, since we clear the inode stripe pattern 
+         fhgfsStatPtr = NULL; // stat values not available
+         __FhgfsOps_clearInodeStripePattern(app, inode);
+         goto out;
+      }
       else
       {
          if(unlikely(!(outInfo.responseFlags & LOOKUPINTENTRESPMSG_FLAG_STAT) ) )
@@ -236,6 +247,7 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
       }
    }
 
+   
    if (!__FhgfsOps_refreshInode(app, inode, fhgfsStatPtr, &iSizeHints) )
       isValid = 1;
    else

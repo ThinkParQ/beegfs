@@ -57,7 +57,7 @@ void RetrieveChunksWork::doWork()
    // that node; the chunks are retrieved incrementally
    if ( node )
    {
-      std::string nodeID = node->getID();
+      std::string nodeID = node->getAlias();
       FetchFsckChunkListStatus status = FetchFsckChunkListStatus_NOTSTARTED;
       unsigned resultCount = 0;
 

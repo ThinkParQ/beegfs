@@ -1,5 +1,4 @@
-#ifndef FLOCKAPPENDMSG_H_
-#define FLOCKAPPENDMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -110,4 +109,3 @@ class FLockAppendMsg : public MirroredMessageBase<FLockAppendMsg>
       }
 };
 
-#endif /* FLOCKAPPENDMSG_H_ */

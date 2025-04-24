@@ -1,5 +1,4 @@
-#ifndef UPDATEFILEATTRIBSRESPMSG_H
-#define UPDATEFILEATTRIBSRESPMSG_H
+#pragma once
 
 #include <common/fsck/FsckFileInode.h>
 #include <common/net/message/NetMessage.h>
@@ -39,4 +38,3 @@ class UpdateFileAttribsRespMsg : public NetMessageSerdes<UpdateFileAttribsRespMs
 };
 
 
-#endif /*UPDATEFILEATTRIBSRESPMSG_H*/

@@ -1,5 +1,4 @@
-#ifndef ADJUSTCHUNKPERMISSIONSRESPMSG_H
-#define ADJUSTCHUNKPERMISSIONSRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -70,4 +69,3 @@ class AdjustChunkPermissionsRespMsg : public NetMessageSerdes<AdjustChunkPermiss
 };
 
 
-#endif /*ADJUSTCHUNKPERMISSIONSRESPMSG_H*/

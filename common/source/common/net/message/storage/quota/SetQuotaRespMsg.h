@@ -1,5 +1,4 @@
-#ifndef SETQUOTARESPMSG_H_
-#define SETQUOTARESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/SimpleIntMsg.h>
@@ -20,4 +19,3 @@ class SetQuotaRespMsg: public SimpleIntMsg
       }
 };
 
-#endif /* SETQUOTARESPMSG_H_ */

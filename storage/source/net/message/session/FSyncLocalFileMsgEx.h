@@ -1,5 +1,4 @@
-#ifndef FSYNCLOCALFILEMSGEX_H_
-#define FSYNCLOCALFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/session/FSyncLocalFileMsg.h>
 
@@ -12,4 +11,3 @@ class FSyncLocalFileMsgEx : public FSyncLocalFileMsg
       FhgfsOpsErr fsync();
 };
 
-#endif /*FSYNCLOCALFILEMSGEX_H_*/

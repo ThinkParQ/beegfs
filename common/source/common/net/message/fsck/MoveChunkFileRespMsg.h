@@ -1,5 +1,4 @@
-#ifndef MOVECHUNKFILERESPMESG_H
-#define MOVECHUNKFILERESPMESG_H
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -19,4 +18,3 @@ class MoveChunkFileRespMsg : public SimpleIntMsg
 };
 
 
-#endif /*MOVECHUNKFILERESPMESG_H*/

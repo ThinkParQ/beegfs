@@ -11,7 +11,7 @@ struct GetFileVersionRespMsg
    NetMessage base;
 
    FhgfsOpsErr result;
-   uint64_t version;
+   uint32_t version;
 };
 extern const struct NetMessageOps GetFileVersionRespMsg_Ops;
 

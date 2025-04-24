@@ -1,5 +1,4 @@
-#ifndef SETMETADATAMIRRORINGMSG_H_
-#define SETMETADATAMIRRORINGMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleMsg.h>
 #include <common/storage/EntryInfo.h>
@@ -18,4 +17,3 @@ class SetMetadataMirroringMsg : public SimpleMsg
 };
 
 
-#endif /*SETMETADATAMIRRORINGMSG_H_*/

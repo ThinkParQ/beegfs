@@ -1,5 +1,4 @@
-#ifndef RESYNCLOCALFILERESPMSG_H_
-#define RESYNCLOCALFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -22,4 +21,3 @@ class ResyncLocalFileRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*RESYNCLOCALFILERESPMSG_H_*/

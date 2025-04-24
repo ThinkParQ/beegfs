@@ -18,7 +18,7 @@ std::unique_ptr<MirroredMessageResponseState> GetFileVersionMsgEx::executeLocall
    GetFileVersionMsgResponseState resp;
 
    auto& metaStore = *Program::getApp()->getMetaStore();
-   auto inode = metaStore.referenceFile(&getEntryInfo());
+   auto [inode, referenceRes] = metaStore.referenceFile(&getEntryInfo());
    if (!inode)
    {
       // The GetFileVersionMsgResponseState constructor sets default values for 'result' and

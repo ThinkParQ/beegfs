@@ -1,5 +1,4 @@
-#ifndef SETCHUNKFILEATTRIBSWORK_H_
-#define SETCHUNKFILEATTRIBSWORK_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/net/sock/Socket.h>
@@ -78,4 +77,3 @@ class SetChunkFileAttribsWork : public Work
 
 };
 
-#endif /* SETCHUNKFILEATTRIBSWORK_H_ */

@@ -1,5 +1,4 @@
-#ifndef TRUNCCHUNKFILEWORK_H_
-#define TRUNCCHUNKFILEWORK_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/net/sock/Socket.h>
@@ -77,4 +76,3 @@ class TruncChunkFileWork : public Work
       }
 };
 
-#endif /* TRUNCCHUNKFILEWORK_H_ */

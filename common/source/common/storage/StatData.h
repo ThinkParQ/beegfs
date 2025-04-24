@@ -6,8 +6,7 @@
  * need to handle disk serialization.
  */
 
-#ifndef STATDATA_H_
-#define STATDATA_H_
+#pragma once
 
 #include <common/storage/striping/ChunkFileInfo.h>
 #include <common/storage/striping/StripePattern.h>
@@ -64,7 +63,7 @@ class StatData
       }
 
       StatData(int64_t fileSize, SettableFileAttribs* settableAttribs,
-         int64_t createTime, int64_t attribChangeTime, unsigned nlink, unsigned contentsVersion)
+         int64_t createTime, int64_t attribChangeTime, unsigned nlink, unsigned metaVersion)
       {
          this->flags = 0;
 
@@ -73,7 +72,7 @@ class StatData
          this->creationTimeSecs     = createTime;
          this->attribChangeTimeSecs = attribChangeTime;
          this->nlink                = nlink;
-         this->contentsVersion      = contentsVersion;
+         this->metaVersion          = metaVersion;
       }
 
       // used on file creation
@@ -87,7 +86,7 @@ class StatData
          this->creationTimeSecs     = createTime;
          this->attribChangeTimeSecs = createTime;
          this->nlink                = 1;
-         this->contentsVersion      = 0;
+         this->metaVersion      = 0;
 
          this->settableFileAttribs.mode    = mode;
          this->settableFileAttribs.userID  = uid;
@@ -108,7 +107,7 @@ class StatData
 
       SettableFileAttribs settableFileAttribs;
 
-      uint32_t contentsVersion; // inc'ed when file contents are modified (for cache invalidation)
+      uint32_t metaVersion; // inc'ed when internal metadata is modified (for cache invalidation)
 
       ChunksBlocksVec chunkBlocksVec; // serialized to disk, but not over network
 
@@ -136,7 +135,7 @@ class StatData
          this->creationTimeSecs     = 0;
          this->attribChangeTimeSecs = 0;
          this->nlink                = 1;
-         this->contentsVersion      = 0;
+         this->metaVersion          = 0;
 
          this->settableFileAttribs.mode    = 0;
          this->settableFileAttribs.userID  = 0;
@@ -157,7 +156,7 @@ class StatData
 
          this->settableFileAttribs = *settableAttribs;
 
-         this->contentsVersion      = 0;
+         this->metaVersion      = 0;
       }
 
       /**
@@ -174,7 +173,7 @@ class StatData
 
          this->settableFileAttribs  = newStatData->settableFileAttribs;
 
-         this->contentsVersion      = newStatData->contentsVersion;
+         this->metaVersion          = newStatData->metaVersion;
 
          this->flags                = newStatData->flags;
          this->chunkBlocksVec       = newStatData->chunkBlocksVec;
@@ -200,7 +199,7 @@ class StatData
 
          outStatData.settableFileAttribs = this->settableFileAttribs;
 
-         outStatData.contentsVersion      = this->contentsVersion;
+         outStatData.metaVersion         = this->metaVersion;
       }
 
       MirroredTimestamps getMirroredTimestamps() const
@@ -324,6 +323,11 @@ class StatData
          this->nlink = numHardLinks;
       }
 
+      void setMetaVersionStat(unsigned metaVersion)
+      {
+         this->metaVersion = metaVersion;
+      }
+
 
       // getters
       int64_t getFileSize() const
@@ -376,6 +380,11 @@ class StatData
          return this->settableFileAttribs.groupID;
       }
 
+      unsigned getMetaVersion() const
+      {
+         return this->metaVersion;
+      }
+
       template<typename This, typename Ctx>
       static void serializeFmt(StatDataFormat format, This obj, Ctx& ctx)
       {
@@ -407,7 +416,7 @@ class StatData
             ctx
                % obj->fileSize
                % obj->nlink
-               % obj->contentsVersion;
+               % obj->metaVersion;
          }
 
          ctx
@@ -452,4 +461,3 @@ class StatData
 
 
 
-#endif /* STATDATA_H_ */

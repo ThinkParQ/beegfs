@@ -1,5 +1,4 @@
-#ifndef LISTTK_H_
-#define LISTTK_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -147,4 +146,3 @@ class ListTk
 };
 
 
-#endif /*LISTTK_H_*/

@@ -1,3 +1,4 @@
+#include <common/net/message/control/GenericResponseMsg.h>
 #include <common/net/message/storage/mirroring/ResyncLocalFileRespMsg.h>
 #include <common/toolkit/MessagingTk.h>
 #include <net/msghelpers/MsgHelperIO.h>
@@ -20,6 +21,7 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
    std::string relativeChunkPathStr = getRelativePathStr();
    int writeErrno;
    bool writeRes;
+   StorageTarget* target;
 
    int openFlags = O_WRONLY | O_CREAT;
    SessionQuotaInfo quotaInfo(false, false, 0, 0);
@@ -29,7 +31,24 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
    int fd;
    FhgfsOpsErr openRes;
 
-   auto* const target = app->getStorageTargets()->getTarget(targetID);
+   // should only be used for chunk balancing, to sync data to both buddies
+   if(isMsgHeaderFeatureFlagSet(RESYNCLOCALFILEMSG_FLAG_CHUNKBALANCE_BUDDYMIRROR) )
+   { // given targetID refers to a buddy mirror group
+      MirrorBuddyGroupMapper* mirrorBuddies = app->getMirrorBuddyGroupMapper();
+      targetID = isMsgHeaderFeatureFlagSet(RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND) ?
+         mirrorBuddies->getSecondaryTargetID(targetID) :
+         mirrorBuddies->getPrimaryTargetID(targetID);
+
+      if(unlikely(!targetID) )
+      { // unknown target
+         LogContext(__func__).logErr("Invalid mirror buddy group ID: " +
+            StringTk::uintToStr(!targetID ) );
+         retVal = FhgfsOpsErr_UNKNOWNTARGET;
+         goto send_response;
+      }
+   }
+
+   target = app->getStorageTargets()->getTarget(targetID);
    if (!target)
    {
       LogContext(__func__).logErr(
@@ -39,8 +58,12 @@ bool ResyncLocalFileMsgEx::processIncoming(ResponseContext& ctx)
       goto send_response;
    }
 
-   targetFD = *target->getMirrorFD();
-
+   retVal = forwardToSecondary(*target, ctx);
+   //check if path is relative to buddy mirror dir or chunks dir
+   targetFD = isMsgHeaderFeatureFlagSet(RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR) 
+         ? *target->getMirrorFD()
+         : *target->getChunkFD();
+    
    // always truncate when we write the very first block of a file
    if(!offset && !isMsgHeaderFeatureFlagSet (RESYNCLOCALFILEMSG_FLAG_NODATA) )
       openFlags |= O_TRUNC;
@@ -234,3 +257,88 @@ bool ResyncLocalFileMsgEx::doTrunc(int fd, off_t length, int& outErrno)
    return true;
 }
 
+/**
+ * If this is a buddy mirror msg and we are the primary, forward this msg to secondary.
+ *
+ * @return _COMMUNICATION if forwarding to buddy failed and buddy is not marked offline (in which
+ *    case *outChunkLocked==false is guaranteed).
+ * @throw SocketException if sending of GenericResponseMsg fails.
+ */
+FhgfsOpsErr ResyncLocalFileMsgEx::forwardToSecondary(StorageTarget& target, ResponseContext& ctx)
+{
+   const char* logContext = "ResyncLocalFileMsg incoming (forward to secondary)";
+
+   App* app = Program::getApp();
+
+   if(!isMsgHeaderFeatureFlagSet(RESYNCLOCALFILEMSG_FLAG_CHUNKBALANCE_BUDDYMIRROR))
+      return FhgfsOpsErr_SUCCESS; // nothing to do
+
+   // instead of creating a new msg object, we just re-use "this" with "buddymirror second" flag
+   addMsgHeaderFeatureFlag(RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND);
+
+   RequestResponseArgs rrArgs(NULL, this, NETMSGTYPE_ResyncLocalFileResp);
+   RequestResponseTarget rrTarget(getResyncToTargetID(), app->getTargetMapper(), app->getStorageNodes(),
+      app->getTargetStateStore(), app->getMirrorBuddyGroupMapper(), true);
+
+   FhgfsOpsErr commRes = MessagingTk::requestResponseTarget(&rrTarget, &rrArgs);
+
+   // remove the flag that we just added for secondary
+   unsetMsgHeaderFeatureFlag(RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND);
+
+   if(unlikely(
+      (commRes == FhgfsOpsErr_COMMUNICATION) &&
+      (rrTarget.outTargetReachabilityState == TargetReachabilityState_OFFLINE) ) )
+   {
+      LogContext(logContext).log(Log_DEBUG, "Secondary is offline and will need resync. " 
+         "mirror buddy group ID: " + StringTk::uintToStr(getResyncToTargetID() ));
+
+      // buddy is marked offline, so local msg processing will be done and buddy needs resync
+      target.setBuddyNeedsResync(true);
+
+      return FhgfsOpsErr_SUCCESS; // go ahead with local msg processing
+   }
+
+   if(unlikely(commRes != FhgfsOpsErr_SUCCESS) )
+   {
+      LogContext(logContext).log(Log_DEBUG, "Forwarding failed. "
+         "mirror buddy group ID: " + StringTk::uintToStr(getResyncToTargetID() ) + "; "
+         "error: " + std::to_string(commRes));
+
+      std::string genericRespStr = "Communication with secondary failed. "
+         "mirror buddy group ID: " + StringTk::uintToStr(getResyncToTargetID() );
+
+      ctx.sendResponse(GenericResponseMsg(GenericRespMsgCode_INDIRECTCOMMERR,
+               std::move(genericRespStr)));
+
+      return FhgfsOpsErr_COMMUNICATION;
+   }
+
+   ResyncLocalFileRespMsg* respMsg = (ResyncLocalFileRespMsg*)rrArgs.outRespMsg.get();
+   FhgfsOpsErr secondaryRes = respMsg->getResult();
+   if(unlikely(secondaryRes != FhgfsOpsErr_SUCCESS) )
+   {
+      if(secondaryRes == FhgfsOpsErr_UNKNOWNTARGET)
+      {
+         /* local msg processing shall be done and buddy needs resync
+            (this is normal when a storage is restarted without a broken secondary target, so we
+            report success to a client in this case) */
+
+         LogContext(logContext).log(Log_DEBUG,
+            "Secondary reports unknown target error and will need resync. "
+            "mirror buddy group ID: " + StringTk::uintToStr(getResyncToTargetID() ) );
+
+         target.setBuddyNeedsResync(true);
+
+         return FhgfsOpsErr_SUCCESS;
+      }
+
+      LogContext(logContext).log(Log_NOTICE, std::string("Secondary reported error: ") +
+         std::to_string(secondaryRes) + "; "
+         "mirror buddy group ID: " + StringTk::uintToStr(getResyncToTargetID()) );
+
+      return secondaryRes;
+   }
+
+
+   return FhgfsOpsErr_SUCCESS;
+}

@@ -1,5 +1,4 @@
-#ifndef MSGHELPERTRUNC_H_
-#define MSGHELPERTRUNC_H_
+#pragma once
 
 #include <common/Common.h>
 #include <storage/MetaStore.h>
@@ -32,4 +31,3 @@ class MsgHelperTrunc
       // inliners
 };
 
-#endif /* MSGHELPERTRUNC_H_ */

@@ -28,16 +28,16 @@ struct MountConfig
 
    bool logLevelDefined; // true if the value has been specified
    bool connPortShiftDefined; // true if the value has been specified
-   bool connMgmtdPortUDPDefined; // true if the value has been specified
-   bool connMgmtdPortTCPDefined; // true if the value has been specified
+   bool connMgmtdPortDefined; // true if the value has been specified
    bool sysMountSanityCheckMSDefined; // true if the value has been specified
 
    int logLevel;
    unsigned connPortShift;
-   unsigned connMgmtdPortUDP;
-   unsigned connMgmtdPortTCP;
+   unsigned connMgmtdPort;
    unsigned sysMountSanityCheckMS;
    char* connInterfacesList;
+   char* connAuthFile;
+   char* connDisableAuthentication;
 
    bool grpid;
 };
@@ -64,6 +64,9 @@ void MountConfig_uninit(MountConfig* this)
    SAFE_KFREE(this->sysMgmtdHost);
    SAFE_KFREE(this->tunePreferredMetaFile);
    SAFE_KFREE(this->tunePreferredStorageFile);
+   SAFE_KFREE(this->connInterfacesList);
+   SAFE_KFREE(this->connAuthFile);
+   SAFE_KFREE(this->connDisableAuthentication);
 }
 
 void MountConfig_destruct(MountConfig* this)

@@ -64,13 +64,18 @@ FileInode* InodeFileStore::referenceLoadedFile(const std::string& entryID)
  *
  * @param loadFromDisk - true for the per-directory InodeFileStore, false for references
  *                       from MetaStore (global map)
- * @return NULL if no such file exists
+ * @param checkLockStore - true in most cases, triggers check if file is locked due
+ *                         to internal meta operations
+ * @return FileInode* and FhgfsOpsErr. FileInode* NULL if no such file exists.
  */
-FileInode* InodeFileStore::referenceFileInode(EntryInfo* entryInfo, bool loadFromDisk)
+FileInodeRes InodeFileStore::referenceFileInode(EntryInfo* entryInfo, bool loadFromDisk, bool checkLockStore)
 {
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
 
-   return referenceFileInodeUnlocked(entryInfo, loadFromDisk);
+   if (checkLockStore) // check bool for internal lock store
+      return referenceFileInodeUnlocked(entryInfo, loadFromDisk);
+   else 
+      return referenceFileInodeUnlockedIgnoreLocking(entryInfo, loadFromDisk);
 }
 
 /**
@@ -78,21 +83,64 @@ FileInode* InodeFileStore::referenceFileInode(EntryInfo* entryInfo, bool loadFro
  * Note: We do not add a reference if isRename == true, but we set an exclusive flag and just
  *       return an unreferenced inode, which can be deleted anytime.
  */
-FileInode* InodeFileStore::referenceFileInodeUnlocked(EntryInfo* entryInfo, bool loadFromDisk)
+FileInodeRes InodeFileStore::referenceFileInodeUnlocked(EntryInfo* entryInfo, bool loadFromDisk)
 {
+   FileInode* inode = NULL;
+   FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
+
+   InodeMapIter iter =  this->inodes.find(entryInfo->getEntryID() );
+   if(iter == this->inodes.end() && loadFromDisk)
+   { // not in map yet => check if in globalInodeLockStore
+      App* app = Program::getApp();
+      MetaStore* metaStore = app->getMetaStore();
+      GlobalInodeLockStore* inodeLockStore = metaStore->getInodeLockStore();
+      if (!inodeLockStore->lookupFileInode(entryInfo)) 
+      //not in globalInodeLockStore, try to load
+      {
+         loadAndInsertFileInodeUnlocked(entryInfo, iter);
+      }
+      else 
+      {  //inode is in GlobalInodeLockStore
+         retVal =  FhgfsOpsErr_INODELOCKED;
+      }
+   }
+   if(iter != this->inodes.end() )
+   { // outInode exists
+      inode = referenceFileInodeMapIterUnlocked(iter);
+      retVal = FhgfsOpsErr_SUCCESS; 
+      return {inode, retVal};
+   }
+
+   return {inode, retVal};
+}
+
+/**
+ * Note: this->rwlock needs to be write locked
+ * Note: We do not add a reference if isRename == true, but we set an exclusive flag and just
+ *       return an unreferenced inode, which can be deleted anytime.
+ * Note: Variation of referenceFileInodeUnlocked(). 
+ *       Bypasses the check for locked files due to internal meta operations.
+ */
+FileInodeRes InodeFileStore::referenceFileInodeUnlockedIgnoreLocking(EntryInfo* entryInfo, bool loadFromDisk)
+{
+   FileInode* inode = NULL;
+   FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
+   FileInodeRes FileInodeResPair = { inode, retVal};
    InodeMapIter iter =  this->inodes.find(entryInfo->getEntryID() );
 
    if(iter == this->inodes.end() && loadFromDisk)
-   { // not in map yet => try to load it
+   { // not in map yet => try to load it      
       loadAndInsertFileInodeUnlocked(entryInfo, iter);
    }
-
+   
    if(iter != this->inodes.end() )
    { // outInode exists
-      return referenceFileInodeMapIterUnlocked(iter);
+      FileInodeResPair.first = referenceFileInodeMapIterUnlocked(iter);
+      FileInodeResPair.second = FhgfsOpsErr_SUCCESS; 
+      return FileInodeResPair;
    }
 
-   return nullptr;
+   return FileInodeResPair;
 }
 
 /**
@@ -199,14 +247,15 @@ unsigned InodeFileStore::decreaseInodeRefCountUnlocked(InodeMapIter& iter)
  * Close the given file. Also updates the InodeFile on disk.
  */
 bool InodeFileStore::closeFile(EntryInfo* entryInfo, FileInode* inode, unsigned accessFlags,
-   unsigned* outNumHardlinks, unsigned* outNumRefs)
+   unsigned* outNumHardlinks, unsigned* outNumRefs, bool& outLastWriterClosed)
 {
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
 
    *outNumHardlinks = 1; // (we're careful here about inodes that are not currently open)
+   outLastWriterClosed = false;
 
    InodeMapIter iter = this->inodes.find(inode->getEntryID() );
-   if(iter != this->inodes.end() )
+   if (iter != this->inodes.end() )
    { // outInode exists
 
       *outNumHardlinks = inode->getNumHardlinks();
@@ -214,6 +263,13 @@ bool InodeFileStore::closeFile(EntryInfo* entryInfo, FileInode* inode, unsigned 
       // Store inode information on disk, they have been set with inode->setDynAttribs() before
       entryInfo->setInodeInlinedFlag(inode->getIsInlined() );
       inode->decNumSessionsAndStore(entryInfo, accessFlags);
+
+      // Here, we monitor the final closure of files opened for writing, including append mode.
+      // To identify when the last writer closes the file, we consider the following conditions:
+      // 1. Whether the file was originally opened with write, append, or read-write permissions.
+      // 2. Whether the count of write sessions associated with the file has dropped to zero.
+      if (!(accessFlags & OPENFILE_ACCESS_READ) && !inode->getNumSessionsWrite())
+         outLastWriterClosed = true;
 
       *outNumRefs = decreaseInodeRefCountUnlocked(iter);
 
@@ -360,6 +416,11 @@ FhgfsOpsErr InodeFileStore::moveRemoteBegin(EntryInfo* entryInfo, char* buf, siz
 
       Serializer ser(buf, bufLen);
       inode->serializeMetaData(ser);
+
+      // Serialize RST info (if present)
+      if (inode->getIsRstAvailable())
+         ser % inode->rstInfo;
+
       *outUsedBufLen = ser.size();
    }
 
@@ -414,13 +475,17 @@ size_t InodeFileStore::getSize()
 FhgfsOpsErr InodeFileStore::openFile(EntryInfo* entryInfo, unsigned accessFlags,
    FileInode*& outInode, bool loadFromDisk)
 {
-   outInode = referenceFileInode(entryInfo, loadFromDisk);
+   FhgfsOpsErr referenceRes;
+   FileInodeRes FileInodeResPair = referenceFileInode(entryInfo, loadFromDisk, true);
+   outInode = FileInodeResPair.first;
+   referenceRes = FileInodeResPair.second;
+
    if (!outInode)
-      return FhgfsOpsErr_PATHNOTEXISTS;
+      return referenceRes;
 
    outInode->incNumSessions(accessFlags);
 
-   return FhgfsOpsErr_SUCCESS;
+   return referenceRes;
 }
 
 /**

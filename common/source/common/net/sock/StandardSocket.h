@@ -1,5 +1,4 @@
-#ifndef STANDARDSOCKET_H_
-#define STANDARDSOCKET_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/RandomReentrant.h>
@@ -162,4 +161,3 @@ class StandardSocketGroup : public StandardSocket
 
       virtual ~StandardSocketGroup();
 };
-#endif /*STANDARDSOCKET_H_*/

@@ -1,5 +1,4 @@
-#ifndef RETRIEVEINODESMSG_H
-#define RETRIEVEINODESMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -54,4 +53,3 @@ class RetrieveInodesMsg : public NetMessageSerdes<RetrieveInodesMsg>
 };
 
 
-#endif /*RETRIEVEINODESMSG_H*/

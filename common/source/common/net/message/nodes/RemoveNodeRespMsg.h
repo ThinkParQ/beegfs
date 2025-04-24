@@ -1,5 +1,4 @@
-#ifndef REMOVENODERESPMSG_H_
-#define REMOVENODERESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleIntMsg.h>
@@ -22,4 +21,3 @@ class RemoveNodeRespMsg : public SimpleIntMsg
 };
 
 
-#endif /* REMOVENODERESPMSG_H_ */

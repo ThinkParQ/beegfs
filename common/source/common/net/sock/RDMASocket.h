@@ -1,5 +1,4 @@
-#ifndef RDMASOCKET_H_
-#define RDMASOCKET_H_
+#pragma once
 
 #include <common/Common.h>
 #include "PooledSocket.h"
@@ -34,4 +33,3 @@ class RDMASocket : public PooledSocket
 };
 
 
-#endif /*RDMASOCKET_H_*/

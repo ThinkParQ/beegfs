@@ -1,7 +1,7 @@
-#ifndef DIRINODE_H_
-#define DIRINODE_H_
+#pragma once
 
 #include <common/storage/striping/StripePattern.h>
+#include <common/storage/RemoteStorageTarget.h>
 #include <common/storage/Metadata.h>
 #include <common/storage/StorageDefinitions.h>
 #include <common/storage/StorageErrors.h>
@@ -16,10 +16,11 @@
 /* Note: Don't forget to update DiskMetaData::getSupportedDirInodeFeatureFlags() if you add new
  *       flags here. */
 
-#define DIRINODE_FEATURE_EARLY_SUBDIRS  2 // indicate proper alignment for statData
-#define DIRINODE_FEATURE_MIRRORED       4 // indicate old mirrored directory (for compatibility)
-#define DIRINODE_FEATURE_STATFLAGS      8 // StatData have a flags field
-#define DIRINODE_FEATURE_BUDDYMIRRORED  16 // indicate buddy mirrored directory
+#define DIRINODE_FEATURE_EARLY_SUBDIRS  2    // indicate proper alignment for statData
+#define DIRINODE_FEATURE_MIRRORED       4    // indicate old mirrored directory (for compatibility)
+#define DIRINODE_FEATURE_STATFLAGS      8    // StatData have a flags field
+#define DIRINODE_FEATURE_BUDDYMIRRORED  16   // indicate buddy mirrored directory
+#define DIRINODE_FEATURE_HAS_RST        32   // indicates remote target availability
 
 // limit number of stripes per file to a high but safe number. too many stripe targets will cause
 // the serialized stripe pattern to be too large to store reliably, so choose a value well below
@@ -96,6 +97,8 @@ class DirInode
 
       StripePattern* getStripePatternClone();
       FhgfsOpsErr setStripePattern(const StripePattern& newPattern, uint32_t actorUID = 0);
+      FhgfsOpsErr setRemoteStorageTarget(const RemoteStorageTarget& rst);
+      FhgfsOpsErr clearRemoteStorageTarget();
 
       FhgfsOpsErr getStatData(StatData& outStatData,
          NumNodeID* outParentNodeID = NULL, std::string* outParentEntryID = NULL);
@@ -115,6 +118,7 @@ class DirInode
       std::string id; // filesystem-wide unique string
       NumNodeID ownerNodeID; // 0 means undefined
       StripePattern* stripePattern; // is the default for new files and subdirs
+      RemoteStorageTarget rstInfo; // remote storage target information
 
       std::string parentDirID; // must be reliable for NFS
       NumNodeID parentNodeID;   // must be reliable for NFS
@@ -154,6 +158,9 @@ class DirInode
       bool storeUpdatedMetaDataBufAsContentsInPlace(char* buf, unsigned bufLen);
       bool storeUpdatedMetaDataUnlocked();
 
+      bool storeRemoteStorageTargetInfoUnlocked();
+      bool storeRemoteStorageTargetDataBufAsXAttr(char* buf, unsigned bufLen);
+
       FhgfsOpsErr renameDirEntry(const std::string& fromName, const std::string& toName,
          DirEntry* overWriteEntry);
       FhgfsOpsErr renameDirEntryUnlocked(const std::string& fromName, const std::string& toName,
@@ -180,6 +187,8 @@ class DirInode
       bool loadFromFileXAttr();
       bool loadFromFileContents();
       bool loadIfNotLoadedUnlocked();
+
+      bool loadRstFromFileXAttr();
 
       FhgfsOpsErr getEntryData(const std::string& entryName, EntryInfo* outInfo,
          FileInodeStoreData* outInodeMetaData);
@@ -474,6 +483,11 @@ class DirInode
          return (getFeatureFlags() & DIRINODE_FEATURE_BUDDYMIRRORED);
       }
 
+      bool getIsRstAvailable() const
+      {
+         return (getFeatureFlags() & DIRINODE_FEATURE_HAS_RST);
+      }
+
       bool getExclusive()
       {
          SafeRWLock safeLock(&rwlock, SafeRWLock_READ);
@@ -532,6 +546,14 @@ class DirInode
          return retVal;
       }
 
+      unsigned getNumHardlinks()
+      {
+         SafeRWLock safeLock(&rwlock, SafeRWLock_READ);
+         unsigned retVal = this->statData.getNumHardlinks();
+         safeLock.unlock();
+         return retVal;
+      }
+
       size_t getNumSubEntries()
       {
          SafeRWLock safeLock(&rwlock, SafeRWLock_READ);
@@ -563,6 +585,11 @@ class DirInode
       StripePattern* getStripePattern() const
       {
          return stripePattern;
+      }
+
+      RemoteStorageTarget* getRemoteStorageTargetInfo()
+      {
+         return &this->rstInfo;
       }
 
    private:
@@ -624,4 +651,3 @@ class DirInode
       }
 };
 
-#endif /*DIRINODE_H_*/

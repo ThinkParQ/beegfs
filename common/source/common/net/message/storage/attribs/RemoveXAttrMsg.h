@@ -1,5 +1,4 @@
-#ifndef REMOVEXATTRMSG_H_
-#define REMOVEXATTRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -65,4 +64,3 @@ class RemoveXAttrMsg : public MirroredMessageBase<RemoveXAttrMsg>
       bool supportsMirroring() const { return true; }
 };
 
-#endif /*REMOVEXATTRMSG_H_*/

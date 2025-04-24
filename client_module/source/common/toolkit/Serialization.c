@@ -1,4 +1,5 @@
 #include "Serialization.h"
+#include "common/Common.h"
 #include <os/OsDeps.h>
 
 bool __Serialization_deserializeNestedField(DeserializeCtx* ctx, DeserializeCtx* outCtx)
@@ -158,7 +159,10 @@ void Serialization_serializeNicList(SerializeCtx* ctx, NicAddressList* nicList)
 {
    unsigned nicListSize = NicAddressList_length(nicList);
    NicAddressListIter iter;
-   unsigned i;
+   unsigned startOffset = ctx->length;
+
+   // length field placeholder
+   Serialization_serializeUInt(ctx, 0xFFFFFFFF);
 
    // elem count info field
    Serialization_serializeUInt(ctx, nicListSize);
@@ -166,10 +170,14 @@ void Serialization_serializeNicList(SerializeCtx* ctx, NicAddressList* nicList)
    // serialize each element of the nicList
    NicAddressListIter_init(&iter, nicList);
 
-   for(i=0; i < nicListSize; i++, NicAddressListIter_next(&iter) )
+   for(unsigned i = 0; i < nicListSize; i++, NicAddressListIter_next(&iter) )
    {
       NicAddress* nicAddr = NicAddressListIter_value(&iter);
       const size_t minNameSize = MIN(sizeof(nicAddr->name), SERIALIZATION_NICLISTELEM_NAME_SIZE);
+
+      // We currently only support and store ipv4 addresses internally, so we always set the
+      // protocol field to 4.
+      Serialization_serializeUInt8(ctx, 4);
 
       { // ipAddress
          Serialization_serializeBlock(ctx, &nicAddr->ipAddr.s_addr, sizeof(nicAddr->ipAddr.s_addr) );
@@ -183,10 +191,14 @@ void Serialization_serializeNicList(SerializeCtx* ctx, NicAddressList* nicList)
          Serialization_serializeBlock(ctx, &nicAddr->nicType, sizeof(uint8_t) );
       }
 
-      {  // 3 bytes padding (for 4 byte alignment)
-         Serialization_serializeBlock(ctx, "\0\0", 3);
+      {  // 2 bytes padding (for 4 byte alignment)
+         Serialization_serializeBlock(ctx, "\0\0", 2);
       }
    }
+
+   // Overwrite placeholder with length
+   if (ctx->data)
+      put_unaligned_le32(ctx->length - startOffset, ctx->data + startOffset);
 }
 
 /**
@@ -196,11 +208,16 @@ void Serialization_serializeNicList(SerializeCtx* ctx, NicAddressList* nicList)
  */
 bool Serialization_deserializeNicListPreprocess(DeserializeCtx* ctx, RawList* outList)
 {
+   if(!Serialization_deserializeUInt(ctx, &outList->length) )
+      return false;
+
    if(!Serialization_deserializeUInt(ctx, &outList->elemCount) )
       return false;
 
    outList->data = ctx->data;
-   outList->length = outList->elemCount * SERIALIZATION_NICLISTELEM_SIZE;
+   // We need the length of the actual list without the two header fields above (which are included
+   // in the sequence length field)
+   outList->length -= 8;
 
    if(unlikely(ctx->length < outList->length) )
       return false;
@@ -218,18 +235,31 @@ bool Serialization_deserializeNicListPreprocess(DeserializeCtx* ctx, RawList* ou
 void Serialization_deserializeNicList(const RawList* inList, NicAddressList* outNicList)
 {
    const char* currentNicListPos = inList->data;
-   unsigned i;
+   unsigned skipped = 0;
 
-
-   for(i=0; i < inList->elemCount; i++)
+   for(unsigned i = 0; i < inList->elemCount; i++)
    {
+      uint8_t protocol;
       NicAddress* nicAddr = os_kmalloc(sizeof(NicAddress) );
       const size_t minNameSize = MIN(sizeof(nicAddr->name), SERIALIZATION_NICLISTELEM_NAME_SIZE);
       memset(nicAddr, 0, sizeof(NicAddress) ); // clear unused fields
 
+      { // protocol
+         protocol = (uint8_t) get_unaligned((char*)currentNicListPos);
+         currentNicListPos += 1;
+      }
+
+      if (protocol == 4)
       { // ipAddress
+         // Ipv4 address
          nicAddr->ipAddr.s_addr = get_unaligned((unsigned*)currentNicListPos);
          currentNicListPos += 4;
+      } else {
+         // If this is an ipv6 address, skip it as it is not supported yet.
+         // 16 bytes ipv6 address + name + nicType + padding
+         currentNicListPos += 16 + SERIALIZATION_NICLISTELEM_NAME_SIZE + 1 + 2;
+         skipped += 1;
+         continue;
       }
 
       { // name
@@ -244,14 +274,16 @@ void Serialization_deserializeNicList(const RawList* inList, NicAddressList* out
          currentNicListPos += 1;
       }
 
-      { // 3 bytes padding (for 4 byte alignment)
-         currentNicListPos += 3;
+      { // 2 bytes padding (for 4 byte alignment)
+         currentNicListPos += 2;
       }
-
 
       NicAddressList_append(outNicList, nicAddr);
    }
 
+   if (skipped > 0) {
+      printk_fhgfs(KERN_INFO, "Skipped deserializing %d unsupported IPv6 Nics", skipped);
+   }
 }
 
 /**
@@ -380,7 +412,7 @@ void Serialization_deserializeNodeList(App* app, const RawList* inList, NodeList
             nodeType == NODETYPE_Meta || nodeType == NODETYPE_Storage? App_getLocalRDMANicListLocked(app) : NULL);
          App_unlockNicList(app);
 
-         Node_setNodeType(node, (NodeType)nodeType);
+         Node_setNodeAliasAndType(node, NULL, (NodeType)nodeType);
 
          // append node to outList
          NodeList_append(outNodeList, node);

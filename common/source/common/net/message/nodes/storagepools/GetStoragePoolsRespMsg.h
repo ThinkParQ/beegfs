@@ -1,5 +1,4 @@
-#ifndef COMMON_GETSTORAGEPOOLSRESPMSG_H_
-#define COMMON_GETSTORAGEPOOLSRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StoragePool.h>
@@ -42,4 +41,3 @@ class GetStoragePoolsRespMsg : public NetMessageSerdes<GetStoragePoolsRespMsg>
 
 };
 
-#endif /*COMMON_GETSTORAGEPOOLSRESPMSG_H_*/

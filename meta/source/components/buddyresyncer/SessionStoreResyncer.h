@@ -1,5 +1,4 @@
-#ifndef META_SESSIONFILESTORERESYNCER_H
-#define META_SESSIONFILESTORERESYNCER_H
+#pragma once
 
 #include <common/nodes/Node.h>
 #include <common/threading/PThread.h>
@@ -34,4 +33,3 @@ class SessionStoreResyncer
       void doSync();
 };
 
-#endif /* META_SESSIONFILESTORERESYNCER_H */

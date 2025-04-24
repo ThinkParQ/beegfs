@@ -1,5 +1,4 @@
-#ifndef NETMESSAGE_H_
-#define NETMESSAGE_H_
+#pragma once
 
 #include <common/net/sock/NetworkInterfaceCard.h>
 #include <common/net/sock/Socket.h>
@@ -446,4 +445,3 @@ class MirroredMessageBase : public NetMessage
       NodeType requestorNodeType;
 };
 
-#endif /*NETMESSAGE_H_*/

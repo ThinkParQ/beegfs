@@ -1,5 +1,4 @@
-#ifndef NODESTK_H_
-#define NODESTK_H_
+#pragma once
 
 #include <common/components/AbstractDatagramListener.h>
 #include <common/nodes/AbstractNodeStore.h>
@@ -46,4 +45,3 @@ class NodesTk
 };
 
 
-#endif /*NODESTK_H_*/

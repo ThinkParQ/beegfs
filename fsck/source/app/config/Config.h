@@ -66,7 +66,6 @@ class Config : public AbstractConfig
       // configurables
 
       std::string connInterfacesFile;
-      int         connFsckPortUDP;
 
       unsigned    tuneNumWorkers;
       std::string tunePreferredNodesFile;
@@ -114,11 +113,6 @@ class Config : public AbstractConfig
       const std::string& getConnInterfacesFile() const
       {
          return connInterfacesFile;
-      }
-
-      int getConnFsckPortUDP() const
-      {
-         return connFsckPortUDP;
       }
 
       unsigned getTuneNumWorkers() const

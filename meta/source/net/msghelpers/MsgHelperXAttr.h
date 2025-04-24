@@ -1,5 +1,4 @@
-#ifndef MSGHELPERXATTR_H_
-#define MSGHELPERXATTR_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 
@@ -47,4 +46,3 @@ class MsgHelperXAttr
       };
 };
 
-#endif /*MSGHELPERXATTR_H_*/

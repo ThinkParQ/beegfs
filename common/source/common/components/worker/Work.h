@@ -1,5 +1,4 @@
-#ifndef WORK_H_
-#define WORK_H_
+#pragma once
 
 #include <common/toolkit/HighResolutionStats.h>
 #include <common/toolkit/TimeFine.h>
@@ -47,4 +46,3 @@ class Work
 #endif
 };
 
-#endif /*WORK_H_*/

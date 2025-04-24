@@ -1,5 +1,4 @@
-#ifndef CONDITION_H_
-#define CONDITION_H_
+#pragma once
 
 #include <common/system/System.h>
 #include <common/Common.h>
@@ -88,4 +87,3 @@ class Condition
 
 };
 
-#endif /*CONDITION_H_*/

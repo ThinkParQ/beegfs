@@ -1,5 +1,4 @@
-#ifndef LOOKUPINTENTMSGEX_H_
-#define LOOKUPINTENTMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/lookup/LookupIntentMsg.h>
 #include <common/net/message/storage/lookup/LookupIntentRespMsg.h>
@@ -201,7 +200,7 @@ class LookupIntentMsgEx : public MirroredMessage<LookupIntentMsg,
       FhgfsOpsErr lookup(const std::string& parentEntryID, const std::string& entryName,
          bool isBuddyMirrored, EntryInfo* outEntryInfo, FileInodeStoreData* outInodeStoreData,
          bool& outInodeDataOutdated);
-      FhgfsOpsErr revalidate(EntryInfo* diskEntryInfo);
+      FhgfsOpsErr revalidate(EntryInfo* diskEntryInfo, uint32_t metaVersion);
       FhgfsOpsErr create(EntryInfo* parentInfo, const std::string& entryName,
          EntryInfo* outEntryInfo, FileInodeStoreData* outInodeData, bool isSecondary);
       FhgfsOpsErr stat(EntryInfo* entryInfo, bool loadFromDisk, StatData& outStatData);
@@ -221,4 +220,3 @@ class LookupIntentMsgEx : public MirroredMessage<LookupIntentMsg,
 
 
 
-#endif /* LOOKUPINTENTMSGEX_H_ */

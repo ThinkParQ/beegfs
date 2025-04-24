@@ -1,5 +1,4 @@
-#ifndef FSCKDIRENTRY_H_
-#define FSCKDIRENTRY_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/NumNodeID.h>
@@ -262,4 +261,3 @@ class FsckDirEntry
 template<>
 struct ListSerializationHasLength<FsckDirEntry> : boost::false_type {};
 
-#endif /* FSCKDIRENTRY_H_ */

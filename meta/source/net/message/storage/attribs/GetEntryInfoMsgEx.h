@@ -1,5 +1,4 @@
-#ifndef GETENTRYINFO_H_
-#define GETENTRYINFO_H_
+#pragma once
 
 #include <storage/DirInode.h>
 #include <common/storage/StorageErrors.h>
@@ -18,13 +17,18 @@ class GetEntryInfoMsgResponseState : public MirroredMessageResponseState
          result(other.result),
          mirrorNodeID(other.mirrorNodeID),
          pattern(std::move(other.pattern)),
-         pathInfo(std::move(other.pathInfo))
+         pathInfo(std::move(other.pathInfo)),
+         rst(std::move(other.rst)),
+         numSessionsRead(other.numSessionsRead),
+         numSessionsWrite(other.numSessionsWrite),
+         fileDataState(other.fileDataState)
       {
       }
 
       void sendResponse(NetMessage::ResponseContext& ctx) override
       {
-         GetEntryInfoRespMsg resp(result, pattern.get(), mirrorNodeID, &pathInfo);
+         GetEntryInfoRespMsg resp(result, pattern.get(), mirrorNodeID, &pathInfo, &rst,
+            numSessionsRead, numSessionsWrite, fileDataState);
          ctx.sendResponse(resp);
       }
 
@@ -42,6 +46,10 @@ class GetEntryInfoMsgResponseState : public MirroredMessageResponseState
       void setMirrorNodeID(uint16_t nodeId) { this->mirrorNodeID = nodeId; }
       void setStripePattern(StripePattern* pattern) { this->pattern.reset(pattern); }
       void setPathInfo(PathInfo const& pathInfo) { this->pathInfo = pathInfo; }
+      void setRemoteStorageTarget(RemoteStorageTarget const& rstInfo) { rst = rstInfo; }
+      void setNumSessionsRead(uint32_t numReaders) { numSessionsRead = numReaders; }
+      void setNumSessionsWrite(uint32_t numWriters) { numSessionsWrite = numWriters; }
+      void setFileDataState(uint8_t dataState) { fileDataState = dataState; }
 
    protected:
       uint32_t serializerTag() const override { return NETMSGTYPE_GetEntryInfo; }
@@ -52,6 +60,10 @@ class GetEntryInfoMsgResponseState : public MirroredMessageResponseState
       uint16_t mirrorNodeID; // metadata mirror node (0 means "none")
       std::unique_ptr<StripePattern> pattern;
       PathInfo pathInfo;
+      RemoteStorageTarget rst;
+      uint32_t numSessionsRead;
+      uint32_t numSessionsWrite;
+      uint8_t fileDataState;
 };
 
 class GetEntryInfoMsgEx : public MirroredMessage<GetEntryInfoMsg, FileIDLock>
@@ -76,9 +88,11 @@ class GetEntryInfoMsgEx : public MirroredMessage<GetEntryInfoMsg, FileIDLock>
          return FhgfsOpsErr_SUCCESS;
       }
 
+      FhgfsOpsErr getInfo(EntryInfo* entryInfo, StripePattern** outPattern, PathInfo* outPathInfo,
+         RemoteStorageTarget* outRstInfo, uint32_t& outNumReadSessions, uint32_t& outNumWriteSessions,
+         uint8_t& outDataState);
+      FhgfsOpsErr getRootInfo(StripePattern** outPattern, RemoteStorageTarget* outRstInfo);
+
       const char* mirrorLogContext() const override { return "GetEntryInfoMsgEx/forward"; }
-      FhgfsOpsErr getInfo(EntryInfo* entryInfo, StripePattern** outPattern, PathInfo* outPathInfo);
-      FhgfsOpsErr getRootInfo(StripePattern** outPattern);
 };
 
-#endif /*GETENTRYINFO_H_*/

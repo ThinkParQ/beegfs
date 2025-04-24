@@ -29,6 +29,7 @@ FhgfsOpsErr MsgHelperOpen::openFile(EntryInfo* entryInfo, unsigned accessFlags,
 
    FhgfsOpsErr openRes = openMetaFile(entryInfo, accessFlags, outFileInode);
 
+
    if(openRes != FhgfsOpsErr_SUCCESS)
       return openRes;
 
@@ -88,7 +89,9 @@ void MsgHelperOpen::openMetaFileCompensate(EntryInfo* entryInfo,
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
    unsigned numHardlinks; // ignored here
-   unsigned numInodeRefs; // ignore here
+   unsigned numInodeRefs; // ignored here
+   bool lastWriterClosed; // ignored here
 
-   metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks, &numInodeRefs);
+   metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks, &numInodeRefs,
+      lastWriterClosed);
 }

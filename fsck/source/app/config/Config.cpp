@@ -70,7 +70,6 @@ void Config::loadDefaults(bool addDashes)
 
    // own definitions
    configMapRedefine("connInterfacesFile", "", addDashes);
-   configMapRedefine("connFsckPortUDP", "8005", addDashes);
 
    configMapRedefine("tuneNumWorkers", "32", addDashes);
    configMapRedefine("tunePreferredNodesFile", "", addDashes);
@@ -120,7 +119,6 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       bool unknownElement = false;
 
       IGNORE_CONFIG_CLIENT_VALUE("logClientID")
-      IGNORE_CONFIG_CLIENT_VALUE("logHelperdIP")
       IGNORE_CONFIG_CLIENT_VALUE("logType")
       IGNORE_CONFIG_CLIENT_VALUE("connNumCommRetries")
       IGNORE_CONFIG_CLIENT_VALUE("connUnmountRetries")
@@ -165,6 +163,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       IGNORE_CONFIG_CLIENT_VALUE("tuneUseGlobalAppendLocks")
       IGNORE_CONFIG_CLIENT_VALUE("tuneUseBufferedAppend")
       IGNORE_CONFIG_CLIENT_VALUE("tuneStatFsCacheSecs")
+      IGNORE_CONFIG_CLIENT_VALUE("sysCacheInvalidationVersion")
       IGNORE_CONFIG_CLIENT_VALUE("sysCreateHardlinksAsSymlinks")
       IGNORE_CONFIG_CLIENT_VALUE("sysMountSanityCheckMS")
       IGNORE_CONFIG_CLIENT_VALUE("sysSyncOnClose")
@@ -182,12 +181,10 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       IGNORE_CONFIG_CLIENT_VALUE("sysFileEventLogMask")
       IGNORE_CONFIG_CLIENT_VALUE("sysRenameEbusyAsXdev")
       IGNORE_CONFIG_CLIENT_VALUE("tuneNumRetryWorkers")
-      IGNORE_CONFIG_CLIENT_VALUE("sysNoEnterpriseFeatureMsg")
+      IGNORE_CONFIG_CLIENT_VALUE("connHelperdPortTCP") // was removed, kept here for compat
 
       if (testConfigMapKeyMatch(iter, "connInterfacesFile", addDashes))
          connInterfacesFile = iter->second;
-      else if (testConfigMapKeyMatch(iter, "connFsckPortUDP", addDashes))
-         assignKeyIfNotZero(iter, connFsckPortUDP);
       else if (testConfigMapKeyMatch(iter, "tuneNumWorkers", addDashes))
          tuneNumWorkers = StringTk::strToUInt(iter->second);
       else if (testConfigMapKeyMatch(iter, "tunePreferredNodesFile", addDashes))

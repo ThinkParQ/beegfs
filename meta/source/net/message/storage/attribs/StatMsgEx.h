@@ -1,5 +1,4 @@
-#ifndef STATMSGEX_H_
-#define STATMSGEX_H_
+#pragma once
 
 #include <storage/DirInode.h>
 #include <common/storage/StorageErrors.h>
@@ -123,4 +122,3 @@ class StatMsgEx: public MirroredMessage<StatMsg, FileIDLock>
       FhgfsOpsErr statRoot(StatData& outStatData);
 };
 
-#endif /*STATMSGEX_H_*/

@@ -1,5 +1,4 @@
-#ifndef USERWORKCONTAINER_H_
-#define USERWORKCONTAINER_H_
+#pragma once
 
 #include <common/toolkit/NamedException.h>
 #include <common/Common.h>
@@ -175,4 +174,3 @@ class UserWorkContainer : public AbstractWorkContainer
 };
 
 
-#endif /* USERWORKCONTAINER_H_ */

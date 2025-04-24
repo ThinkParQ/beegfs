@@ -128,7 +128,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "diskWriteBytes"
+              "options": "Write"
             },
             "properties": [
               {
@@ -147,7 +147,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "diskReadBytes"
+              "options": "Read"
             },
             "properties": [
               {
@@ -218,7 +218,7 @@
           "measurement": "highResStorage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"diskReadBytes\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"diskReadBytes\") |> group(columns: [\"nodeNumID\"], mode: \"by\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> rename(columns: {_value: \"Read\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -267,7 +267,7 @@
           "measurement": "highResStorage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"diskWriteBytes\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"diskWriteBytes\") |> group(columns: [\"nodeNumID\"], mode: \"by\") |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> rename(columns: {_value: \"Write\"})",
           "refId": "B",
           "resultFormat": "time_series",
           "select": [
@@ -455,7 +455,7 @@
           "measurement": "storage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) => r.nodeID == \"${storageID}\")\r\n|> filter(fn: (r) => r._measurement == \"storage\")\r\n|> filter(fn: (r) => r._field == \"diskSpaceTotal\" or r._field == \"diskSpaceFree\")  \r\n|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n|> map(fn: (r) => ({ r with _value: r.diskSpaceTotal - r.diskSpaceFree }))\r\n|> rename(columns: {_value: \"diskSpaceUsed\"})",
+          "query": "from(bucket: \"${bucket}\")  \r\n|> range(start: v.timeRangeStart, stop:v.timeRangeStop)  \r\n|> filter(fn: (r) => r.nodeNumID == \"${storageID}\")\r\n|> filter(fn: (r) => r._measurement == \"storage\")\r\n|> filter(fn: (r) => r._field == \"diskSpaceTotal\" or r._field == \"diskSpaceFree\")  \r\n|> group(columns: [\"nodeNumID\"], mode: \"by\")\r\n|> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n|> map(fn: (r) => ({ r with _value: r.diskSpaceTotal - r.diskSpaceFree }))\r\n|> rename(columns: {_value: \"diskSpaceUsed\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -548,7 +548,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "netSendBytes"
+              "options": "Send"
             },
             "properties": [
               {
@@ -571,7 +571,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "netRecvBytes"
+              "options": "Received"
             },
             "properties": [
               {
@@ -634,7 +634,7 @@
           "measurement": "highResStorage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"netRecvBytes\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"netRecvBytes\")  |> group(columns: [\"nodeNumID\"], mode: \"by\") |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> rename(columns: {_value: \"Received\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -683,7 +683,7 @@
           "measurement": "highResStorage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"netSendBytes\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"netSendBytes\") |> group(columns: [\"nodeNumID\"], mode: \"by\") |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> rename(columns: {_value: \"Send\"})",
           "refId": "B",
           "resultFormat": "time_series",
           "select": [
@@ -773,7 +773,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "workRequests"
+              "options": "Processed"
             },
             "properties": [
               {
@@ -792,7 +792,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "queuedRequests"
+              "options": "Queued"
             },
             "properties": [
               {
@@ -856,7 +856,7 @@
           "measurement": "highResStorage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"workRequests\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"workRequests\") |> group(columns: [\"nodeNumID\"], mode: \"by\") |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> rename(columns: {_value: \"Processed\"})",
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -905,7 +905,7 @@
           "measurement": "highResStorage",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"queuedRequests\")  |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> yield(name: \"max\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"highResStorage\" and    r._field == \"queuedRequests\") |> group(columns: [\"nodeNumID\"], mode: \"by\") |> aggregateWindow(every: v.windowPeriod, fn: max, createEmpty: false)  |> rename(columns: {_value: \"Queued\"})",
           "refId": "B",
           "resultFormat": "time_series",
           "select": [
@@ -958,7 +958,20 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "isResponding"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -993,7 +1006,7 @@
           "measurement": "meta",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeID == \"${storageID}\" and     r._measurement == \"storage\" and    r._field == \"isResponding\")  |> aggregateWindow(every: 1m, fn: last, createEmpty: false)  |> yield(name: \"last\")",
+          "query": "from(bucket: \"${bucket}\")  |> range(start: v.timeRangeStart, stop:v.timeRangeStop)  |> filter(fn: (r) =>    r.nodeNumID == \"${storageID}\" and     r._measurement == \"storage\" and    r._field == \"isResponding\") |> group(columns: [\"nodeNumID\"], mode: \"by\") |> keep(columns: [\"_time\", \"_value\"])  |> aggregateWindow(every: 1m, fn: last, createEmpty: false)  |> yield(name: \"last\")",
           "rawQuery": false,
           "refId": "A",
           "resultFormat": "time_series",
@@ -1169,7 +1182,7 @@
           "measurement": "storageTargets",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "  from(bucket: \"${bucket}\")    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)    |> filter(fn: (r) => r.nodeID == \"${storageID}\" and r._measurement == \"storageTargets\" and r._field == \"diskSpaceTotal\")    |> group(columns: [\"storageTargetID\"])    |> last()    |> group()    |> keep(columns: [\"_value\", \"storageTargetID\"])    |> rename(columns: {_value: \"Total Space\"})",
+          "query": "  from(bucket: \"${bucket}\")    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)    |> filter(fn: (r) => r.nodeNumID == \"${storageID}\" and r._measurement == \"storageTargets\" and r._field == \"diskSpaceTotal\")    |> group(columns: [\"storageTargetID\"])    |> last()    |> group()    |> keep(columns: [\"_value\", \"storageTargetID\"])    |> rename(columns: {_value: \"Total Space\"})",
           "rawQuery": false,
           "refId": "A",
           "resultFormat": "table",
@@ -1243,7 +1256,7 @@
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
           },
           "hide": false,
-          "query": "  from(bucket: \"${bucket}\")    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)    |> filter(fn: (r) => r.nodeID == \"${storageID}\" and r._measurement == \"storageTargets\" and r._field == \"diskSpaceFree\")    |> group(columns: [\"storageTargetID\"])    |> last()    |> group()    |> keep(columns: [\"_value\", \"storageTargetID\"])    |> rename(columns: {_value: \"Free Space\"})",
+          "query": "  from(bucket: \"${bucket}\")    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)    |> filter(fn: (r) => r.nodeNumID == \"${storageID}\" and r._measurement == \"storageTargets\" and r._field == \"diskSpaceFree\")    |> group(columns: [\"storageTargetID\"])    |> last()    |> group()    |> keep(columns: [\"_value\", \"storageTargetID\"])    |> rename(columns: {_value: \"Free Space\"})",
           "refId": "B"
         },
         {
@@ -1252,7 +1265,7 @@
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
           },
           "hide": false,
-          "query": "  from(bucket: \"${bucket}\")    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)    |> filter(fn: (r) => r.nodeID == \"${storageID}\" and r._measurement == \"storageTargets\" and r._field == \"targetConsistencyState\")    |> group(columns: [\"storageTargetID\"])    |> last()    |> group()    |> keep(columns: [\"_value\", \"storageTargetID\"])    |> rename(columns: {_value: \"State\"})",
+          "query": "  from(bucket: \"${bucket}\")    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)    |> filter(fn: (r) => r.nodeNumID == \"${storageID}\" and r._measurement == \"storageTargets\" and r._field == \"targetConsistencyState\")    |> group(columns: [\"storageTargetID\"])    |> last()    |> group()    |> keep(columns: [\"_value\", \"storageTargetID\"])    |> rename(columns: {_value: \"State\"})",
           "refId": "C"
         }
       ],
@@ -1311,13 +1324,13 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "import \"influxdata/influxdb/schema\"schema.measurementTagValues(  bucket: \"${bucket}\",  tag: \"nodeID\",  measurement: \"storage\")",
+        "definition": "import \"influxdata/influxdb/schema\"schema.measurementTagValues(  bucket: \"${bucket}\",  tag: \"nodeNumID\",  measurement: \"storage\")",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "storageID",
         "options": [],
-        "query": "import \"influxdata/influxdb/schema\"schema.measurementTagValues(  bucket: \"${bucket}\",  tag: \"nodeID\",  measurement: \"storage\")",
+        "query": "import \"influxdata/influxdb/schema\"schema.measurementTagValues(  bucket: \"${bucket}\",  tag: \"nodeNumID\",  measurement: \"storage\")",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

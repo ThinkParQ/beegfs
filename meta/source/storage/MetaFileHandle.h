@@ -1,5 +1,4 @@
-#ifndef META_METAFILEHANDLE_H
-#define META_METAFILEHANDLE_H
+#pragma once
 
 #include <storage/DirInode.h>
 #include <storage/FileInode.h>
@@ -64,4 +63,3 @@ class MetaFileHandle
       void bool_value() {}
 };
 
-#endif

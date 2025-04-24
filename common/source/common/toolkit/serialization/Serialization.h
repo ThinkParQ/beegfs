@@ -1,5 +1,4 @@
-#ifndef SERIALIZATION_H_
-#define SERIALIZATION_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Atomics.h>
@@ -14,8 +13,6 @@
 #include <boost/utility/enable_if.hpp>
 
 #define SERIALIZATION_NICLISTELEM_NAME_SIZE  (16)
-#define SERIALIZATION_NICLISTELEM_SIZE       (8+SERIALIZATION_NICLISTELEM_NAME_SIZE) /*
-                                              8 = 4b ipAddr + 1b nicType + 3b alignment padding */
 #define SERIALIZATION_CHUNKINFOLISTELEM_ID_SIZE (96)
 #define SERIALIZATION_CHUNKINFOLISTELEM_PATHSTR_SIZE (255)
 #define SERIALIZATION_FILEINFOLISTELEM_OWNERNODE_SIZE (255)
@@ -65,8 +62,8 @@ class Serializer
          : buffer(NULL), bufferSize(-1), bufferOffset(0)
       {}
 
-      Serializer(char* buffer, unsigned bufferSize)
-         : buffer(buffer), bufferSize(bufferSize), bufferOffset(0)
+      Serializer(void* buffer, unsigned bufferSize)
+         : buffer((char*) buffer), bufferSize(bufferSize), bufferOffset(0)
       {}
 
       Serializer(Serializer&& other)
@@ -126,7 +123,10 @@ class Serializer
             && likely(
                   this->bufferOffset + length >= this->bufferOffset
                   && this->bufferOffset + length <= this->bufferSize) )
-            std::memcpy(this->buffer + this->bufferOffset, source, length);
+         {
+            if (length > 0) // fixes memcpy nonnull warning
+               std::memcpy(this->buffer + this->bufferOffset, source, length);
+         }
          else
             this->bufferSize = 0;
 
@@ -272,8 +272,8 @@ inline void swap(Serializer& a, Serializer& b)
 class Deserializer
 {
    public:
-      Deserializer(const char* buffer, unsigned bufferSize)
-         : buffer(buffer), bufferSize(bufferSize), bufferOffset(0)
+      Deserializer(const void* buffer, unsigned bufferSize)
+         : buffer((const char*) buffer), bufferSize(bufferSize), bufferOffset(0)
       {}
 
       Deserializer(Deserializer&& other)
@@ -332,11 +332,21 @@ class Deserializer
          this->bufferSize = 0;
       }
 
+      // Added this in 2024 -- isn't there an existing better way?
+      void parseEof()
+      {
+         if (bufferOffset != bufferSize)
+            setBad();
+      }
+
       void getBlock(void* dest, size_t length)
       {
          if(likely(this->bufferOffset + length >= this->bufferOffset
                && this->bufferOffset + length <= this->bufferSize) )
-            std::memcpy(dest, this->buffer + this->bufferOffset, length);
+         {
+            if (length > 0) // fixes memcpy nonnull warning
+               std::memcpy(dest, this->buffer + this->bufferOffset, length);
+         }
          else
             setBad();
 
@@ -979,4 +989,3 @@ inline ssize_t serializeIntoNewBuffer(const Object& object, boost::scoped_array<
    return ser.size();
 }
 
-#endif /*SERIALIZATION_H_*/

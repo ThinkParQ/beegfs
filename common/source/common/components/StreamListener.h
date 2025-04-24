@@ -1,5 +1,4 @@
-#ifndef STREAMLISTENER_H_
-#define STREAMLISTENER_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/queue/MultiWorkQueue.h>
@@ -25,7 +24,6 @@ class StreamListener : public PThread
    private:
       LogContext        log;
       StandardSocket*   tcpListenSock;
-      StandardSocket*   sdpListenSock;
       RDMASocket*       rdmaListenSock;
 
       MultiWorkQueue*   workQueue;
@@ -69,4 +67,3 @@ class StreamListener : public PThread
 
 };
 
-#endif /*STREAMLISTENER_H_*/

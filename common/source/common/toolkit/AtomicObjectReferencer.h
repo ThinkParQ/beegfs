@@ -1,5 +1,4 @@
-#ifndef ATOMICOBJECTREFERENCER_H_
-#define ATOMICOBJECTREFERENCER_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 
@@ -83,4 +82,3 @@ class AtomicObjectReferencer
 };
 
 
-#endif /*ATOMICOBJECTREFERENCER_H_*/

@@ -13,17 +13,12 @@
 struct PollState;
 typedef struct PollState PollState;
 
-struct ExternalHelperd;
-
-
 
 extern bool SocketTk_initOnce(void);
 extern void SocketTk_uninitOnce(void);
 
 extern int SocketTk_poll(PollState* state, int timeoutMS);
 
-extern bool SocketTk_getHostByName(struct ExternalHelperd* helperd, const char* hostname,
-   struct in_addr* outIPAddr);
 extern bool SocketTk_getHostByAddrStr(const char* hostAddr, struct in_addr* outIPAddr);
 extern struct in_addr SocketTk_in_aton(const char* hostAddr);
 

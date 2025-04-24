@@ -1,5 +1,4 @@
-#ifndef INCOMINGDATAWORK_H_
-#define INCOMINGDATAWORK_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/components/StreamListener.h>
@@ -30,4 +29,3 @@ class IncomingDataWork : public Work
       Socket* sock;
 };
 
-#endif /*INCOMINGDATAWORK_H_*/

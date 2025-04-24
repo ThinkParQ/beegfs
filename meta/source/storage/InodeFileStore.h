@@ -1,5 +1,4 @@
-#ifndef INODEFILESTORE_H_
-#define INODEFILESTORE_H_
+#pragma once
 
 #include <common/toolkit/ObjectReferencer.h>
 #include <common/Common.h>
@@ -7,6 +6,7 @@
 #include <common/toolkit/MetadataTk.h>
 #include <common/storage/StorageDefinitions.h>
 #include <common/storage/StorageErrors.h>
+#include <storage/GlobalInodeLockStore.h>
 #include "FileInode.h"
 
 
@@ -15,6 +15,7 @@ typedef std::map<std::string, FileInodeReferencer*> InodeMap;
 typedef InodeMap::iterator InodeMapIter;
 typedef InodeMap::const_iterator InodeMapCIter;
 typedef InodeMap::value_type InodeMapVal;
+typedef std::pair<FileInode*, FhgfsOpsErr>  FileInodeRes; 
 
 /**
  * Layer in between our inodes and the data on the underlying file system. So we read/write from/to
@@ -34,7 +35,7 @@ class InodeFileStore
       }
 
       bool isInStore(const std::string& fileID);
-      FileInode* referenceFileInode(EntryInfo* entryInfo, bool loadFromDisk);
+      FileInodeRes referenceFileInode(EntryInfo* entryInfo, bool loadFromDisk, bool checkLockStore);
       FileInode* referenceLoadedFile(const std::string& entryID);
       bool releaseFileInode(FileInode* inode);
       FhgfsOpsErr unlinkFileInode(EntryInfo* entryInfo, std::unique_ptr<FileInode>* outInode);
@@ -47,7 +48,7 @@ class InodeFileStore
       size_t getSize();
 
       bool closeFile(EntryInfo* entryInfo, FileInode* inode, unsigned accessFlags,
-         unsigned* outNumHardlinks, unsigned* outNumRefs);
+         unsigned* outNumHardlinks, unsigned* outNumRefs, bool& outLastWriterClosed);
       FhgfsOpsErr openFile(EntryInfo* entryInfo, unsigned accessFlags,
          FileInode*& outInode, bool loadFromDisk);
 
@@ -62,7 +63,8 @@ class InodeFileStore
       RWLock rwlock;
 
       unsigned decreaseInodeRefCountUnlocked(InodeMapIter& iter);
-      FileInode* referenceFileInodeUnlocked(EntryInfo* entryInfo, bool loadFromDisk);
+      FileInodeRes referenceFileInodeUnlocked(EntryInfo* entryInfo, bool loadFromDisk);
+      FileInodeRes referenceFileInodeUnlockedIgnoreLocking(EntryInfo* entryInfo, bool loadFromDisk);
       FhgfsOpsErr getUnreferencedInodeUnlocked(EntryInfo* entryInfo, FileInode*& outInode);
       void deleteUnreferencedInodeUnlocked(const std::string& entryID);
 
@@ -111,4 +113,3 @@ class InodeFileStore
 
 };
 
-#endif /*INODEFILESTORE_H_*/

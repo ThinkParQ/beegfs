@@ -1,5 +1,4 @@
-#ifndef STORAGE_NODE_OP_STATS_H_
-#define STORAGE_NODE_OP_STATS_H_
+#pragma once
 
 
 #include <common/nodes/OpCounter.h>
@@ -114,4 +113,3 @@ class StorageNodeOpStats : public NodeOpStats
 
 };
 
-#endif /* STORAGE_NODE_OP_STATS_H_ */

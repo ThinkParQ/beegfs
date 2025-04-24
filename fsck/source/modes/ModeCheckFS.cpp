@@ -434,9 +434,9 @@ void ModeCheckFS::printHeaderInformation()
    {
       FsckTkEx::fsckOutput(
             "IMPORTANT NOTICE: The initiation of a repair action on a metadata mirror group "
-            "will temporarily set the consistency state of the secondary node to bad to prevent "
+            "will temporarily set the consistency state\nof the secondary node to bad to prevent "
             "interaction during the repair. After fsck finishes, it will set the states "
-            "of all affected nodes to needs-resync, so the repaired data will be synced from their "
+            "of all\naffected nodes to needs-resync, so the repaired data will be synced from their "
             "primary. \n\nIf beegfs-fsck is aborted prematurely, a resync needs to be initiated "
             "manually so all targets are consistent (good) again." ,
             OutputOptions_DOUBLELINEBREAK | OutputOptions_HEADLINE);
@@ -534,7 +534,7 @@ FsckErrCount ModeCheckFS::checkAndRepairDanglingDentry()
 
    std::pair<UserPrompter*, UserPrompter*> prompt(&forFiles, &forDirs);
 
-   FsckTkEx::fsckOutput("* Checking: Dangling directory entry ...",
+   FsckTkEx::fsckOutput("* Checking: Dangling directory entry (dentry) ...",
       OutputOptions_FLUSH |OutputOptions_LINEBREAK);
 
    return checkAndRepairGeneric(this->database->findDanglingDirEntries(),
@@ -874,7 +874,7 @@ void ModeCheckFS::logDuplicateChunk(std::list<FsckChunk>& dups, FsckErrCount& er
 
 FsckErrCount ModeCheckFS::checkDuplicateContDirs()
 {
-   FsckTkEx::fsckOutput("* Checking: Duplicated content directores ...",
+   FsckTkEx::fsckOutput("* Checking: Duplicated content directories ...",
          OutputOptions_FLUSH | OutputOptions_LINEBREAK);
 
    int dummy = 0;

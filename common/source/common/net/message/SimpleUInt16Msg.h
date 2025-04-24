@@ -1,5 +1,4 @@
-#ifndef SIMPLEUINT16MSG_H_
-#define SIMPLEUINT16MSG_H_
+#pragma once
 
 #include "NetMessage.h"
 
@@ -32,4 +31,3 @@ class SimpleUInt16Msg : public NetMessageSerdes<SimpleUInt16Msg>
       uint16_t getValue() const { return value; }
 };
 
-#endif /* SIMPLEUINT16MSG_H_ */

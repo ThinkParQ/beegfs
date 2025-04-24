@@ -1,5 +1,4 @@
-#ifndef SETLASTBUDDYCOMMOVERRIDERESPMSG_H_
-#define SETLASTBUDDYCOMMOVERRIDERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -29,4 +28,3 @@ class SetLastBuddyCommOverrideRespMsg : public SimpleIntMsg
 
 };
 
-#endif /*SETLASTBUDDYCOMMOVERRIDERESPMSG_H_*/

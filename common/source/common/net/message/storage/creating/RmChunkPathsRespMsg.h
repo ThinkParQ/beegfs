@@ -1,5 +1,4 @@
-#ifndef RMCHUNKPATHSRESPMSG_H
-#define RMCHUNKPATHSRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -39,4 +38,3 @@ class RmChunkPathsRespMsg : public NetMessageSerdes<RmChunkPathsRespMsg>
 };
 
 
-#endif /*RMCHUNKPATHSRESPMSG_H*/

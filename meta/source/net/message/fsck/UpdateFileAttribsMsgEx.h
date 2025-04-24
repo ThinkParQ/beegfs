@@ -1,5 +1,4 @@
-#ifndef UPDATEFILEATTRIBSMSGEX_H
-#define UPDATEFILEATTRIBSMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/UpdateFileAttribsMsg.h>
@@ -11,4 +10,3 @@ class UpdateFileAttribsMsgEx : public UpdateFileAttribsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*UPDATEFILEATTRIBSMSGEX_H*/

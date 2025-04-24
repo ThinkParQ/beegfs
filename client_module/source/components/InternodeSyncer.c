@@ -25,7 +25,6 @@ void InternodeSyncer_init(InternodeSyncer* this, App* app)
    this->cfg = App_getConfig(app);
 
    this->dgramLis = App_getDatagramListener(app);
-   this->helperd = App_getHelperd(app);
 
    this->mgmtNodes = App_getMgmtNodes(app);
    this->metaNodes = App_getMetaNodes(app);
@@ -274,7 +273,7 @@ void __InternodeSyncer_mgmtInit(InternodeSyncer* this)
    if(!waitForMgmtLogged)
    {
       const char* hostname = Config_getSysMgmtdHost(this->cfg);
-      unsigned short port = Config_getConnMgmtdPortUDP(this->cfg);
+      unsigned short port = Config_getConnMgmtdPort(this->cfg);
 
       Logger_logFormatted(log, Log_WARNING, logContext,
          "Waiting for beegfs-mgmtd@%s:%hu...", hostname, port);
@@ -341,7 +340,7 @@ bool __InternodeSyncer_waitForMgmtHeartbeat(InternodeSyncer* this)
    Thread* thisThread = (Thread*)this;
 
    const char* hostname = Config_getSysMgmtdHost(this->cfg);
-   unsigned short port = Config_getConnMgmtdPortUDP(this->cfg);
+   unsigned short port = Config_getConnMgmtdPort(this->cfg);
    struct in_addr ipAddr;
    int i;
 
@@ -359,20 +358,20 @@ bool __InternodeSyncer_waitForMgmtHeartbeat(InternodeSyncer* this)
 
    // resolve name, send message, wait for incoming heartbeat
 
+   if (!SocketTk_getHostByAddrStr(hostname, &ipAddr)) {
+      return false;
+   }
+
    for(i=0; (i <= numRetries) && !Thread_getSelfTerminate(thisThread); i++)
    {
-      bool resolveRes = SocketTk_getHostByName(this->helperd, hostname, &ipAddr);
-      if(resolveRes)
-      { // we got an ip => send request and wait
-         int tryTimeoutWarpMS = Random_getNextInRange(-(waitTimeoutMS/4), waitTimeoutMS/4);
+      int tryTimeoutWarpMS = Random_getNextInRange(-(waitTimeoutMS/4), waitTimeoutMS/4);
 
-         DatagramListener_sendtoIP_kernel(this->dgramLis, heartbeatReqBuf, sizeof heartbeatReqBuf, 0,
-            ipAddr, port);
+      DatagramListener_sendtoIP_kernel(this->dgramLis, heartbeatReqBuf, sizeof heartbeatReqBuf, 0,
+         ipAddr, port);
 
-         if(NodeStoreEx_waitForFirstNode(this->mgmtNodes, waitTimeoutMS + tryTimeoutWarpMS) )
-         {
-            return true; // heartbeat received => we're done
-         }
+      if(NodeStoreEx_waitForFirstNode(this->mgmtNodes, waitTimeoutMS + tryTimeoutWarpMS) )
+      {
+         return true; // heartbeat received => we're done
       }
    }
 
@@ -387,13 +386,14 @@ bool __InternodeSyncer_registerNode(InternodeSyncer* this)
    static bool registrationFailureLogged = false; // to avoid log spamming
 
    const char* logContext = "Registration";
+   Config* cfg = App_getConfig(this->app);
    Logger* log = App_getLogger(this->app);
 
    Node* mgmtNode;
 
    NoAllocBufferStore* bufStore = App_getMsgBufStore(this->app);
    Node* localNode = App_getLocalNode(this->app);
-   const char* localNodeID = Node_getID(localNode);
+   NodeString alias;
    NumNodeID localNodeNumID = Node_getNumID(localNode);
    NumNodeID newLocalNodeNumID;
    NicAddressList nicList;
@@ -413,8 +413,9 @@ bool __InternodeSyncer_registerNode(InternodeSyncer* this)
       goto exit;
    }
 
-   RegisterNodeMsg_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client,
-      &nicList, Config_getConnClientPortUDP(this->cfg));
+   Node_copyAlias(localNode, &alias);
+   RegisterNodeMsg_initFromNodeData(&msg, alias.buf, localNodeNumID, NODETYPE_Client,
+      &nicList, Config_getConnClientPort(this->cfg));
 
    // connect & communicate
    requestRes = MessagingTk_requestResponse(this->app, mgmtNode,
@@ -428,6 +429,8 @@ bool __InternodeSyncer_registerNode(InternodeSyncer* this)
    // handle result
    registerResp = (RegisterNodeRespMsg*)respMsg;
    newLocalNodeNumID = RegisterNodeRespMsg_getNodeNumID(registerResp);
+   Config_setConnMgmtdGrpcPort(cfg, RegisterNodeRespMsg_getGrpcPort(registerResp));
+   App_updateFsUUID(this->app, RegisterNodeRespMsg_getFsUUID(registerResp));
 
    if (newLocalNodeNumID.value == 0)
    {
@@ -501,7 +504,7 @@ void __InternodeSyncer_reregisterNode(InternodeSyncer* this)
    Node* mgmtNode;
 
    Node* localNode = App_getLocalNode(this->app);
-   const char* localNodeID = Node_getID(localNode);
+   NodeString alias;
    NumNodeID localNodeNumID = Node_getNumID(localNode);
    NicAddressList nicList;
 
@@ -513,8 +516,9 @@ void __InternodeSyncer_reregisterNode(InternodeSyncer* this)
    if(!mgmtNode)
       goto exit;
 
-   HeartbeatMsgEx_initFromNodeData(&msg, localNodeID, localNodeNumID, NODETYPE_Client, &nicList);
-   HeartbeatMsgEx_setPorts(&msg, Config_getConnClientPortUDP(this->cfg), 0);
+   Node_copyAlias(localNode, &alias);
+   HeartbeatMsgEx_initFromNodeData(&msg, alias.buf, localNodeNumID, NODETYPE_Client, &nicList);
+   HeartbeatMsgEx_setPorts(&msg, Config_getConnClientPort(this->cfg), 0);
 
    DatagramListener_sendMsgToNode(this->dgramLis, mgmtNode, (NetMessage*)&msg);
 
@@ -542,7 +546,7 @@ bool __InternodeSyncer_unregisterNode(InternodeSyncer* this)
 
    NoAllocBufferStore* bufStore = App_getMsgBufStore(this->app);
    Node* localNode = App_getLocalNode(this->app);
-   const char* localNodeID = Node_getID(localNode);
+   NodeString alias;
    NumNodeID localNodeNumID = Node_getNumID(localNode);
 
    RemoveNodeMsgEx msg;
@@ -586,11 +590,12 @@ cleanup_request:
       Logger_log(log, Log_WARNING, logContext, "Node deregistration successful.");
    else
    {
+      Node_copyAlias(localNode, &alias);
       Logger_log(log, Log_CRITICAL, logContext,
          "Node deregistration failed. Management node offline?");
       Logger_logFormatted(log, Log_CRITICAL, logContext,
          "In case you didn't enable automatic removal, you will have to remove this ClientID "
-         "manually from the system: %s", localNodeID);
+         "manually from the system: %s", alias.buf);
    }
 
    return nodeUnregistered;

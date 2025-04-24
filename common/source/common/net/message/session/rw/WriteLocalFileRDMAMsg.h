@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILERDMAMSG_H_
-#define WRITELOCALFILERDMAMSG_H_
+#pragma once
 
 #ifdef BEEGFS_NVFS
 #include <common/net/message/NetMessage.h>
@@ -65,4 +64,3 @@ class WriteLocalFileRDMAMsg : public WriteLocalFileMsgBase, public NetMessageSer
 };
 #endif /* BEEGFS_NVFS */
 
-#endif /*WRITELOCALFILERDMAMSG_H_*/

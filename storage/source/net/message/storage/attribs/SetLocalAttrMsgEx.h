@@ -1,5 +1,4 @@
-#ifndef SETLOCALATTRMSGEX_H_
-#define SETLOCALATTRMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/attribs/SetLocalAttrMsg.h>
@@ -18,4 +17,3 @@ class SetLocalAttrMsgEx : public SetLocalAttrMsg
 };
 
 
-#endif /*SETLOCALATTRMSGEX_H_*/

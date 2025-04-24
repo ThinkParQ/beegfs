@@ -1,5 +1,4 @@
-#ifndef STORAGEBENCHCONTROLMSG_H_
-#define STORAGEBENCHCONTROLMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/benchmark/StorageBench.h>
@@ -96,4 +95,3 @@ class StorageBenchControlMsg: public NetMessageSerdes<StorageBenchControlMsg>
       }
 };
 
-#endif /* STORAGEBENCHCONTROLMSG_H_ */

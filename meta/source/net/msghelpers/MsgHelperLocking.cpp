@@ -54,12 +54,13 @@ FhgfsOpsErr MsgHelperLocking::trySesssionRecovery(EntryInfo* entryInfo, NumNodeI
       { // bad, our recovery session ID was used by someone in the meantime => cleanup
          unsigned numHardlinks; // ignored here
          unsigned numInodeRefs; // ignored here
+         bool lastWriterClosed; // ignored here
 
          LogContext(logContext).log(Log_WARNING,
             "Recovery of file session failed: SessionID is in use by another file now.");
 
          metaStore->closeFile(entryInfo, recoverySessionFile->releaseInode(), recoveryAccessFlags,
-               &numHardlinks, &numInodeRefs);
+               &numHardlinks, &numInodeRefs, lastWriterClosed);
 
          delete(recoverySessionFile);
 
@@ -117,7 +118,7 @@ FhgfsOpsErr MsgHelperLocking::flockAppend(EntryInfo* entryInfo, unsigned ownerFD
 
          // if the file still exists, just do the lock cancel without session recovery attempt
 
-         MetaFileHandle lockCancelFile = metaStore->referenceFile(entryInfo);
+         auto [lockCancelFile, referenceRes] = metaStore->referenceFile(entryInfo);
          if(lockCancelFile)
          {
             lockCancelFile->flockAppend(lockDetails);

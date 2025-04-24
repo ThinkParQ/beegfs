@@ -1,5 +1,4 @@
-#ifndef COMMON_RESYNCSESSIONSTORERESPMSG_H
-#define COMMON_RESYNCSESSIONSTORERESPMSG_H
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -17,5 +16,4 @@ class ResyncSessionStoreRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /* COMMON_RESYNCSESSIONSTORERESPMSG_H */
 

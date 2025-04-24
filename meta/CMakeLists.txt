@@ -122,6 +122,7 @@ add_library(
 	./source/net/message/storage/attribs/UpdateDirParentMsgEx.cpp
 	./source/net/message/storage/attribs/SetAttrMsgEx.cpp
 	./source/net/message/storage/attribs/SetXAttrMsgEx.cpp
+	./source/net/message/storage/attribs/SetFilePatternMsgEx.cpp
 	./source/net/message/storage/TruncFileMsgEx.cpp
 	./source/net/message/storage/GetHighResStatsMsgEx.cpp
 	./source/net/message/storage/lookup/FindOwnerMsgEx.cpp
@@ -130,13 +131,21 @@ add_library(
 	./source/net/message/storage/lookup/LookupIntentMsgEx.h
 	./source/net/message/storage/lookup/FindLinkOwnerMsgEx.h
 	./source/net/message/storage/lookup/LookupIntentMsgEx.cpp
+	./source/net/message/storage/chunkbalancing/ChunkBalanceMsgEx.cpp
+	./source/net/message/storage/chunkbalancing/StripePatternUpdateMsgEx.cpp
 	./source/net/message/storage/StatStoragePathMsgEx.h
 	./source/net/message/storage/StatStoragePathMsgEx.cpp
 	./source/net/message/storage/listing/ListDirFromOffsetMsgEx.h
 	./source/net/message/storage/listing/ListDirFromOffsetMsgEx.cpp
 	./source/net/message/storage/quota/SetExceededQuotaMsgEx.cpp
 	./source/net/message/storage/quota/SetExceededQuotaMsgEx.h
-	./source/net/message/fsck/UpdateFileAttribsMsgEx.cpp
+    ./source/net/message/storage/attribs/SetFilePatternMsgEx.h
+    ./source/net/message/storage/attribs/SetFilePatternMsgEx.cpp
+    ./source/net/message/storage/creating/UnlinkLocalFileInodeMsgEx.h
+	./source/net/message/storage/creating/UnlinkLocalFileInodeMsgEx.cpp
+    ./source/net/message/storage/creating/MoveFileInodeMsgEx.h
+    ./source/net/message/storage/creating/MoveFileInodeMsgEx.cpp
+    ./source/net/message/fsck/UpdateFileAttribsMsgEx.cpp
 	./source/net/message/fsck/RemoveInodesMsgEx.h
 	./source/net/message/fsck/AdjustChunkPermissionsMsgEx.h
 	./source/net/message/fsck/FixInodeOwnersMsgEx.cpp
@@ -168,7 +177,8 @@ add_library(
 	./source/net/message/fsck/RemoveInodesMsgEx.cpp
 	./source/net/message/fsck/RetrieveFsIDsMsgEx.cpp
 	./source/net/message/fsck/CreateEmptyContDirsMsgEx.cpp
-	./source/net/message/fsck/CheckAndRepairDupInodeMsgEx.cpp
+    ./source/net/message/fsck/CheckAndRepairDupInodeMsgEx.h
+    ./source/net/message/fsck/CheckAndRepairDupInodeMsgEx.cpp
 	./source/net/msghelpers/MsgHelperMkFile.h
 	./source/net/msghelpers/MsgHelperTrunc.cpp
 	./source/net/msghelpers/MsgHelperXAttr.cpp

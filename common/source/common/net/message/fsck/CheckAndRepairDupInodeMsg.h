@@ -1,5 +1,4 @@
-#ifndef CHECKANDREPAIRDUPINODEMSG_H
-#define CHECKANDREPAIRDUPINODEMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/fsck/FsckDuplicateInodeInfo.h>
@@ -40,4 +39,3 @@ class CheckAndRepairDupInodeMsg : public NetMessageSerdes<CheckAndRepairDupInode
       }
 };
 
-#endif /* CHECKANDREPAIRDUPINODEMSG_H */

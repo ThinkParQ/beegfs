@@ -1,9 +1,9 @@
-#ifndef SETDIRPATTERNMSG_H_
-#define SETDIRPATTERNMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/striping/StripePattern.h>
 #include <common/storage/EntryInfo.h>
+#include <common/storage/RemoteStorageTarget.h>
 #include <common/Common.h>
 
 class SetDirPatternMsg : public MirroredMessageBase<SetDirPatternMsg>
@@ -18,12 +18,12 @@ class SetDirPatternMsg : public MirroredMessageBase<SetDirPatternMsg>
        * @param path just a reference, so do not free it as long as you use this object!
        * @param pattern just a reference, so do not free it as long as you use this object!
        */
-      SetDirPatternMsg(EntryInfo* entryInfo, StripePattern* pattern) :
+      SetDirPatternMsg(EntryInfo* entryInfo, StripePattern* pattern, RemoteStorageTarget* rst) :
          BaseType(NETMSGTYPE_SetDirPattern)
       {
          this->entryInfoPtr = entryInfo;
-
          this->pattern = pattern;
+         this->rstPtr = rst;
       }
 
       /**
@@ -38,7 +38,8 @@ class SetDirPatternMsg : public MirroredMessageBase<SetDirPatternMsg>
       {
          ctx
             % serdes::backedPtr(obj->entryInfoPtr, obj->entryInfo)
-            % serdes::backedPtr(obj->pattern, obj->parsed.pattern);
+            % serdes::backedPtr(obj->pattern, obj->parsed.pattern)
+            % serdes::backedPtr(obj->rstPtr, obj->rst);
 
          if (obj->isMsgHeaderFeatureFlagSet(Flags::HAS_UID))
             ctx % obj->uid;
@@ -55,10 +56,12 @@ class SetDirPatternMsg : public MirroredMessageBase<SetDirPatternMsg>
       // for serialization
       EntryInfo* entryInfoPtr;
 
-      StripePattern* pattern; // not owned by this object!
+      StripePattern* pattern;       // not owned by this object!
+      RemoteStorageTarget* rstPtr;  // not owned by this object!
 
       // for deserialization
       EntryInfo entryInfo;
+      RemoteStorageTarget rst;
       struct {
          std::unique_ptr<StripePattern> pattern;
       } parsed;
@@ -74,6 +77,11 @@ class SetDirPatternMsg : public MirroredMessageBase<SetDirPatternMsg>
          return &this->entryInfo;
       }
 
+      RemoteStorageTarget* getRemoteStorageTarget()
+      {
+         return &this->rst;
+      }
+
       uint32_t getUID() const { return uid; }
 
       void setUID(uint32_t uid)
@@ -86,4 +94,3 @@ class SetDirPatternMsg : public MirroredMessageBase<SetDirPatternMsg>
 };
 
 
-#endif /*SETDIRPATTERNMSG_H_*/

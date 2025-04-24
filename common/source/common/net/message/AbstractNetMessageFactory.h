@@ -1,5 +1,4 @@
-#ifndef ABSTRACTNETMESSAGEFACTORY_H_
-#define ABSTRACTNETMESSAGEFACTORY_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -27,4 +26,3 @@ class AbstractNetMessageFactory
       virtual std::unique_ptr<NetMessage> createFromMsgType(unsigned short msgType) const = 0;
 };
 
-#endif /*ABSTRACTNETMESSAGEFACTORY_H_*/

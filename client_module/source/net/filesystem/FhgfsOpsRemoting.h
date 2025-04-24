@@ -58,7 +58,7 @@ extern FhgfsOpsErr FhgfsOpsRemoting_mkfileWithStripeHints(App* app, const EntryI
 extern FhgfsOpsErr FhgfsOpsRemoting_unlinkfile(App* app, const EntryInfo* parentInfo,
    const char* entryName, const struct FileEvent* event);
 extern FhgfsOpsErr FhgfsOpsRemoting_openfile(const EntryInfo* entryInfo, RemotingIOInfo* ioInfo,
-   uint64_t* outVersion, const struct FileEvent* event);
+   uint32_t* outVersion, const struct FileEvent* event);
 extern FhgfsOpsErr FhgfsOpsRemoting_closefile(const EntryInfo* entryInfo,
    RemotingIOInfo* ioInfo, const struct FileEvent* event);
 extern FhgfsOpsErr FhgfsOpsRemoting_closefileEx(const EntryInfo* entryInfo,
@@ -140,7 +140,7 @@ extern FhgfsOpsErr FhgfsOpsRemoting_refreshEntry(App* app, const EntryInfo* entr
 extern FhgfsOpsErr FhgfsOpsRemoting_bumpFileVersion(App* app, const EntryInfo* entryInfo,
    bool persistent, const struct FileEvent* event);
 extern FhgfsOpsErr FhgfsOpsRemoting_getFileVersion(App* app, const EntryInfo* entryInfo,
-   uint64_t* outVersion);
+   uint32_t* outVersion);
 
 FhgfsOpsErr __FhgfsOpsRemoting_flockGenericEx(struct NetMessage* requestMsg, unsigned respMsgType,
    NodeOrGroup owner, bool isBuddyMirrored, App* app, const char* fileHandleID, int lockTypeFlags,

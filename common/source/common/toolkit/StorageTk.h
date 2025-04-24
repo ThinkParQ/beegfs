@@ -1,5 +1,4 @@
-#ifndef STORAGETK_H_
-#define STORAGETK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/app/config/InvalidConfigException.h>
@@ -13,6 +12,7 @@
 #include <common/threading/Atomics.h>
 #include <common/threading/Mutex.h>
 #include <common/toolkit/LockFD.h>
+#include <common/toolkit/HashTk.h>
 
 #include <dirent.h>
 
@@ -98,7 +98,7 @@ class StorageTk
       static bool checkStorageFormatFileExists(const std::string pathStr);
       static bool checkSessionFileExists(const std::string& pathStr);
 
-      static void checkOrCreateOrigNodeIDFile(const std::string pathStr, std::string currentNodeID);
+      static void deprecateNodeStringIDFiles(const std::string pathStr);
 
       static void readTargetIDFile(const std::string pathStr, std::string* outTargetID);
       static void readOrCreateTargetIDFile(const std::string pathStr, const NumNodeID localNodeID,
@@ -266,7 +266,7 @@ class StorageTk
       static void getHashes(const std::string hashStr, size_t numHashesLevel1,
           size_t numHashesLevel2, uint16_t& outHashLevel1, uint16_t& outHashLevel2)
       {
-         uint32_t checksum = StringTk::strChecksum(hashStr.c_str(), hashStr.length() );
+         uint32_t checksum = HashTk::hsieh32(hashStr.c_str(), hashStr.length() );
 
          outHashLevel1 =  ((uint16_t)(checksum >> 16) ) % numHashesLevel1;
          outHashLevel2 =  ((uint16_t) checksum)         % numHashesLevel2;
@@ -513,4 +513,3 @@ class StorageTk
 
 };
 
-#endif /*STORAGETK_H_*/

@@ -492,7 +492,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1278,7 +1278,6 @@
             "inspect": false
           },
           "mappings": [],
-          "noValue": "Node Down",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1487,7 +1486,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1677,7 +1676,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1725,7 +1724,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1889,7 +1888,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1936,11 +1935,11 @@
             ]
           ],
           "tags": [
-            {	
-              "key": "nodeID",	
-              "operator": "=~",	
-              "value": "/^$storageID$/"	
-            }	
+            {
+              "key": "nodeNumID",
+              "operator": "=~",
+              "value": "/^$storageID$/"
+            }
           ]
         }
       ],
@@ -2063,12 +2062,6 @@
             },
             {
               "params": [
-                "nodeID"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
                 "none"
               ],
               "type": "fill"
@@ -2095,7 +2088,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -2143,7 +2136,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -2354,7 +2347,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -2873,7 +2866,7 @@
       },
       "targets": [
         {
-          "alias": "$tag_host: $col",
+          "alias": "$col",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -4026,14 +4019,14 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "show tag values from storage with key = \"nodeID\" ",
+        "definition": "show tag values from storage with key = \"nodeNumID\" ",
         "hide": 0,
         "includeAll": false,
         "label": "Storage ID",
         "multi": false,
         "name": "storageID",
         "options": [],
-        "query": "show tag values from storage with key = \"nodeID\" ",
+        "query": "show tag values from storage with key = \"nodeNumID\" ",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4046,13 +4039,14 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "select last(\"hostnameid\") from storage  where nodeID =~ /^$storageID$/",
-        "hide": 2,
+        "definition": "select last(\"hostnameid\") from storage  where nodeNumID =~ /^$storageID$/",
+        "hide": 0,
         "includeAll": false,
+        "label": "Storage Host",
         "multi": false,
         "name": "hoststorage",
         "options": [],
-        "query": "select last(\"hostnameid\") from storage  where nodeID =~ /^$storageID$/",
+        "query": "select last(\"hostnameid\") from storage  where nodeNumID =~ /^$storageID$/",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

@@ -43,7 +43,7 @@ bool NetworkInterfaceCard::findAll(StringList* allowedInterfacesList, bool useRD
 
 /**
  * find all network interfaces. This differs from findAll because here only the interfaces are
- * (TCP and SDP) are detected. No check for there RDMA capability is performed.
+ * (TCP) are detected. No check for there RDMA capability is performed.
  *
  * @return true if any usable standard interface was found
  */
@@ -177,7 +177,6 @@ void NetworkInterfaceCard::filterInterfacesForRDMA(NicAddressList* list, NicAddr
 bool NetworkInterfaceCard::checkAndAddRdmaCapability(NicAddressList& nicList)
 {
    // Note: This works by binding an RDMASocket to each IP of the passed list.
-   // Note: This only checks standard interfaces (no SDP interfaces)
 
    NicAddressList rdmaInterfaces;
 
@@ -279,38 +278,8 @@ bool NetworkInterfaceCard::fillNicAddress(int sock, NicAddrType nicType, struct 
       switch(ifr->ifr_hwaddr.sa_family)
       {
          case ARPHRD_LOOPBACK: return false;
-
          default:
-         {
-            // make sure we allow SDP for IB only (because an SDP socket domain is valid for other
-            // NIC types as well, but cannot connect then, of course
-            if( (nicType == NICADDRTYPE_SDP) && (ifr->ifr_hwaddr.sa_family != ARPHRD_INFINIBAND) )
-               return false;
-         } break;
-
-         // explicit types no longer required, because we identify the hardware by the socket type
-         // now (just the loopback should be avoided)
-         /*
-         case ARPHRD_INFINIBAND:
-         {
-            outAddr->nicType = NICADDRTYPE_SDP;
-            //return false;
-         } break;
-
-         case ARPHRD_NETROM:
-         case ARPHRD_ETHER:
-         case ARPHRD_PPP:
-         case ARPHRD_EETHER:
-         case ARPHRD_IEEE802:
-         {
-            outAddr->nicType = NICADDRTYPE_STANDARD;
-         } break;
-
-         default:
-         { // ignore everything else
-            return false;
-         } break;
-         */
+            break;
       }
 
       // copy nicType
@@ -329,7 +298,6 @@ const char* NetworkInterfaceCard::nicTypeToString(NicAddrType nicType)
    {
       case NICADDRTYPE_RDMA: return "RDMA";
       case NICADDRTYPE_STANDARD: return "TCP";
-      case NICADDRTYPE_SDP: return "SDP";
 
       default: return "<unknown>";
    }
@@ -350,17 +318,6 @@ std::string NetworkInterfaceCard::nicAddrToString(NicAddress* nicAddr)
    return resultStr;
 }
 
-bool NetworkInterfaceCard::supportsSDP(NicAddressList* nicList)
-{
-   for(NicAddressListIter iter = nicList->begin(); iter != nicList->end(); iter++)
-   {
-      if(iter->nicType == NICADDRTYPE_SDP)
-         return true;
-   }
-
-   return false;
-}
-
 bool NetworkInterfaceCard::supportsRDMA(NicAddressList* nicList)
 {
    for(NicAddressListIter iter = nicList->begin(); iter != nicList->end(); iter++)
@@ -375,7 +332,6 @@ bool NetworkInterfaceCard::supportsRDMA(NicAddressList* nicList)
 void NetworkInterfaceCard::supportedCapabilities(NicAddressList* nicList,
          NicListCapabilities* outCapabilities)
 {
-   outCapabilities->supportsSDP = supportsSDP(nicList);
    outCapabilities->supportsRDMA = supportsRDMA(nicList);
 }
 

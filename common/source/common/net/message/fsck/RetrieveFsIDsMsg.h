@@ -1,5 +1,4 @@
-#ifndef RETRIEVEFSIDSMSG_H
-#define RETRIEVEFSIDSMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/Path.h>
@@ -78,4 +77,3 @@ public:
       }
 };
 
-#endif /*RETRIEVEFSIDSMSG_H*/

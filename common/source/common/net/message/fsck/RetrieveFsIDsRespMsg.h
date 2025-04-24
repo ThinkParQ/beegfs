@@ -1,5 +1,4 @@
-#ifndef RETRIEVEFSIDSRESPMSG_H
-#define RETRIEVEFSIDSRESPMSG_H
+#pragma once
 
 #include <common/Common.h>
 #include <common/fsck/FsckFsID.h>
@@ -70,4 +69,3 @@ class RetrieveFsIDsRespMsg : public NetMessageSerdes<RetrieveFsIDsRespMsg>
       }
 };
 
-#endif /*RETRIEVEFSIDSRESPMSG_H*/

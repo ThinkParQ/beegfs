@@ -1,5 +1,4 @@
-#ifndef GETTARGETSTATESRESPMSG_H
-#define GETTARGETSTATESRESPMSG_H
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -61,4 +60,3 @@ class GetTargetStatesRespMsg : public NetMessageSerdes<GetTargetStatesRespMsg>
 };
 
 
-#endif /* GETTARGETSTATESRESPMSG_H */

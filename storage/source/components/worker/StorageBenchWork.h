@@ -1,5 +1,4 @@
-#ifndef STORAGEBENCHWORK_H_
-#define STORAGEBENCHWORK_H_
+#pragma once
 
 #include <common/benchmark/StorageBench.h>
 #include <common/components/worker/Work.h>
@@ -42,4 +41,3 @@ class StorageBenchWork: public Work
       Pipe* operatorCommunication;
 };
 
-#endif /* STORAGEBENCHWORK_H_ */

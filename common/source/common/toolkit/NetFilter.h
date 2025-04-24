@@ -1,5 +1,4 @@
-#ifndef NETFILTER_H_
-#define NETFILTER_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/app/config/ICommonConfig.h>
@@ -136,4 +135,3 @@ class NetFilter
       }
 };
 
-#endif /* NETFILTER_H_ */

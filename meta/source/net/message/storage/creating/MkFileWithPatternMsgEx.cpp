@@ -180,7 +180,8 @@ FhgfsOpsErr MkFileWithPatternMsgEx::mkMetaFile(DirInode& dir, MkFileDetails& mkD
    }
 
    return Program::getApp()->getMetaStore()->mkNewMetaFile(
-      dir, &mkDetails, std::move(stripePattern), outEntryInfo, &inodeDiskData);
+      dir, &mkDetails, std::move(stripePattern), getRemoteStorageTarget(), outEntryInfo,
+      &inodeDiskData);
       // (note: internally deletes stripePattern)
 }
 
@@ -199,6 +200,7 @@ void MkFileWithPatternMsgEx::forwardToSecondary(ResponseContext& ctx)
    mkFileMsg.setPattern(inodeDiskData.getStripePattern());
    mkFileMsg.setDirTimestamps(dirTimestamps);
    mkFileMsg.setCreateTime(inodeDiskData.getInodeStatData()->getCreationTimeSecs());
+   mkFileMsg.setRemoteStorageTarget(getRemoteStorageTarget());
 
    sendToSecondary(ctx, mkFileMsg, NETMSGTYPE_MkFileResp);
 }

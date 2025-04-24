@@ -1,5 +1,4 @@
-#ifndef SESSIONFILESTORE_H_
-#define SESSIONFILESTORE_H_
+#pragma once
 
 #include <common/toolkit/ObjectReferencer.h>
 #include <common/threading/Mutex.h>
@@ -131,4 +130,3 @@ class SessionFileStore
       void performAsyncCleanup(EntryInfo* entryInfo, MetaFileHandle inode, unsigned accessFlags);
 };
 
-#endif /*SESSIONFILESTORE_H_*/

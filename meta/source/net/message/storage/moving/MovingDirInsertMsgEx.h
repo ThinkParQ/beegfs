@@ -1,5 +1,4 @@
-#ifndef MOVINGDIRINSERTMSGEX_H_
-#define MOVINGDIRINSERTMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/moving/MovingDirInsertMsg.h>
@@ -50,4 +49,3 @@ class MovingDirInsertMsgEx : public MirroredMessage<MovingDirInsertMsg,
       const char* mirrorLogContext() const override { return "MovingDirInsertMsgEx/forward"; }
 };
 
-#endif /*MOVINGDIRINSERTMSGEX_H_*/

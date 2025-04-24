@@ -1,5 +1,4 @@
-#ifndef TRUNCLOCALFILEMSGEX_H_
-#define TRUNCLOCALFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/TruncLocalFileMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -36,4 +35,3 @@ class TruncLocalFileMsgEx : public TruncLocalFileMsg
             bool* outChunkLocked);
 };
 
-#endif /*TRUNCLOCALFILEMSGEX_H_*/

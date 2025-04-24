@@ -1,5 +1,4 @@
-#ifndef GETFILEVERSIONMSG_H
-#define GETFILEVERSIONMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -34,4 +33,3 @@ class GetFileVersionMsg : public MirroredMessageBase<GetFileVersionMsg>
       EntryInfo& getEntryInfo() const { return *entryInfo; }
 };
 
-#endif

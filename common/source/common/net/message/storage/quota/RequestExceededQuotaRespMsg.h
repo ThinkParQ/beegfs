@@ -1,5 +1,4 @@
-#ifndef REQUESTEXCEEDEDQUOTARESPMSG_H_
-#define REQUESTEXCEEDEDQUOTARESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/storage/quota/SetExceededQuotaMsg.h>
@@ -65,4 +64,3 @@ class RequestExceededQuotaRespMsg: public SetExceededQuotaMsg
 
 };
 
-#endif /* REQUESTEXCEEDEDQUOTARESPMSG_H_ */

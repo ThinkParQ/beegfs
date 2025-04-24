@@ -1,5 +1,4 @@
-#ifndef COMMON_STORAGE_QUOTA_QUOTA_H_
-#define COMMON_STORAGE_QUOTA_QUOTA_H_
+#pragma once
 
 #include <ostream>
 
@@ -22,4 +21,3 @@ enum QuotaInodeSupport
    QuotaInodeSupport_NO_BLOCKDEVICES=3
 };
 
-#endif /* COMMON_STORAGE_QUOTA_QUOTA_H_ */

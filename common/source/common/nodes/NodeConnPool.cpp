@@ -222,15 +222,6 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
                newRDMASock = RDMASocket::create().release();
                sock = newRDMASock;
             } break;
-            case NICADDRTYPE_SDP:
-            { // SDP
-               if(!localNicCapsCopy.supportsSDP)
-                  continue;
-
-               log.log(Log_DEBUG, "Establishing new SDP connection to: " + endpointStr);
-               newStandardSock = new StandardSocket(PF_SDP, SOCK_STREAM);
-               sock = newStandardSock;
-            } break;
             case NICADDRTYPE_STANDARD:
             { // TCP
                log.log(Log_DEBUG, "Establishing new TCP connection to: " + endpointStr);
@@ -680,11 +671,6 @@ void NodeConnPool::statsAddNic(NicAddrType nicType)
          (stats.numEstablishedRDMA)++;
       } break;
 
-      case NICADDRTYPE_SDP:
-      {
-         (stats.numEstablishedSDP)++;
-      } break;
-
       default:
       {
          (stats.numEstablishedStd)++;
@@ -702,11 +688,6 @@ void NodeConnPool::statsRemoveNic(NicAddrType nicType)
       case NICADDRTYPE_RDMA:
       {
          (stats.numEstablishedRDMA)--;
-      } break;
-
-      case NICADDRTYPE_SDP:
-      {
-         (stats.numEstablishedSDP)--;
       } break;
 
       default:

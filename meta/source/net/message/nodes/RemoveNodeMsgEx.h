@@ -1,5 +1,4 @@
-#ifndef REMOVENODEMSGEX_H_
-#define REMOVENODEMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/RemoveNodeMsg.h>
 
@@ -10,4 +9,3 @@ class RemoveNodeMsgEx : public RemoveNodeMsg
 };
 
 
-#endif /* REMOVENODEMSGEX_H_ */

@@ -1,5 +1,4 @@
-#ifndef SETMETADATAMIRRORINGMSGEX_H_
-#define SETMETADATAMIRRORINGMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/mirroring/SetMetadataMirroringMsg.h>
@@ -17,4 +16,3 @@ class SetMetadataMirroringMsgEx : public SetMetadataMirroringMsg
       static FhgfsOpsErr moveRootDirectory(bool revertMove);
 };
 
-#endif /*SETMETADATAMIRRORINGMSGEX_H_*/

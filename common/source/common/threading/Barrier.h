@@ -1,5 +1,4 @@
-#ifndef COMMON_BARRIER_H
-#define COMMON_BARRIER_H
+#pragma once
 
 #include <common/threading/PThread.h>
 
@@ -38,4 +37,3 @@ class Barrier
       }
 };
 
-#endif /* COMMON_BARRIER_H */

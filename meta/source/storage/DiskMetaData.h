@@ -1,5 +1,4 @@
-#ifndef DISKMETADATA_H_
-#define DISKMETADATA_H_
+#pragma once
 
 #include "FileInodeStoreData.h"
 
@@ -77,4 +76,3 @@ class DiskMetaData
       static void serializeDirInodeCommonData(Inode& inode, Ctx& ctx);
 };
 
-#endif // DISKMETADATA_H_

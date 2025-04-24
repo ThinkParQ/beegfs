@@ -1,5 +1,4 @@
-#ifndef SETCHANNELDIRECTMSGEX_H_
-#define SETCHANNELDIRECTMSGEX_H_
+#pragma once
 
 #include <common/net/message/control/SetChannelDirectMsg.h>
 
@@ -10,4 +9,3 @@ class SetChannelDirectMsgEx : public SetChannelDirectMsg
 };
 
 
-#endif /*SETCHANNELDIRECTMSGEX_H_*/

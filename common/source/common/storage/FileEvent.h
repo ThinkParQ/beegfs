@@ -1,23 +1,25 @@
-#ifndef FILEEVENT_H_
-#define FILEEVENT_H_
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 
 enum class FileEventType
 {
-   FLUSH = 0,
-   TRUNCATE = 1,
-   SETATTR = 2,
-   CLOSE_WRITE = 3,
-   CREATE = 4,
-   MKDIR = 5,
-   MKNOD = 6,
-   SYMLINK = 7,
-   RMDIR = 8,
-   UNLINK = 9,
-   HARDLINK = 10,
-   RENAME = 11,
-   READ = 12,
+   FLUSH = 1,
+   TRUNCATE = 2,
+   SETATTR = 3,
+   CLOSE_WRITE = 4,
+   CREATE = 5,
+   MKDIR = 6,
+   MKNOD = 7,
+   SYMLINK = 8,
+   RMDIR = 9,
+   UNLINK = 10,
+   HARDLINK = 11,
+   RENAME = 12,
+   OPEN_READ = 13,
+   OPEN_WRITE = 14,
+   OPEN_READ_WRITE = 15,
+   LAST_WRITER_CLOSED = 16
 };
 
 template<>
@@ -46,4 +48,3 @@ struct FileEvent
    }
 };
 
-#endif

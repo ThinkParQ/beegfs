@@ -8,10 +8,6 @@ export BEEGFS_DEBUG_IP
 export KDIR
 export KSRCDIR
 
-# Tell makefiles that this is a development build. Don't use config files in /etc/beegfs.
-BEEGFS_DEV_BUILD=1
-export BEEGFS_DEV_BUILD
-
 BEEGFS_THIRDPARTY_OPTIONAL =
 export BEEGFS_THIRDPARTY_OPTIONAL
 
@@ -27,11 +23,15 @@ else
   BEEGFS_EPOCH := 20
 endif
 
-# sanitize version strings:
-# rpm accepts underscores but not dashes
-# deb accepts dashes but not underscores
-BEEGFS_VERSION_RPM := $(subst -,_,$(BEEGFS_VERSION))
-BEEGFS_VERSION_DEB := $(BEEGFS_EPOCH):$(subst _,-,$(BEEGFS_VERSION))
+# underscores are not allowed in version strings, because they are not valid semver
+ifneq (,$(findstring _,$(BEEGFS_VERSION)))
+  $(error Underscores not allowed in versions. BEEGFS_VERSION is $(BEEGFS_VERSION))
+endif
+
+# dashes in semver for pre-releases should be converted to tildes for package managers in the
+# distributions we support
+BEEGFS_VERSION_RPM := $(subst -,~,$(BEEGFS_VERSION))
+BEEGFS_VERSION_DEB := $(BEEGFS_EPOCH):$(subst -,~,$(BEEGFS_VERSION))
 export BEEGFS_VERSION
 
 ifneq ($(NVFS_INCLUDE_PATH),)
@@ -42,10 +42,10 @@ export BEEGFS_NVFS
 PREFIX ?= /opt/beegfs
 DESTDIR ?=
 
-DAEMONS := mgmtd meta storage helperd mon
-UTILS := fsck ctl event_listener $(if $(WITHOUT_COMM_DEBUG),,comm_debug)
+DAEMONS := meta storage mon
+UTILS := fsck event_listener $(if $(WITHOUT_COMM_DEBUG),,comm_debug)
 
-# exclude components with no runnable tests from `test' and do not provide `ctl-test'.
+# exclude components with no runnable tests from `test'.
 DO_NOT_TEST := thirdparty event_listener
 
 ALL_COMPONENTS := thirdparty common $(DAEMONS) $(UTILS)
@@ -171,9 +171,12 @@ package-deb: clean
 			cd build; \
 			sed -i -e 's/beegfs (.*)/beegfs ($(BEEGFS_VERSION_DEB))/' debian/changelog; \
 			sed -i -e 's/@DATE/$(shell date -R)/' debian/changelog; \
-			debuild -eBEEGFS_\* $(DEBUILD_OPTS) -us -uc -b \
+			debuild -eBEEGFS_\* $(DEBUILD_OPTS) -us -uc -b 2>&1 | grep -Ev "dir-or-file-in-opt" \
 		) && \
-		rm -rf build *.dsc *.tar.gz
+		rm -rf build *.dsc *.tar.gz \
+		# Replace tilde in package filename with hypens.
+		# Github release action and api substitutes tilde (~) with dot (.) in file names when uploaded to Github packages.
+		find -type f -name "*~*.deb" -exec bash -c 'mv "$$1" "$${1//\~/-}"' _ {} \;
 
 # use RPMBUILD_OPTS to pass more options to rpmuild, eg
 #   RPMBUILD_OPTS='-D "MAKE_CONCURRENCY 32"'
@@ -189,4 +192,7 @@ package-rpm: clean
 		--define '_topdir $(abspath $(PACKAGE_DIR))' \
 		--define 'EPOCH $(BEEGFS_EPOCH)' \
 		--define 'BEEGFS_VERSION $(BEEGFS_VERSION_RPM)' \
-		$(RPMBUILD_OPTS)
+		$(RPMBUILD_OPTS) \
+	# Replace tilde in package filename with hypens.
+	# Github release action and api substitutes tilde (~) with dot (.) in file names when uploaded to Github packages.
+	find $(PACKAGE_DIR)/RPMS -type f -name "*~*.rpm" -exec bash -c 'mv "$$1" "$${1//\~/-}"' _ {} \;

@@ -1,5 +1,4 @@
-#ifndef ENTRYINFOWITHDEPTH_H_
-#define ENTRYINFOWITHDEPTH_H_
+#pragma once
 
 #include <common/storage/EntryInfo.h>
 
@@ -63,4 +62,3 @@ class EntryInfoWithDepth : public EntryInfo
 };
 
 
-#endif /* ENTRYINFOWITHDEPTH_H_ */

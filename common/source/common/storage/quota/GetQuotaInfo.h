@@ -1,5 +1,4 @@
-#ifndef GETQUOTAINFOHELPER_H_
-#define GETQUOTAINFOHELPER_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -52,4 +51,3 @@ class GetQuotaInfo
       QuotaDataMap calculateQuotaSums(const QuotaDataMapForTarget& quotaMaps);
 };
 
-#endif /* GETQUOTAINFOHELPER_H_ */

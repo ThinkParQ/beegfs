@@ -1,5 +1,4 @@
-#ifndef GETTARGETMAPPINGSRESPMSG_H_
-#define GETTARGETMAPPINGSRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -49,4 +48,3 @@ class GetTargetMappingsRespMsg : public NetMessageSerdes<GetTargetMappingsRespMs
       }
 };
 
-#endif /* GETTARGETMAPPINGSRESPMSG_H_ */

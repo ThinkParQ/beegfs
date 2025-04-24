@@ -1,5 +1,4 @@
-#ifndef DYNAMICFILEATTRIBS_H_
-#define DYNAMICFILEATTRIBS_H_
+#pragma once
 
 #include <common/toolkit/MathTk.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -63,4 +62,3 @@ typedef std::vector<DynamicFileAttribs> DynamicFileAttribsVec;
 typedef DynamicFileAttribsVec::iterator DynamicFileAttribsVecIter;
 typedef DynamicFileAttribsVec::const_iterator DynamicFileAttribsVecCIter;
 
-#endif /*DYNAMICFILEATTRIBS_H_*/

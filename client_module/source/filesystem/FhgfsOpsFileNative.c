@@ -233,7 +233,7 @@ static int beegfs_open(struct inode* inode, struct file* filp)
    struct FhgfsInode* fhgfsInode = BEEGFS_INODE(inode);
    int err;
    RemotingIOInfo ioInfo;
-   uint64_t remoteVersion;
+   uint32_t remoteVersion;
    bool mustAcquire;
 
    FhgfsOpsHelper_logOp(5, app, file_dentry(filp), file_inode(filp), __func__);
@@ -255,12 +255,12 @@ static int beegfs_open(struct inode* inode, struct file* filp)
    FhgfsInode_entryInfoWriteLock(fhgfsInode);
    {
       mustAcquire =
-         (fhgfsInode->version > remoteVersion &&
-            fhgfsInode->version - remoteVersion < 0x80000000ULL) ||
-         (fhgfsInode->version < remoteVersion &&
-            remoteVersion - fhgfsInode->version < 0x80000000ULL);
+         (fhgfsInode->fileVersion > remoteVersion &&
+            fhgfsInode->fileVersion - remoteVersion < 0x80000000ULL) ||
+         (fhgfsInode->fileVersion < remoteVersion &&
+            remoteVersion - fhgfsInode->fileVersion < 0x80000000ULL);
 
-      fhgfsInode->version = remoteVersion;
+      fhgfsInode->fileVersion = remoteVersion;
    }
    FhgfsInode_entryInfoWriteUnlock(fhgfsInode);
 
@@ -315,7 +315,7 @@ static int beegfs_flush(struct file* filp, fl_owner_t id)
          &inode->entryInfo,
          true, cfg->eventLogMask & EventLogMask_FLUSH ? &event : NULL);
 
-   inode->version += 1;
+   inode->fileVersion += 1;
 
    FhgfsInode_entryInfoWriteUnlock(inode);
 
@@ -515,7 +515,7 @@ static int __beegfs_fsync(struct file* filp, loff_t start, loff_t end, int datas
       err = FhgfsOpsErr_toSysErr(err);
    }
 
-   fhgfsInode->version += 1;
+   fhgfsInode->fileVersion += 1;
 
    FhgfsInode_entryInfoWriteUnlock(fhgfsInode);
 

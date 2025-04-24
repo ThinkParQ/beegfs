@@ -1,5 +1,4 @@
-#ifndef UPDATEDIRPARENTMSG_H_
-#define UPDATEDIRPARENTMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -62,4 +61,3 @@ class UpdateDirParentMsg : public MirroredMessageBase<UpdateDirParentMsg>
 
 
 
-#endif // UPDATEDIRPARENTMSG_H_

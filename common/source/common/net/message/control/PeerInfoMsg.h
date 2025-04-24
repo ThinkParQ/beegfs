@@ -1,5 +1,4 @@
-#ifndef COMMON_NET_MESSAGE_CONTROL_PEERINFOMSG_H
-#define COMMON_NET_MESSAGE_CONTROL_PEERINFOMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/Node.h>
@@ -32,4 +31,3 @@ class PeerInfoMsg : public NetMessageSerdes<PeerInfoMsg>
       NumNodeID id;
 };
 
-#endif /* AUTHENTICATECHANNELMSG_H_ */

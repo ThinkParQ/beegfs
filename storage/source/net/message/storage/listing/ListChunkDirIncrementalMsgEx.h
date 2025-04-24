@@ -1,5 +1,4 @@
-#ifndef LISTCHUNKDIRINCREMENTALMSGEX_H_
-#define LISTCHUNKDIRINCREMENTALMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/listing/ListChunkDirIncrementalMsg.h>
 
@@ -14,4 +13,3 @@ class ListChunkDirIncrementalMsgEx : public ListChunkDirIncrementalMsg
          IntList& outEntryTypes, int64_t &outNewOffset);
 };
 
-#endif /*LISTCHUNKDIRINCREMENTALMSGEX_H_*/

@@ -174,7 +174,7 @@ void RetrieveInodesWork::doWork(bool isBuddyMirrored)
             }
             else
             {
-               throw FsckException("Communication error occured with node " + node.getID());
+               throw FsckException("Communication error occured with node " + node.getAlias());
             }
 
             // if any of the worker threads threw an exception, we should stop now!

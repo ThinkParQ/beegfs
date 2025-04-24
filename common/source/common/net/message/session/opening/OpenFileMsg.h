@@ -1,5 +1,4 @@
-#ifndef OPENFILEMSG_H_
-#define OPENFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
@@ -127,4 +126,3 @@ class OpenFileMsg : public MirroredMessageBase<OpenFileMsg>
       }
 };
 
-#endif /*OPENFILEMSG_H_*/

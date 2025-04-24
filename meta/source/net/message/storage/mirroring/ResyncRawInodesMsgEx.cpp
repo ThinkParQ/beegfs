@@ -141,12 +141,32 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncSingle(ResponseContext& ctx)
 FhgfsOpsErr ResyncRawInodesMsgEx::resyncInode(ResponseContext& ctx, const Path& path,
    Deserializer& data, const bool isDirectory, const bool recvXAttrs)
 {
-   std::vector<char> content;
+   std::map<std::string, std::vector<char>> content;
    bool isDeletion;
 
-   data
-      % content
-      % isDeletion;
+   // Decide how to correctly deserialize incoming data based on 'recvXAttrs' flag:
+   //
+   // Note: After switching data structure used to encode/serialize inode data from std::vector to
+   // std::map to accomodate new xattr introduced that stores Remote Storage Targets (RST) info in
+   // inodes, we need to handle both formats (See PR#3905 for more details):
+   // - true (default): Represents inode data with base meta xattr (META_XATTR_NAME) plus any
+   //                   user-defined xattrs as key-value pairs in map format.
+   // - false: Represents standalone dentry data still using the original vector format for
+   //         compatibility, deserialized as single value.
+   if (!recvXAttrs)
+   {
+      content.try_emplace(META_XATTR_NAME);
+      data
+         % content[META_XATTR_NAME]
+         % isDeletion;
+   }
+   else
+   {
+      data
+         % content
+         % isDeletion;
+   }
+
    if (!data.good())
    {
       LOG(MIRRORING, ERR, "Received bad data from primary.");
@@ -184,9 +204,14 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncInode(ResponseContext& ctx, const Path& 
 
    if (!isDirectory)
    {
-      const auto setContentRes = inode.second.setContent(&content[0], content.size());
-      if (setContentRes)
-         return setContentRes;
+      for (const auto& attr : content)
+      {
+         const auto setContentRes = inode.second.setContent(
+                     attr.first.c_str(), attr.second.data(), attr.second.size());
+
+         if (setContentRes)
+            return setContentRes;
+      }
    }
 
    if (!hasXAttrs || !recvXAttrs)
@@ -216,7 +241,7 @@ FhgfsOpsErr ResyncRawInodesMsgEx::resyncDentry(ResponseContext& ctx, const Path&
 
    // dentries with independent contents (dir dentries, dentries to non-inlined files) can be
    // treated like inodes for the purpose of resync. don't sync xattrs though, because dentries
-   // should never have them
+   // should never have them. set recvXAttrs=false to indicate independent dentry data.
    if (!linksToFsID)
       return resyncInode(ctx, path, data, false, false);
 

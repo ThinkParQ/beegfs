@@ -1,5 +1,4 @@
-#ifndef DELETEDIRENTRIESMSG_H
-#define DELETEDIRENTRIESMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirEntry.h>
 #include <common/net/message/NetMessage.h>
@@ -37,4 +36,3 @@ class DeleteDirEntriesMsg : public NetMessageSerdes<DeleteDirEntriesMsg>
 };
 
 
-#endif /*DELETEDIRENTRIESMSG_H*/

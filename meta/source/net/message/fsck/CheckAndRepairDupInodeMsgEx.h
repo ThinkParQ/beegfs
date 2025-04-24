@@ -1,5 +1,4 @@
-#ifndef CHECKANDREPAIRDUPINODEMSGEX_H
-#define CHECKANDREPAIRDUPINODEMSGEX_H
+#pragma once
 
 #include <common/net/message/fsck/CheckAndRepairDupInodeMsg.h>
 
@@ -9,4 +8,3 @@ class CheckAndRepairDupInodeMsgEx : public CheckAndRepairDupInodeMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* CHECKANDREPAIRDUPINODEMSGEX_H */

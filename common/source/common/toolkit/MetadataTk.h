@@ -1,5 +1,4 @@
-#ifndef METADATATK_H_
-#define METADATATK_H_
+#pragma once
 
 #include <common/nodes/NodeStoreServers.h>
 #include <common/nodes/RootInfo.h>
@@ -70,4 +69,3 @@ class MetadataTk
       }
 };
 
-#endif /*METADATATK_H_*/

@@ -1,5 +1,4 @@
-#ifndef COMPONENTS_TIMERQUEUE_H
-#define COMPONENTS_TIMERQUEUE_H
+#pragma once
 
 #include <common/threading/Condition.h>
 #include <common/threading/PThread.h>
@@ -128,4 +127,3 @@ class TimerQueue : public PThread
       void deactivateWorker(TimerWorker* worker);
 };
 
-#endif

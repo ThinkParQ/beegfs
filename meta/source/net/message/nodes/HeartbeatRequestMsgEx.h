@@ -1,5 +1,4 @@
-#ifndef HEARTBEATREQUESTMSGEX_H_
-#define HEARTBEATREQUESTMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/HeartbeatRequestMsg.h>
 
@@ -9,4 +8,3 @@ class HeartbeatRequestMsgEx : public HeartbeatRequestMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*HEARTBEATREQUESTMSGEX_H_*/

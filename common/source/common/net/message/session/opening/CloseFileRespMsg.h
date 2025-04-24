@@ -1,5 +1,4 @@
-#ifndef CLOSEFILERESPMSG_H_
-#define CLOSEFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class CloseFileRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*CLOSEFILERESPMSG_H_*/

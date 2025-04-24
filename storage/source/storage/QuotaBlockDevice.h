@@ -1,5 +1,4 @@
-#ifndef QUOTABLOCKDEVICE_H_
-#define QUOTABLOCKDEVICE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/storage/Path.h>
@@ -101,4 +100,3 @@ class QuotaBlockDevice
       }
 };
 
-#endif /* QUOTABLOCKDEVICE_H_ */

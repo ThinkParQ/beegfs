@@ -1,5 +1,4 @@
-#ifndef GETTARGETMAPPINGSMSG_H_
-#define GETTARGETMAPPINGSMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleMsg.h>
@@ -16,4 +15,3 @@ class GetTargetMappingsMsg : public SimpleMsg
 };
 
 
-#endif /* GETTARGETMAPPINGSMSG_H_ */

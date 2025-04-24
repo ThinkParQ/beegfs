@@ -1,5 +1,4 @@
-#ifndef REMOVEINODESMSGEX_H
-#define REMOVEINODESMSGEX_H
+#pragma once
 
 #include <common/net/message/fsck/RemoveInodesMsg.h>
 
@@ -9,4 +8,3 @@ class RemoveInodesMsgEx : public RemoveInodesMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*REMOVEINODESMSGEX_H*/

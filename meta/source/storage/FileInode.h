@@ -1,7 +1,7 @@
-#ifndef FILEINODE_H_
-#define FILEINODE_H_
+#pragma once
 
 #include <common/storage/striping/StripePattern.h>
+#include <common/storage/RemoteStorageTarget.h>
 #include <common/storage/StorageDefinitions.h>
 #include <common/storage/StorageErrors.h>
 #include <common/storage/PathInfo.h>
@@ -94,6 +94,9 @@ class FileInode
          LOG_DEBUG("Delete FileInode", Log_SPAM, std::string("Deleting inode: ") + getEntryID());
       }
 
+      FhgfsOpsErr setRemoteStorageTarget(EntryInfo* entryInfo, const RemoteStorageTarget& rst);
+      FhgfsOpsErr clearRemoteStorageTarget(EntryInfo* entryInfo);
+
       void decNumSessionsAndStore(EntryInfo* entryInfo, unsigned accessFlags);
       static FileInode* createFromEntryInfo(EntryInfo* entryInfo);
 
@@ -168,6 +171,7 @@ class FileInode
 
    private:
       FileInodeStoreData inodeDiskData;
+      RemoteStorageTarget rstInfo;
 
       ChunkFileInfoVec fileInfoVec; // stores individual data for each node (e.g. file length),
          // esp. the DYNAMIC ATTRIBS, that live only in memory and are not stored to disk (compared
@@ -229,11 +233,18 @@ class FileInode
       FhgfsOpsErr storeUpdatedInlinedInodeUnlocked(EntryInfo* entryInfo,
          StripePattern* updatedStripePattern = NULL);
 
+      std::string getMetaFilePath(EntryInfo* entryInfo);
+      bool storeRemoteStorageTargetUnlocked(EntryInfo* entryInfo);
+      bool storeRemoteStorageTargetBufAsXAttr(char* buf, unsigned bufLen, const std::string& metafilename);
+
       static bool removeStoredMetaData(const std::string& id, bool isBuddyMirrored);
 
       bool loadFromInodeFile(EntryInfo* entryInfo);
       bool loadFromFileXAttr(const std::string& id, bool isBuddyMirrored);
       bool loadFromFileContents(const std::string& id, bool isBuddyMirrored);
+
+      bool loadRstFromInodeFile(EntryInfo* entryInfo);
+      bool loadRstFromFileXAttr(EntryInfo* entryInfo);
 
       std::pair<bool, LockEntryNotifyList> flockEntryUnlocked(EntryLockDetails& lockDetails,
          EntryLockQueuesContainer* lockQs);
@@ -267,6 +278,13 @@ class FileInode
 
    public:
       // inliners
+
+      void setRemoteStorageTargetUnpersistent(const RemoteStorageTarget& rst)
+      {
+         SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE); // L O C K
+         this->rstInfo.set(rst);
+         safeLock.unlock();
+      }
 
       /**
        * Save meta-data to disk
@@ -329,6 +347,11 @@ class FileInode
          this->inodeDiskData.setEntryID(newID);
 
          safeLock.unlock();
+      }
+
+      RemoteStorageTarget* getRemoteStorageTargetInfo()
+      {
+         return &this->rstInfo;
       }
 
       StripePattern* getStripePatternUnlocked()
@@ -796,20 +819,59 @@ class FileInode
          return retVal;
       }
 
+      bool getIsRstAvailable()
+      {
+         SafeRWLock safeLock(&rwlock, SafeRWLock_READ);
+         bool retVal = this->getIsRstAvailableUnlocked();
+         safeLock.unlock();
+         return retVal;
+      }
+
+      void setFileDataState(uint8_t value)
+      {
+         SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE);
+         this->inodeDiskData.setFileDataState(value);
+         safeLock.unlock();
+      }
+
+      uint8_t getFileDataState()
+      {
+         SafeRWLock safeLock(&rwlock, SafeRWLock_READ);
+         uint8_t retVal = this->getFileDataStateUnlocked();
+         safeLock.unlock();
+         return retVal;
+      }
+
       bool incrementFileVersion(EntryInfo* entryInfo)
       {
          UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
 
-         inodeDiskData.setVersion(inodeDiskData.getVersion() + 1);
+         inodeDiskData.setFileVersion(inodeDiskData.getFileVersion() + 1);
          return storeUpdatedInodeUnlocked(entryInfo, nullptr);
       }
 
-      uint64_t getFileVersion()
+      uint32_t getFileVersion()
       {
          UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
 
-         return inodeDiskData.getVersion();
+         return inodeDiskData.getFileVersion();
       }
+
+      bool incrementMetaVersion(EntryInfo* entryInfo)
+      {
+         UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
+
+         inodeDiskData.setMetaVersion(inodeDiskData.getMetaVersion() + 1);
+         return storeUpdatedInodeUnlocked(entryInfo, nullptr);
+      }
+
+      uint32_t getMetaVersion()
+      {
+         UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
+
+         return inodeDiskData.getMetaVersion();
+      }
+
 
 
    protected:
@@ -853,6 +915,14 @@ class FileInode
          return this->inodeDiskData.getIsBuddyMirrored();
       }
 
+      bool getIsRstAvailableUnlocked()
+      {
+         return this->inodeDiskData.getIsRstAvailable();
+      }
+
+      uint8_t getFileDataStateUnlocked() const
+      {
+         return this->inodeDiskData.getFileDataState();
+      }
 };
 
-#endif /*FILEINODE_H_*/

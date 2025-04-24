@@ -1,5 +1,4 @@
-#ifndef FSCKDIRINODE_H_
-#define FSCKDIRINODE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/FsckTk.h>
@@ -226,4 +225,3 @@ class FsckDirInode
 template<>
 struct ListSerializationHasLength<FsckDirInode> : boost::false_type {};
 
-#endif /* FSCKDIRINODE_H_ */

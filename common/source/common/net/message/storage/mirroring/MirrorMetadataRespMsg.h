@@ -1,5 +1,4 @@
-#ifndef MIRRORMETADATARESPMSG_H_
-#define MIRRORMETADATARESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -33,4 +32,3 @@ class MirrorMetadataRespMsg : public SimpleIntMsg
 };
 
 
-#endif /* MIRRORMETADATARESPMSG_H_ */

@@ -1,5 +1,4 @@
-#ifndef REQUESTSTORAGEDATARESPMSG_H_
-#define REQUESTSTORAGEDATARESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/Node.h>
@@ -74,7 +73,7 @@ class RequestStorageDataRespMsg: public NetMessageSerdes<RequestStorageDataRespM
             % obj->nodeID
             % obj->hostnameid
             % obj->nodeNumID
-            % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
+            % serdesNicAddressList(obj->nicList, obj->parsed.nicList)
             % obj->indirectWorkListSize
             % obj->directWorkListSize
             % obj->diskSpaceTotalMiB
@@ -140,4 +139,3 @@ class RequestStorageDataRespMsg: public NetMessageSerdes<RequestStorageDataRespM
       }
 };
 
-#endif /*REQUESTSTORAGEDATARESPMSG_H_*/

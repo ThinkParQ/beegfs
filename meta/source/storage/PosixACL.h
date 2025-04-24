@@ -1,5 +1,4 @@
-#ifndef POSIXACL_H_
-#define POSIXACL_H_
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 #include <common/Common.h>
@@ -56,4 +55,3 @@ class PosixACL
       ACLEntryVec entries;
 };
 
-#endif /*POSIXACL_H_*/

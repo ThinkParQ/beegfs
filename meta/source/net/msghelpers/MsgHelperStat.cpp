@@ -71,14 +71,14 @@ FhgfsOpsErr MsgHelperStat::refreshDynAttribs(EntryInfo* entryInfo, bool makePers
    std::string parentEntryID = entryInfo->getParentEntryID();
    std::string entryID       = entryInfo->getEntryID();
 
-   MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+   auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
    if(!inode)
    {
       std::string logContext("Stat Helper (refresh filesize:  parentID: " + parentEntryID
          + " entryID: " + entryID + ")");
-      LogContext(logContext).log(Log_DEBUG, std::string("File not exists") );
+      LogContext(logContext).log(Log_DEBUG, std::string("File could not be referenced") );
 
-      return FhgfsOpsErr_PATHNOTEXISTS;
+      return referenceRes;
    }
 
    if(inode->getStripePattern()->getAssignedNumTargets() == 1)

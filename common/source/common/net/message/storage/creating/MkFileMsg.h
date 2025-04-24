@@ -1,12 +1,11 @@
-#ifndef MKFILEMSG_H_
-#define MKFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
 #include <common/storage/FileEvent.h>
 #include <common/storage/StatData.h>
 #include <common/storage/striping/StripePattern.h>
-
+#include <common/storage/RemoteStorageTarget.h>
 
 #define MKFILEMSG_FLAG_STRIPEHINTS        1 /* msg contains extra stripe hints */
 #define MKFILEMSG_FLAG_STORAGEPOOLID      2 /* msg contains a storage pool ID to override parent */
@@ -68,6 +67,7 @@ class MkFileMsg : public MirroredMessageBase<MkFileMsg>
             ctx
                % serdes::rawString(obj->newEntryID, obj->newEntryIDLen, 4)
                % serdes::backedPtr(obj->pattern, obj->parsed.pattern)
+               % serdes::backedPtr(obj->rstPtr, obj->rstInfo)
                % obj->dirTimestamps
                % obj->createTime;
 
@@ -101,7 +101,8 @@ class MkFileMsg : public MirroredMessageBase<MkFileMsg>
       // will only be set and used if NetMessageHeader::Flag_BuddyMirrorSecond is set
       const char* newEntryID;
       unsigned newEntryIDLen;
-      StripePattern* pattern; // not owned by this object!
+      StripePattern* pattern;       // not owned by this object!
+      RemoteStorageTarget* rstPtr;  // not owned by this object!
 
       bool supportsMirroring() const { return true; }
 
@@ -119,6 +120,7 @@ class MkFileMsg : public MirroredMessageBase<MkFileMsg>
 
       // for deserialization
       EntryInfo parentInfo;
+      RemoteStorageTarget rstInfo;
       struct {
          UInt16List preferredTargets;
          std::unique_ptr<StripePattern> pattern;
@@ -209,6 +211,16 @@ class MkFileMsg : public MirroredMessageBase<MkFileMsg>
          return *pattern;
       }
 
+      void setRemoteStorageTarget(RemoteStorageTarget* rst)
+      {
+         this->rstPtr = rst;
+      }
+
+      RemoteStorageTarget* getRemoteStorageTarget()
+      {
+         return &this->rstInfo;
+      }
+
       void setDirTimestamps(MirroredTimestamps ts) { dirTimestamps = ts; }
       void setCreateTime(int64_t ts) { createTime = ts; }
 
@@ -221,4 +233,3 @@ class MkFileMsg : public MirroredMessageBase<MkFileMsg>
       }
 };
 
-#endif /*MKFILEMSG_H_*/

@@ -11,7 +11,6 @@ MGMTD_CFG_KEY="sysMgmtdHost"
 ALLOW_INIT_CFG_KEY="storeAllowFirstRunInit"
 FS_UUID_CFG_KEY="storeFsUUID"
 SERVER_NUMID_FILE="nodeNumID"
-SERVER_STRID_FILE="nodeID"
 FORMAT_FILENAME="format.conf"
 FORMAT_FILE_VERSION="4"
 XATTR_CFG_KEY="storeUseExtendedAttribs"
@@ -48,10 +47,6 @@ print_usage()
 	echo
 	echo "   -h        - Print this help."
 	echo
-	echo "   -S <str>  - Assign the given string ID to the server of this storage"
-	echo "               directory. This ID will be used in server-related log messages."
-	echo "               (Default: Use hostname as ID.)"
-	echo
 	echo "   -u        - Do not disable usage of uninitialized storage directory in config"
 	echo "               file and do not store the UUID of the underlying fs."
 	echo
@@ -68,7 +63,7 @@ print_usage()
 	echo
 	echo "EXAMPLES:"
 	echo " * Numeric IDs can generally be chosen arbitrarily. However, it is usually a"
-	echo "   good idea to pick a numeric ID that machtes the hostname, e.g. if the"
+	echo "   good idea to pick a numeric ID that matches the hostname, e.g. if the"
 	echo "   hostname is \"meta02\", you would use \"2\" as numeric ID for the beegfs-meta"
 	echo "   service on this server."
 	echo
@@ -114,11 +109,6 @@ init_storage_dir()
 	if [ -n "${SERVER_NUMID}" ]; then
 		echo " * Creating server numeric ID file: ${STORAGE_PATH}/${SERVER_NUMID_FILE}"
 		echo "${SERVER_NUMID}" > "${STORAGE_PATH}/${SERVER_NUMID_FILE}"
-	fi
-
-	if [ -n "${SERVER_STRID}" ]; then
-		echo " * Creating server string ID file: ${STORAGE_PATH}/${SERVER_STRID_FILE}"
-		echo "${SERVER_STRID}" > "${STORAGE_PATH}/${SERVER_STRID_FILE}"
 	fi
 }
 
@@ -180,7 +170,6 @@ FORCE_ACTIONS=""
 FORMAT_USE_XATTR="true"
 MGMTD_HOST=""
 SERVER_NUMID=""
-SERVER_STRID=""
 STORAGE_PATH=""
 DISABLE_UNINITED_TARGETS="1"
 
@@ -209,7 +198,7 @@ while getopts "Cc:fhm:p:S:s:ux" opt; do
 		STORAGE_PATH="$OPTARG"
 		;;
 	S)
-		SERVER_STRID="$OPTARG"
+		echo "WARNING: The -S flag previously used to specify a string ID been deprecated and now has no effect. Starting in BeeGFS string IDs were replaced with aliases configured using BeeGFS CTL."
 		;;
 	s)
 		SERVER_NUMID="$OPTARG"

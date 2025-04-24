@@ -2,8 +2,7 @@
  * Data of a FileInode stored on disk.
  */
 
-#ifndef FILEINODESTOREDATA
-#define FILEINODESTOREDATA
+#pragma once
 
 #include <common/storage/striping/StripePattern.h>
 #include <common/storage/Metadata.h>
@@ -21,12 +20,22 @@
 #define FILEINODE_FEATURE_HAS_ORIG_UID       32 // uid was updated
 #define FILEINODE_FEATURE_HAS_STATFLAGS      64 // stat-data have their own flags
 #define FILEINODE_FEATURE_HAS_VERSIONS      128 // file has a cto version counter
+#define FILEINODE_FEATURE_HAS_RST           256 // file has remote targets
+#define FILEINODE_FEATURE_HAS_DATA_STATE    512 // file has a data state (local, offloaded, etc.)
 
 enum FileInodeOrigFeature
 {
    FileInodeOrigFeature_UNSET = -1,
    FileInodeOrigFeature_TRUE,
    FileInodeOrigFeature_FALSE
+};
+
+enum FileDataState : uint8_t
+{
+   FileDataState_NONE      = 0x00,  // Data stored in BeeGFS but the data state has never been set
+   FileDataState_LOCAL     = 0x01,  // Data stored in BeeGFS (default)
+   FileDataState_LOCKED    = 0x02,  // Data is locked and cannot be accessed
+   FileDataState_OFFLOADED = 0x03,  // Data is offloaded to a remote target
 };
 
 /* inode data inlined into a direntry, such as in DIRENTRY_STORAGE_FORMAT_VER3 */
@@ -52,7 +61,9 @@ class FileInodeStoreData
        : inodeFeatureFlags(FILEINODE_FEATURE_HAS_VERSIONS),
          stripePattern(NULL),
          origFeature(FileInodeOrigFeature_UNSET),
-         version(0)
+         fileVersion(0),
+         metaVersion(0),
+         fileDataState(FileDataState_NONE)
       { }
 
       FileInodeStoreData(const std::string& entryID, StatData* statData,
@@ -64,7 +75,8 @@ class FileInodeStoreData
          origFeature(origFeature),
          origParentUID(origParentUID),
          origParentEntryID(origParentEntryID),
-         version(0)
+         fileVersion(0),
+         metaVersion(0), fileDataState(FileDataState_NONE)
       {
          this->stripePattern              = stripePattern->clone();
 
@@ -106,7 +118,10 @@ class FileInodeStoreData
       std::string origParentEntryID;
 
       // version number for CTO cache consistency optimizations
-      uint64_t version;
+      uint32_t fileVersion;
+      uint32_t metaVersion;
+
+      FileDataState fileDataState;
 
       void getPathInfo(PathInfo* outPathInfo);
 
@@ -127,8 +142,19 @@ class FileInodeStoreData
          return this->stripePattern;
       }
 
-      uint64_t getVersion() const { return version; }
-      void     setVersion(uint64_t version) { this->version = version; }
+      uint32_t getFileVersion() const { return fileVersion; }
+      uint32_t getMetaVersion() const { return metaVersion; }
+
+      void     setFileVersion(uint32_t fileVersion) 
+      { 
+         this->fileVersion = fileVersion;  
+      }
+
+      void     setMetaVersion(uint32_t metaVersion) 
+      { 
+         this->metaVersion = metaVersion; 
+         setMetaVersionStat(metaVersion);  //update metadata version in StatData   
+      }
 
    protected:
 
@@ -148,7 +174,9 @@ class FileInodeStoreData
          this->origFeature       = diskData->origFeature;
          this->origParentUID     = diskData->origParentUID;
          this->origParentEntryID = diskData->origParentEntryID;
-         this->version = diskData->version;
+         this->fileVersion       = diskData->fileVersion;
+         setMetaVersion(diskData->metaVersion);
+         this->fileDataState     = diskData->fileDataState;
       }
 
       void setInodeFeatureFlags(unsigned flags)
@@ -177,6 +205,55 @@ class FileInodeStoreData
       bool getIsBuddyMirrored() const
       {
          return (getInodeFeatureFlags() & FILEINODE_FEATURE_BUDDYMIRRORED);
+      }
+
+      void setIsRstAvailable(bool available)
+      {
+         if (available)
+            addInodeFeatureFlag(FILEINODE_FEATURE_HAS_RST);
+         else
+            removeInodeFeatureFlag(FILEINODE_FEATURE_HAS_RST);
+      }
+
+      bool getIsRstAvailable() const
+      {
+         return (getInodeFeatureFlags() & FILEINODE_FEATURE_HAS_RST);
+      }
+
+      void setFileDataState(uint8_t state)
+      {
+         switch (state)
+         {
+            case FileDataState_NONE:
+            {
+               // Special case: Reset the file data state to NONE and clear the associated
+               // feature flag (FILEINODE_FEATURE_HAS_DATA_STATE), indicating that no data
+               // state is active until explicitly set again.
+               this->fileDataState = FileDataState_NONE;
+               removeInodeFeatureFlag(FILEINODE_FEATURE_HAS_DATA_STATE);
+               break;
+            }
+            case FileDataState_LOCAL:
+            case FileDataState_LOCKED:
+            case FileDataState_OFFLOADED:
+            {
+               this->fileDataState = static_cast<FileDataState>(state);
+               addInodeFeatureFlag(FILEINODE_FEATURE_HAS_DATA_STATE);
+               break;
+            }
+            default:
+            {
+               // Invalid state handling. Log a warning and retain current file data state.
+               LogContext(__func__).log(Log_WARNING, "Invalid file data state: " +
+               StringTk::uintToStr(state) + ". Keeping current state.");
+               break;
+            }
+         }
+      }
+
+      uint8_t getFileDataState() const
+      {
+         return this->fileDataState;
       }
 
       void setInodeStatData(StatData& statData)
@@ -278,6 +355,11 @@ class FileInodeStoreData
          this->inodeStatData.setNumHardLinks(numHardlinks);
       }
 
+      void setMetaVersionStat(unsigned metaVersion)
+      {
+         this->inodeStatData.setMetaVersionStat(metaVersion);
+      }
+
       unsigned getNumHardlinks() const
       {
          return this->inodeStatData.getNumHardlinks();
@@ -303,4 +385,3 @@ class FileInodeStoreData
 };
 
 
-#endif /* FILEINODESTOREDATA */

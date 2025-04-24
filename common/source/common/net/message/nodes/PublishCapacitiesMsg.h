@@ -1,5 +1,4 @@
-#ifndef PUBLISHCAPACITIESMSG_H_
-#define PUBLISHCAPACITIESMSG_H_
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/Common.h>
@@ -20,4 +19,3 @@ class PublishCapacitiesMsg : public AcknowledgeableMsgSerdes<PublishCapacitiesMs
       { }
 };
 
-#endif /*PUBLISHCAPACITIESMSG_H_*/

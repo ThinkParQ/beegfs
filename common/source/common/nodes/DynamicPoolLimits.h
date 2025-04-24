@@ -1,5 +1,4 @@
-#ifndef DYNAMICPOOLLIMITS_H_
-#define DYNAMICPOOLLIMITS_H_
+#pragma once
 
 #include <common/toolkit/MinMaxStore.h>
 #include <common/nodes/CapacityPoolType.h>
@@ -109,4 +108,3 @@ class DynamicPoolLimits
       }
 };
 
-#endif // DYNAMICPOOLLIMITS_H_

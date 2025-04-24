@@ -7,7 +7,6 @@
 
 DEFAULT_CFG_PATH="/etc/beegfs/beegfs-client.conf"
 MGMTD_CFG_KEY="sysMgmtdHost"
-LOGTYPE_CFG_KEY="logType"
 QUOTA_ENABLED_CFG_KEY="quotaEnabled"
 
 print_usage()
@@ -32,9 +31,6 @@ print_usage()
 	echo "   -f        - Force actions, ignore warnings."
 	echo
 	echo "   -h        - Print this help."
-	echo
-	echo "   -l        - Set logger type to syslog in config file."
-	echo "               (Default: Log via beegfs-helperd)"
 	echo
 	echo "   -q        - Enable quota support in config file."
 	echo "               (Default: Quota support disabled)"
@@ -66,11 +62,6 @@ update_config_file()
 		sed -i "s/\(^${MGMTD_CFG_KEY}.*=\).*/\1 ${MGMTD_HOST}/" ${CFG_PATH}
 	fi
 
-	if [ -n "${LOGTYPE}" ]; then
-		echo " * Setting log type: ${LOGTYPE}"
-		sed -i "s/\(^${LOGTYPE_CFG_KEY}.*=\).*/\1 ${LOGTYPE}/" ${CFG_PATH}
-	fi
-
 	if [ -n "${QUOTA_ENABLED}" ]; then
 		echo " * Setting quota enabled: ${QUOTA_ENABLED}"
 		sed -i "s/\(^${QUOTA_ENABLED_CFG_KEY}.*=\).*/\1 ${QUOTA_ENABLED}/" ${CFG_PATH}
@@ -86,13 +77,12 @@ update_config_file()
 CFG_PATH="$DEFAULT_CFG_PATH" # empty path means "don't update cfg file"
 FORCE_ACTIONS=""
 MGMTD_HOST=""
-LOGTYPE=""
 QUOTA_ENABLED=""
 
 # parse command line arguments
 # (see print_usage() for description of parameters)
 
-while getopts "Cc:fhlm:q" opt; do
+while getopts "Cc:fhm:q" opt; do
         case $opt in
 	C)
 		CFG_PATH=""
@@ -106,9 +96,6 @@ while getopts "Cc:fhlm:q" opt; do
 	h)
 		print_usage
 		exit 0
-		;;
-	l)
-		LOGTYPE="syslog"
 		;;
 	m)
 		MGMTD_HOST="$OPTARG"

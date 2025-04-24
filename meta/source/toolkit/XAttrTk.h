@@ -1,5 +1,4 @@
-#ifndef META_XATTRTK_H
-#define META_XATTRTK_H
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 
@@ -32,4 +31,3 @@ namespace XAttrTk
    std::pair<FhgfsOpsErr, std::vector<std::string>> listUserXAttrs(const std::string& path);
 }
 
-#endif

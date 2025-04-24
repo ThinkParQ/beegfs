@@ -1,5 +1,4 @@
-#ifndef LOCKINGNOTIFIER_H_
-#define LOCKINGNOTIFIER_H_
+#pragma once
 
 #include <common/Common.h>
 #include <storage/Locking.h>
@@ -25,4 +24,3 @@ class LockingNotifier
 
 };
 
-#endif /* LOCKINGNOTIFIER_H_ */

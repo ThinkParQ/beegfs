@@ -85,10 +85,18 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
 
       if (!isSecondary && getFileEvent() && app->getFileEventLogger() && getFileEvent())
       {
-            app->getFileEventLogger()->log(
-                     *getFileEvent(),
-                     entryInfo->getEntryID(),
-                     entryInfo->getParentEntryID());
+         unsigned numHardlinks = 0;
+         auto dir = metaStore->referenceDir(entryInfo->getEntryID(),
+            entryInfo->getIsBuddyMirrored(), true);
+         if (likely(dir))
+         {
+            numHardlinks = dir->getNumHardlinks();
+            metaStore->releaseDir(dir->getID());
+         }
+
+         EventContext eventCtx = makeEventContext(entryInfo, entryInfo->getParentEntryID(),
+            getMsgHeaderUserID(), "", numHardlinks, isSecondary);
+         logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
       }
 
       return boost::make_unique<ResponseState>(setAttrRes);
@@ -110,9 +118,9 @@ std::unique_ptr<MirroredMessageResponseState> SetAttrMsgEx::executeLocally(Respo
    }
 
    // we need to reference the inode first, as we want to use it several times
-   MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+   auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
    if (!inode)
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
+      return boost::make_unique<ResponseState>(referenceRes);
 
    // in the following we need to distinguish between several cases.
    // 1. if times shall be updated we need to send the update to the storage servers first
@@ -203,12 +211,16 @@ finish:
    if (!isSecondary && setAttrRes == FhgfsOpsErr_SUCCESS &&
          app->getFileEventLogger() && getFileEvent())
    {
-         app->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  entryInfo->getEntryID(),
-                  entryInfo->getParentEntryID(),
-                  "",
-                  inode->getNumHardlinks() > 1);
+      EventContext eventCtx = makeEventContext(
+         entryInfo,
+         entryInfo->getParentEntryID(),
+         getMsgHeaderUserID(),
+         "",
+         inode->getNumHardlinks(),
+         isSecondary
+      );
+
+      logEvent(app->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
    metaStore->releaseFile(entryInfo->getParentEntryID(), inode);

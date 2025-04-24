@@ -26,6 +26,7 @@ struct fhgfs_stat
    Time atime;
    Time mtime;
    Time ctime; // attrib change time (not creation time)
+   unsigned int metaVersion;
 };
 typedef struct fhgfs_stat fhgfs_stat;
 

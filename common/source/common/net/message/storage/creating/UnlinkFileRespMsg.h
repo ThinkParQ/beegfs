@@ -1,5 +1,4 @@
-#ifndef UNLINKFILERESPMSG_H_
-#define UNLINKFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class UnlinkFileRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*UNLINKFILERESPMSG_H_*/

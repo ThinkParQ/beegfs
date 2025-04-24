@@ -1,5 +1,4 @@
-#ifndef MAPTARGETSMSGEX_H_
-#define MAPTARGETSMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/MapTargetsMsg.h>
 
@@ -10,4 +9,3 @@ class MapTargetsMsgEx : public MapTargetsMsg
 };
 
 
-#endif /* MAPTARGETSMSGEX_H_ */

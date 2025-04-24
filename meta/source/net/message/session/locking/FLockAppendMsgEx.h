@@ -1,5 +1,4 @@
-#ifndef FLOCKAPPENDMSGEX_H_
-#define FLOCKAPPENDMSGEX_H_
+#pragma once
 
 #include <common/net/message/session/locking/FLockAppendMsg.h>
 #include <common/net/message/session/locking/FLockAppendRespMsg.h>
@@ -31,4 +30,3 @@ class FLockAppendMsgEx : public MirroredMessage<FLockAppendMsg, FileIDLock>
       const char* mirrorLogContext() const override { return "FLockAppendMsgEx/forward"; }
 };
 
-#endif /* FLOCKAPPENDMSGEX_H_ */

@@ -1,5 +1,4 @@
-#ifndef DISPOSALCLEANER_H
-#define DISPOSALCLEANER_H
+#pragma once
 
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/nodes/Node.h>
@@ -32,4 +31,3 @@ class DisposalCleaner
       const bool onlyMirrored;
 };
 
-#endif

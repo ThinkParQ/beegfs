@@ -1,5 +1,4 @@
-#ifndef REFRESHENTRYINFOMSG_H_
-#define REFRESHENTRYINFOMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -57,4 +56,3 @@ class RefreshEntryInfoMsg : public MirroredMessageBase<RefreshEntryInfoMsg>
 };
 
 
-#endif /* REFRESHENTRYINFOMSG_H_ */

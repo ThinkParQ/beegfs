@@ -1,5 +1,4 @@
-#ifndef OPENTK_IBVSOCKET_H_
-#define OPENTK_IBVSOCKET_H_
+#pragma once
 
 #include <arpa/inet.h>
 
@@ -81,4 +80,3 @@ struct IBVCommConfig
 };
 
 
-#endif /*OPENTK_IBVSOCKET_H_*/

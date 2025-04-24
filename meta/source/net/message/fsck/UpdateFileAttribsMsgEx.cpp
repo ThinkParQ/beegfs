@@ -27,7 +27,7 @@ bool UpdateFileAttribsMsgEx::processIncoming(ResponseContext& ctx)
       if (iter->getIsBuddyMirrored())
          lock = {entryLockStore, entryInfo.getEntryID(), true};
 
-      MetaFileHandle inode = metaStore->referenceFile(&entryInfo);
+      auto [inode, referenceRes] = metaStore->referenceFile(&entryInfo);
 
       if (inode)
       {

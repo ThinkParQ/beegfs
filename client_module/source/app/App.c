@@ -47,7 +47,7 @@ void App_init(App* this, MountConfig* mountConfig)
    this->netFilter = NULL;
    this->tcpOnlyFilter = NULL;
    this->logger = NULL;
-   this->helperd = NULL;
+   this->fsUUID = NULL;
    StrCpyList_init(&this->allowedInterfaces);
    StrCpyList_init(&this->allowedRDMAInterfaces);
    UInt16List_init(&this->preferredMetaNodes);
@@ -79,6 +79,7 @@ void App_init(App* this, MountConfig* mountConfig)
    this->specialInodeOps = NULL;
 
    Mutex_init(&this->nicListMutex);
+   Mutex_init(&this->fsUUIDMutex);
 
 #ifdef BEEGFS_DEBUG
    Mutex_init(&this->debugCounterMutex);
@@ -120,7 +121,6 @@ void App_uninit(App* this)
    UInt16List_uninit(&this->preferredMetaNodes);
    StrCpyList_uninit(&this->allowedInterfaces);
    StrCpyList_uninit(&this->allowedRDMAInterfaces);
-   SAFE_DESTRUCT(this->helperd, ExternalHelperd_destruct);
    SAFE_DESTRUCT(this->logger, Logger_destruct);
    SAFE_DESTRUCT(this->tcpOnlyFilter, NetFilter_destruct);
    SAFE_DESTRUCT(this->netFilter, NetFilter_destruct);
@@ -289,7 +289,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
       kfree(hostnameCopy);
    }
 
-   this->helperd = ExternalHelperd_construct(this, this->cfg);
 
    // load allowed interface list
    interfacesList = Config_getConnInterfacesList(this->cfg);
@@ -302,13 +301,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
       if(strlen(interfacesFilename) &&
          !Config_loadStringListFile(interfacesFilename, &this->allowedInterfaces) )
       {
-         // if loading of file failed, we need to set LogType Syslog as fallback here, because
-         // helperd can't be used for error logging. helperd would need a valid NicList to connect,
-         // but that's initialized later.
-         // Of course, using printk could be another option here, but the code calling this function
-         // proceeds with some more log messages, that should be logged to log file if possible, but
-         // need to be redirected to syslog in this case here as well
-         Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
          Logger_logErrFormatted(this->logger, logContext,
             "Unable to load configured interfaces file: %s", interfacesFilename);
          return false;
@@ -320,13 +312,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    if(strlen(rdmaInterfacesFilename) &&
       !Config_loadStringListFile(rdmaInterfacesFilename, &this->allowedRDMAInterfaces) )
    {
-      // if loading of file failed, we need to set LogType Syslog as fallback here, because
-      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
-      // but that's initialized later.
-      // Of course, using printk could be another option here, but the code calling this function
-      // proceeds with some more log messages, that should be logged to log file if possible, but
-      // need to be redirected to syslog in this case here as well
-      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured RDMA interfaces file: %s", rdmaInterfacesFilename);
       return false;
@@ -337,13 +322,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    if(strlen(preferredMetaFile) &&
       !Config_loadUInt16ListFile(this->cfg, preferredMetaFile, &this->preferredMetaNodes) )
    {
-      // if loading of file failed, we need to set LogType Syslog as fallback here, because
-      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
-      // but that's initialized later.
-      // Of course, using printk could be another option here, but the code calling this function
-      // proceeds with some more log messages, that should be logged to log file if possible, but
-      // need to be redirected to syslog in this case here as well
-      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured preferred meta nodes file: %s", preferredMetaFile);
       return false;
@@ -353,13 +331,6 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
    if(strlen(preferredStorageFile) &&
       !Config_loadUInt16ListFile(this->cfg, preferredStorageFile, &this->preferredStorageTargets) )
    {
-      // if loading of file failed, we need to set LogType Syslog as fallback here, because
-      // helperd can't be used for error logging. helperd would need a valid NicList to connect,
-      // but that's initialized later.
-      // Of course, using printk could be another option here, but the code calling this function
-      // proceeds with some more log messages, that should be logged to log file if possible, but
-      // need to be redirected to syslog in this case here as well
-      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErrFormatted(this->logger, logContext,
          "Unable to load configured preferred storage nodes file: %s", preferredStorageFile);
       return false;
@@ -388,8 +359,9 @@ bool __App_initDataObjects(App* this, MountConfig* mountConfig)
 
    if(Config_getLogClientID(this->cfg) )
    { // set real clientID
-      const char* clientID = Node_getID(this->localNode);
-      Logger_setClientID(this->logger, clientID);
+      NodeString alias;
+      Node_copyAlias(this->localNode, &alias);
+      Logger_setClientID(this->logger, alias.buf);
    }
 
    // prealloc buffers
@@ -516,7 +488,7 @@ bool __App_initInodeOperations(App* this)
         /* Note: symlinks don't have ACLs
          * The get_acl() operation was introduced as get_inode_acl() in the struct inode_operations in Linux 6.2
          */
-#if defined(KERNEL_HAS_GET_ACL) 
+#if defined(KERNEL_HAS_GET_ACL)
          this->fileInodeOps->get_acl = FhgfsOps_get_acl;
          this->dirInodeOps->get_acl  = FhgfsOps_get_acl;
 #endif
@@ -587,6 +559,33 @@ void App_updateLocalInterfaces(App* this, NicAddressList* nicList)
    }
    ListTk_kfreeNicAddressListElems(&rdmaNicList);
    NicAddressList_uninit(&rdmaNicList);
+}
+
+/**
+ * Retrieve file system UUID for the mounted BeeGFS.
+ *
+ * @return a pointer to a copy of the file system UUID. Must be freed by the caller.
+ */
+char* App_cloneFsUUID(App* this)
+{
+   char* fsUUID;
+   Mutex_lock(&this->fsUUIDMutex);
+   fsUUID = StringTk_strDup(this->fsUUID);
+   Mutex_unlock(&this->fsUUIDMutex);
+
+   return fsUUID;
+}
+
+/**
+ * Update file system UUID for the mounted BeeGFS.
+ *
+ * @param fsUUID will be cloned and stored in the app object so original pointer can be freed.
+ */
+void App_updateFsUUID(App* this, const char* fsUUID)
+{
+   Mutex_lock(&this->fsUUIDMutex);
+   this->fsUUID = StringTk_strDup(fsUUID);
+   Mutex_unlock(&this->fsUUIDMutex);
 }
 
 /**
@@ -669,11 +668,11 @@ bool __App_initLocalNodeInfo(App* this)
    char* hostname;
    Time now;
    pid_t currentPID;
-   char* nodeID;
+   char* generatedAlias;
+   char* alias;
 
    if (!App_findAllowedInterfaces(this, &nicList))
    {
-      Config_setLogTypeNum(this->cfg, LOGTYPE_Syslog);
       Logger_logErr(this->logger, logContext, "Couldn't find any usable NIC");
       // required by App_uninit()
       NicAddressList_init(&this->rdmaNicList);
@@ -687,15 +686,23 @@ bool __App_initLocalNodeInfo(App* this)
    hostname = System_getHostnameCopy();
    currentPID = current->pid;
 
-   nodeID = StringTk_kasprintf("%llX-%llX-%s",
+   // Generate the client alias (formerly nodeID):
+   generatedAlias = StringTk_kasprintf("c%llX-%llX-%s",
       (uint64_t)currentPID, (uint64_t)now.tv_sec, hostname);
 
+   // Truncate the generatedAlias at 32 characters before using it as the nodeID since it will be
+   // used as this client's alias by the management, and aliases are limited to 32 characters.
+   alias = os_kmalloc(33);
+   strncpy(alias, generatedAlias, 32);
+   alias[32] = '\0';
+
    // note: numeric ID gets initialized with 0; will be set by management later in InternodeSyncer
-   this->localNode = Node_construct(this, nodeID, (NumNodeID){0},
-      Config_getConnClientPortUDP(this->cfg), 0, &nicList, NULL);
+   this->localNode = Node_construct(this, alias, (NumNodeID){0},
+      Config_getConnClientPort(this->cfg), 0, &nicList, NULL);
 
    // clean up
-   kfree(nodeID);
+   kfree(generatedAlias);
+   kfree(alias);
    kfree(hostname);
 
    // delete nicList elems
@@ -712,7 +719,7 @@ bool __App_initComponents(App* this)
    Logger_log(this->logger, Log_DEBUG, logContext, "Initializing components...");
 
    this->dgramListener =
-      DatagramListener_construct(this, this->localNode, Config_getConnClientPortUDP(this->cfg) );
+      DatagramListener_construct(this, this->localNode, Config_getConnClientPort(this->cfg) );
    if(!this->dgramListener)
    {
       Logger_logErr(this->logger, logContext,
@@ -816,9 +823,7 @@ void __App_waitForComponentTermination(App* this, Thread* component)
 void __App_logInfos(App* this)
 {
    const char* logContext = "App_logInfos";
-
-   char* localNodeID = Node_getID(this->localNode);
-
+   NodeString alias;
    size_t nicListStrLen = 1024;
    char* nicListStr = os_kmalloc(nicListStrLen);
    char* extendedNicListStr = os_kmalloc(nicListStrLen);
@@ -834,7 +839,8 @@ void __App_logInfos(App* this)
    LOG_DEBUG(this->logger, 1, logContext, "--DEBUG VERSION--");
 
    // print local clientID
-   Logger_logFormatted(this->logger, 2, logContext, "ClientID: %s", localNodeID);
+   Node_copyAlias(this->localNode, &alias);
+   Logger_logFormatted(this->logger, 2, logContext, "ClientID: %s", alias.buf);
 
    // list usable network interfaces
    NicAddressListIter_init(&nicIter, &nicList);
@@ -850,9 +856,6 @@ void __App_logInfos(App* this)
 
       if(nicAddr->nicType == NICADDRTYPE_RDMA)
          nicTypeStr = "RDMA";
-      else
-      if(nicAddr->nicType == NICADDRTYPE_SDP)
-         nicTypeStr = "SDP";
       else
       if(nicAddr->nicType == NICADDRTYPE_STANDARD)
          nicTypeStr = "TCP";
@@ -936,7 +939,6 @@ bool __App_mountServerCheck(App* this)
 
    bool retVal = false;
    bool retriesEnabledOrig = this->connRetriesEnabled;
-   char* helperdCheckStr;
    bool mgmtInitDone;
    FhgfsOpsErr statRootErr;
    fhgfs_stat statRootDetails;
@@ -950,20 +952,6 @@ bool __App_mountServerCheck(App* this)
 
 
    this->connRetriesEnabled = false; // NO _ R E T R I E S
-
-   // check helper daemon
-
-   helperdCheckStr = ExternalHelperd_getHostByName(this->helperd, "localhost");
-   if(!helperdCheckStr)
-   {
-      Logger_logErr(this->logger, logContext, "Communication with user-space helper daemon failed. "
-         "Is beegfs-helperd running?");
-
-      goto error_resetRetries;
-   }
-
-   kfree(helperdCheckStr);
-
 
    // wait for management init
 

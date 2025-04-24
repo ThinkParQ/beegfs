@@ -314,7 +314,7 @@ extern struct inode* FhgfsOps_alloc_inode(struct super_block* sb);
 extern void FhgfsOps_destroy_inode(struct inode* inode);
 
 extern struct inode* __FhgfsOps_newInodeWithParentID(struct super_block* sb, struct kstat* kstat,
-   dev_t dev, EntryInfo* entryInfo, NumNodeID parentNodeID, FhgfsIsizeHints* iSizeHints);
+   dev_t dev, EntryInfo* entryInfo, NumNodeID parentNodeID, FhgfsIsizeHints* iSizeHints, unsigned int metaVersion);
 
 extern int __FhgfsOps_instantiateInode(struct dentry* dentry, EntryInfo* entryInfo,
    fhgfs_stat* fhgfsStat, FhgfsIsizeHints* iSizeHints);
@@ -327,7 +327,7 @@ extern int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* 
    FhgfsIsizeHints* iSizeHints, bool noFlush);
 extern int __FhgfsOps_revalidateMapping(App* app, struct inode* inode);
 extern int __FhgfsOps_flushInodeFileCache(App* app, struct inode* inode);
-
+extern void __FhgfsOps_clearInodeStripePattern(App* app, struct inode* inode);
 
 // inliners
 static inline void __FhgfsOps_applyStatDataToInode(struct kstat* kstat, FhgfsIsizeHints* iSizeHints,
@@ -338,8 +338,10 @@ static inline void __FhgfsOps_applyStatAttribsToInode(struct kstat* kstat, struc
 static inline void __FhgfsOps_applyStatSizeToInode(struct kstat* kstat,
    FhgfsIsizeHints* iSizeHints, struct inode* inOutInode);
 static inline struct inode* __FhgfsOps_newInode(struct super_block* sb, struct kstat* kstat,
-   dev_t dev, EntryInfo* entryInfo,  FhgfsIsizeHints* iSizeHints);
+   dev_t dev, EntryInfo* entryInfo,  FhgfsIsizeHints* iSizeHints, unsigned int metaVersion);
 static inline bool __FhgfsOps_isPagedMode(struct super_block* sb);
+
+
 
 /**
  * This structure is passed to _compareInodeID().
@@ -477,9 +479,9 @@ void __FhgfsOps_applyStatSizeToInode(struct kstat* kstat, FhgfsIsizeHints* iSize
  * See __FhgfsOps_newInodeWithParentID for details. This is just a wrapper function.
  */
 struct inode* __FhgfsOps_newInode(struct super_block* sb, struct kstat* kstat, dev_t dev,
-   EntryInfo* entryInfo,  FhgfsIsizeHints* iSizeHints)
+   EntryInfo* entryInfo,  FhgfsIsizeHints* iSizeHints, unsigned int metaVersion)
 {
-      return __FhgfsOps_newInodeWithParentID(sb, kstat, dev, entryInfo, (NumNodeID){0}, iSizeHints);
+      return __FhgfsOps_newInodeWithParentID(sb, kstat, dev, entryInfo, (NumNodeID){0}, iSizeHints, metaVersion);
 }
 
 bool __FhgfsOps_isPagedMode(struct super_block* sb)

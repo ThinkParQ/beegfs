@@ -1,5 +1,4 @@
-#ifndef POLLLIST_H_
-#define POLLLIST_H_
+#pragma once
 
 #include <common/toolkit/poll/Pollable.h>
 #include <common/Common.h>
@@ -31,4 +30,3 @@ class PollList
 
 };
 
-#endif /*POLLLIST_H_*/

@@ -1,5 +1,4 @@
-#ifndef COMMON_NUMERICID_H
-#define COMMON_NUMERICID_H
+#pragma once
 
 #include <common/toolkit/serialization/Serialization.h>
 #include <common/toolkit/StringTk.h>
@@ -196,4 +195,3 @@ namespace std
          static NumericID<T, Tag> denorm_min() noexcept { return NumericID<T, Tag>(numeric_limits<T>::denorm_min()); }
    };
 }
-#endif /*COMMON_NUMERICID_H*/

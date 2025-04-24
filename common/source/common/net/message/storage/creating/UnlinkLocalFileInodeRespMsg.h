@@ -1,27 +1,44 @@
-#ifndef UNLINKLOCALFILEINODERESPMSG_H_
-#define UNLINKLOCALFILEINODERESPMSG_H_
+#pragma once
 
-#include <common/net/message/SimpleIntMsg.h>
+#include <common/net/message/NetMessage.h>
 
-class UnlinkLocalFileInodeRespMsg : public SimpleIntMsg
+class UnlinkLocalFileInodeRespMsg : public NetMessageSerdes<UnlinkLocalFileInodeRespMsg>
 {
    public:
-      UnlinkLocalFileInodeRespMsg(FhgfsOpsErr result) : SimpleIntMsg(NETMSGTYPE_UnlinkLocalFileInodeResp, result)
+      UnlinkLocalFileInodeRespMsg(FhgfsOpsErr result, unsigned linkCount) :
+         BaseType(NETMSGTYPE_UnlinkLocalFileInodeResp)
       {
+         this->result = result;
+         this->preUnlinkHardlinkCount = linkCount;
       }
 
       /**
        * Constructor for deserialization only.
        */
-      UnlinkLocalFileInodeRespMsg() : SimpleIntMsg(NETMSGTYPE_UnlinkLocalFileInodeResp)
+      UnlinkLocalFileInodeRespMsg() : BaseType(NETMSGTYPE_UnlinkLocalFileInodeResp)
       {
+      }
+
+      template<typename This, typename Ctx>
+      static void serialize(This obj, Ctx& ctx)
+      {
+         ctx
+            % obj->result
+            % obj->preUnlinkHardlinkCount;
       }
 
       // getters & setters
       FhgfsOpsErr getResult() const
       {
-         return (FhgfsOpsErr)getValue();
+         return this->result;
       }
-};
 
-#endif /* UNLINKLOCALFILEINODERESPMSG_H_ */
+      unsigned getPreUnlinkHardlinkCount() const
+      {
+         return this->preUnlinkHardlinkCount;
+      }
+
+      private:
+         FhgfsOpsErr result;
+         unsigned preUnlinkHardlinkCount;
+};

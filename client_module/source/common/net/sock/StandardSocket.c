@@ -148,9 +148,6 @@ bool StandardSocket_init(StandardSocket* this, int domain, int type, int protoco
    NicAddrType_t nicType = NICADDRTYPE_STANDARD;
 
    // init super class
-   if(domain == PF_SDP)
-      nicType = NICADDRTYPE_SDP;
-
    _PooledSocket_init( (PooledSocket*)this, nicType);
 
    thisBase->ops = &standardOps;
@@ -160,9 +157,6 @@ bool StandardSocket_init(StandardSocket* this, int domain, int type, int protoco
    this->sock = NULL;
 
    this->sockDomain = domain;
-
-   if(domain == PF_SDP)
-      thisBase->sockType = NICADDRTYPE_SDP;
 
    return _StandardSocket_initSock(this, domain, type, protocol);
 }
@@ -189,11 +183,6 @@ StandardSocket* StandardSocket_constructUDP(void)
 StandardSocket* StandardSocket_constructTCP(void)
 {
    return StandardSocket_construct(PF_INET, SOCK_STREAM, 0);
-}
-
-StandardSocket* StandardSocket_constructSDP(void)
-{
-   return StandardSocket_construct(PF_SDP, SOCK_STREAM, 0);
 }
 
 void _StandardSocket_uninit(Socket* this)
@@ -358,8 +347,6 @@ bool StandardSocket_setTcpCork(StandardSocket* this, bool enable)
 
 bool _StandardSocket_connectByIP(Socket* this, struct in_addr ipaddress, unsigned short port)
 {
-   // note: does not set the family type to the one of this socket (would lead to problems with SDP)
-
    // note: this might look a bit strange (it's kept similar to the c++ version)
 
    // note: error messages here would flood the log if hosts are unreachable on primary interface

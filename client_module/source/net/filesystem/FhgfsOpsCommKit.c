@@ -320,14 +320,18 @@ static bool __commkit_prepare_generic(CommKitContext* context, struct CommKitTar
       { // connection error
          if(!context->connFailedLogged)
          { // no conn error logged yet
-            if (fatal_signal_pending(current))
+            NodeString nodeAndType;
+            Node_copyAliasWithTypeStr(info->node, &nodeAndType);
+            if (fatal_signal_pending(current)){
                Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
                   "Connect to server canceled by pending signal: %s",
-                  Node_getNodeIDWithTypeStr(info->node) );
-            else
+                  nodeAndType.buf );
+            }
+            else {
                Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
                   "Unable to connect to server: %s",
-                  Node_getNodeIDWithTypeStr(info->node) );
+                  nodeAndType.buf );
+            }
          }
 
          context->connFailedLogged = true;
@@ -367,8 +371,10 @@ static void __commkit_sendheader_generic(CommKitContext* context,
 
    if(unlikely(sendRes != info->headerSize) )
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(info->node, &nodeAndType);
       Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
-         "Failed to send message to %s: %s", Node_getNodeIDWithTypeStr(info->node),
+         "Failed to send message to %s: %s", nodeAndType.buf,
          Socket_getPeername(info->socket) );
 
       info->state = CommKitState_SOCKETINVALIDATE;
@@ -390,6 +396,7 @@ static void __commkit_senddata_generic(CommKitContext* context, struct CommKitTa
 
    if(unlikely(sendRes < 0) )
    {
+      NodeString nodeAndType;
       if(sendRes == -EFAULT)
       { // bad buffer address given
          Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
@@ -400,8 +407,9 @@ static void __commkit_senddata_generic(CommKitContext* context, struct CommKitTa
          return;
       }
 
+      Node_copyAliasWithTypeStr(info->node, &nodeAndType);
       Logger_logErrFormatted(context->log, context->ops->logContext,
-         "Communication error in SENDDATA stage. Node: %s", Node_getNodeIDWithTypeStr(info->node) );
+         "Communication error in SENDDATA stage. Node: %s", nodeAndType.buf );
       if(context->ops->printSendDataDetails)
          context->ops->printSendDataDetails(context, info);
 
@@ -490,10 +498,13 @@ recv_err:
    if(unlikely(recvRes <= 0) )
    { // receive failed
       // note: signal pending log msg will be printed in stage SOCKETEXCEPTION, so no need here
-      if (!fatal_signal_pending(current))
+      if (!fatal_signal_pending(current)) {
+         NodeString nodeAndType;
+         Node_copyAliasWithTypeStr(info->node, &nodeAndType);
          Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
-            "Receive failed from: %s @ %s", Node_getNodeIDWithTypeStr(info->node),
+            "Receive failed from: %s @ %s", nodeAndType.buf,
             Socket_getPeername(info->socket) );
+      }
 
       info->state = CommKitState_SOCKETINVALIDATE;
       return;
@@ -518,6 +529,8 @@ static void __commkit_recvdata_generic(CommKitContext* context, struct CommKitTa
 
    if(unlikely(recvRes < 0) )
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(info->node, &nodeAndType);
       if(recvRes == -EFAULT)
       { // bad buffer address given
          Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
@@ -527,18 +540,17 @@ static void __commkit_recvdata_generic(CommKitContext* context, struct CommKitTa
          info->state = CommKitState_SOCKETINVALIDATE;
          return;
       }
-      else
-      if(recvRes == -ETIMEDOUT)
+      else if(recvRes == -ETIMEDOUT)
       { // timeout
          Logger_logErrFormatted(context->log, context->ops->logContext,
             "Communication timeout in RECVDATA stage. Node: %s",
-            Node_getNodeIDWithTypeStr(info->node) );
+            nodeAndType.buf );
       }
       else
       { // error
          Logger_logErrFormatted(context->log, context->ops->logContext,
             "Communication error in RECVDATA stage. Node: %s (recv result: %lld)",
-            Node_getNodeIDWithTypeStr(info->node), (long long)recvRes);
+            nodeAndType.buf, (long long)recvRes);
       }
 
       info->state = CommKitState_SOCKETINVALIDATE;
@@ -554,18 +566,20 @@ static void __commkit_recvdata_generic(CommKitContext* context, struct CommKitTa
 static void __commkit_socketinvalidate_generic(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(info->node, &nodeAndType);
    if (fatal_signal_pending(current))
    { // interrupted by signal
       info->nodeResult = -FhgfsOpsErr_INTERRUPTED;
       Logger_logFormatted(context->log, Log_NOTICE, context->ops->logContext,
-         "Communication interrupted by signal. Node: %s", Node_getNodeIDWithTypeStr(info->node) );
+         "Communication interrupted by signal. Node: %s", nodeAndType.buf );
    }
    else
    if(!Node_getIsActive(info->node) )
    {
       info->nodeResult = -FhgfsOpsErr_UNKNOWNNODE;
       Logger_logErrFormatted(context->log, context->ops->logContext,
-         "Communication with inactive node. Node: %s", Node_getNodeIDWithTypeStr(info->node) );
+         "Communication with inactive node. Node: %s", nodeAndType.buf );
    }
    else if (info->nodeResult == -FhgfsOpsErr_ADDRESSFAULT)
    {
@@ -575,7 +589,7 @@ static void __commkit_socketinvalidate_generic(CommKitContext* context,
    { // "normal" connection error
       info->nodeResult = -FhgfsOpsErr_COMMUNICATION;
       Logger_logErrFormatted(context->log, context->ops->logContext,
-         "Communication error. Node: %s", Node_getNodeIDWithTypeStr(info->node) );
+         "Communication error. Node: %s", nodeAndType.buf );
 
       if(context->ops->printSocketDetails)
          context->ops->printSocketDetails(context, info);
@@ -807,15 +821,17 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
 
    bool parseRes;
    GenericResponseMsg msg;
-
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(info->node, &nodeAndType);
    GenericResponseMsg_init(&msg);
+
 
    parseRes = NetMessageFactory_deserializeFromBuf(context->app, info->headerBuffer,
       info->headerSize, &msg.simpleIntStringMsg.netMessage, NETMSGTYPE_GenericResponse);
    if(!parseRes)
    {
       Logger_logFormatted(context->log, Log_ERR, "received bad message type from %s: %i",
-         Node_getNodeIDWithTypeStr(info->node),
+         nodeAndType.buf,
          NetMessage_getMsgType(&msg.simpleIntStringMsg.netMessage) );
       return -FhgfsOpsErr_INTERNAL;
    }
@@ -829,7 +845,7 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
 
             Logger_logFormatted(context->log, Log_NOTICE, logContext,
                "Peer is asking for a retry: %s; Reason: %s",
-               Node_getNodeIDWithTypeStr(info->node),
+               nodeAndType.buf,
                GenericResponseMsg_getLogStr(&msg) );
             Logger_logFormatted(context->log, Log_DEBUG, logContext,
                "Message type: %u", requestMsgType);
@@ -844,7 +860,7 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
 
             Logger_logFormatted(context->log, Log_NOTICE, logContext,
                "Peer reported indirect communication error: %s; Reason: %s",
-               Node_getNodeIDWithTypeStr(info->node),
+              nodeAndType.buf,
                GenericResponseMsg_getLogStr(&msg) );
             Logger_logFormatted(context->log, Log_DEBUG, logContext,
                "Message type: %u", requestMsgType);
@@ -855,7 +871,7 @@ static FhgfsOpsErr __commkit_message_genericResponse(CommKitContext* context,
       default:
          Logger_logFormatted(context->log, Log_NOTICE, logContext,
             "Peer replied with unknown control code: %s; Code: %u; Reason: %s",
-            Node_getNodeIDWithTypeStr(info->node),
+            nodeAndType.buf,
             (unsigned)GenericResponseMsg_getControlCode(&msg),
             GenericResponseMsg_getLogStr(&msg) );
          Logger_logFormatted(context->log, Log_DEBUG, logContext,
@@ -1070,10 +1086,11 @@ static void __commkit_readfile_printSocketDetails(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
    FileOpState* currentState = container_of(info, FileOpState, base);
-
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(info->node, &nodeAndType);
    Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
       "Sent request: node: %s; fileHandleID: %s; offset: %lld; size: %zu",
-      Node_getNodeIDWithTypeStr(info->node), context->ioInfo->fileHandleID,
+      nodeAndType.buf, context->ioInfo->fileHandleID,
       (long long)currentState->offset, currentState->totalSize);
 }
 
@@ -1100,9 +1117,11 @@ static ssize_t __commkit_readfile_receive(CommKitContext* context, FileOpState* 
 
    if(unlikely(recvRes < 0) )
    {
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(currentState->base.node, &nodeAndType);
       Logger_logFormatted(context->log, Log_SPAM, context->ops->logContext,
          "Request details: receive from %s: %lld bytes (error %zi)",
-         Node_getNodeIDWithTypeStr(currentState->base.node), (long long)length, recvRes);
+         nodeAndType.buf, (long long)length, recvRes);
    }
 
    return recvRes;
@@ -1149,9 +1168,11 @@ static int __commkit_readfile_recvdata_prefix(CommKitContext* context, FileOpSta
    // buffer overflow check
    if(unlikely(currentState->transmitted + lengthInfo > currentState->totalSize) )
    {
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(currentState->base.node, &nodeAndType);
       Logger_logErrFormatted(context->log, context->ops->logContext,
          "Bug: Received a lengthInfo that would overflow request from %s: %lld %zu %zu",
-         Node_getNodeIDWithTypeStr(currentState->base.node), (long long)lengthInfo,
+         nodeAndType.buf, (long long)lengthInfo,
          currentState->transmitted, currentState->totalSize);
 
       return -EREMOTEIO;
@@ -1412,10 +1433,11 @@ static void __commkit_writefile_printSocketDetails(CommKitContext* context,
    struct CommKitTargetInfo* info)
 {
    FileOpState* currentState = container_of(info, FileOpState, base);
-
+   NodeString nodeAndType;
+   Node_copyAliasWithTypeStr(info->node, &nodeAndType);
    Logger_logFormatted(context->log, Log_DEBUG, context->ops->logContext,
       "Sent request: node: %s; fileHandleID: %s; offset: %lld; size: %lld",
-      Node_getNodeIDWithTypeStr(info->node), context->ioInfo->fileHandleID,
+      nodeAndType.buf, context->ioInfo->fileHandleID,
       (long long)currentState->offset, (long long)currentState->toBeTransmitted);
 }
 
@@ -1452,9 +1474,11 @@ static int __commkit_writefile_recvHeader(CommKitContext* context, struct CommKi
 
    if(unlikely(!deserRes) )
    { // response invalid
+      NodeString nodeAndType;
+      Node_copyAliasWithTypeStr(currentState->base.node, &nodeAndType);
       Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
          "Received invalid response from %s. Expected type: %d. Disconnecting: %s",
-         Node_getNodeIDWithTypeStr(currentState->base.node), expectedType,
+         nodeAndType.buf, expectedType,
          Socket_getPeername(currentState->base.socket) );
 
       return -FhgfsOpsErr_COMMUNICATION;
@@ -1475,10 +1499,12 @@ static int __commkit_writefile_recvHeader(CommKitContext* context, struct CommKi
 
    if(unlikely(writeRespValue == -FhgfsOpsErr_COMMUNICATION) && !context->connFailedLogged)
    { // server was unable to communicate with another server
+      NodeString nodeAndType;
       context->connFailedLogged = true;
+      Node_copyAliasWithTypeStr(currentState->base.node, &nodeAndType);
       Logger_logFormatted(context->log, Log_WARNING, context->ops->logContext,
          "Server reported indirect communication error: %s. targetID: %hu",
-         Node_getNodeIDWithTypeStr(currentState->base.node), currentState->base.targetID);
+         nodeAndType.buf, currentState->base.targetID);
    }
 
    currentState->base.nodeResult = writeRespValue;

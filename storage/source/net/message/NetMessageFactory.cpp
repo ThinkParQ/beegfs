@@ -84,6 +84,11 @@
 #include <common/net/message/nodes/StorageBenchControlMsg.h>
 #include <net/message/nodes/StorageBenchControlMsgEx.h>
 
+// chunk balancing
+#include <common/net/message/storage/chunkbalancing/StripePatternUpdateRespMsg.h>
+#include <common/net/message/storage/chunkbalancing/CpChunkPathsRespMsg.h>
+#include <net/message/storage/chunkbalancing/CpChunkPathsMsgEx.h>
+
 #include <common/net/message/SimpleMsg.h>
 #include <net/message/nodes/storagepools/RefreshStoragePoolsMsgEx.h>
 #include "NetMessageFactory.h"
@@ -139,6 +144,8 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_GetTargetConsistencyStatesResp: { msg = new GetTargetConsistencyStatesRespMsg(); } break;
 
       // storage messages
+      case NETMSGTYPE_CpChunkPaths: { msg = new CpChunkPathsMsgEx(); } break;
+      case NETMSGTYPE_CpChunkPathsResp: { msg = new CpChunkPathsRespMsg(); } break;
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;
       case NETMSGTYPE_GetChunkFileAttribs: { msg = new GetChunkFileAttribsMsgEx(); } break;
       case NETMSGTYPE_GetHighResStats: { msg = new GetHighResStatsMsgEx(); } break;
@@ -159,6 +166,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_StatStoragePath: { msg = new StatStoragePathMsgEx(); } break;
       case NETMSGTYPE_StorageResyncStarted: { msg = new StorageResyncStartedMsgEx(); } break;
       case NETMSGTYPE_StorageResyncStartedResp: { msg = new StorageResyncStartedRespMsg(); } break;
+      case NETMSGTYPE_StripePatternUpdateResp: { msg = new StripePatternUpdateRespMsg(); } break;
       case NETMSGTYPE_TruncLocalFile: { msg = new TruncLocalFileMsgEx(); } break;
       case NETMSGTYPE_TruncLocalFileResp: { msg = new TruncLocalFileRespMsg(); } break;
       case NETMSGTYPE_UnlinkLocalFile: { msg = new UnlinkLocalFileMsgEx(); } break;

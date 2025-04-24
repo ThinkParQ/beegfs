@@ -1,5 +1,4 @@
-#ifndef LOGMSG_H_
-#define LOGMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -87,4 +86,3 @@ class LogMsg : public NetMessageSerdes<LogMsg>
 
 };
 
-#endif /*LOGMSG_H_*/

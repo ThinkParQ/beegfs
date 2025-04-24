@@ -1,5 +1,4 @@
-#ifndef NODESTORECLIENTS_H_
-#define NODESTORECLIENTS_H_
+#pragma once
 
 #include <common/threading/Mutex.h>
 #include <common/threading/Condition.h>
@@ -43,4 +42,3 @@ class NodeStoreClients : public AbstractNodeStore
       }
 };
 
-#endif /*NODESTORECLIENTS_H_*/

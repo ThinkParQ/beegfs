@@ -1,5 +1,4 @@
-#ifndef HARDLINKMSG_H_
-#define HARDLINKMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -153,4 +152,3 @@ class HardlinkMsg : public MirroredMessageBase<HardlinkMsg>
 };
 
 
-#endif /*HARDLINKMSG_H_*/

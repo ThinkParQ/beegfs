@@ -1,5 +1,4 @@
-#ifndef CONNACCEPTOR_H_
-#define CONNACCEPTOR_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/queue/MultiWorkQueue.h>
@@ -30,7 +29,6 @@ class ConnAcceptor : public PThread
       unsigned short    listenPort;
 
       StandardSocket*   tcpListenSock;
-      StandardSocket*   sdpListenSock;
       RDMASocket*       rdmaListenSock;
 
       int               epollFD;
@@ -41,7 +39,6 @@ class ConnAcceptor : public PThread
 
       bool initSocks();
       bool startRDMASocket(NicListCapabilities* localNicCaps);
-      bool startSDPSocket(NicListCapabilities* localNicCaps);
       void handleNewLocalNicCaps();
 
       virtual void run();
@@ -58,4 +55,3 @@ class ConnAcceptor : public PThread
 
 };
 
-#endif /*CONNACCEPTOR_H_*/

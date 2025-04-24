@@ -15,9 +15,9 @@ std::pair<FhgfsOpsErr, StringVector> MsgHelperXAttr::listxattr(EntryInfo* entryI
 
    if (entryInfo->getEntryType() == DirEntryType_REGULARFILE && !entryInfo->getIsInlined())
    {
-      MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+      auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
       if (!inode)
-         return {FhgfsOpsErr_PATHNOTEXISTS, {}};
+         return {referenceRes, {}};
 
       auto result = inode->listXAttr();
 
@@ -55,9 +55,9 @@ std::tuple<FhgfsOpsErr, std::vector<char>, ssize_t> MsgHelperXAttr::getxattr(Ent
 
    if (entryInfo->getEntryType() == DirEntryType_REGULARFILE && !entryInfo->getIsInlined())
    {
-      MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+       auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
       if (!inode)
-         return std::make_tuple(FhgfsOpsErr_PATHNOTEXISTS, std::vector<char>(), ssize_t(0));
+         return std::make_tuple(referenceRes, std::vector<char>(), ssize_t(0));
 
       result = inode->getXAttr(name, maxSize);
 
@@ -102,9 +102,9 @@ FhgfsOpsErr MsgHelperXAttr::removexattr(EntryInfo* entryInfo, const std::string&
 
    if (entryInfo->getEntryType() == DirEntryType_REGULARFILE && !entryInfo->getIsInlined())
    {
-      MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+       auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
       if (!inode)
-         return FhgfsOpsErr_PATHNOTEXISTS;
+         return referenceRes;
 
       auto result = inode->removeXAttr(entryInfo, name);
 
@@ -141,9 +141,9 @@ FhgfsOpsErr MsgHelperXAttr::setxattr(EntryInfo* entryInfo, const std::string& na
 
    if (entryInfo->getEntryType() == DirEntryType_REGULARFILE && !entryInfo->getIsInlined())
    {
-      MetaFileHandle inode = metaStore->referenceFile(entryInfo);
+       auto [inode, referenceRes] = metaStore->referenceFile(entryInfo);
       if (!inode)
-         return FhgfsOpsErr_PATHNOTEXISTS;
+         return referenceRes;
 
       auto result = inode->setXAttr(entryInfo, name, value, flags);
 

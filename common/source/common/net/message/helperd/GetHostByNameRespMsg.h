@@ -1,5 +1,4 @@
-#ifndef GETHOSTBYNAMERESPMSG_H_
-#define GETHOSTBYNAMERESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -41,4 +40,3 @@ class GetHostByNameRespMsg : public NetMessageSerdes<GetHostByNameRespMsg>
       }
 };
 
-#endif /*GETHOSTBYNAMERESPMSG_H_*/

@@ -1,5 +1,4 @@
-#ifndef CHUNKFETCHERSLAVE_H_
-#define CHUNKFETCHERSLAVE_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/ComponentInitException.h>
@@ -61,4 +60,3 @@ class ChunkFetcherSlave : public PThread
       }
 };
 
-#endif /* CHUNKFETCHERSLAVE_H_ */

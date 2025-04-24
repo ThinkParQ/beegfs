@@ -1,5 +1,4 @@
-#ifndef STORAGE_COMPONENTS_BUDDYRESYNCER_SYNCCANDIDATE_H
-#define STORAGE_COMPONENTS_BUDDYRESYNCER_SYNCCANDIDATE_H
+#pragma once
 
 #include <common/storage/mirroring/SyncCandidateStore.h>
 
@@ -43,4 +42,3 @@ class ChunkSyncCandidateFile : public ChunkSyncCandidateDir
 
 typedef SyncCandidateStore<ChunkSyncCandidateDir, ChunkSyncCandidateFile> ChunkSyncCandidateStore;
 
-#endif /* STORAGE_COMPONENTS_BUDDYRESYNCER_SYNCCANDIDATE_H */

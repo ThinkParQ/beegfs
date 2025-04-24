@@ -1,9 +1,9 @@
-#ifndef MKLOCALDIRMSG_H_
-#define MKLOCALDIRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/NumNodeID.h>
 #include <common/storage/striping/StripePattern.h>
+#include <common/storage/RemoteStorageTarget.h>
 #include <common/storage/EntryInfo.h>
 #include <common/storage/StatData.h>
 
@@ -19,7 +19,7 @@ class MkLocalDirMsg : public MirroredMessageBase<MkLocalDirMsg>
        * @param entryInfo just a reference, so do not free it as long as you use this object!
        */
       MkLocalDirMsg(EntryInfo* entryInfo, unsigned userID, unsigned groupID, int mode,
-         StripePattern* pattern, NumNodeID parentNodeID,
+         StripePattern* pattern, RemoteStorageTarget* rst, NumNodeID parentNodeID,
          const CharVector& defaultACLXAttr, const CharVector& accessACLXAttr) :
             BaseType(NETMSGTYPE_MkLocalDir),
             defaultACLXAttr(defaultACLXAttr), accessACLXAttr(accessACLXAttr)
@@ -29,6 +29,7 @@ class MkLocalDirMsg : public MirroredMessageBase<MkLocalDirMsg>
          this->groupID = groupID;
          this->mode = mode;
          this->pattern = pattern;
+         this->rstPtr = rst;
          this->parentNodeID = parentNodeID;
       }
 
@@ -46,6 +47,7 @@ class MkLocalDirMsg : public MirroredMessageBase<MkLocalDirMsg>
             % obj->mode
             % serdes::backedPtr(obj->entryInfoPtr, obj->entryInfo)
             % serdes::backedPtr(obj->pattern, obj->parsed.pattern)
+            % serdes::backedPtr(obj->rstPtr, obj->rst)
             % obj->parentNodeID
             % obj->defaultACLXAttr
             % obj->accessACLXAttr;
@@ -63,11 +65,13 @@ class MkLocalDirMsg : public MirroredMessageBase<MkLocalDirMsg>
       NumNodeID parentNodeID;
 
       // for serialization
-      EntryInfo* entryInfoPtr; // not owned by this object!
-      StripePattern* pattern;  // not owned by this object!
+      EntryInfo* entryInfoPtr;      // not owned by this object!
+      StripePattern* pattern;       // not owned by this object!
+      RemoteStorageTarget* rstPtr;  // not owned by this object!
 
       // for deserialization
       EntryInfo entryInfo;
+      RemoteStorageTarget rst;
       struct {
          std::unique_ptr<StripePattern> pattern;
       } parsed;
@@ -91,6 +95,11 @@ class MkLocalDirMsg : public MirroredMessageBase<MkLocalDirMsg>
       }
 
       // getters & setters
+      RemoteStorageTarget* getRemoteStorageTarget()
+      {
+         return &this->rst;
+      }
+
       unsigned getUserID() const
       {
          return userID;
@@ -129,4 +138,3 @@ class MkLocalDirMsg : public MirroredMessageBase<MkLocalDirMsg>
       void setDirTimestamps(const MirroredTimestamps& ts) { dirTimestamps = ts; }
 };
 
-#endif /*MKLOCALDIRMSG_H_*/

@@ -1,5 +1,4 @@
-#ifndef STORAGERESYNCSTARTED_H_
-#define STORAGERESYNCSTARTED_H_
+#pragma once
 
 #include <common/net/message/storage/mirroring/StorageResyncStartedMsg.h>
 
@@ -15,4 +14,3 @@ class StorageResyncStartedMsgEx : public StorageResyncStartedMsg
       void pauseWorkers();
 };
 
-#endif /* STORAGERESYNCSTARTED_H_ */

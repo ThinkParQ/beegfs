@@ -1,5 +1,4 @@
-#ifndef INTERNODESYNCER_H_
-#define INTERNODESYNCER_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/AbstractDatagramListener.h>
@@ -143,4 +142,3 @@ class InternodeSyncer : public PThread
 };
 
 
-#endif /* INTERNODESYNCER_H_ */

@@ -1,5 +1,4 @@
-#ifndef RAID0PATTERN_H_
-#define RAID0PATTERN_H_
+#pragma once
 #include "StripePattern.h"
 
 
@@ -120,4 +119,3 @@ class Raid0Pattern : public StripePattern
 
 };
 
-#endif /*RAID0PATTERN_H_*/

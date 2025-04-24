@@ -1,5 +1,4 @@
-#ifndef METADATA_H_
-#define METADATA_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -27,4 +26,3 @@
 
 
 
-#endif /*METADATA_H_*/

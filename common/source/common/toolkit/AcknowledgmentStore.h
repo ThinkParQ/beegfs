@@ -1,5 +1,4 @@
-#ifndef ACKNOWLEDGMENTSTORE_H_
-#define ACKNOWLEDGMENTSTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/Node.h>
@@ -79,4 +78,3 @@ class AcknowledgmentStore
 
 };
 
-#endif /*ACKNOWLEDGMENTSTORE_H_*/

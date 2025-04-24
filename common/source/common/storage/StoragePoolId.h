@@ -1,5 +1,4 @@
-#ifndef COMMON_STORAGEPOOLID_H
-#define COMMON_STORAGEPOOLID_H
+#pragma once
 
 #include <common/NumericID.h>
 
@@ -20,4 +19,3 @@ typedef std::vector<StoragePoolId> StoragePoolIdVector;
 typedef StoragePoolIdVector::iterator StoragePoolIdVectorIter;
 typedef StoragePoolIdVector::const_iterator StoragePoolIdVectorCIter;
 
-#endif /*COMMON_STORAGEPOOLID_H*/

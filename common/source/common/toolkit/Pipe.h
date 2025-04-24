@@ -1,5 +1,4 @@
-#ifndef PIPE_H_
-#define PIPE_H_
+#pragma once
 
 #include "FileDescriptor.h"
 #include <common/Common.h>
@@ -68,4 +67,3 @@ class Pipe
       }
 };
 
-#endif /*PIPE_H_*/

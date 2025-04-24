@@ -1,5 +1,4 @@
-#ifndef APP_H_
-#define APP_H_
+#pragma once
 
 #include <app/config/Config.h>
 #include <common/Common.h>
@@ -23,6 +22,7 @@
 #include <common/toolkit/AcknowledgmentStore.h>
 #include <common/toolkit/NetFilter.h>
 #include <components/DatagramListener.h>
+#include <components/FileEventLogger.h>
 #include <components/InternodeSyncer.h>
 #include <components/buddyresyncer/BuddyResyncer.h>
 #include <net/message/NetMessageFactory.h>
@@ -55,7 +55,6 @@ typedef StreamLisVec::iterator StreamLisVecIter;
 // forward declarations
 class LogContext;
 class ModificationEventFlusher;
-class FileEventLogger;
 
 
 class App : public AbstractApp
@@ -71,6 +70,7 @@ class App : public AbstractApp
       virtual void handleNetworkInterfaceFailure(const std::string& devname) override;
 
       void handleNetworkInterfacesChanged(NicAddressList nicList);
+
 
    private:
       int appResult;
@@ -144,7 +144,7 @@ class App : public AbstractApp
 
       ExceededQuotaPerTarget exceededQuotaStores;
 
-      std::unique_ptr<FileEventLogger> fileEventLogger;
+      std::unique_ptr<FileEventLogger, decltype(&destroyFileEventLogger)> fileEventLogger { nullptr, &destroyFileEventLogger };
 
       unsigned nextNumaBindTarget; // the numa node to which we will bind the next component thread
 
@@ -171,8 +171,8 @@ class App : public AbstractApp
       void initLogging();
       void initDataObjects();
       void initBasicNetwork();
-      void initLocalNodeIDs(std::string& outLocalID, NumNodeID& outLocalNumID);
-      void initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID);
+      void initLocalNodeIDs(NumNodeID& outLocalNumID);
+      void initLocalNode(NumNodeID localNodeNumID);
       void initLocalNodeNumIDFile(NumNodeID localNodeNumID);
       bool preinitStorage();
       void checkTargetUUID();
@@ -186,7 +186,7 @@ class App : public AbstractApp
       void joinComponents();
 
       bool waitForMgmtNode();
-      bool preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID);
+      bool preregisterNode(NumNodeID& outLocalNodeNumID);
       bool downloadMgmtInfo(TargetConsistencyState& outInitialConsistencyState);
 
       void logInfos();
@@ -200,7 +200,6 @@ class App : public AbstractApp
       bool storeSessions();
       bool deleteSessionFiles();
 
-      bool checkEnterpriseFeatureUsage();
 
    public:
       // inliners
@@ -510,4 +509,3 @@ class App : public AbstractApp
 };
 
 
-#endif /*APP_H_*/

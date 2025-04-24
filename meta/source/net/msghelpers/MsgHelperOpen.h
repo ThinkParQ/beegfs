@@ -1,5 +1,4 @@
-#ifndef MSGHELPEROPEN_H_
-#define MSGHELPEROPEN_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/storage/EntryInfo.h>
@@ -25,4 +24,3 @@ class MsgHelperOpen
 
 };
 
-#endif /* MSGHELPEROPEN_H_ */

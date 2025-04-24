@@ -1,5 +1,4 @@
-#ifndef COMMON_NEXCEEDEDQUOTAPERTARGET_H_
-#define COMMON_NEXCEEDEDQUOTAPERTARGET_H_
+#pragma once
 
 #include <common/storage/quota/ExceededQuotaStore.h>
 
@@ -16,4 +15,3 @@ class ExceededQuotaPerTarget
       mutable RWLock rwLock;
 };
 
-#endif /* COMMON_NEXCEEDEDQUOTAPERTARGET_H_ */

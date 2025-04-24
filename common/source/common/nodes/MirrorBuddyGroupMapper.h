@@ -1,5 +1,4 @@
-#ifndef MIRRORBUDDYGROUPMAPPER_H_
-#define MIRRORBUDDYGROUPMAPPER_H_
+#pragma once
 
 #include <common/nodes/NodeCapacityPools.h>
 #include <common/nodes/TargetMapper.h>
@@ -195,4 +194,3 @@ class MirrorBuddyGroupMapper
       }
 };
 
-#endif /* MIRRORBUDDYGROUPMAPPER_H_ */

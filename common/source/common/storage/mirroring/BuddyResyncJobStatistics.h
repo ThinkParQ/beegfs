@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCJOBSTATISTICS_H_
-#define BUDDYRESYNCJOBSTATISTICS_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -200,4 +199,3 @@ class MetaBuddyResyncJobStatistics : public BuddyResyncJobStatistics
       uint64_t getModSyncErrors() { return modSyncErrors; }
 };
 
-#endif /* BUDDYRESYNCJOBSTATS_H_ */

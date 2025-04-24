@@ -1,5 +1,4 @@
-#ifndef UNLINKLOCALFILEMSGEX_H_
-#define UNLINKLOCALFILEMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/creating/UnlinkLocalFileMsg.h>
 
@@ -16,4 +15,3 @@ class UnlinkLocalFileMsgEx : public UnlinkLocalFileMsg
             bool* outChunkLocked);
 };
 
-#endif /*UNLINKLOCALFILEMSGEX_H_*/

@@ -1,5 +1,4 @@
-#ifndef CREATEDEFDIRINODESMSGEX_H
-#define CREATEDEFDIRINODESMSGEX_H
+#pragma once
 
 #include <common/storage/striping/Raid0Pattern.h>
 #include <common/net/message/fsck/CreateDefDirInodesMsg.h>
@@ -11,4 +10,3 @@ class CreateDefDirInodesMsgEx : public CreateDefDirInodesMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*CREATEDEFDIRINODESMSGEX_H*/

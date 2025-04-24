@@ -1,5 +1,4 @@
-#ifndef STRIPEPATTERN_H_
-#define STRIPEPATTERN_H_
+#pragma once
 
 #include <boost/optional.hpp>
 #include <common/Common.h>
@@ -306,4 +305,3 @@ class StripePattern
       }
 };
 
-#endif /*STRIPEPATTERN_H_*/

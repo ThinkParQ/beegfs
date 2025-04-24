@@ -1,5 +1,4 @@
-#ifndef RENAMEV2MSGEX_H_
-#define RENAMEV2MSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/moving/RenameMsg.h>
@@ -68,17 +67,16 @@ class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
       std::unique_ptr<MirroredMessageResponseState> executeLocally(ResponseContext& ctx,
          bool isSecondary) override;
 
-      FhgfsOpsErr movingPerform(DirInode& fromParent, EntryInfo* fromDirInfo,
-         const std::string& oldName, DirEntryType entryType, EntryInfo* toDirInfo,
-         const std::string& newName, std::string& unlinkedEntryID);
+      FhgfsOpsErr movingPerform(DirInode& fromParent, const std::string& oldName,
+         DirEntryType entryType, EntryInfo* toDirInfo, const std::string& newName,
+         std::string& unlinkedEntryID);
 
       FhgfsOpsErr renameInSameDir(DirInode& fromParent, const std::string& oldName,
          const std::string& toName, std::string& unlinkedEntryID);
-      FhgfsOpsErr renameDir(DirInode& fromParent, EntryInfo* fromDirInfo,
-         const std::string& oldName, EntryInfo* toDirInfo, const std::string& newName);
-      FhgfsOpsErr renameFile(DirInode& fromParent, EntryInfo* fromDirInfo,
-         const std::string& oldName, EntryInfo* toDirInfo, const std::string& newName,
-         std::string& unlinkedEntryID);
+      FhgfsOpsErr renameDir(DirInode& fromParent, const std::string& oldName,
+         EntryInfo* toDirInfo, const std::string& newName);
+      FhgfsOpsErr renameFile(DirInode& fromParent, const std::string& oldName, EntryInfo* toDirInfo,
+         const std::string& newName, std::string& unlinkedEntryID);
 
       FhgfsOpsErr remoteFileInsertAndUnlink(EntryInfo* fromFileInfo, EntryInfo* toDirInfo,
          const std::string newName, char* serialBuf, size_t serialBufLen,
@@ -87,6 +85,7 @@ class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
          char* serialBuf, size_t serialBufLen);
       FhgfsOpsErr updateRenamedDirInode(EntryInfo* renamedDirEntryInfo, EntryInfo* toDirInfo);
       FhgfsOpsErr unlinkRemoteFileInode(EntryInfo* entryInfo);
+      std::pair<FhgfsOpsErr, unsigned> getLinkCountForMovedEntry(EntryInfo* entryInfo);
 
       void forwardToSecondary(ResponseContext& ctx) override;
 
@@ -99,4 +98,3 @@ class RenameV2MsgEx : public MirroredMessage<RenameMsg, RenameV2Locks>
 };
 
 
-#endif /*RENAMEV2MSGEX_H_*/

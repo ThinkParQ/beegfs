@@ -1,5 +1,4 @@
-#ifndef FLOCKENTRYMSGEX_H_
-#define FLOCKENTRYMSGEX_H_
+#pragma once
 
 #include <common/net/message/session/locking/FLockEntryMsg.h>
 #include <common/net/message/session/locking/FLockEntryRespMsg.h>
@@ -35,4 +34,3 @@ class FLockEntryMsgEx : public MirroredMessage<FLockEntryMsg, FileIDLock>
       const char* mirrorLogContext() const override { return "FLockEntryMsgEx/forward"; }
 };
 
-#endif /* FLOCKENTRYMSGEX_H_ */

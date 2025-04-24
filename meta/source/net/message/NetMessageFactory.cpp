@@ -54,6 +54,7 @@
 #include <common/net/message/storage/moving/RenameRespMsg.h>
 #include <common/net/message/storage/quota/RequestExceededQuotaRespMsg.h>
 #include <common/net/message/storage/attribs/SetAttrRespMsg.h>
+#include <common/net/message/storage/attribs/SetFilePatternRespMsg.h>
 #include <common/net/message/storage/attribs/SetLocalAttrRespMsg.h>
 #include <common/net/message/storage/attribs/StatRespMsg.h>
 #include <common/net/message/storage/StatStoragePathRespMsg.h>
@@ -96,6 +97,8 @@
 #include <net/message/storage/attribs/RemoveXAttrMsgEx.h>
 #include <net/message/storage/attribs/SetAttrMsgEx.h>
 #include <net/message/storage/attribs/SetDirPatternMsgEx.h>
+#include <net/message/storage/attribs/SetFilePatternMsgEx.h>
+#include <net/message/storage/attribs/SetFileDataStateMsgEx.h>
 #include <net/message/storage/attribs/SetXAttrMsgEx.h>
 #include <net/message/storage/attribs/StatMsgEx.h>
 #include <net/message/storage/attribs/UpdateDirParentMsgEx.h>
@@ -151,6 +154,12 @@
 #include <net/message/fsck/UpdateFileAttribsMsgEx.h>
 #include <net/message/fsck/AdjustChunkPermissionsMsgEx.h>
 #include <net/message/fsck/CheckAndRepairDupInodeMsgEx.h>
+
+// chunk balancing
+#include <common/net/message/storage/chunkbalancing/CpChunkPathsRespMsg.h>
+#include <net/message/storage/chunkbalancing/ChunkBalanceMsgEx.h>
+#include <net/message/storage/chunkbalancing/StripePatternUpdateMsgEx.h>
+
 
 #include <common/net/message/SimpleMsg.h>
 #include <net/message/nodes/storagepools/RefreshStoragePoolsMsgEx.h>
@@ -208,6 +217,8 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_SetTargetConsistencyStatesResp: { msg = new SetTargetConsistencyStatesRespMsg(); } break;
 
       // storage messages
+      case NETMSGTYPE_ChunkBalance: { msg = new ChunkBalanceMsgEx(); } break;
+      case NETMSGTYPE_CpChunkPathsResp: { msg = new CpChunkPathsRespMsg(); } break; 
       case NETMSGTYPE_FindLinkOwner: { msg = new FindLinkOwnerMsgEx(); } break;
       case NETMSGTYPE_FindOwner: { msg = new FindOwnerMsgEx(); } break;
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;
@@ -271,6 +282,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_StatResp: { msg = new StatRespMsg(); } break;
       case NETMSGTYPE_StatStoragePath: { msg = new StatStoragePathMsgEx(); } break;
       case NETMSGTYPE_StatStoragePathResp: { msg = new StatStoragePathRespMsg(); } break;
+      case NETMSGTYPE_StripePatternUpdate: { msg = new StripePatternUpdateMsgEx(); } break;
       case NETMSGTYPE_TruncFile: { msg = new TruncFileMsgEx(); } break;
       case NETMSGTYPE_TruncFileResp: { msg = new TruncFileRespMsg(); } break;
       case NETMSGTYPE_TruncLocalFileResp: { msg = new TruncLocalFileRespMsg(); } break;
@@ -283,6 +295,10 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_MoveFileInodeResp: {msg = new MoveFileInodeRespMsg(); } break;
       case NETMSGTYPE_UnlinkLocalFileInode: {msg = new UnlinkLocalFileInodeMsgEx(); } break;
       case NETMSGTYPE_UnlinkLocalFileInodeResp: {msg = new UnlinkLocalFileInodeRespMsg(); } break;
+      case NETMSGTYPE_SetFilePattern: { msg = new SetFilePatternMsgEx(); } break;
+      case NETMSGTYPE_SetFilePatternResp: { msg = new SetFilePatternRespMsg(); } break;
+      case NETMSGTYPE_SetFileDataState: { msg = new SetFileDataStateMsgEx(); } break;
+      case NETMSGTYPE_SetFileDataStateResp: { msg = new SetFileDataStateRespMsg(); } break;
 
       // session messages
       case NETMSGTYPE_BumpFileVersion: { msg = new BumpFileVersionMsgEx(); } break;

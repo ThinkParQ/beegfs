@@ -71,7 +71,7 @@ std::unique_ptr<MirroredMessageResponseState> FLockEntryMsgEx::executeLocally(Re
 
          // if the file still exists, just do the lock cancel without session recovery attempt
 
-         MetaFileHandle lockCancelFile = metaStore->referenceFile(entryInfo);
+         auto [lockCancelFile, referenceRes] = metaStore->referenceFile(entryInfo);
          if(lockCancelFile)
          {
             lockCancelFile->flockEntry(lockDetails);

@@ -1,5 +1,4 @@
-#ifndef INCOMINGPREPROCESSEDMSGWORK_H_
-#define INCOMINGPREPROCESSEDMSGWORK_H_
+#pragma once
 
 #include <common/app/AbstractApp.h>
 #include <common/components/worker/Work.h>
@@ -37,4 +36,3 @@ class IncomingPreprocessedMsgWork : public Work
       NetMessageHeader msgHeader;
 };
 
-#endif /*INCOMINGPREPROCESSEDMSGWORK_H_*/

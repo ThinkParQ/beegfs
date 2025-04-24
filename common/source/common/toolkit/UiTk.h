@@ -1,5 +1,4 @@
-#ifndef COMMON_UITK_H_
-#define COMMON_UITK_H_
+#pragma once
 
 #include <boost/optional.hpp>
 #include <iostream>
@@ -13,4 +12,3 @@ bool userYNQuestion(const std::string& question,
 
 }
 
-#endif  //COMMON_UITK_H_

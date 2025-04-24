@@ -1,5 +1,4 @@
-#ifndef STREAMLISTENERV2_H_
-#define STREAMLISTENERV2_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/components/worker/queue/StreamListenerWorkQueue.h>
@@ -116,4 +115,3 @@ class StreamListenerV2 : public PThread
 
 };
 
-#endif /*STREAMLISTENERV2_H_*/

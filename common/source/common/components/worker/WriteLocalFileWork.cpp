@@ -88,7 +88,7 @@ int64_t WriteLocalFileWork::communicate(Node& node, char* bufOut, unsigned bufOu
    catch(SocketConnectException& e)
    {
       LogContext(logContext).log(Log_WARNING, std::string("Unable to connect to storage node: ") +
-         node.getID() );
+         node.getAlias() );
 
       retVal = -FhgfsOpsErr_COMMUNICATION;
    }

@@ -1,5 +1,4 @@
-#ifndef FIXINODEOWNERSMSG_H
-#define FIXINODEOWNERSMSG_H
+#pragma once
 
 #include <common/fsck/FsckDirInode.h>
 #include <common/net/message/NetMessage.h>
@@ -38,4 +37,3 @@ class FixInodeOwnersMsg : public NetMessageSerdes<FixInodeOwnersMsg>
 };
 
 
-#endif /*FIXINODEOWNERSMSG_H*/

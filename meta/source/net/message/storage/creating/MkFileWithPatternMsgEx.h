@@ -1,5 +1,4 @@
-#ifndef MKFILEWITHPATTERNMSGEX_H_
-#define MKFILEWITHPATTERNMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/creating/MkFileRespMsg.h>
 #include <common/net/message/storage/creating/MkFileWithPatternMsg.h>
@@ -50,4 +49,3 @@ class MkFileWithPatternMsgEx : public MirroredMessage<MkFileWithPatternMsg,
       std::string entryID;
 };
 
-#endif /* MKFILEWITHPATTERNMSGEX_H_ */

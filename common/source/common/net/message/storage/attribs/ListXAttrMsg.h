@@ -1,5 +1,4 @@
-#ifndef LISTXATTRMSG_H_
-#define LISTXATTRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -56,4 +55,3 @@ class ListXAttrMsg : public MirroredMessageBase<ListXAttrMsg>
       }
 };
 
-#endif /*LISTXATTRMSG_H_*/

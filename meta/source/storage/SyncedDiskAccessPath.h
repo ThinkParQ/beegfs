@@ -1,5 +1,4 @@
-#ifndef SYNCEDDISKACCESSPATH_H_
-#define SYNCEDDISKACCESSPATH_H_
+#pragma once
 
 #include <common/storage/Path.h>
 #include <common/system/System.h>
@@ -132,4 +131,3 @@ class SyncedDiskAccessPath : public Path
       }
 };
 
-#endif /*SYNCEDDISKACCESSPATH_H_*/

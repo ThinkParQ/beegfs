@@ -1,5 +1,4 @@
-#ifndef OFFLINEWAITTIMEOUTTK_H_
-#define OFFLINEWAITTIMEOUTTK_H_
+#pragma once
 
 /**
  * Calculates the offline wait timeout from config variables. It consists of:
@@ -40,4 +39,3 @@ public:
    }
 };
 
-#endif /* OFFLINEWAITTIMEOUTTK_H_ */

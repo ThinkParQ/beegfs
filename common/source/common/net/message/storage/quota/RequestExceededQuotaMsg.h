@@ -1,5 +1,4 @@
-#ifndef REQUESTEXCEEDEDQUOTAMSG_H_
-#define REQUESTEXCEEDEDQUOTAMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -71,4 +70,3 @@ class RequestExceededQuotaMsg: public NetMessageSerdes<RequestExceededQuotaMsg>
       }
 };
 
-#endif /* REQUESTEXCEEDEDQUOTAMSG_H_ */

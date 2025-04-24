@@ -10,6 +10,7 @@
 
 #define BEEGFS_PROC_ENTRY_CONFIG              "config"
 #define BEEGFS_PROC_ENTRY_STATUS              ".status"
+#define BEEGFS_PROC_ENTRY_FSUUID              "fs_uuid"
 #define BEEGFS_PROC_ENTRY_MGMTNODES           "mgmt_nodes"
 #define BEEGFS_PROC_ENTRY_METANODES           "meta_nodes"
 #define BEEGFS_PROC_ENTRY_STORAGENODES        "storage_nodes"
@@ -75,6 +76,7 @@ static const struct fhgfs_proc_file fhgfs_proc_files[] =
 {
    { BEEGFS_PROC_ENTRY_CONFIG, &__ProcFs_readV2_config },
    { BEEGFS_PROC_ENTRY_STATUS, &__ProcFs_readV2_status },
+   { BEEGFS_PROC_ENTRY_FSUUID, &__ProcFs_readV2_fsUUID },
    { BEEGFS_PROC_ENTRY_MGMTNODES, &__ProcFs_readV2_mgmtNodes },
    { BEEGFS_PROC_ENTRY_METANODES, &__ProcFs_readV2_metaNodes },
    { BEEGFS_PROC_ENTRY_STORAGENODES, &__ProcFs_readV2_storageNodes },
@@ -169,7 +171,8 @@ void ProcFs_removeGeneralDir(void)
  */
 void ProcFs_createEntries(App* app)
 {
-   const char* sessionID = ProcFsHelper_getSessionID(app);
+   NodeString sessionID;
+   Node* localNode = App_getLocalNode(app);
 
    struct proc_dir_entry* procDir;
 
@@ -180,8 +183,8 @@ void ProcFs_createEntries(App* app)
    // create unique directory for this clientID and store app pointer as "->data"
 
    char* dirNameBuf = vmalloc(BEEGFS_PROC_NAMEBUF_LEN);
-
-   scnprintf(dirNameBuf, BEEGFS_PROC_NAMEBUF_LEN, BEEGFS_PROC_DIR_NAME "/%s", sessionID);
+   Node_copyAlias(localNode, &sessionID);
+   scnprintf(dirNameBuf, BEEGFS_PROC_NAMEBUF_LEN, BEEGFS_PROC_DIR_NAME "/%s", sessionID.buf);
 
    procDir = __ProcFs_mkDir(dirNameBuf, app);
    if(!procDir)
@@ -241,10 +244,10 @@ void ProcFs_removeEntries(App* app)
 {
    char* dirNameBuf = vmalloc(BEEGFS_PROC_NAMEBUF_LEN);
    char* entryNameBuf = vmalloc(BEEGFS_PROC_NAMEBUF_LEN);
-
-   const char* sessionID = ProcFsHelper_getSessionID(app);
-
-   scnprintf(dirNameBuf, BEEGFS_PROC_NAMEBUF_LEN, BEEGFS_PROC_DIR_NAME "/%s", sessionID);
+   Node* localNode = App_getLocalNode(app);
+   NodeString sessionID;
+   Node_copyAlias(localNode, &sessionID);
+   scnprintf(dirNameBuf, BEEGFS_PROC_NAMEBUF_LEN, BEEGFS_PROC_DIR_NAME "/%s", sessionID.buf);
 
    // remove entries
    scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
@@ -253,6 +256,10 @@ void ProcFs_removeEntries(App* app)
 
    scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
       dirNameBuf, BEEGFS_PROC_ENTRY_STATUS);
+   remove_proc_entry(entryNameBuf, NULL);
+
+   scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
+      dirNameBuf, BEEGFS_PROC_ENTRY_FSUUID);
    remove_proc_entry(entryNameBuf, NULL);
 
    scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
@@ -380,6 +387,13 @@ int __ProcFs_readV2_mgmtNodes(struct seq_file* file, void* p)
    NodeStoreEx* nodes = App_getMgmtNodes(app);
 
    return ProcFsHelper_readV2_nodes(file, app, nodes);
+}
+
+int __ProcFs_readV2_fsUUID(struct seq_file* file, void* p)
+{
+   App* app = file->private;
+
+   return ProcFsHelper_readV2_fsUUID(file, app);
 }
 
 /**

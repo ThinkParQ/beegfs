@@ -1,5 +1,4 @@
-#ifndef GETQUOTAINFORESPMSG_H_
-#define GETQUOTAINFORESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -66,4 +65,3 @@ class GetQuotaInfoRespMsg: public NetMessageSerdes<GetQuotaInfoRespMsg>
       }
 };
 
-#endif /* GETQUOTAINFORESPMSG_H_ */

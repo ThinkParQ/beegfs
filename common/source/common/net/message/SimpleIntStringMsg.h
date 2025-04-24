@@ -1,5 +1,4 @@
-#ifndef SIMPLEINTSTRINGMSG_H_
-#define SIMPLEINTSTRINGMSG_H_
+#pragma once
 
 #include "NetMessage.h"
 
@@ -46,4 +45,3 @@ class SimpleIntStringMsg : public NetMessageSerdes<SimpleIntStringMsg>
 };
 
 
-#endif /* SIMPLEINTSTRINGMSG_H_ */

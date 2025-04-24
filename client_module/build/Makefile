@@ -238,8 +238,22 @@ endif
 	find ../include -mount -name '*.h' -type f | \
 		xargs -I ’{}’ cp --parents ’{}’ $(RELEASE_PATH_CLIENT)/build
 
+# When used for development where the full BeeGFS source is available, this install target handles
+# ensuring the mount.beegfs script is installed. If the mount.script is not present in the source,
+# for example if the install target was invoked via the BeeGFS client service and AutoRebuild.mk, it
+# just checks the script already exists at /sbin/mount.beegfs since the script should have been
+# installed by the package manager. If it does not exist an error is returned as this is likely a
+# bug elsewhere related to installing the script, or somebody is trying to use this Makefile in an
+# unsupported/unexpected manner and further investigation is required.
 install:
 	install -D -m 644 $(TARGET).ko $(KMOD_INST_DIR)/$(TARGET).ko
+	@if [ -f dist/sbin/mount.beegfs ]; then \
+		install -D -m 755 dist/sbin/mount.beegfs /sbin/mount.beegfs; \
+		echo "Info: Installed mount script at /sbin/mount.beegfs."; \
+	elif [ ! -f /sbin/mount.beegfs ]; then \
+		echo "Error: mount.beegfs does not already exist at /sbin/mount.beegfs (this is likely a bug elsewhere)."; \
+		exit 1; \
+	fi
 	depmod -a $(KRELEASE)
 
 clean:

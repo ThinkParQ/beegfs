@@ -1,5 +1,4 @@
-#ifndef STATSTORAGEPATHMSG_H_
-#define STATSTORAGEPATHMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleUInt16Msg.h>
 
@@ -38,4 +37,3 @@ class StatStoragePathMsg : public SimpleUInt16Msg
 
 };
 
-#endif /*STATSTORAGEPATHMSG_H_*/

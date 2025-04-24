@@ -105,7 +105,6 @@ static inline bool __NodeConnPool_getWasLastTimeCompleteFail(NodeConnPool* this)
 struct NodeConnPoolStats
 {
    unsigned numEstablishedStd;
-   unsigned numEstablishedSDP;
    unsigned numEstablishedRDMA;
 };
 
@@ -148,7 +147,7 @@ struct NodeConnPool
    NodeConnPoolStats stats;
    NodeConnPoolErrorState errState;
 
-   bool logConnErrors; // false to disable logging during acquireStream() (e.g. for helperd)
+   bool logConnErrors; // false to disable logging during acquireStream()
    bool enableTCPFallback;
 
    Mutex mutex;

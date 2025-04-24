@@ -1,5 +1,4 @@
-#ifndef NAMEDEXCEPTION_H_
-#define NAMEDEXCEPTION_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -66,4 +65,3 @@ class NamedException : public std::exception
 
 };
 
-#endif /*NAMEDEXCEPTION_H_*/

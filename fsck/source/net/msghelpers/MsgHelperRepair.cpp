@@ -334,7 +334,7 @@ void MsgHelperRepair::deleteChunks(Node& node, FsckChunkList* chunks, FsckChunkL
    {
       *failedDeletes = *chunks;
 
-      LogContext(logContext).logErr("Communication error occured with node: " + node.getID());
+      LogContext(logContext).logErr("Communication error occured with node: " + node.getAlias());
    }
 }
 
@@ -457,7 +457,7 @@ void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lost
       *failedInodes = *dirInodes;
 
       LogContext(logContext).logErr("Communication error occured with node: " +
-         lostAndFoundNode.getID());
+         lostAndFoundNode.getAlias());
    }
 
    if (! failedInodes->empty())
@@ -501,7 +501,7 @@ void MsgHelperRepair::linkToLostAndFound(Node& lostAndFoundNode, EntryInfo* lost
       *failedInodes = *fileInodes;
 
       LogContext(logContext).logErr("Communication error occured with node: " +
-         lostAndFoundNode.getID());
+         lostAndFoundNode.getAlias());
    }
 
    if (! failedInodes->empty())
@@ -778,7 +778,7 @@ void MsgHelperRepair::fixChunkPermissions(Node& node, FsckChunkList& chunkList,
       }
       else
       {
-         LogContext(logContext).logErr("Communication error occured with node: " + node.getID());
+         LogContext(logContext).logErr("Communication error occured with node: " + node.getAlias());
 
          failedChunks.push_back(*chunksIter);
       }
@@ -822,7 +822,7 @@ bool MsgHelperRepair::moveChunk(Node& node, FsckChunk& chunk, const std::string&
    }
    else
    {
-      LogContext(logContext).logErr("Communication error occured with node: " + node.getID());
+      LogContext(logContext).logErr("Communication error occured with node: " + node.getAlias());
       result = false;
    }
 

@@ -238,7 +238,7 @@ std::string MsgHelperGenericDebug::printNodeStoreConns(const NodeStoreServers* n
 
    for (const auto& node : nodes->referenceAllNodes())
    {
-      returnStream << node->getID() << " [ID: " << node->getNumID() << "]" << std::endl;
+      returnStream << node->getAlias() << " [ID: " << node->getNumID() << "]" << std::endl;
 
       returnStream << printNodeConns(*node);
    }
@@ -266,7 +266,6 @@ std::string MsgHelperGenericDebug::printNodeConns(Node& node)
    connPool->getStats(&poolStats);
 
    if(!(poolStats.numEstablishedStd +
-        poolStats.numEstablishedSDP +
         poolStats.numEstablishedRDMA) )
       returnStream << "<none>";
    else
@@ -279,17 +278,6 @@ std::string MsgHelperGenericDebug::printNodeConns(Node& node)
             &isNonPrimaryConn);
 
          returnStream << "TCP: " << poolStats.numEstablishedStd << " (" << peerName <<
-            (isNonPrimaryConn ? nonPrimaryTag : "") << "); ";
-      }
-
-      if(poolStats.numEstablishedSDP)
-      {
-         std::string peerName;
-
-         connPool->getFirstPeerName(NICADDRTYPE_SDP, &peerName,
-            &isNonPrimaryConn);
-
-         returnStream << "SDP: " << poolStats.numEstablishedSDP << " (" << peerName <<
             (isNonPrimaryConn ? nonPrimaryTag : "") << "); ";
       }
 

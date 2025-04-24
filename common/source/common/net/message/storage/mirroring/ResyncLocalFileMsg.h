@@ -1,5 +1,4 @@
-#ifndef RESYNCLOCALFILEMSG_H_
-#define RESYNCLOCALFILEMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/PathInfo.h>
@@ -12,6 +11,13 @@
 #define RESYNCLOCALFILEMSG_FLAG_TRUNC      4 /* truncate after write; cannot be used together with
                                                 RESYNCLOCALFILEMSG_FLAG_NODATA */
 #define RESYNCLOCALFILEMSG_CHECK_SPARSE    8 /* check if incoming data has sparse areas */
+
+#define RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR     16 /*check if incoming data should be synced to buddy mirror directory*/
+
+#define RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND  32 /*check if data should be written to secondary*/
+
+#define RESYNCLOCALFILEMSG_FLAG_CHUNKBALANCE_BUDDYMIRROR  64 /*check if data should be written to both primary and secondary*/
+
 
 #define RESYNCER_SPARSE_BLOCK_SIZE 4096 //4K
 
@@ -70,7 +76,8 @@ class ResyncLocalFileMsg : public NetMessageSerdes<ResyncLocalFileMsg>
       unsigned getSupportedHeaderFeatureFlagsMask() const
       {
          return RESYNCLOCALFILEMSG_FLAG_SETATTRIBS | RESYNCLOCALFILEMSG_FLAG_NODATA |
-            RESYNCLOCALFILEMSG_FLAG_TRUNC | RESYNCLOCALFILEMSG_CHECK_SPARSE;
+            RESYNCLOCALFILEMSG_FLAG_TRUNC | RESYNCLOCALFILEMSG_CHECK_SPARSE | RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR | RESYNCLOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND | 
+            RESYNCLOCALFILEMSG_FLAG_CHUNKBALANCE_BUDDYMIRROR;
       }
 
    private:
@@ -127,4 +134,3 @@ class ResyncLocalFileMsg : public NetMessageSerdes<ResyncLocalFileMsg>
       }
 };
 
-#endif /*RESYNCLOCALFILEMSG_H_*/

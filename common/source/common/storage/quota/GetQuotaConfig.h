@@ -1,5 +1,4 @@
-#ifndef GETQUOTACONFIG_H_
-#define GETQUOTACONFIG_H_
+#pragma once
 
 #include "QuotaConfig.h"
 
@@ -21,4 +20,3 @@ struct GetQuotaInfoConfig : public QuotaConfig
 };
 
 
-#endif /* GETQUOTACONFIG_H_ */

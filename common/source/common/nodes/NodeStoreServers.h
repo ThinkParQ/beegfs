@@ -1,5 +1,4 @@
-#ifndef NODESTORESERVERS_H_
-#define NODESTORESERVERS_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/threading/Mutex.h>
@@ -86,4 +85,3 @@ class NodeStoreServers : public AbstractNodeStore
       }
 };
 
-#endif /*NODESTORESERVERS_H_*/

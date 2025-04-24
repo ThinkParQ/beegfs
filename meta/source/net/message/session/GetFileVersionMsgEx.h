@@ -1,5 +1,4 @@
-#ifndef GETFILEVERSIONMSGEX_H
-#define GETFILEVERSIONMSGEX_H
+#pragma once
 
 #include <common/net/message/session/GetFileVersionMsg.h>
 #include <common/net/message/session/GetFileVersionRespMsg.h>
@@ -36,7 +35,7 @@ class GetFileVersionMsgResponseState : public MirroredMessageResponseState
       }
 
       void setGetFileVersionResult(FhgfsOpsErr result) { this->result = result; }
-      void setFileVersion(uint64_t version) { this->version = version; }
+      void setFileVersion(uint32_t version) { this->version = version; }
 
    protected:
       uint32_t serializerTag() const override { return NETMSGTYPE_GetFileVersion; }
@@ -44,7 +43,7 @@ class GetFileVersionMsgResponseState : public MirroredMessageResponseState
 
    private:
       FhgfsOpsErr result;
-      uint64_t version;
+      uint32_t version;
 };
 
 class GetFileVersionMsgEx : public MirroredMessage<GetFileVersionMsg, FileIDLock>
@@ -73,4 +72,3 @@ class GetFileVersionMsgEx : public MirroredMessage<GetFileVersionMsg, FileIDLock
       const char* mirrorLogContext() const override { return "GetFileVersionMsgEx/forward"; }
 };
 
-#endif /* GETFILEVERSIONMSGEX_H */

@@ -1,5 +1,4 @@
-#ifndef SOCKETTK_H_
-#define SOCKETTK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <nu/error_or.hpp>
@@ -26,4 +25,3 @@ class SocketTk
          bool fullyQualified);
 };
 
-#endif /*SOCKETTK_H_*/

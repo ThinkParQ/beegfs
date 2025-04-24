@@ -1,5 +1,4 @@
-#ifndef TARGETSTATESTORE_H_
-#define TARGETSTATESTORE_H_
+#pragma once
 
 #include <common/nodes/MirrorBuddyGroup.h>
 #include <common/nodes/Node.h>
@@ -129,4 +128,3 @@ class TargetStateStore
       }
 };
 
-#endif /* TARGETSTATESTORE_H_ */

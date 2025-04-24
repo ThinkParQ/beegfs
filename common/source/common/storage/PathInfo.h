@@ -1,11 +1,4 @@
-/*
- * class PathInfo - required information to find an inode or chunk files
- *
- * NOTE: If you change this file, do not forget to adjust the client side PathInfo.h
- */
-
-#ifndef PATHINFO_H_
-#define PATHINFO_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -14,17 +7,19 @@
                                            and origParentEntryID, i.e. 2014.01 style layout */
 #define PATHINFO_FEATURE_ORIG_UNKNOWN 2 /* indicates _FEATURE_ORIG is unknown and needs to be
                                            requested from the meta-inode */
+#define PATHINFO_FEATURE_IS_STUB      4 /* Indicates a stub file, just a placeholder without actual
+                                           data being present within BeeGFS filesystem */
 
 class PathInfo; // forward declaration
-
 
 typedef std::list<PathInfo> PathInfoList;
 typedef PathInfoList::iterator PathInfoListIter;
 typedef PathInfoList::const_iterator PathInfoListConstIter;
 
-
 /**
- * Information about a file/directory
+ * class PathInfo - Represents information about a file required to locate its inode or chunk
+ * files. It also includes flags for various features such as original parent information and
+ * stub file tracking.
  */
 class PathInfo
 {
@@ -105,6 +100,11 @@ class PathInfo
          return this->flags & PATHINFO_FEATURE_ORIG ? true : false;
       }
 
+      bool isStub() const
+      {
+         return this->flags & PATHINFO_FEATURE_IS_STUB ? true : false;
+      }
+
       bool operator==(const PathInfo& other) const
       {
          // consider this to be equal if ALL static parameters are equal
@@ -139,4 +139,3 @@ class PathInfo
       }
 };
 
-#endif /* PATHINFO_H_ */

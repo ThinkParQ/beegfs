@@ -1,5 +1,4 @@
-#ifndef GETMIRRORBUDDYGROUPSMSG_H
-#define GETMIRRORBUDDYGROUPSMSG_H
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleIntMsg.h>
@@ -37,4 +36,3 @@ class GetMirrorBuddyGroupsMsg : public SimpleIntMsg
 };
 
 
-#endif /* GETMIRRORBUDDYGROUPSMSG_H */

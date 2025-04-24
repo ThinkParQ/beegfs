@@ -1,5 +1,4 @@
-#ifndef TIMETK_H
-#define TIMETK_H 
+#pragma once
 
 #include <chrono>
 #include <string>
@@ -98,4 +97,3 @@ print_nice_time_t<Duration> print_nice_time (Duration const& duration) {
 }
 
 } // namespace TimeTk
-#endif /* TIMETK_H */

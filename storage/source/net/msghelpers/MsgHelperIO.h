@@ -1,5 +1,4 @@
-#ifndef MSGHELPERIO_H_
-#define MSGHELPERIO_H_
+#pragma once
 
 #include <app/config/Config.h>
 #include <app/App.h>
@@ -192,4 +191,3 @@ class MsgHelperIO
       }
 };
 
-#endif /* MSGHELPERIO_H_ */

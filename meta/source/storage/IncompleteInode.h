@@ -1,5 +1,4 @@
-#ifndef META_INCOMPLETEINODE_H
-#define META_INCOMPLETEINODE_H
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 
@@ -41,7 +40,7 @@ class IncompleteInode
 
       FhgfsOpsErr setXattr(const char* name, const void* value, size_t size);
 
-      FhgfsOpsErr setContent(const void* value, size_t size);
+      FhgfsOpsErr setContent(const char* name, const void* value, size_t size);
 
       FhgfsOpsErr clearUnsetXAttrs();
 
@@ -53,4 +52,3 @@ class IncompleteInode
       std::string fileName() const;
 };
 
-#endif

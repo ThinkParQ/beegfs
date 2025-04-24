@@ -1,5 +1,4 @@
-#ifndef RECREATEFSIDSMSGEX_H
-#define RECREATEFSIDSMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/RecreateFsIDsMsg.h>
@@ -11,4 +10,3 @@ class RecreateFsIDsMsgEx : public RecreateFsIDsMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*RECREATEFSIDSMSGEX_H*/

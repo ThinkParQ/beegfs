@@ -1,5 +1,4 @@
-#ifndef REFRESHSESSIONRESPMSG_H_
-#define REFRESHSESSIONRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class RefreshSessionRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /* REFRESHSESSIONRESPMSG_H_ */

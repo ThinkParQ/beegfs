@@ -1,5 +1,4 @@
-#ifndef FSCKSETEVENTLOGGINGMSG_H
-#define FSCKSETEVENTLOGGINGMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/toolkit/ListTk.h>
@@ -43,9 +42,8 @@ class FsckSetEventLoggingMsg: public NetMessageSerdes<FsckSetEventLoggingMsg>
          ctx
             % obj->enableLogging
             % obj->portUDP
-            % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
+            % serdesNicAddressList(obj->nicList, obj->parsed.nicList)
             % obj->forceRestart;
       }
 };
 
-#endif /*FSCKSETEVENTLOGGINGMSG_H*/

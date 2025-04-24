@@ -1,5 +1,4 @@
-#ifndef COMMON_TEMPFILETK_H_
-#define COMMON_TEMPFILETK_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 
@@ -12,4 +11,3 @@ FhgfsOpsErr storeTmpAndMove(const std::string& filename, const std::string& cont
 
 };
 
-#endif /* COMMON_TEMPFILETK_H_ */

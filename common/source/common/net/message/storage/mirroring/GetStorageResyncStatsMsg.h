@@ -1,5 +1,4 @@
-#ifndef GETSTORAGERESYNCSTATSMSG_H
-#define GETSTORAGERESYNCSTATSMSG_H
+#pragma once
 
 #include <common/net/message/SimpleUInt16Msg.h>
 
@@ -22,4 +21,3 @@ class GetStorageResyncStatsMsg : public SimpleUInt16Msg
       }
 };
 
-#endif /*GETSTORAGERESYNCSTATSMSG_H*/

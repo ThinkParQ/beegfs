@@ -1,5 +1,4 @@
-#ifndef SETSTORAGETARGETINFORESPMSG_H_
-#define SETSTORAGETARGETINFORESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleIntMsg.h>
@@ -22,4 +21,3 @@ class SetStorageTargetInfoRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*SETSTORAGETARGETINFORESPMSG_H_*/

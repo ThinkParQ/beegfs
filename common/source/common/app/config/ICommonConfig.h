@@ -1,5 +1,4 @@
-#ifndef ICOMMONCONFIG_H_
-#define ICOMMONCONFIG_H_
+#pragma once
 
 #include <common/Common.h>
 #include "InvalidConfigException.h"
@@ -22,15 +21,11 @@ class ICommonConfig
       unsigned    logNumRotatedFiles;
 
       int         connPortShift; // shifts all UDP and TCP ports
-      int         connClientPortUDP;
-      int         connStoragePortUDP;
-      int         connMetaPortUDP;
-      int         connMonPortUDP;
-      int         connMgmtdPortUDP;
-      int         connStoragePortTCP;
-      int         connMetaPortTCP;
-      int         connHelperdPortTCP;
-      int         connMgmtdPortTCP;
+      int         connClientPort;
+      int         connStoragePort;
+      int         connMetaPort;
+      int         connMonPort;
+      int         connMgmtdPort;
       bool        connUseRDMA;
       unsigned    connBacklogTCP;
       unsigned    connMaxInternodeNum;
@@ -98,49 +93,29 @@ class ICommonConfig
          return logNumRotatedFiles;
       }
 
-      int getConnClientPortUDP() const
+      int getConnClientPort() const
       {
-         return connClientPortUDP ? (connClientPortUDP + connPortShift) : 0;
+         return connClientPort ? (connClientPort + connPortShift) : 0;
       }
 
-      int getConnStoragePortUDP() const
+      int getConnStoragePort() const
       {
-         return connStoragePortUDP ? (connStoragePortUDP + connPortShift) : 0;
+         return connStoragePort ? (connStoragePort + connPortShift) : 0;
       }
 
-      int getConnMetaPortUDP() const
+      int getConnMetaPort() const
       {
-         return connMetaPortUDP ? (connMetaPortUDP + connPortShift) : 0;
+         return connMetaPort ? (connMetaPort + connPortShift) : 0;
       }
 
-      int getConnMonPortUDP() const
+      int getConnMonPort() const
       {
-         return connMonPortUDP ? (connMonPortUDP + connPortShift) : 0;
+         return connMonPort ? (connMonPort + connPortShift) : 0;
       }
 
-      int getConnMgmtdPortUDP() const
+      int getConnMgmtdPort() const
       {
-         return connMgmtdPortUDP ? (connMgmtdPortUDP + connPortShift) : 0;
-      }
-
-      int getConnStoragePortTCP() const
-      {
-         return connStoragePortTCP ? (connStoragePortTCP + connPortShift) : 0;
-      }
-
-      int getConnMetaPortTCP() const
-      {
-         return connMetaPortTCP ? (connMetaPortTCP + connPortShift) : 0;
-      }
-
-      int getConnHelperdPortTCP() const
-      {
-         return connHelperdPortTCP ? (connHelperdPortTCP + connPortShift) : 0;
-      }
-
-      int getConnMgmtdPortTCP() const
-      {
-         return connMgmtdPortTCP ? (connMgmtdPortTCP + connPortShift) : 0;
+         return connMgmtdPort ? (connMgmtdPort + connPortShift) : 0;
       }
 
       bool getConnUseRDMA() const
@@ -270,4 +245,3 @@ class ICommonConfig
       }
 };
 
-#endif /*ICOMMONCONFIG_H_*/

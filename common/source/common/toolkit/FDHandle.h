@@ -1,5 +1,4 @@
-#ifndef FDHANDLE_H
-#define FDHANDLE_H
+#pragma once
 
 #include <algorithm>
 #include <errno.h>
@@ -7,53 +6,67 @@
 
 class FDHandle
 {
+   private:
+      int m_fd = -1;
+
    public:
-      FDHandle(): fd(-1) {}
-
-      explicit FDHandle(int fd): fd(fd) {}
-
-      ~FDHandle()
+      int close()
       {
-         if (fd >= 0)
-            ::close(fd);
+         if (! valid())
+            return 0;
+
+         int r = ::close(m_fd);
+         m_fd = -1;
+         return r;
+      }
+
+      int get() const
+      {
+         return m_fd;
+      }
+
+      void reset(int fd)
+      {
+         close();
+         m_fd = fd;
+      }
+
+      bool valid() const
+      {
+         return m_fd >= 0;
+      }
+
+      // so weird... can we get rid of this?
+      int operator*() const
+      {
+         return m_fd;
+      }
+
+      FDHandle& operator=(const FDHandle&) = delete;
+
+      void operator=(FDHandle&& other)
+      {
+         close();
+         std::swap(m_fd, other.m_fd);
+      }
+
+      FDHandle()
+      {}
+
+      explicit FDHandle(int fd)
+      {
+         reset(fd);
       }
 
       FDHandle(const FDHandle&) = delete;
-      FDHandle& operator=(const FDHandle&) = delete;
 
-      FDHandle(FDHandle&& other): fd(-1)
+      FDHandle(FDHandle&& other)
       {
-         swap(other);
+         std::swap(m_fd, other.m_fd);
       }
 
-      FDHandle& operator=(FDHandle&& other)
+      ~FDHandle()
       {
-         FDHandle(std::move(other)).swap(*this);
-         return *this;
+         close();
       }
-
-      void swap(FDHandle& other)
-      {
-         std::swap(fd, other.fd);
-      }
-
-      int get() const { return fd; }
-      int operator*() const { return fd; }
-      bool valid() const { return fd >= 0; }
-
-      int close()
-      {
-         if (fd < 0)
-            return 0;
-
-         const int result = ::close(fd);
-         fd = -1;
-
-         return result < 0 ? errno : 0;
-      }
-
-   private:
-      int fd;
 };
-
-#endif

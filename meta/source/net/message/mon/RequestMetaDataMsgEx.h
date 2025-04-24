@@ -1,5 +1,4 @@
-#ifndef REQUESTMETADATAMSGEX_H_
-#define REQUESTMETADATAMSGEX_H_
+#pragma once
 
 #include <app/App.h>
 #include <common/app/log/LogContext.h>
@@ -12,4 +11,3 @@ class RequestMetaDataMsgEx : public RequestMetaDataMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*REQUESTMETADATAMSGEX_H_*/

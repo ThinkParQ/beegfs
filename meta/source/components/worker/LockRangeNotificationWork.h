@@ -1,5 +1,4 @@
-#ifndef LOCKRANGENOTIFICATIONWORK_H_
-#define LOCKRANGENOTIFICATIONWORK_H_
+#pragma once
 
 
 #include <common/components/worker/Work.h>
@@ -48,4 +47,3 @@ class LockRangeNotificationWork : public Work
 };
 
 
-#endif /* LOCKRANGENOTIFICATIONWORK_H_ */

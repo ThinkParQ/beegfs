@@ -1,5 +1,4 @@
-#ifndef STATSTORAGEPATHMSGEX_H_
-#define STATSTORAGEPATHMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/StatStoragePathMsg.h>
@@ -17,4 +16,3 @@ class StatStoragePathMsgEx : public StatStoragePathMsg
 };
 
 
-#endif /*STATSTORAGEPATHMSGEX_H_*/

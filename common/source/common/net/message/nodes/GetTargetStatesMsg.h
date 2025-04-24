@@ -1,5 +1,4 @@
-#ifndef GETTARGETSTATESMSG_H
-#define GETTARGETSTATESMSG_H
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/Common.h>
@@ -36,4 +35,3 @@ class GetTargetStatesMsg : public SimpleIntMsg
 };
 
 
-#endif /* GETTARGETSTATESMSG_H */

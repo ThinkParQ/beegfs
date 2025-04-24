@@ -1,5 +1,4 @@
-#ifndef SETXATTRRESPMSG_H_
-#define SETXATTRRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -11,4 +10,3 @@ class SetXAttrRespMsg : public SimpleIntMsg
       SetXAttrRespMsg() : SimpleIntMsg(NETMSGTYPE_SetXAttrResp) {}
 };
 
-#endif /*SETXATTRRESPMSG_H_*/

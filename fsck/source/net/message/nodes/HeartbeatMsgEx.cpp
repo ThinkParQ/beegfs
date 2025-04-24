@@ -62,12 +62,10 @@ bool HeartbeatMsgEx::processIncoming(ResponseContext& ctx)
    isNodeNew = (nodes->addOrUpdateNode(std::move(node)) == NodeStoreResult::Added);
    if(isNodeNew)
    {
-      bool supportsSDP = NetworkInterfaceCard::supportsSDP(&nicList);
       bool supportsRDMA = NetworkInterfaceCard::supportsRDMA(&nicList);
 
       log.log(Log_WARNING, std::string("New node: ") +
          nodeIDWithTypeStr + "; " +
-         std::string(supportsSDP ? "SDP; " : "") +
          std::string(supportsRDMA ? "RDMA; " : "") +
          std::string("Source: ") + ctx.peerName() );
 

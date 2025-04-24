@@ -1,5 +1,4 @@
-#ifndef STORAGETARGETINFO_H_
-#define STORAGETARGETINFO_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/nodes/Node.h>
@@ -138,4 +137,3 @@ typedef std::list<StorageTargetInfo> StorageTargetInfoList;
 typedef StorageTargetInfoList::iterator StorageTargetInfoListIter;
 typedef StorageTargetInfoList::const_iterator StorageTargetInfoListCIter;
 
-#endif /* STORAGETARGETINFO_H_ */

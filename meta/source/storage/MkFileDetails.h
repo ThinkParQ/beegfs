@@ -3,8 +3,7 @@
  *
  */
 
-#ifndef MKFILEDETAILS_H_
-#define MKFILEDETAILS_H_
+#pragma once
 
 struct MkFileDetails
 {
@@ -29,4 +28,3 @@ struct MkFileDetails
 };
 
 
-#endif /* MKFILEDETAILS_H_ */

@@ -1,5 +1,4 @@
-#ifndef ABSTRACTAPP_H_
-#define ABSTRACTAPP_H_
+#pragma once
 
 #include <common/app/log/Logger.h>
 #include <common/app/config/ICommonConfig.h>
@@ -85,8 +84,6 @@ class AbstractApp : public PThread
 
       bool initNoDefaultRouteList(NetVector* outNets);
 
-      void logEULAMsg(std::string);
-
    private:
       static bool basicInitializations();
       bool basicDestructions();
@@ -132,4 +129,3 @@ class AbstractApp : public PThread
 
 };
 
-#endif /*ABSTRACTAPP_H_*/

@@ -1,5 +1,4 @@
-#ifndef CREATEEMPTYCONTDIRSRESPMSG_H
-#define CREATEEMPTYCONTDIRSRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -38,4 +37,3 @@ class CreateEmptyContDirsRespMsg : public NetMessageSerdes<CreateEmptyContDirsRe
       }
 };
 
-#endif /* CREATEEMPTYCONTDIRSRESPMSG_H */

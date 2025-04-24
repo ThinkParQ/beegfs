@@ -1,5 +1,4 @@
-#ifndef TRUNCLOCALFILERESPMSG_H_
-#define TRUNCLOCALFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -81,4 +80,3 @@ class TruncLocalFileRespMsg : public NetMessageSerdes<TruncLocalFileRespMsg>
 };
 
 
-#endif /*TRUNCLOCALFILERESPMSG_H_*/

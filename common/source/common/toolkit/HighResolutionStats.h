@@ -1,5 +1,4 @@
-#ifndef HIGHRESOLUTIONSTATS_H_
-#define HIGHRESOLUTIONSTATS_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -103,4 +102,3 @@ class HighResolutionStatsTk
       }
 };
 
-#endif /*HIGHRESOLUTIONSTATS_H_*/

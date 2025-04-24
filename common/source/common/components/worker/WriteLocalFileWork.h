@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILEWORK_H_
-#define WRITELOCALFILEWORK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/sock/Socket.h>
@@ -75,4 +74,3 @@ class WriteLocalFileWork : public Work
 
 };
 
-#endif /*WRITELOCALFILEWORK_H_*/

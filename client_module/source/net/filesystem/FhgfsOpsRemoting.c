@@ -738,7 +738,7 @@ cleanup_request:
  *        pattern will be set if it is NULL; values have to be freed by the caller
  */
 FhgfsOpsErr FhgfsOpsRemoting_openfile(const EntryInfo* entryInfo, RemotingIOInfo* ioInfo,
-   uint64_t* outVersion, const struct FileEvent* event)
+   uint32_t* outVersion, const struct FileEvent* event)
 {
    App* app = ioInfo->app;
    Logger* log = App_getLogger(app);
@@ -801,7 +801,6 @@ FhgfsOpsErr FhgfsOpsRemoting_openfile(const EntryInfo* entryInfo, RemotingIOInfo
       if(!ioInfo->pattern)
       { // inode doesn't have pattern yet => create it from response
          StripePattern* pattern = OpenFileRespMsg_createPattern(openResp);
-
          // check stripe pattern validity
          if(unlikely(StripePattern_getPatternType(pattern) == STRIPEPATTERN_Invalid) )
          { // invalid pattern
@@ -1106,14 +1105,13 @@ FhgfsOpsErr FhgfsOpsRemoting_flockAppendEx(const EntryInfo* entryInfo, RWLock* e
    Logger* log = App_getLogger(app);
    AtomicInt* atomicCounter = App_getLockAckAtomicCounter(app);
    const NumNodeID localNodeNumID = Node_getNumID(App_getLocalNode(app) );
-   const char* localNodeID = Node_getID(App_getLocalNode(app) );
    char* lockAckID;
-
    FLockAppendMsg requestMsg;
    FhgfsOpsErr lockRes;
-
+   NodeString alias;
+   Node_copyAlias(App_getLocalNode(app), &alias);
    // (note: lockAckID must be _globally_ unique)
-   lockAckID = StringTk_kasprintf("%X-%s-alck", AtomicInt_incAndRead(atomicCounter), localNodeID);
+   lockAckID = StringTk_kasprintf("%X-%s-alck", AtomicInt_incAndRead(atomicCounter), alias.buf);
    if(unlikely(!lockAckID) )
    { // out of mem
       Logger_logErrFormatted(log, logContext, "Unable to proceed - out of memory");
@@ -1150,14 +1148,15 @@ FhgfsOpsErr FhgfsOpsRemoting_flockEntryEx(const EntryInfo* entryInfo, RWLock* ei
    Logger* log = App_getLogger(app);
    AtomicInt* atomicCounter = App_getLockAckAtomicCounter(app);
    const NumNodeID localNodeNumID = Node_getNumID(App_getLocalNode(app) );
-   const char* localNodeID = Node_getID(App_getLocalNode(app) );
    char* lockAckID;
 
    FLockEntryMsg requestMsg;
    FhgfsOpsErr lockRes;
+   NodeString alias;
+   Node_copyAlias(App_getLocalNode(app), &alias);
 
    // (note: lockAckID must be _globally_ unique)
-   lockAckID = StringTk_kasprintf("%X-%s-elck", AtomicInt_incAndRead(atomicCounter), localNodeID);
+   lockAckID = StringTk_kasprintf("%X-%s-elck", AtomicInt_incAndRead(atomicCounter), alias.buf);
    if(unlikely(!lockAckID) )
    { // out of mem
       Logger_logErrFormatted(log, logContext, "Unable to proceed - out of memory");
@@ -1195,14 +1194,15 @@ FhgfsOpsErr FhgfsOpsRemoting_flockRangeEx(const EntryInfo* entryInfo, RWLock* ei
    Logger* log = App_getLogger(app);
    AtomicInt* atomicCounter = App_getLockAckAtomicCounter(app);
    const NumNodeID localNodeNumID = Node_getNumID(App_getLocalNode(app) );
-   const char* localNodeID = Node_getID(App_getLocalNode(app) );
    char* lockAckID;
 
    FLockRangeMsg requestMsg;
    FhgfsOpsErr lockRes;
+   NodeString alias;
+   Node_copyAlias(App_getLocalNode(app), &alias);
 
    // (note: lockAckID must be _globally_ unique)
-   lockAckID = StringTk_kasprintf("%X-%s-rlck", AtomicInt_incAndRead(atomicCounter), localNodeID);
+   lockAckID = StringTk_kasprintf("%X-%s-rlck", AtomicInt_incAndRead(atomicCounter), alias.buf);
    if(unlikely(!lockAckID) )
    { // out of mem
       Logger_logErrFormatted(log, logContext, "Unable to proceed - out of memory");
@@ -1388,7 +1388,7 @@ ssize_t FhgfsOpsRemoting_writefileVec(struct iov_iter* iter, loff_t offset,
          // prepare for next loop
          {
             size_t count = iov_iter_count(&chunkIter);
-            currentOffset += count; 
+            currentOffset += count;
             toBeWritten -= count;
             expectedWritten += count;
             numWorks++;
@@ -2282,7 +2282,7 @@ FhgfsOpsErr FhgfsOpsRemoting_lookupIntent(App* app,
    if (inInfo->entryInfoPtr)
    {  // EntryInfo already available, so a revalidate intent (lookup-by-id/entryInfo)
       LookupIntentMsg_initFromEntryInfo(&requestMsg, inInfo->parentEntryInfo, inInfo->entryName,
-         inInfo->entryInfoPtr);
+         inInfo->entryInfoPtr, inInfo->metaVersion);
    }
    else
    {  // no EntryInfo available, we need to lookup-by-name
@@ -2566,7 +2566,7 @@ cleanup_request:
 }
 
 FhgfsOpsErr FhgfsOpsRemoting_getFileVersion(App* app, const EntryInfo* entryInfo,
-   uint64_t* outVersion)
+   uint32_t* outVersion)
 {
    struct GetFileVersionMsg requestMsg;
    RequestResponseNode rrNode = {

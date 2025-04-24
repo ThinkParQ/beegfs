@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILERESPMSG_H_
-#define WRITELOCALFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleInt64Msg.h>
 
@@ -17,4 +16,3 @@ class WriteLocalFileRespMsg : public SimpleInt64Msg
       }
 };
 
-#endif /*WRITELOCALFILERESPMSG_H_*/

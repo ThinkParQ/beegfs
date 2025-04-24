@@ -1,5 +1,4 @@
-#ifndef MKLOCALDIRRESPMSG_H_
-#define MKLOCALDIRRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -30,4 +29,3 @@ class MkLocalDirRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*MKLOCALDIRRESPMSG_H_*/

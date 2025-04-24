@@ -1,5 +1,4 @@
-#ifndef SIMPLEMSG_H_
-#define SIMPLEMSG_H_
+#pragma once
 
 #include "NetMessage.h"
 
@@ -28,4 +27,3 @@ class SimpleMsg : public NetMessage
 };
 
 
-#endif /*SIMPLEMSG_H_*/

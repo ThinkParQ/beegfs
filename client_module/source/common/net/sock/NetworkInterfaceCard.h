@@ -14,13 +14,11 @@ extern void NIC_findAll(StrCpyList* allowedInterfaces, bool useRDMA, bool onlyRD
 extern const char* NIC_nicTypeToString(NicAddrType_t nicType);
 extern char* NIC_nicAddrToString(NicAddress* nicAddr);
 
-extern bool NIC_supportsSDP(NicAddressList* nicList);
 extern bool NIC_supportsRDMA(NicAddressList* nicList);
 extern void NIC_supportedCapabilities(NicAddressList* nicList,
    NicListCapabilities* outCapabilities);
 
 extern void __NIC_findAllTCP(StrCpyList* allowedInterfaces, NicAddressList* outList);
-extern bool __NIC_checkSDPAvailable(void);
 extern void __NIC_filterInterfacesForRDMA(NicAddressList* list, NicAddressList* outList);
 
 

@@ -1,5 +1,4 @@
-#ifndef STORAGE_FETCHFSCKCHUNKSMSGEX_H
-#define STORAGE_FETCHFSCKCHUNKSMSGEX_H
+#pragma once
 
 #include <common/net/message/fsck/FetchFsckChunkListMsg.h>
 #include <common/net/message/fsck/FetchFsckChunkListRespMsg.h>
@@ -10,4 +9,3 @@ class FetchFsckChunkListMsgEx : public FetchFsckChunkListMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /* STORAGE_FETCHFSCKCHUNKSMSGEX_H */

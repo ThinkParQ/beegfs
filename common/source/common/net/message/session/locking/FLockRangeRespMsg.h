@@ -1,5 +1,4 @@
-#ifndef FLOCKRANGERESPMSG_H_
-#define FLOCKRANGERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -29,4 +28,3 @@ class FLockRangeRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /* FLOCKRANGERESPMSG_H_ */

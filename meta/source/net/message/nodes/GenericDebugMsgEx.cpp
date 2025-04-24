@@ -871,7 +871,7 @@ std::string GenericDebugMsgEx::processOpWriteInlinedFileInode(std::istringstream
    EntryInfo entryInfo(Program::getApp()->getLocalNodeNumID(), parentDirID, entryID, name,
       DirEntryType_REGULARFILE, 0);
 
-   MetaFileHandle fileInode = metaStore->referenceFile(&entryInfo);
+   auto [fileInode, referenceRes] = metaStore->referenceFile(&entryInfo);
 
    if (!fileInode)
       return "Could not reference inode";

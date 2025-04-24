@@ -1,5 +1,4 @@
-#ifndef COMMON_GETTARGETCONSISTENCYSTATERESPSMSG_H
-#define COMMON_GETTARGETCONSISTENCYSTATERESPSMSG_H
+#pragma once
 
 class GetTargetConsistencyStatesRespMsg : public NetMessageSerdes<GetTargetConsistencyStatesRespMsg>
 {
@@ -25,4 +24,3 @@ class GetTargetConsistencyStatesRespMsg : public NetMessageSerdes<GetTargetConsi
       const TargetConsistencyStateVec& getStates() const { return states; }
 };
 
-#endif /* COMMON_GETTARGETCONSISTENCYSTATERESPSMSG_H */

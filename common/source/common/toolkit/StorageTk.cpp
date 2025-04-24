@@ -8,7 +8,10 @@
 #include <common/toolkit/UnitTk.h>
 #include "StorageTk.h"
 
+#include <cstdio>
+#include <fstream>
 #include <ftw.h>
+#include <ios>
 #include <sys/file.h>
 #include <sys/vfs.h>
 #include <sys/statfs.h>
@@ -574,53 +577,32 @@ bool StorageTk::checkSessionFileExists(const std::string& pathStr)
    return pathExists(filePathStr.c_str() );
 }
 
-
 /**
- * @param pathStr path to the storage working directory (not including a filename)
- * @thow InvalidConfigException on ID mismatch (or I/O error)
+ * Writes out a deprecation notice to the old string ID and original string ID files. Rename the
+ * files to end with ".v7". Nothing is written if these files no longer exist. Errors writing to the
+ * files are ignored.
  */
-void StorageTk::checkOrCreateOrigNodeIDFile(const std::string pathStr, std::string currentNodeID)
-{
-   // make sure that nodeID hasn't changed since last time
+void StorageTk::deprecateNodeStringIDFiles(const std::string pathStr) {
+   auto deprecate = [](Path path) {
+      const std::string appendContent =
+         "\n# String IDs have been deprecated starting with BeeGFS 8."
+         "\n# This file can be safely deleted once you are sure you do not need to downgrade back to BeeGFS 7."
+         "\n# If you do need to downgrade, remove this comment and rename the file to remove the .v7 suffix.\n";
 
-   Path metaPath(pathStr);
-   Path nodeIDPath = metaPath / STORAGETK_ORIGINALNODEID_FILENAME;
+      if (StorageTk::pathExists(path.str())) {
+         const std::string newPathString = path.str() + ".v7";
+         std::rename(path.str().c_str(), newPathString.c_str());
 
-   std::string origNodeID;
-   try
-   {
-      StringList nodeIDList; // actually, the file would contain only a single line
-
-      ICommonConfig::loadStringListFile(nodeIDPath.str().c_str(), nodeIDList);
-      if(!nodeIDList.empty() )
-         origNodeID = *nodeIDList.begin();
-   }
-   catch(InvalidConfigException& e) {}
-
-   if(!origNodeID.empty() )
-   { // compare original to current
-      if(origNodeID != currentNodeID)
-      {
-         std::ostringstream outStream;
-         outStream << "NodeID has changed from '" << origNodeID << "' to '" << currentNodeID <<
-            "'. " << "Shutting down... " << "(File: " << nodeIDPath.str() << ")";
-
-         throw InvalidConfigException(outStream.str() );
+         std::ofstream o;
+         o.open(newPathString, std::ios::ios_base::app);
+         o << appendContent;
+         o.close();
       }
-   }
-   else
-   { // no origNodeID file yet => create file (based on currentNodeID)
-      const std::string fileContents = 
-            currentNodeID + "\n"
-            "# This file was auto-generated and must not be modified. If your hostname has "
-            "changed, create a\n# copy of this file under the name \"nodeID\", keep the content "
-            "unchanged and restart this service.";
-            
-      const auto writeRes = TempFileTk::storeTmpAndMove(nodeIDPath.str(), fileContents + "\n");
-      if (writeRes != FhgfsOpsErr_SUCCESS)
-         throw InvalidConfigException("Unable to create file for storage target ID "
-               + nodeIDPath.str());
-   }
+   };
+
+   Path basePath(pathStr);
+   deprecate(basePath / STORAGETK_NODEID_FILENAME);
+   deprecate(basePath / STORAGETK_ORIGINALNODEID_FILENAME);
 }
 
 /**
@@ -746,7 +728,7 @@ void StorageTk::createNumIDFile(const std::string pathStr, const std::string fil
    Path targetIDPath = storageDirPath / filename;
   //check if the file already exists, create file only if it does not exists
    auto res = readNumFromFile<uint16_t>(pathStr, filename);
-   if ( res.first == FhgfsOpsErr_PATHNOTEXISTS ) 
+   if ( res.first == FhgfsOpsErr_PATHNOTEXISTS )
    {
       const auto writeRes = TempFileTk::storeTmpAndMove(targetIDPath.str(), targetIDStr);
       if (writeRes != FhgfsOpsErr_SUCCESS)

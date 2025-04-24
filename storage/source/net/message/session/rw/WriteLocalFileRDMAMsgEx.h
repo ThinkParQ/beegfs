@@ -1,5 +1,4 @@
-#ifndef WRITELOCALFILERDMAMSGEX_H_
-#define WRITELOCALFILERDMAMSGEX_H_
+#pragma once
 
 #ifdef BEEGFS_NVFS
 #include <common/net/message/session/rw/WriteLocalFileRDMAMsg.h>
@@ -93,4 +92,3 @@ typedef WriteLocalFileMsgExBase<WriteLocalFileRDMAMsgSender,
 
 #endif /* BEEGFS_NVFS */
 
-#endif // WRITELOCALFILERDMAMSGEX_H_

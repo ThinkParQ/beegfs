@@ -1,5 +1,4 @@
-#ifndef COMMON_ADDSTORAGEPOOLRESPMSG_H_
-#define COMMON_ADDSTORAGEPOOLRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StorageErrors.h>
@@ -36,4 +35,3 @@ class AddStoragePoolRespMsg : public NetMessageSerdes<AddStoragePoolRespMsg>
       StoragePoolId poolId;
 };
 
-#endif /*COMMON_ADDSTORAGEPOOLRESPMSG_H_*/

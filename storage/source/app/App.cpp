@@ -11,6 +11,7 @@
 #include <common/nodes/LocalNode.h>
 #include <common/nodes/TargetStateInfo.h>
 #include <common/storage/striping/Raid0Pattern.h>
+#include <common/system/UUID.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/toolkit/NodesTk.h>
 #include <common/toolkit/OfflineWaitTimeoutTk.h>
@@ -24,7 +25,6 @@
 #include <csignal>
 #include <syslog.h>
 #include <sys/resource.h>
-#include <sys/sysmacros.h>
 #include <dlfcn.h>
 #include <blkid/blkid.h>
 #include <uuid/uuid.h>
@@ -192,14 +192,13 @@ void App::runNormal()
 
 
    // init basic data objects & storage
-   std::string localNodeID;
    NumNodeID localNodeNumID;
 
    preinitStorage(); // locks target dirs => call before anything else that accesses the disk
 
    initLogging();
    checkTargetsUUIDs();
-   initLocalNodeIDs(localNodeID, localNodeNumID);
+   initLocalNodeIDs(localNodeNumID);
    initDataObjects();
    initBasicNetwork();
 
@@ -241,13 +240,13 @@ void App::runNormal()
 
    if(!localNodeNumID)
    { // no local num ID yet => try to retrieve one from mgmt
-      bool preregisterNodeRes = preregisterNode(localNodeID, localNodeNumID);
+      bool preregisterNodeRes = preregisterNode(localNodeNumID);
       if(!preregisterNodeRes)
          throw InvalidConfigException("Node pre-registration at management node canceled");
    }
 
    if(!localNodeNumID) // just a sanity check that should never fail
-      throw InvalidConfigException("Failed to retrieve numeric local node ID from mgmt");
+      throw InvalidConfigException("Failed to retrieve numeric local node ID from mgmtd");
 
 
    auto preregisterTargetsRes = preregisterTargets(localNodeNumID);
@@ -260,12 +259,8 @@ void App::runNormal()
 
    // we have all local node data now => init localNode
 
-   initLocalNode(localNodeID, localNodeNumID);
+   initLocalNode(localNodeNumID);
    initLocalNodeNumIDFile(localNodeNumID);
-
-   // log system and configuration info
-
-   logInfos();
 
    bool downloadRes = registerAndDownloadMgmtInfo();
    if(!downloadRes)
@@ -274,9 +269,6 @@ void App::runNormal()
       appResult = APPCODE_INITIALIZATION_ERROR;
       return;
    }
-
-   // check and log if enterprise features are used
-   checkEnterpriseFeatureUsage();
 
    // init components
 
@@ -426,35 +418,17 @@ void App::initBasicNetwork()
 }
 
 /**
- * Load node IDs from disk or generate string ID.
+ * Loads node num ID from disk if it was set.
+ * Also handles writing out the deprecation notice for to the old string ID files.
  */
-void App::initLocalNodeIDs(std::string& outLocalNodeID, NumNodeID& outLocalNodeNumID)
+void App::initLocalNodeIDs(NumNodeID& outLocalNodeNumID)
 {
-   // load nodeID file (from first storage dir)
-
-   const auto& storagePath = cfg->getStorageDirectories().front();
-   Path nodeIDPath = storagePath / STORAGETK_NODEID_FILENAME;
-   StringList nodeIDList; // actually, the file would contain only a single line
-
-   bool idPathExists = StorageTk::pathExists(nodeIDPath.str() );
-   if(idPathExists)
-      ICommonConfig::loadStringListFile(nodeIDPath.str().c_str(), nodeIDList);
-
-   if(!nodeIDList.empty() )
-      outLocalNodeID = *nodeIDList.begin();
-
-   // auto-generate nodeID if it wasn't loaded
-
-   if(outLocalNodeID.empty() )
-      outLocalNodeID = System::getHostname();
-
-   // check targets for nodeID changes
-
-   for (const auto& path : cfg->getStorageDirectories())
-      StorageTk::checkOrCreateOrigNodeIDFile(path.str(), outLocalNodeID);
+   for (const auto& path : cfg->getStorageDirectories()) {
+         StorageTk::deprecateNodeStringIDFiles(path.str());
+   }
 
    // load nodeNumID file (from primary storage dir)
-
+   const auto& storagePath = cfg->getStorageDirectories().front();
    StorageTk::readNumIDFile(storagePath.str(), STORAGETK_NODENUMID_FILENAME, &outLocalNodeNumID);
 
    // note: localNodeNumID is still 0 here if it wasn't loaded from the file
@@ -464,15 +438,15 @@ void App::initLocalNodeIDs(std::string& outLocalNodeID, NumNodeID& outLocalNodeN
 /**
  * create and attach the localNode object.
  */
-void App::initLocalNode(std::string& localNodeID, NumNodeID localNodeNumID)
+void App::initLocalNode(NumNodeID localNodeNumID)
 {
-   unsigned portUDP = cfg->getConnStoragePortUDP();
-   unsigned portTCP = cfg->getConnStoragePortTCP();
+   unsigned port = cfg->getConnStoragePort();
    NicAddressList nicList = getLocalNicList();
 
-   // create localNode object
-   this->localNode = std::make_shared<LocalNode>(NODETYPE_Storage, localNodeID, localNodeNumID,
-      portUDP, portTCP, nicList);
+   // create localNode object. Note the alias (formerly string ID) is not known at this stage so it
+   // is set to an empty string. It will be set later by registerAndDownloadMgmtInfo().
+   this->localNode = std::make_shared<LocalNode>(NODETYPE_Storage, "", localNodeNumID,
+      port, port, nicList);
 
    // attach to storageNodes store
    storageNodes->setLocalNode(this->localNode);
@@ -583,14 +557,14 @@ void App::initComponents()
    this->log->log(Log_DEBUG, "Initializing components...");
    NicAddressList nicList = getLocalNicList();
    this->dgramListener = new DatagramListener(
-      netFilter, nicList, ackStore, cfg->getConnStoragePortUDP(),
+      netFilter, nicList, ackStore, cfg->getConnStoragePort(),
       this->cfg->getConnRestrictOutboundInterfaces() );
    if(cfg->getTuneListenerPrioShift() )
       dgramListener->setPriorityShift(cfg->getTuneListenerPrioShift() );
 
    streamListenersInit();
 
-   unsigned short listenPort = cfg->getConnStoragePortTCP();
+   unsigned short listenPort = cfg->getConnStoragePort();
 
    this->connAcceptor = new ConnAcceptor(this, nicList, listenPort);
 
@@ -1028,8 +1002,8 @@ bool App::waitForMgmtNode()
    const unsigned waitTimeoutMS = 0; // infinite wait
    const unsigned nameResolutionRetries = 3;
 
-   unsigned udpListenPort = cfg->getConnStoragePortUDP();
-   unsigned udpMgmtdPort = cfg->getConnMgmtdPortUDP();
+   unsigned udpListenPort = cfg->getConnStoragePort();
+   unsigned udpMgmtdPort = cfg->getConnMgmtdPort();
    std::string mgmtdHost = cfg->getSysMgmtdHost();
    NicAddressList nicList = getLocalNicList();
 
@@ -1059,20 +1033,33 @@ bool App::waitForMgmtNode()
  *
  * @return true if pre-registration successful and localNodeNumID set.
  */
-bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID)
+bool App::preregisterNode(NumNodeID& outLocalNodeNumID)
 {
+   const char* logContext = "Preregister node";
+
    static bool registrationFailureLogged = false; // to avoid log spamming
 
    auto mgmtNode = mgmtNodes->referenceFirstNode();
    if(!mgmtNode)
    {
-      log->logErr("Unexpected: No management node found in store during node pre-registration.");
+      LogContext(logContext).logErr(
+         "Unexpected: No management node found in store during node pre-registration.");
       return false;
    }
 
    NicAddressList nicList = getLocalNicList();
-   RegisterNodeMsg msg(localNodeID, outLocalNodeNumID, NODETYPE_Storage, &nicList,
-      cfg->getConnStoragePortUDP(), cfg->getConnStoragePortTCP() );
+   // In BeeGFS 8 string IDs were replaced with aliases. The mgmtd now ignores the alias provided in
+   // the RegisterNodeMsg for meta nodes so just it can just be set to an empty string. It will be
+   // set later on for the local node as part of registerAndDownloadMgmtInfo().
+   RegisterNodeMsg msg("", outLocalNodeNumID, NODETYPE_Storage, &nicList,
+      cfg->getConnStoragePort(), cfg->getConnStoragePort() );
+   auto uuid = UUID::getMachineUUID();
+   if (uuid.empty()) {
+      LogContext(logContext).log(Log_CRITICAL,
+         "Couldn't determine UUID for machine. Node registration not possible.");
+      return false;
+   }
+   msg.setMachineUUID(uuid);
 
    Time startTime;
    Time lastRetryTime;
@@ -1102,11 +1089,12 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
 
          if(!outLocalNodeNumID)
          { // mgmt rejected our registration
-            log->logErr("ID reservation request was rejected by this mgmt node: " +
+            LogContext(logContext).logErr(
+               "ID reservation request was rejected by this management node: " +
                mgmtNode->getTypedNodeID() );
          }
          else
-            log->log(Log_WARNING, "Node ID reservation successful.");
+            LogContext(logContext).log(Log_WARNING, "Node ID reservation successful.");
 
          break;
       }
@@ -1115,8 +1103,8 @@ bool App::preregisterNode(std::string& localNodeID, NumNodeID& outLocalNodeNumID
 
       if(!registrationFailureLogged)
       {
-         log->log(Log_CRITICAL, "Node ID reservation failed. Management node offline? "
-            "Will keep on trying...");
+         LogContext(logContext).log(Log_CRITICAL,
+            "Node ID reservation failed. Management node offline? Will keep on trying...");
          registrationFailureLogged = true;
       }
 
@@ -1285,7 +1273,7 @@ bool App::registerAndDownloadMgmtInfo()
 
    int retrySleepTimeMS = 10000; // 10sec
 
-   unsigned udpListenPort = cfg->getConnStoragePortUDP();
+   unsigned udpListenPort = cfg->getConnStoragePort();
    bool allSuccessful = false;
    NicAddressList nicList = getLocalNicList();
 
@@ -1520,61 +1508,7 @@ void App::checkTargetsUUIDs()
       auto cfg_uuid_str = uuid_strs.begin();
 
       for(; path != paths.end() && cfg_uuid_str != uuid_strs.end(); ++path, ++cfg_uuid_str) {
-
-         // Find out device numbers of underlying device
-         struct stat st;
-
-         if (stat(path->str().c_str(), &st)) {
-            throw InvalidConfigException("Could not stat target directory: " + path->str());
-         }
-
-         // look for the device path
-         std::ifstream mountInfo("/proc/self/mountinfo");
-
-         if (!mountInfo) {
-            throw InvalidConfigException("Could not open /proc/self/mountinfo");
-         }
-
-         auto majmin_f = boost::format("%1%:%2%") % major(st.st_dev) % minor(st.st_dev);       
-
-         std::string line, device_path, device_majmin;
-         while (std::getline(mountInfo, line)) {
-            std::istringstream is(line);
-            std::string dummy;
-            is >> dummy >> dummy >> device_majmin >> dummy >> dummy >> dummy >> dummy >> dummy >> dummy >> device_path;
-
-            if (majmin_f.str() == device_majmin)
-               break;
-
-            device_path = "";
-         }
-
-         if (device_path.empty()) {
-            throw InvalidConfigException("Determined the underlying device for target directory " +  path->str() + " is " + majmin_f.str() + " but could not find that device in /proc/self/mountinfo");
-         }
-
-         // Lookup the fs UUID
-         std::unique_ptr<blkid_struct_probe, void(*)(blkid_struct_probe*)>
-               probe(blkid_new_probe_from_filename(device_path.data()), blkid_free_probe);
-
-         if (!probe) {
-            throw InvalidConfigException("Failed to open device for probing: " + device_path + " (check BeeGFS is running with root or sufficient privileges)");
-         }
-
-         if (blkid_probe_enable_superblocks(probe.get(), 1) < 0) {
-            throw InvalidConfigException("Failed to enable superblock probing");
-         }
-
-         if (blkid_do_fullprobe(probe.get()) < 0) {
-            throw InvalidConfigException("Failed to probe device");
-         }
-
-         const char* uuid = nullptr; // gets released automatically
-         if (blkid_probe_lookup_value(probe.get(), "UUID", &uuid, nullptr) < 0) {
-            throw InvalidConfigException("Failed to lookup file system UUID");
-         }
-
-         std::string uuid_str(uuid);
+         std::string uuid_str = UUID::getFsUUID(path->str());
 
          if (*cfg_uuid_str != uuid_str)
          {
@@ -1593,30 +1527,4 @@ void App::checkTargetsUUIDs()
             "the appropriate UUIDs.");
    }
 
-}
-
-/**
- * Creates a list of Enterprise Features that are in use. This list is passed to logEULAMsg.
- */
-bool App::checkEnterpriseFeatureUsage()
-{
-   std::string enabledFeatures;
-
-   if (this->mirrorBuddyGroupMapper->getSize() > 0)
-      enabledFeatures.append("Mirroring, ");
-
-   if (this->cfg->getQuotaEnableEnforcement())
-      enabledFeatures.append("Quotas, ");
-
-   if (this->storagePoolStore->getSize() > 1)
-      enabledFeatures.append("Storage Pools, ");
-
-   // Remove ", " from end of string
-   if (enabledFeatures.length() > 2)
-      enabledFeatures.resize(enabledFeatures.size() - 2);
-
-   logEULAMsg(enabledFeatures);
-
-   // return true only if any enterprise features are enabled, false otherwise
-   return !enabledFeatures.empty();
 }

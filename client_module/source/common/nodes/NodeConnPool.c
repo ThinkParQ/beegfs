@@ -494,15 +494,6 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
                "Establishing new RDMA connection from %s to: %s@%s", from, nodeTypeStr, endpointStr);
             sock = (Socket*)RDMASocket_construct(srcAddr, srcRdma);
          } break;
-         case NICADDRTYPE_SDP:
-         { // SDP
-            if(!this->localNicCaps.supportsSDP)
-               goto continue_clean_endpointStr;
-
-            Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
-               "Establishing new SDP connection to: %s@%s", nodeTypeStr, endpointStr);
-            sock = (Socket*)StandardSocket_constructSDP();
-         } break;
          case NICADDRTYPE_STANDARD:
          { // TCP
             Logger_logTopFormatted(log, LogTopic_CONN, Log_DEBUG, logContext,
@@ -637,10 +628,10 @@ Socket* NodeConnPool_acquireStreamSocketEx(NodeConnPool* this, bool allowWaiting
       {
          if(this->logConnErrors && !__NodeConnPool_getWasLastTimeCompleteFail(this) )
          {
-            const char* nodeIDWithTypeStr = Node_getNodeIDWithTypeStr(this->parentNode);
-
+            NodeString nodeAndType;
+            Node_copyAliasWithTypeStr(this->parentNode, &nodeAndType);
             Logger_logTopFormatted(log, LogTopic_CONN, Log_CRITICAL, logContext,
-               "Connect failed on all available routes: %s", nodeIDWithTypeStr);
+               "Connect failed on all available routes: %s", nodeAndType.buf);
          }
 
          __NodeConnPool_setCompleteFail(this);
@@ -954,8 +945,7 @@ bool __NodeConnPool_applySocketOptionsConnected(NodeConnPool* this, Socket* sock
    NicAddrType_t sockType = Socket_getSockType(sock);
 
    // apply general socket options
-   if( (sockType == NICADDRTYPE_STANDARD) ||
-       (sockType == NICADDRTYPE_SDP) )
+   if(sockType == NICADDRTYPE_STANDARD)
    {
       StandardSocket* standardSock = (StandardSocket*)sock;
       bool corkRes;
@@ -1128,11 +1118,6 @@ void __NodeConnPool_statsAddNic(NodeConnPool* this, NicAddrType_t nicType)
          (this->stats.numEstablishedRDMA)++;
       } break;
 
-      case NICADDRTYPE_SDP:
-      {
-         (this->stats.numEstablishedSDP)++;
-      } break;
-
       default:
       {
          (this->stats.numEstablishedStd)++;
@@ -1150,11 +1135,6 @@ void __NodeConnPool_statsRemoveNic(NodeConnPool* this, NicAddrType_t nicType)
       case NICADDRTYPE_RDMA:
       {
          (this->stats.numEstablishedRDMA)--;
-      } break;
-
-      case NICADDRTYPE_SDP:
-      {
-         (this->stats.numEstablishedSDP)--;
       } break;
 
       default:
@@ -1175,15 +1155,17 @@ bool NodeConnPool_updateInterfaces(NodeConnPool* this, unsigned short streamPort
    Logger* log = App_getLogger(this->app);
    const char* logContext = "NodeConn (update stream port)";
    bool hasChanged = false; // retVal
+   NodeString alias;
 
    Mutex_lock(&this->mutex); // L O C K
+   Node_copyAlias(this->parentNode, &alias);
 
    if(streamPort && (streamPort != this->streamPort) )
    {
       this->streamPort = streamPort;
       hasChanged = true;
       Logger_logFormatted(log, Log_NOTICE, logContext,
-         "Node %s port has changed", Node_getID(this->parentNode));
+         "Node %s port has changed", alias.buf);
    }
 
    if (!NicAddressList_equals(&this->nicList, nicList))
@@ -1192,7 +1174,7 @@ bool NodeConnPool_updateInterfaces(NodeConnPool* this, unsigned short streamPort
 
       hasChanged = true;
       Logger_logFormatted(log, Log_NOTICE, logContext,
-         "Node %s interfaces have changed", Node_getID(this->parentNode));
+         "Node %s interfaces have changed", alias.buf);
 
       ListTk_cloneNicAddressList(nicList, &newNicList, true);
       ListTk_kfreeNicAddressListElems(&this->nicList);

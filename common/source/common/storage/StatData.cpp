@@ -166,5 +166,5 @@ bool StatData::operator==(const StatData& second) const
       && attribChangeTimeSecs == second.attribChangeTimeSecs
       && fileSize == second.fileSize
       && nlink == second.nlink
-      && contentsVersion == second.contentsVersion;
+      && metaVersion == second.metaVersion;
 }

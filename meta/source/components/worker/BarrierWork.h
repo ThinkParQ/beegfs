@@ -1,5 +1,4 @@
-#ifndef META_BARRIERWORK_H
-#define META_BARRIERWORK_H
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/threading/Atomics.h>
@@ -37,4 +36,3 @@ class BarrierWork : public Work
       Barrier* barrier;
 };
 
-#endif /* META_BARRIERWORK_H */

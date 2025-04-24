@@ -1,4 +1,5 @@
 #include <common/toolkit/HashTk.h>
+#include <crypto/hash.h>
 
 #define get16bits(d) (*((const uint16_t *) (d)))
 
@@ -287,4 +288,64 @@ uint64_t HashTk_hash64(HashTkHashTypes hashType, const char* data, int len)
    }
 
    return hash64;
+}
+
+
+// Generates sha256 hash using the kernel crypto interface.
+int HashTk_sha256(const unsigned char* data, unsigned int dataLen, unsigned char* outHash)
+{
+   const char* hashAlgName = "sha256";
+   struct crypto_shash *alg;
+   struct shash_desc *sdesc;
+   int res = 0;
+
+   alg = crypto_alloc_shash(hashAlgName, 0, 0);
+   if(IS_ERR(alg))
+   {
+       printk_fhgfs(KERN_ERR, "Allocating shash failed: %ld\n", PTR_ERR(alg));
+       return -1;
+   }
+
+   sdesc = kmalloc(crypto_shash_descsize(alg), GFP_KERNEL);
+   if (sdesc == NULL)
+   {
+       printk_fhgfs(KERN_ERR, "Allocating hash memory failed\n");
+       crypto_free_shash(alg);
+       return -1;
+   }
+
+   sdesc->tfm = alg;
+
+   res = crypto_shash_digest(sdesc, data, dataLen, outHash);
+   if (res != 0)
+   {
+       printk_fhgfs(KERN_ERR, "Calculating hash failed: %d\n", res);
+   }
+
+   kfree(sdesc);
+   crypto_free_shash(alg);
+   return res;
+}
+
+// Generates sha256 hash from the input byte slice and returns the auth secret containing the
+// 8 most significant bytes of the hash in little endian order. Matches the behavior of other
+// implementations.
+int HashTk_authHash(const unsigned char* data, unsigned int dataLen, uint64_t* outHash)
+{
+   int res;
+   unsigned char buf[32];
+
+   res = HashTk_sha256(data, dataLen, buf);
+   if (res != 0) {
+      return res;
+   }
+
+   *outHash = 0;
+   for(int i = 7; i >= 0; --i)
+   {
+      *outHash <<= 8;
+      *outHash += buf[i];
+   }
+
+   return 0;
 }

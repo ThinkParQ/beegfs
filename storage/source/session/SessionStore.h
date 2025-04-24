@@ -1,5 +1,4 @@
-#ifndef SESSIONSTORE_H_
-#define SESSIONSTORE_H_
+#pragma once
 
 #include <common/nodes/Node.h>
 #include <common/toolkit/ObjectReferencer.h>
@@ -35,4 +34,3 @@ class SessionStore
       mutable Mutex mutex;
 };
 
-#endif /*SESSIONSTORE_H_*/

@@ -1,5 +1,4 @@
-#ifndef SETEXCEEDEDQUOTAMSG_H_
-#define SETEXCEEDEDQUOTAMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -86,4 +85,3 @@ class SetExceededQuotaMsg: public NetMessageSerdes<SetExceededQuotaMsg>
       }
 };
 
-#endif /* SETEXCEEDEDQUOTAMSG_H_ */

@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCERGATHERSLAVE_H_
-#define BUDDYRESYNCERGATHERSLAVE_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/storage/mirroring/SyncCandidateStore.h>
@@ -181,4 +180,3 @@ class BuddyResyncerGatherSlave : public PThread
 typedef std::vector<BuddyResyncerGatherSlave*> BuddyResyncerGatherSlaveVec;
 typedef BuddyResyncerGatherSlaveVec::iterator BuddyResyncerGatherSlaveVecIter;
 
-#endif /* BUDDYRESYNCERGATHERSLAVE_H_ */

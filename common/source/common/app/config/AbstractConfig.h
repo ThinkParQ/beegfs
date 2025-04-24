@@ -1,5 +1,4 @@
-#ifndef ABSTRACTCONFIG_H_
-#define ABSTRACTCONFIG_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -106,4 +105,3 @@ class AbstractConfig : public ICommonConfig
 
 };
 
-#endif /*ABSTRACTCONFIG_H_*/

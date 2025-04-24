@@ -1,5 +1,4 @@
-#ifndef BUDDYMIRRORPATTERN_H_
-#define BUDDYMIRRORPATTERN_H_
+#pragma once
 
 #include "StripePattern.h"
 
@@ -121,4 +120,3 @@ class BuddyMirrorPattern : public StripePattern
 
 };
 
-#endif /*BUDDYMIRRORPATTERN_H_*/

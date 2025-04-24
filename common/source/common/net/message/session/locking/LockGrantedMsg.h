@@ -1,5 +1,4 @@
-#ifndef LOCKGRANTEDMSG_H_
-#define LOCKGRANTEDMSG_H_
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 #include <common/nodes/NumNodeID.h>
@@ -63,4 +62,3 @@ class LockGrantedMsg : public AcknowledgeableMsgSerdes<LockGrantedMsg>
 };
 
 
-#endif /* LOCKGRANTEDMSG_H_ */

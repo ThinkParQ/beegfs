@@ -2,8 +2,7 @@
  * Big- and little-endian byte swapping.
  */
 
-#ifndef BYTESWAP_H_
-#define BYTESWAP_H_
+#pragma once
 
 #include <inttypes.h>
 
@@ -53,4 +52,3 @@ inline uint64_t byteswap64(uint64_t u)
 #define LE_TO_HOST_64(value)    HOST_TO_LE_64(value)
 
 
-#endif /* BYTESWAP_H_ */

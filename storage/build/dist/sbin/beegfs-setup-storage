@@ -13,7 +13,6 @@ FS_UUID_CFG_KEY="storeFsUUID"
 TARGET_NUMID_FILE="targetNumID"
 TARGET_STRID_FILE="targetID"
 SERVER_NUMID_FILE="nodeNumID"
-SERVER_STRID_FILE="nodeID"
 STORAGEPOOL_ID_FILE="storagePoolID"
 FORMAT_FILENAME="format.conf"
 FORMAT_FILE_VERSION="3"
@@ -55,20 +54,12 @@ print_usage()
 	echo
 	echo "   -h        - Print this help."
 	echo
-	echo "   -I <str>  - Assign the given string ID to this storage target. This ID will"
-	echo "               be used in target-related log messages."
-	echo "               (Default: Automatically generate an ID.)"
-	echo
         echo "   -P <num>  - Automatically add the configured target to storage pool with the"
         echo "               given ID on first start."
         echo 
 	echo "   -r        - Replace current list of target directories with the given path."
 	echo "               (Default: Append directory to current target list in server"
 	echo "               config file.)"
-	echo 
-	echo "   -S <str>  - Assign the given string ID to the server of this storage target."
-	echo "               This ID will be used in server-related log messages."
-	echo "               (Default: Use hostname as ID.)"
 	echo
 	echo "   -u        - Do not disable usage of uninitialized target directories in"
 	echo "               config file and do not store the UUID of the underlying fs."
@@ -160,12 +151,7 @@ init_storage_dir()
 		echo "${SERVER_NUMID}" > "${STORAGE_PATH}/${SERVER_NUMID_FILE}"
 	fi
 
-	if [ -n "${SERVER_STRID}" ]; then
-		echo " * Creating server string ID file: ${STORAGE_PATH}/${SERVER_STRID_FILE}"
-		echo "${SERVER_STRID}" > "${STORAGE_PATH}/${SERVER_STRID_FILE}"
-	fi
-	
-        if [ -n "${STORAGEPOOL_ID}" ]; then
+	if [ -n "${STORAGEPOOL_ID}" ]; then
 		echo " * Creating storage pool ID file: ${STORAGE_PATH}/${STORAGEPOOL_ID_FILE}"
 		echo "${STORAGEPOOL_ID}" > "${STORAGE_PATH}/${STORAGEPOOL_ID_FILE}"
 	fi
@@ -249,7 +235,6 @@ TARGET_STRID=""
 MGMTD_HOST=""
 REPLACE_TARGETS=""
 SERVER_NUMID=""
-SERVER_STRID=""
 STORAGE_PATH=""
 STORAGEPOOL_ID=""
 DISABLE_UNINITED_TARGETS="1"
@@ -291,7 +276,7 @@ while getopts "Cc:fhI:i:m:p:P:rS:s:u" opt; do
 		REPLACE_TARGETS="1"
 		;;
 	S)
-		SERVER_STRID="$OPTARG"
+		echo "WARNING: The -S flag previously used to specify a string ID been deprecated and now has no effect. Starting in BeeGFS string IDs were replaced with aliases configured using BeeGFS CTL."
 		;;
 	s)
 		SERVER_NUMID="$OPTARG"

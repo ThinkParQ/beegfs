@@ -1,15 +1,16 @@
-#ifndef NETWORKINTERFACECARD_H_
-#define NETWORKINTERFACECARD_H_
+#pragma once
 
+#include "common/app/log/Logger.h"
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
 
+#include <cstdint>
 #include <net/if.h>
 
 enum NicAddrType {
-   NICADDRTYPE_STANDARD,
-   NICADDRTYPE_SDP,
-   NICADDRTYPE_RDMA
+   NICADDRTYPE_STANDARD = 0,
+   // removed: NICADDRTYPE_SDP = 1,
+   NICADDRTYPE_RDMA = 2
 };
 
 
@@ -120,13 +121,19 @@ struct NicAddress
    struct in_addr ipAddr;
    NicAddrType    nicType;
    char           name[IFNAMSIZ];
+   uint8_t        protocol;
 
    static void serialize(const NicAddress* obj, Serializer& ser)
    {
+      // We currently only support and store ipv4 addresses internally, so we always set the
+      // protocol field to 4.
+      uint8_t protocol = 4;
+      ser % protocol;
+
       ser.putBlock(&obj->ipAddr.s_addr, sizeof(obj->ipAddr.s_addr) );
       ser.putBlock(obj->name, BEEGFS_MIN(sizeof(obj->name), SERIALIZATION_NICLISTELEM_NAME_SIZE) );
       ser % serdes::as<char>(obj->nicType);
-      ser.skip(3); // PADDING
+      ser.skip(2); // PADDING
    }
 
    static void serialize(NicAddress* obj, Deserializer& des)
@@ -136,11 +143,21 @@ struct NicAddress
 
       ::memset(obj, 0, sizeof(*obj) );
 
-      des.getBlock(&obj->ipAddr.s_addr, sizeof(obj->ipAddr.s_addr) );
+      des % obj->protocol;
+      if (obj->protocol == 4) {
+         // Ipv4 address
+         des.getBlock(&obj->ipAddr.s_addr, sizeof(obj->ipAddr.s_addr));
+      } else {
+         // If this is an ipv6 address, skip it as it is not supported yet. The receiver of this
+         // nic must check the protocol afterwards and discard it if it is not ipv4. For the usual
+         // list deserialization it is handled by the deserializaer specialization below.
+         des.skip(16);
+      }
+
       des.getBlock(obj->name, minNameSize);
       obj->name[minNameSize - 1] = 0;
       des % serdes::as<char>(obj->nicType);
-      des.skip(3); // PADDING
+      des.skip(2); // PADDING
    }
 
    bool operator==(const NicAddress& o) const
@@ -150,18 +167,58 @@ struct NicAddress
    }
 };
 
-template<>
-struct ListSerializationHasLength<NicAddress> : boost::false_type {};
-
 typedef struct NicListCapabilities
 {
-   bool supportsSDP;
    bool supportsRDMA;
 } NicListCapabilities;
 
 
 typedef std::list<NicAddress> NicAddressList;
 typedef NicAddressList::iterator NicAddressListIter;
+
+// Specialization of NicAddressList serializer, forwarding to the generic list serializer
+inline serdes::BackedPtrSer<NicAddressList> serdesNicAddressList(NicAddressList* const& ptr, const NicAddressList& backing) {
+   return serdes::backedPtr(ptr, backing);
+}
+
+struct BackedNicAddressListDes {
+   NicAddressList& backing;
+   NicAddressList*& ptr;
+
+   BackedNicAddressListDes(NicAddressList*& ptr, NicAddressList& backing) : backing(backing), ptr(ptr) {}
+
+   friend Deserializer& operator%(Deserializer& des, BackedNicAddressListDes value)
+   {
+      value.backing.clear();
+
+      uint32_t nicListLength;
+      des % nicListLength;
+
+      uint32_t nicListCount;
+      des % nicListCount;
+
+      for (uint32_t i = 0; i < nicListCount; i++) {
+         NicAddress nic;
+
+         des % nic;
+         if (nic.protocol != 4) {
+            LOG(GENERAL, WARNING, "Skipping incoming Ipv6 interface ", nic.name);
+            continue;
+         }
+
+         value.backing.push_back(nic);
+      }
+
+      value.ptr = &value.backing;
+      return des;
+   }
+};
+
+// Specialization of NicAddressList deserializer, allows skipping ipv6 interfaces while not supported.
+inline BackedNicAddressListDes serdesNicAddressList(NicAddressList*& ptr, NicAddressList& backing) {
+   BackedNicAddressListDes backed(ptr, backing);
+   return backed;
+}
 
 // used for debugging
 static inline std::string NicAddressList_str(const NicAddressList& nicList)
@@ -188,7 +245,6 @@ class NetworkInterfaceCard
       static const char* nicTypeToString(NicAddrType nicType);
       static std::string nicAddrToString(NicAddress* nicAddr);
 
-      static bool supportsSDP(NicAddressList* nicList);
       static bool supportsRDMA(NicAddressList* nicList);
       static void supportedCapabilities(NicAddressList* nicList,
          NicListCapabilities* outCapabilities);
@@ -241,6 +297,3 @@ class NetworkInterfaceCard
          }
       };
 };
-
-
-#endif /*NETWORKINTERFACECARD_H_*/

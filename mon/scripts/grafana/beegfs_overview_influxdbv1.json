@@ -535,7 +535,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-BlYlRd"
+            "mode": "palette-classic"
           },
           "custom": {
             "axisCenteredZero": false,
@@ -624,7 +624,7 @@
       },
       "targets": [
         {
-          "alias": "$tag_nodeID Recv",
+          "alias": "Recv (nodeNumID = $tag_nodeNumID)",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -638,7 +638,7 @@
             },
             {
               "params": [
-                "nodeID"
+                "nodeNumID"
               ],
               "type": "tag"
             },
@@ -670,14 +670,14 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
           ]
         },
         {
-          "alias": "$tag_nodeID Send",
+          "alias": "Send (nodeNumID = $tag_nodeNumID)",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -691,7 +691,7 @@
             },
             {
               "params": [
-                "nodeID"
+                "nodeNumID"
               ],
               "type": "tag"
             },
@@ -724,7 +724,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -828,7 +828,7 @@
       },
       "targets": [
         {
-          "alias": "$tag_nodeID Read",
+          "alias": "Read (nodeNumID = $tag_nodeNumID)",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -842,7 +842,7 @@
             },
             {
               "params": [
-                "nodeID"
+                "nodeNumID"
               ],
               "type": "tag"
             },
@@ -874,14 +874,14 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
           ]
         },
         {
-          "alias": "$tag_nodeID Write",
+          "alias": "Write (nodeNumID = $tag_nodeNumID)",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
@@ -895,7 +895,7 @@
             },
             {
               "params": [
-                "nodeID"
+                "nodeNumID"
               ],
               "type": "tag"
             },
@@ -928,7 +928,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -949,7 +949,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "center",
             "displayMode": "auto",
             "inspect": false
           },
@@ -979,30 +979,18 @@
               }
             ]
           },
-          "unit": "bool"
+          "unit": "none"
         },
         "overrides": [
           {
             "matcher": {
-              "id": "byType",
-              "options": "string"
+              "id": "byName",
+              "options": "Service Status"
             },
             "properties": [
               {
-                "id": "custom.align",
-                "value": "center"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byType",
-              "options": "boolean"
-            },
-            "properties": [
-              {
-                "id": "custom.align",
-                "value": "center"
+                "id": "unit",
+                "value": "bool"
               },
               {
                 "id": "custom.displayMode",
@@ -1049,7 +1037,7 @@
           "groupBy": [
             {
               "params": [
-                "nodeID"
+                "nodeNumID"
               ],
               "type": "tag"
             }
@@ -1058,7 +1046,7 @@
           "orderByTime": "ASC",
           "policy": "default",
           "refId": "A",
-          "resultFormat": "time_series",
+          "resultFormat": "table",
           "select": [
             [
               {
@@ -1070,27 +1058,52 @@
               {
                 "params": [],
                 "type": "last"
+              },
+              {
+                "params": [
+                  "Service Status"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "hostnameid"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": [
+                  "Host"
+                ],
+                "type": "alias"
               }
             ]
-          ]
+          ],
+          "tags": []
         }
       ],
       "title": "Meta Status",
       "transformations": [
-        {
-          "id": "seriesToRows",
-          "options": {}
-        },
         {
           "id": "organize",
           "options": {
             "excludeByName": {
               "Time": true
             },
-            "indexByName": {},
+            "indexByName": {
+              "Host": 2,
+              "Service Status": 3,
+              "Time": 0,
+              "nodeNumID": 1
+            },
             "renameByName": {
-              "Metric": "Meta Node",
-              "Value": "Service Status"
+              "nodeNumID": "nodeNumID"
             }
           }
         }
@@ -1109,7 +1122,7 @@
             "mode": "thresholds"
           },
           "custom": {
-            "align": "auto",
+            "align": "center",
             "displayMode": "auto",
             "inspect": false
           },
@@ -1135,14 +1148,10 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byType",
-              "options": "number"
+              "id": "byName",
+              "options": "Total Space"
             },
             "properties": [
-              {
-                "id": "custom.align",
-                "value": "center"
-              },
               {
                 "id": "unit",
                 "value": "mbytes"
@@ -1151,13 +1160,13 @@
           },
           {
             "matcher": {
-              "id": "byType",
-              "options": "string"
+              "id": "byName",
+              "options": "Free Space"
             },
             "properties": [
               {
-                "id": "custom.align",
-                "value": "center"
+                "id": "unit",
+                "value": "mbytes"
               }
             ]
           },
@@ -1168,12 +1177,16 @@
             },
             "properties": [
               {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
                 "id": "mappings",
                 "value": [
                   {
                     "options": {
                       "false": {
-                        "color": "red",
+                        "color": "#f2495c",
                         "index": 1,
                         "text": "STOPPED"
                       },
@@ -1186,22 +1199,6 @@
                     "type": "value"
                   }
                 ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byType",
-              "options": "boolean"
-            },
-            "properties": [
-              {
-                "id": "custom.align",
-                "value": "center"
-              },
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
               }
             ]
           }
@@ -1243,13 +1240,7 @@
           "groupBy": [
             {
               "params": [
-                "$interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "nodeID"
+                "nodeNumID"
               ],
               "type": "tag"
             }
@@ -1258,9 +1249,29 @@
           "measurement": "storage",
           "orderByTime": "ASC",
           "policy": "default",
+          "query": "SELECT last(\"hostnameid\") AS \"Host\", last(\"diskSpaceTotal\") AS \"Total Space\", last(\"diskSpaceFree\") AS \"Free Space\", last(\"isResponding\") AS \"Service status\" FROM \"storage\" WHERE (\"nodeNumID\" =~ /^$storageID$/) AND $timeFilter GROUP BY \"nodeNumID\"",
+          "rawQuery": false,
           "refId": "A",
           "resultFormat": "table",
           "select": [
+            [
+              {
+                "params": [
+                  "hostnameid"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": [
+                  "Host"
+                ],
+                "type": "alias"
+              }
+            ],
             [
               {
                 "params": [
@@ -1274,46 +1285,11 @@
               },
               {
                 "params": [
-                  "Total"
+                  "Total Space"
                 ],
                 "type": "alias"
               }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "nodeID",
-              "operator": "=~",
-              "value": "/^$storageID$/"
-            }
-          ]
-        },
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "nodeID"
-              ],
-              "type": "tag"
-            }
-          ],
-          "hide": false,
-          "measurement": "storage",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "B",
-          "resultFormat": "table",
-          "select": [
+            ],
             [
               {
                 "params": [
@@ -1327,46 +1303,11 @@
               },
               {
                 "params": [
-                  "Free"
+                  "Free Space"
                 ],
                 "type": "alias"
               }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "nodeID",
-              "operator": "=~",
-              "value": "/^$storageID$/"
-            }
-          ]
-        },
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_BEEGFS_MON_INFLUXDB}"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "nodeID"
-              ],
-              "type": "tag"
-            }
-          ],
-          "hide": false,
-          "measurement": "storage",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "C",
-          "resultFormat": "table",
-          "select": [
+            ],
             [
               {
                 "params": [
@@ -1380,7 +1321,7 @@
               },
               {
                 "params": [
-                  "Status"
+                  "Service Status"
                 ],
                 "type": "alias"
               }
@@ -1388,7 +1329,7 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
@@ -1398,75 +1339,13 @@
       "title": "Storage",
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "Free": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Status": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "Total": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "nodeID": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "queue": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "status": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "storage.last {nodeID: beegfs1}": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "work": {
-                "aggregations": [
-                  "lastNotNull"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
           "id": "organize",
           "options": {
-            "excludeByName": {},
+            "excludeByName": {
+              "Time": true
+            },
             "indexByName": {},
-            "renameByName": {
-              "Free (lastNotNull)": "Free Space",
-              "Status (lastNotNull)": "Service Status",
-              "Total (lastNotNull)": "Total Space",
-              "nodeID": "Storage Node",
-              "queue (lastNotNull)": "",
-              "status (lastNotNull)": "Status"
-            }
+            "renameByName": {}
           }
         }
       ],
@@ -1695,14 +1574,14 @@
           ],
           "tags": [
             {
-              "key": "nodeID",
+              "key": "nodeNumID",
               "operator": "=~",
               "value": "/^$storageID$/"
             }
           ]
         }
       ],
-      "title": "Storage Node $storageID",
+      "title": "Storage Node ID - $storageID",
       "transformations": [
         {
           "id": "organize",
@@ -1735,13 +1614,13 @@
           "type": "influxdb",
           "uid": "${DS_BEEGFS_MON_INFLUXDB}"
         },
-        "definition": "show tag values from storage with key = \"nodeID\" ",
+        "definition": "show tag values from storage with key = \"nodeNumID\" ",
         "hide": 2,
         "includeAll": true,
         "multi": false,
         "name": "storageID",
         "options": [],
-        "query": "show tag values from storage with key = \"nodeID\" ",
+        "query": "show tag values from storage with key = \"nodeNumID\" ",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

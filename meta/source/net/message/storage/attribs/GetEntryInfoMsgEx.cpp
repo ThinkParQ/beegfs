@@ -27,24 +27,29 @@ FileIDLock GetEntryInfoMsgEx::lock(EntryLockStore& store)
 std::unique_ptr<MirroredMessageResponseState> GetEntryInfoMsgEx::executeLocally(ResponseContext& ctx,
    bool isSecondary)
 {
+
    GetEntryInfoMsgResponseState resp;
 
    EntryInfo* entryInfo = this->getEntryInfo();
    StripePattern* pattern = NULL;
    FhgfsOpsErr getInfoRes;
    PathInfo pathInfo;
+   RemoteStorageTarget rstInfo;
+   uint32_t numSessionsRead = 0;
+   uint32_t numSessionsWrite = 0;
+   uint8_t dataState = 0;
 
    if (entryInfo->getParentEntryID().empty())
    {
       // special case: get info for root directory
       // no pathInfo here, as this is currently only used for fileInodes
-      getInfoRes = getRootInfo(&pattern);
+      getInfoRes = getRootInfo(&pattern, &rstInfo);
    }
    else
    {
-      getInfoRes = getInfo(entryInfo, &pattern, &pathInfo);
+      getInfoRes = getInfo(entryInfo, &pattern, &pathInfo, &rstInfo, numSessionsRead,
+         numSessionsWrite, dataState);
    }
-
 
    if (getInfoRes != FhgfsOpsErr_SUCCESS)
    { // error occurred => create a dummy pattern
@@ -55,6 +60,10 @@ std::unique_ptr<MirroredMessageResponseState> GetEntryInfoMsgEx::executeLocally(
    resp.setGetEntryInfoResult(getInfoRes);
    resp.setStripePattern(pattern);
    resp.setPathInfo(pathInfo);
+   resp.setRemoteStorageTarget(rstInfo);
+   resp.setNumSessionsRead(numSessionsRead);
+   resp.setNumSessionsWrite(numSessionsWrite);
+   resp.setFileDataState(dataState);
 
    App* app = Program::getApp();
    app->getNodeOpStats()->updateNodeOp(ctx.getSocket()->getPeerIP(), MetaOpCounter_GETENTRYINFO,
@@ -68,7 +77,8 @@ std::unique_ptr<MirroredMessageResponseState> GetEntryInfoMsgEx::executeLocally(
  * @param outPattern StripePattern clone (in case of success), that must be deleted by the caller
  */
 FhgfsOpsErr GetEntryInfoMsgEx::getInfo(EntryInfo* entryInfo, StripePattern** outPattern,
-   PathInfo* outPathInfo)
+   PathInfo* outPathInfo, RemoteStorageTarget* outRstInfo, uint32_t& outNumReadSessions,
+   uint32_t& outNumWriteSessions, uint8_t& outDataState)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
@@ -79,21 +89,26 @@ FhgfsOpsErr GetEntryInfoMsgEx::getInfo(EntryInfo* entryInfo, StripePattern** out
       if(dir)
       {
          *outPattern = dir->getStripePatternClone();
-
+         outRstInfo->set(dir->getRemoteStorageTargetInfo());
          metaStore->releaseDir(entryInfo->getEntryID() );
          return FhgfsOpsErr_SUCCESS;
       }
    }
    else
    { // entry is a file
-      MetaFileHandle fileInode = metaStore->referenceFile(entryInfo);
+      auto [fileInode, referenceRes] = metaStore->referenceFile(entryInfo);
       if(fileInode)
       {
          *outPattern = fileInode->getStripePattern()->clone();
+         outRstInfo->set(fileInode->getRemoteStorageTargetInfo());
          fileInode->getPathInfo(outPathInfo);
 
+         outNumReadSessions = fileInode->getNumSessionsRead();
+         outNumWriteSessions = fileInode->getNumSessionsWrite();
+         outDataState = fileInode->getFileDataState();
+
          metaStore->releaseFile(entryInfo->getParentEntryID(), fileInode);
-         return FhgfsOpsErr_SUCCESS;
+         return referenceRes;
       }
    }
 
@@ -103,7 +118,7 @@ FhgfsOpsErr GetEntryInfoMsgEx::getInfo(EntryInfo* entryInfo, StripePattern** out
 /**
  * @param outPattern StripePattern clone (in case of success), that must be deleted by the caller
  */
-FhgfsOpsErr GetEntryInfoMsgEx::getRootInfo(StripePattern** outPattern)
+FhgfsOpsErr GetEntryInfoMsgEx::getRootInfo(StripePattern** outPattern, RemoteStorageTarget* outRstInfo)
 {
    App* app = Program::getApp();
    MirrorBuddyGroupMapper* metaBuddyGroupMapper = app->getMetaBuddyGroupMapper();
@@ -122,6 +137,7 @@ FhgfsOpsErr GetEntryInfoMsgEx::getRootInfo(StripePattern** outPattern)
       return FhgfsOpsErr_NOTOWNER;
 
    *outPattern = rootDir->getStripePatternClone();
+   outRstInfo->set(rootDir->getRemoteStorageTargetInfo());
 
    return FhgfsOpsErr_SUCCESS;
 }

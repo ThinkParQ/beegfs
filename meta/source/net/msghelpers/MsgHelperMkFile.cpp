@@ -9,8 +9,8 @@
  */
 FhgfsOpsErr MsgHelperMkFile::mkFile(DirInode& parentDir, MkFileDetails* mkDetails,
    const UInt16List* preferredTargets, const unsigned numtargets, const unsigned chunksize, 
-   StripePattern* stripePattern, EntryInfo* outEntryInfo, FileInodeStoreData* outInodeData,
-   StoragePoolId storagePoolId)
+   StripePattern* stripePattern, RemoteStorageTarget* rstInfo, EntryInfo* outEntryInfo,
+   FileInodeStoreData* outInodeData, StoragePoolId storagePoolId)
 {
    const char* logContext = "MsgHelperMkFile (create file)";
 
@@ -39,7 +39,7 @@ FhgfsOpsErr MsgHelperMkFile::mkFile(DirInode& parentDir, MkFileDetails* mkDetail
 
    // create meta file
    retVal = metaStore->mkNewMetaFile(parentDir, mkDetails,
-         std::unique_ptr<StripePattern>(stripePattern), outEntryInfo, outInodeData);
+         std::unique_ptr<StripePattern>(stripePattern), rstInfo, outEntryInfo, outInodeData);
 
    if ( (modEventLoggingEnabled ) && ( outEntryInfo ) )
    {

@@ -1,5 +1,4 @@
-#ifndef MOVECHUNKFILEMSGEX_H
-#define MOVECHUNKFILEMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/MoveChunkFileMsg.h>
@@ -14,4 +13,3 @@ class MoveChunkFileMsgEx : public MoveChunkFileMsg
       unsigned moveChunk();
 };
 
-#endif /*MOVECHUNKFILEMSGEX_H*/

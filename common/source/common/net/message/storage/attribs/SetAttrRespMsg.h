@@ -1,5 +1,4 @@
-#ifndef SETATTRRESPMSG_H_
-#define SETATTRRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -15,4 +14,3 @@ class SetAttrRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*SETATTRRESPMSG_H_*/

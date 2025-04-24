@@ -20,7 +20,7 @@ add_library(
 	./source/common/toolkit/StorageTk.h
 	./source/common/toolkit/RandomReentrant.h
 	./source/common/toolkit/FsckTk.cpp
-	./source/common/toolkit/BufferTk.h
+	./source/common/toolkit/HashTk.h
 	./source/common/toolkit/UnitTk.h
 	./source/common/toolkit/PreallocatedFile.h
 	./source/common/toolkit/StringTk.h
@@ -49,7 +49,7 @@ add_library(
 	./source/common/toolkit/OfflineWaitTimeoutTk.h
 	./source/common/toolkit/AcknowledgmentStore.cpp
 	./source/common/toolkit/SocketTk.h
-	./source/common/toolkit/BufferTk.cpp
+	./source/common/toolkit/HashTk.cpp
 	./source/common/toolkit/AtomicObjectReferencer.h
 	./source/common/toolkit/poll/PollList.cpp
 	./source/common/toolkit/poll/PollList.h
@@ -86,6 +86,8 @@ add_library(
 	./source/common/toolkit/TempFileTk.cpp
 	./source/common/toolkit/MetadataTk.h
 	./source/common/toolkit/BuildTypeTk.cpp
+	./source/common/toolkit/hash_library/sha256.h
+	./source/common/toolkit/hash_library/sha256.cpp
 	./source/common/Common.h
 	./source/common/benchmark/StorageBench.h
 	./source/common/NumericID.h
@@ -154,10 +156,6 @@ add_library(
 	./source/common/net/message/session/FSyncLocalFileRespMsg.h
 	./source/common/net/message/session/GetFileVersionRespMsg.h
 	./source/common/net/message/NetMessageTypes.h
-	./source/common/net/message/helperd/LogRespMsg.h
-	./source/common/net/message/helperd/GetHostByNameRespMsg.h
-	./source/common/net/message/helperd/LogMsg.h
-	./source/common/net/message/helperd/GetHostByNameMsg.h
 	./source/common/net/message/SimpleMsg.h
 	./source/common/net/message/SimpleIntMsg.h
 	./source/common/net/message/nodes/GetMirrorBuddyGroupsRespMsg.h
@@ -527,7 +525,6 @@ add_library(
 	./source/common/fsck/FsckTargetID.h
 	./source/common/fsck/FsckDirEntry.h
 	./source/common/fsck/FsckDirInode.h
-	./source/common/external/sdp_inet.h
 )
 
 if(NOT BEEGFS_SKIP_TESTS)
@@ -585,7 +582,8 @@ target_include_directories(
 target_link_libraries(
 	beegfs-common
 	${NL3ROUTE_LIBRARIES}
-	blkid
+	ssl
+	crypto
 )
 
 target_include_directories(beegfs_ib PRIVATE ./ib_lib)

@@ -1,5 +1,4 @@
-#ifndef ATOMICS_H_
-#define ATOMICS_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -171,4 +170,3 @@ class Atomic
 #undef BEEGFS_NO_TSAN
 
 
-#endif /* ATOMICS_H_ */

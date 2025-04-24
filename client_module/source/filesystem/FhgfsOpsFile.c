@@ -516,7 +516,7 @@ int FhgfsOps_releasedir(struct inode* inode, struct file* file)
  * @param lookupInfo is NULL if this is a direct open call from the vfs
  */
 int FhgfsOps_openReferenceHandle(App* app, struct inode* inode, struct file* file,
-   unsigned openFlags, LookupIntentInfoOut* lookupInfo, uint64_t* outVersion)
+   unsigned openFlags, LookupIntentInfoOut* lookupInfo, uint32_t* outVersion)
 {
    Config* cfg = App_getConfig(app);
    Logger* log = App_getLogger(app);

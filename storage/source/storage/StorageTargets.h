@@ -1,5 +1,4 @@
-#ifndef STORAGETARGETS_H_
-#define STORAGETARGETS_H_
+#pragma once
 
 
 #include <common/Common.h>
@@ -253,4 +252,3 @@ class StorageTargets
 };
 
 
-#endif /* STORAGETARGETS_H_ */

@@ -1,5 +1,4 @@
-#ifndef SETMIRRORBUDDYGROUPMSGEX_H_
-#define SETMIRRORBUDDYGROUPMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/SetMirrorBuddyGroupMsg.h>
 
@@ -10,4 +9,3 @@ class SetMirrorBuddyGroupMsgEx : public SetMirrorBuddyGroupMsg
 };
 
 
-#endif /* SETMIRRORBUDDYGROUPMSGEX_H_ */

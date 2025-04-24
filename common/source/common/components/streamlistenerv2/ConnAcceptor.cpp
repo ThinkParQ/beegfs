@@ -40,7 +40,6 @@ ConnAcceptor::~ConnAcceptor()
       close(epollFD);
 
    SAFE_DELETE(tcpListenSock);
-   SAFE_DELETE(sdpListenSock);
    SAFE_DELETE(rdmaListenSock);
 }
 
@@ -80,54 +79,15 @@ bool ConnAcceptor::startRDMASocket(NicListCapabilities* localNicCaps)
    return true;
 }
 
-bool ConnAcceptor::startSDPSocket(NicListCapabilities* localNicCaps)
-{
-   if(localNicCaps->supportsSDP)
-   { // SDP usage is enabled
-      try
-      {
-         sdpListenSock = new StandardSocket(PF_SDP, SOCK_STREAM);
-         sdpListenSock->setSoReuseAddr(true);
-         sdpListenSock->bind(listenPort);
-         sdpListenSock->listen();
-
-         struct epoll_event epollEvent;
-         epollEvent.events = EPOLLIN;
-         epollEvent.data.ptr = sdpListenSock;
-         if(epoll_ctl(epollFD, EPOLL_CTL_ADD, sdpListenSock->getFD(), &epollEvent) == -1)
-         {
-            log.logErr(std::string("Unable to add SDP listen sock to epoll set: ") +
-               System::getErrString() );
-            return false;
-         }
-
-         log.log(Log_NOTICE, std::string("Listening for SDP connections: Port ") +
-            StringTk::intToStr(listenPort) );
-      }
-      catch(SocketException& e)
-      {
-         log.logErr(std::string("SDP socket: ") + e.what() );
-         SAFE_DELETE(sdpListenSock);
-         return false;
-      }
-   }
-   return true;
-}
-
 bool ConnAcceptor::initSocks()
 {
    auto cfg = PThread::getCurrentThreadApp()->getCommonConfig();
 
    rdmaListenSock = NULL;
-   sdpListenSock = NULL;
    tcpListenSock = NULL;
 
    // RDMA
    if (!startRDMASocket(&localNicCaps))
-      return false;
-
-   // SDP
-   if (!startSDPSocket(&localNicCaps))
       return false;
 
    // TCP
@@ -222,24 +182,6 @@ void ConnAcceptor::handleNewLocalNicCaps()
 
          log.log(Log_NOTICE, std::string("Shutdown RDMA listen sock complete"));
       }
-
-      if (localNicCaps.supportsSDP)
-      {
-         if (!sdpListenSock)
-            startSDPSocket(&localNicCaps);
-      }
-      else if (sdpListenSock)
-      {
-         log.log(Log_NOTICE, std::string("Shutdown SDP listen sock..."));
-
-         if(epoll_ctl(epollFD, EPOLL_CTL_DEL, sdpListenSock->getFD(), NULL) == -1)
-            log.logErr(std::string("Unable to remove SDP listen sock from epoll set: ") +
-               System::getErrString() );
-         SAFE_DELETE(sdpListenSock);
-
-         log.log(Log_NOTICE, std::string("Shutdown SDP listen sock complete"));
-      }
-
    }
 }
 
@@ -252,7 +194,6 @@ void ConnAcceptor::listenLoop()
    // (just to have these values on the stack...)
    const int epollFD = this->epollFD;
    RDMASocket* rdmaListenSock;
-   StandardSocket* sdpListenSock;
    StandardSocket* tcpListenSock;
 
    // wait for incoming events and handle them...
@@ -262,7 +203,6 @@ void ConnAcceptor::listenLoop()
 
       handleNewLocalNicCaps();
       rdmaListenSock = this->rdmaListenSock;
-      sdpListenSock = this->sdpListenSock;
       tcpListenSock = this->tcpListenSock;
 
       //log.log(Log_DEBUG, std::string("Before poll(). pollArrayLen: ") +
@@ -294,9 +234,6 @@ void ConnAcceptor::listenLoop()
          if(currentPollable == tcpListenSock)
             onIncomingStandardConnection(tcpListenSock);
          else
-         if(currentPollable == sdpListenSock)
-            onIncomingStandardConnection(sdpListenSock);
-         else
          { // unknown connection => should never happen
             log.log(Log_WARNING, "Should never happen: Ignoring event for unknown connection. "
                "FD: " + StringTk::uintToStr(currentPollable->getFD() ) );
@@ -309,7 +246,7 @@ void ConnAcceptor::listenLoop()
 /**
  * Accept the incoming connection and add new socket to StreamListenerV2 queue.
  *
- * Note: This is for standard sockets like TCP and SDP.
+ * Note: This is for standard sockets like TCP.
  */
 void ConnAcceptor::onIncomingStandardConnection(StandardSocket* sock)
 {

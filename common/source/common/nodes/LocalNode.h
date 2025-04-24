@@ -1,5 +1,4 @@
-#ifndef LOCALNODE_H_
-#define LOCALNODE_H_
+#pragma once
 
 
 #include <common/nodes/LocalNodeConnPool.h>
@@ -19,9 +18,9 @@ class LocalNode : public Node
       /**
        * @param portTCP not used internally, but required when connection info is exported
        */
-      LocalNode(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
+      LocalNode(NodeType nodeType, std::string alias, NumNodeID nodeNumID, unsigned short portUDP,
             unsigned short portTCP, NicAddressList& nicList):
-         Node(nodeType, std::move(nodeID), nodeNumID, portUDP)
+         Node(nodeType, std::move(alias), nodeNumID, portUDP)
       {
          this->portTCP = portTCP;
 
@@ -38,4 +37,3 @@ class LocalNode : public Node
       }
 };
 
-#endif /*LOCALNODE_H_*/

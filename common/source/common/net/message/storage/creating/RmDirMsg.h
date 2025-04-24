@@ -1,5 +1,4 @@
-#ifndef RMDIRMSG_H_
-#define RMDIRMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -87,4 +86,3 @@ class RmDirMsg : public MirroredMessageBase<RmDirMsg>
 };
 
 
-#endif /*RMDIRMSG_H_*/

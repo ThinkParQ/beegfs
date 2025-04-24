@@ -10,8 +10,6 @@
 #include <common/threading/Condition.h>
 #include <common/net/message/NetMessage.h>
 #include <nodes/NodeStoreEx.h>
-#include <toolkit/ExternalHelperd.h>
-
 
 /*
  * note: AckEntry-queues management is integrated into AckManager, because it needs

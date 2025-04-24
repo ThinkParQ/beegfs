@@ -1,5 +1,4 @@
-#ifndef SETMETADATAMIRRORINGRESPMSG_H_
-#define SETMETADATAMIRRORINGRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/storage/StorageErrors.h>
@@ -32,4 +31,3 @@ class SetMetadataMirroringRespMsg : public SimpleIntMsg
 };
 
 
-#endif /*SETMETADATAMIRRORINGRESPMSG_H_*/

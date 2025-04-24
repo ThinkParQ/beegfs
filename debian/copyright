@@ -11,10 +11,6 @@ Files: client_module/*
 Copyright: 2009 Fraunhofer ITWM, 2022 ThinkParQ GmbH
 License: GPL-2
 
-Files: beeond_thirdparty_gpl/source/parallel-20150122.tar.bz2
-Copyright: 2007-2015, Ole Tange and Free Software Foundation, Inc.
-License: GPL-3
-
 Files:
  common/source/common/toolkit/BufferTk.cpp
  client_module/source/common/toolkit/HashTk.c

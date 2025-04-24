@@ -1,5 +1,4 @@
-#ifndef COMMON_RWLOCKGUARD_H
-#define COMMON_RWLOCKGUARD_H
+#pragma once
 
 #include <common/threading/RWLock.h>
 #include <common/threading/SafeRWLock.h>
@@ -30,4 +29,3 @@ class RWLockGuard
       RWLock* lock;
 };
 
-#endif

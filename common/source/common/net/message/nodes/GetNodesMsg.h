@@ -1,5 +1,4 @@
-#ifndef GETNODESMSG_H_
-#define GETNODESMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 #include <common/nodes/Node.h>
@@ -34,4 +33,3 @@ class GetNodesMsg : public SimpleIntMsg
 };
 
 
-#endif /*GETNODESMSG_H_*/

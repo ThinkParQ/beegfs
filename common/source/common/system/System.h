@@ -1,8 +1,8 @@
-#ifndef SYSTEM_H_
-#define SYSTEM_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/app/config/InvalidConfigException.h>
+#include <common/storage/StorageErrors.h>
 
 #include <sys/fsuid.h>
 #include <limits>
@@ -26,6 +26,10 @@ class System
       static void getMemoryInfo(uint64_t *memTotal, uint64_t *memFree, uint64_t *memCached,
          uint64_t *memBuffered);
       static uint64_t getUsableMemorySize();
+      static std::string getDevicePathFromMountpoint(std::string mountpoint);
+      static std::string getFsUUID(std::string mountpoint);
+      static std::pair<FhgfsOpsErr, std::string> getPartUUID(std::string mountpoint);
+      static std::string getMachineUUID();
 
       static std::string getUserNameFromUID(unsigned uid);
       static bool getUIDFromUserName(std::string username, uid_t* outUID);
@@ -77,4 +81,3 @@ class System
 
 };
 
-#endif /*SYSTEM_H_*/

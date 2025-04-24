@@ -1,5 +1,3 @@
-#include <common/net/message/helperd/LogMsg.h>
-#include <common/net/message/helperd/LogRespMsg.h>
 #include <common/threading/Thread.h>
 #include <common/toolkit/MessagingTk.h>
 #include <common/nodes/Node.h>
@@ -30,9 +28,6 @@ void Logger_init(Logger* this, App* app, Config* cfg)
 
    this->clientID = NULL;
 
-   ExternalHelperd_initHelperdNode(app, cfg, "loggerd", &this->loggerdNode);
-   this->loggerdReachable = true;
-
    Mutex_init(&this->outputMutex);
 
 
@@ -54,13 +49,6 @@ Logger* Logger_construct(App* app, Config* cfg)
 
 void Logger_uninit(Logger* this)
 {
-   Node* loggerdNode = this->loggerdNode;
-
-   this->loggerdNode = NULL; // disable logging, because loggerdNode destruction
-   // will produce log messages (e.g. in the NodeConnPool class)
-
-   Node_put(loggerdNode);
-
    SAFE_KFREE(this->clientID);
 
    SAFE_KFREE(this->logContextBuf);
@@ -91,7 +79,7 @@ void Logger_logFormatted(Logger* this, LogLevel level, const char* context, cons
 
    va_list ap;
 
-   if( (level > this->logLevels[LogTopic_GENERAL]) || !this->loggerdNode)
+   if(level > this->logLevels[LogTopic_GENERAL])
       return;
 
    va_start(ap, msgFormat);
@@ -108,7 +96,7 @@ void Logger_logTopFormatted(Logger* this, LogTopic logTopic, LogLevel level, con
 
    va_list ap;
 
-   if( (level > this->logLevels[logTopic]) || !this->loggerdNode)
+   if(level > this->logLevels[logTopic])
       return;
 
    va_start(ap, msgFormat);
@@ -162,7 +150,7 @@ void Logger_logTopFormattedWithEntryID(struct inode* inode, LogTopic logTopic, L
 void Logger_logFormattedVA(Logger* this, LogLevel level, const char* context, const char* msgFormat,
    va_list ap)
 {
-   if( (level > this->logLevels[LogTopic_GENERAL]) || !this->loggerdNode)
+   if(level > this->logLevels[LogTopic_GENERAL])
       return;
 
    __Logger_logTopFormattedGranted(this, LogTopic_GENERAL, level, context, msgFormat, ap);
@@ -174,7 +162,7 @@ void Logger_logFormattedVA(Logger* this, LogLevel level, const char* context, co
 void Logger_logTopFormattedVA(Logger* this, LogTopic logTopic, LogLevel level, const char* context,
    const char* msgFormat, va_list ap)
 {
-   if( (level > this->logLevels[logTopic]) || !this->loggerdNode)
+   if(level > this->logLevels[logTopic])
       return;
 
    __Logger_logTopFormattedGranted(this, logTopic, level, context, msgFormat, ap);
@@ -185,9 +173,6 @@ void Logger_logErrFormatted(Logger* this, const char* context, const char* msgFo
    // note: cannot be inlined because of variable arg list
 
    va_list ap;
-
-   if(!this->loggerdNode)
-      return;
 
    va_start(ap, msgFormat);
 
@@ -203,89 +188,12 @@ void Logger_logTopErrFormatted(Logger* this, LogTopic logTopic, const char* cont
 
    va_list ap;
 
-   if(!this->loggerdNode)
-      return;
-
    va_start(ap, msgFormat);
 
    __Logger_logTopFormattedGranted(this, logTopic, Log_ERR, context, msgFormat, ap);
 
    va_end(ap);
 }
-
-/**
- * Prints a message to the standard log (by sending it to the loggerd).
- *
- * @param level the level of relevance (should be greater than 0)
- * @param msg the message
- */
-void __Logger_logTopGrantedUnlocked(Logger* this, LogTopic logTopic, LogLevel level,
-   const char* context, const char* msg)
-{
-   // Note: We must be careful here not to use a buffer from the msgBufStore, because that could
-      // lead to a deadlock when all buffers are used up for messaging and then messaging needs to
-      // log disconnect errors => no buffer left in store
-
-   Config* cfg = App_getConfig(this->app);
-
-   int threadID = current->pid;
-   char threadName[BEEGFS_TASK_COMM_LEN];
-   LogMsg requestMsg;
-   char* respBuf;
-   NetMessage* respMsg;
-   FhgfsOpsErr requestRes;
-   LogRespMsg* logResp;
-   int retVal;
-
-
-   if(Config_getLogTypeNum(cfg) == LOGTYPE_Syslog)
-   { // log to syslog
-      printk_fhgfs(KERN_INFO, "%s: %s\n", context, msg);
-      return;
-   }
-
-
-   // log to helperd...
-
-   // prepare request msg
-   Thread_getCurrentThreadName(threadName);
-   LogMsg_initFromEntry(&requestMsg, level, threadID, threadName, context, msg);
-
-   // connect & communicate
-   requestRes = MessagingTk_requestResponseKMalloc(this->app,
-      this->loggerdNode, (NetMessage*)&requestMsg, NETMSGTYPE_LogResp, &respBuf, &respMsg);
-
-   if(unlikely(requestRes != FhgfsOpsErr_SUCCESS) )
-   { // request/response failed
-      if(requestRes != FhgfsOpsErr_INTERRUPTED)
-      { // (no need to klog an error if the user manually interrupted this operation)
-         __Logger_logUnreachableLoggerd(this);
-
-         if(!level)
-         { // this was an error, so inform the user about it!
-            printk_fhgfs(KERN_INFO, "%s: %s\n", context, msg);
-         }
-      }
-
-      return;
-   }
-
-   __Logger_logReachableLoggerd(this);
-
-   // handle result
-   logResp = (LogRespMsg*)respMsg;
-   retVal = LogRespMsg_getValue(logResp);
-
-   if(retVal)
-   { // error
-      // nothing to be done here
-   }
-
-   // clean-up
-   NETMESSAGE_FREE(respMsg);
-   kfree(respBuf);
-}
-
 
 /**
  * Prints a message to the standard log.
@@ -318,10 +226,7 @@ void __Logger_logTopFormattedGranted(Logger* this, LogTopic logTopic, LogLevel l
    else
       snprintf(this->logContextBuf, LOGGER_LOGBUF_SIZE, "%s", context);
 
-
-   __Logger_logTopGrantedUnlocked(this, logTopic, level, this->logContextBuf,
-      this->logFormattedBuf);
-
+   printk_fhgfs(KERN_INFO, "%s: %s\n", this->logContextBuf, this->logFormattedBuf);
 
    __Logger_setCurrentOutputPID(this, LOGGER_PID_NOCURRENTOUTPUT); // release currentOutputPID
 
@@ -362,38 +267,6 @@ void __Logger_setCurrentOutputPID(Logger* this, pid_t pid)
    Mutex_unlock(&this->multiLockMutex);
 }
 
-
-void __Logger_logReachableLoggerd(Logger* this)
-{
-   if(this->loggerdReachable)
-   {
-      // nothing to be done (we print the message only once)
-   }
-   else
-   {
-      // helperd was unreachable before => print notice
-      printk_fhgfs(KERN_NOTICE, "External logger (provided by beegfs-helperd) is "
-         "reachable now => logging re-enabled\n");
-
-      this->loggerdReachable = true;
-   }
-}
-
-void __Logger_logUnreachableLoggerd(Logger* this)
-{
-   if(!this->loggerdReachable)
-   {
-      // we already printed the error message in this case
-   }
-   else
-   {
-      // print error message
-      printk_fhgfs(KERN_WARNING, "External logger (provided by beegfs-helperd) is "
-         "unreachable => logging currently disabled\n");
-
-      this->loggerdReachable = false;
-   }
-}
 
 /**
  * Returns a pointer to the static string representation of a log topic (or "<unknown>" for unknown/

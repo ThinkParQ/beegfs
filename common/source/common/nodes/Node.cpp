@@ -13,7 +13,7 @@
  */
 Node::Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP,
       unsigned short portTCP, const NicAddressList& nicList) :
-   nodeType(nodeType), id(nodeID)
+   nodeType(nodeType), alias(nodeID)
 {
    this->numID = nodeNumID;
    this->portUDP = portUDP;
@@ -29,7 +29,7 @@ Node::Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned 
  * @param portUDP value 0 if undefined
  */
 Node::Node(NodeType nodeType, std::string nodeID, NumNodeID nodeNumID, unsigned short portUDP):
-   nodeType(nodeType), id(std::move(nodeID))
+   nodeType(nodeType), alias(std::move(nodeID))
 {
    this->numID = nodeNumID;
    this->portUDP = portUDP;
@@ -117,7 +117,8 @@ bool Node::updateInterfacesUnlocked(unsigned short portUDP, unsigned short portT
  */
 std::string Node::getTypedNodeID() const
 {
-   return getTypedNodeID(id, numID, nodeType);
+   std::shared_lock lock(aliasMutex);
+   return getTypedNodeID(alias, numID, nodeType);
 }
 
 std::string Node::getTypedNodeID(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType)
@@ -130,14 +131,15 @@ std::string Node::getTypedNodeID(std::string nodeID, NumNodeID nodeNumID, NodeTy
  */
 std::string Node::getNodeIDWithTypeStr() const
 {
-   return getNodeIDWithTypeStr(id, numID, nodeType);
+   std::shared_lock lock(aliasMutex);
+   return getNodeIDWithTypeStr(alias, numID, nodeType);
 }
 
 /**
  * Returns the node type dependent ID (numeric ID for servers and string ID for clients) and the
  * node type in a human-readable string.
  *
- * This is intendened as a convenient way to get a string with node ID and type for log messages.
+ * This is intended as a convenient way to get a string with node ID and type for log messages.
  */
 std::string Node::getNodeIDWithTypeStr(std::string nodeID, NumNodeID nodeNumID, NodeType nodeType)
 {

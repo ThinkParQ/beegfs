@@ -26,18 +26,21 @@ std::unique_ptr<MirroredMessageResponseState> MoveFileInodeMsgEx::executeLocally
 {
    App* app = Program::getApp();
    MetaStore* metaStore = app->getMetaStore();
-   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
+   MoveFileInodeMsgResponseState resp;
 
    if (getMode() == FileInodeMode::MODE_INVALID)
    {
       // invalid operation requested
-      return boost::make_unique<ResponseState>(retVal);
+      return boost::make_unique<ResponseState>(std::move(resp));
    }
 
    EntryInfo* fromFileInfo = getFromFileEntryInfo();
+   FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
+   unsigned linkCount = 0;
+
    if (getCreateHardlink())
    {
-      retVal = metaStore->makeNewHardlink(fromFileInfo);
+      std::tie(retVal, linkCount) = metaStore->makeNewHardlink(fromFileInfo);
    }
    else
    {
@@ -53,7 +56,9 @@ std::unique_ptr<MirroredMessageResponseState> MoveFileInodeMsgEx::executeLocally
          retVal = FhgfsOpsErr_PATHNOTEXISTS;
    }
 
-   return boost::make_unique<ResponseState>(retVal);
+   resp.setResult(retVal);
+   resp.setHardlinkCount(linkCount);
+   return boost::make_unique<ResponseState>(std::move(resp));
 }
 
 void MoveFileInodeMsgEx::forwardToSecondary(ResponseContext& ctx)

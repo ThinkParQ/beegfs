@@ -1,5 +1,4 @@
-#ifndef FIXMETADATAOWNERMSGEX_H
-#define FIXMETADATAOWNERMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/net/message/fsck/DeleteDirEntriesMsg.h>
@@ -11,4 +10,3 @@ class DeleteDirEntriesMsgEx : public DeleteDirEntriesMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*FIXMETADATAOWNERMSGEX_H*/

@@ -1,5 +1,4 @@
-#ifndef TRUNCFILERESPMSG_H_
-#define TRUNCFILERESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -16,4 +15,3 @@ class TruncFileRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*TRUNCFILERESPMSG_H_*/

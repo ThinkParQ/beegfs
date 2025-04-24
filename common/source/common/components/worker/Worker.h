@@ -1,5 +1,4 @@
-#ifndef WORKER_H_
-#define WORKER_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/app/AbstractApp.h>
@@ -105,4 +104,3 @@ class Worker : public PThread
       }
 };
 
-#endif /*WORKER_H_*/

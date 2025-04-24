@@ -1,5 +1,4 @@
-#ifndef DIRENTRYSTORE_H_
-#define DIRENTRYSTORE_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Mutex.h>
@@ -200,4 +199,3 @@ class DirEntryStore
 };
 
 
-#endif /* DIRENTRYSTORE_H_*/

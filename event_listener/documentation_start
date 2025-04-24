@@ -60,5 +60,5 @@ Read
    Example
    mv source dest
    will result in
-   { "Version": 1, "PacketSize": 76, "Dropped": 0, "Missed": 0, "Type": "Rename", "Path": "source", "EntryId": "1-5A562525-1", "ParentEntryId": "root", "TargetPath": "dest" }
+   { "Version": 1, "PacketSize": 76, "Missed": 0, "Type": "Rename", "Path": "source", "EntryId": "1-5A562525-1", "ParentEntryId": "root", "TargetPath": "dest" }
 

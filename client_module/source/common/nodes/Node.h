@@ -5,6 +5,7 @@
 #include <common/nodes/NumNodeID.h>
 #include <common/threading/Condition.h>
 #include <common/threading/Mutex.h>
+#include <common/threading/RWLock.h>
 #include <common/toolkit/StringTk.h>
 #include <common/toolkit/Time.h>
 #include <linux/kref.h>
@@ -34,13 +35,71 @@ extern void Node_updateLastHeartbeatT(Node* this);
 extern bool Node_updateInterfaces(Node* this, unsigned short portUDP, unsigned short portTCP,
    NicAddressList* nicList);
 
-extern const char* Node_getNodeIDWithTypeStr(Node* this);
+/**
+ * NodeString is a structure to hold a formatted string representation related to a Node.
+ *
+ * This structure provides a fixed-size buffer that can store various strings associated with a
+ * Node, such as the node's alias or a combination of the alias and node type. It is designed to be
+ * used in functions where thread-safe operations are required to copy or format node-related
+ * strings into a pre-allocated buffer.
+ */
+typedef struct NodeString {
+   // The mgmtd only allows aliases up to 32 characters with characters limited to "a-zA-Z0-9.-_".
+   // It is also used for the AliasWithTypeStr which may be up to 66 bytes: 
+   //
+   // `<32 CHARACTER ALIAS> [<undefined/invalid>:4294967295]\0`
+   //
+   // Because it is unlikely we ever encounter an <undefined/invalid> node with an ID that is the
+   // uint32 max and a 32 character alias the buffer size is set to 64 bytes which corresponds to
+   // the cache line on most architectures. Longer strings will be truncated and end with ellipses.
+   char buf[64];
+} NodeString;
+
+/**
+ * Node_copyAliasWithTypeStr copies the alias, numerical ID (for servers) and the node type in a
+ * human-readable string. Intended as a convenient way to get a string identifying a node/client for
+ * log messages.
+ *
+ * @param this is which Node to return an identifying string for.
+ * @param outStr is where the string should be copied to.
+ *
+* IMPORTANT: With the shift from string IDs to aliases in b8.0, aliases may be updated dynamically.
+ * Callers MUST use this function to access the alias.
+ */
+extern void Node_copyAliasWithTypeStr(Node *this, NodeString *outStr);
+/**
+ * Node_copyAlias gets a copy of the node's alias (formerly known as a string ID).
+ *
+ * @param this is a pointer to the Node structure with the alias to get.
+ * @param outStr is where the alias should be copied to.
+ *
+ * @return string remains valid until Node_putAlias is called; caller must not free the string.
+ * IMPORTANT: With the shift from string IDs to aliases in b8.0, aliases may be updated dynamically.
+ * Callers MUST use this function to access the alias.
+ */
+extern void Node_copyAlias(Node *this, NodeString *outStr);
 
 // static
 extern const char* Node_nodeTypeToStr(NodeType nodeType);
 
 // getters & setters
-static inline char* Node_getID(Node* this);
+
+/**
+ * Node_setNodeAliasAndType() handles thread safe updates to the alias (formerly node string ID),
+ * node type, and nodeAliasWithTypeStr. It blocks until other writers (unlikely) have finished
+ * making updates or readers (more likely) have released these fields with the corresponding
+ * Node_putX functions.
+ *
+ * @param this is a pointer to the Node structure with the alias, nodeType, and
+ * nodeAliasWithTypeStr.
+ * @param alias is the alias to set. Copies the alias and does not take ownership of it. The caller
+ * is responsible for freeing the alias when appropriate.
+ * @param nodeType the nodeType to set.
+ *
+ * The alias or nodeType can be respectively NULL or set to NODETYPE_Invalid to only update one
+ * field and update the nodeAliasWithTypeStr.
+ */
+extern bool Node_setNodeAliasAndType(Node* this, const char *alias, NodeType nodeType);
 static inline NumNodeID Node_getNumID(Node* this);
 static inline void Node_setNumID(Node* this, const NumNodeID numID);
 static inline void Node_cloneNicList(Node* this, NicAddressList* nicList);
@@ -52,21 +111,22 @@ static inline bool Node_getIsActive(Node* this);
 static inline unsigned short Node_getPortUDP(Node* this);
 static inline unsigned short Node_getPortTCP(Node* this);
 static inline NodeType Node_getNodeType(Node* this);
-static inline void Node_setNodeType(Node* this, NodeType nodeType);
 static inline const char* Node_getNodeTypeStr(Node* this);
 
 enum NodeType
    {NODETYPE_Invalid = 0, NODETYPE_Meta = 1, NODETYPE_Storage = 2, NODETYPE_Client = 3,
-   NODETYPE_Mgmt = 4, NODETYPE_Helperd = 5};
+   NODETYPE_Mgmt = 4};
 
 
 struct Node
 {
-   char* id; // string ID, generated locally on each node; not thread-safe (not meant to be changed)
    NumNodeID numID; // numeric ID, assigned by mgmtd server store (unused for clients)
 
+   // Must be locked before accessing the alias, nodeType, or nodeAliasWithTypeStr.
+   RWLock aliasAndTypeMu;
+   char* alias; // alias (formerly string ID): initially generated locally on each node but thread safe and able to be updated as of b8.0
    NodeType nodeType; // set by NodeStore::addOrUpdate()
-   char* nodeIDWithTypeStr; // for log messages (initially NULL, alloc'ed when needed)
+   char* nodeAliasWithTypeStr; // for log messages (initially NULL, initialized when the alias is set/updated)
 
    NodeConnPool* connPool;
    unsigned short portUDP;
@@ -101,11 +161,6 @@ static inline void __Node_put(struct kref* ref)
 static inline int Node_put(Node* node)
 {
    return kref_put(&node->references, __Node_put);
-}
-
-char* Node_getID(Node* this)
-{
-   return this->id;
 }
 
 NumNodeID Node_getNumID(Node* this)
@@ -190,19 +245,11 @@ unsigned short Node_getPortTCP(Node* this)
 
 NodeType Node_getNodeType(Node* this)
 {
-   return this->nodeType;
-}
-
-/**
- * Note: Not thread-safe to avoid unnecessary overhead. We assume this is called only in situations
- * where the object is not used by multiple threads, such as NodeStore::addOrUpdate() or
- * Serialization_deserializeNodeList().
- */
-void Node_setNodeType(Node* this, NodeType nodeType)
-{
-   this->nodeType = nodeType;
-
-   SAFE_KFREE(this->nodeIDWithTypeStr); // will be recreated on demand by _getNodeIDWithTypeStr()
+   NodeType nodeType;
+   RWLock_readLock(&this->aliasAndTypeMu);
+   nodeType = this->nodeType;
+   RWLock_readUnlock(&this->aliasAndTypeMu);
+   return nodeType;
 }
 
 /**
@@ -212,7 +259,11 @@ void Node_setNodeType(Node* this, NodeType nodeType)
  */
 const char* Node_getNodeTypeStr(Node* this)
 {
-   return Node_nodeTypeToStr(this->nodeType);
+   const char* nodeType;
+   RWLock_readLock(&this->aliasAndTypeMu);
+   nodeType = Node_nodeTypeToStr(this->nodeType);
+   RWLock_readUnlock(&this->aliasAndTypeMu);
+   return nodeType;
 }
 
 #endif /*NODE_H_*/

@@ -1,5 +1,4 @@
-#ifndef GETSTORAGERESYNCSTATSRESPMSG_H_
-#define GETSTORAGERESYNCSTATSRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/mirroring/BuddyResyncJobStatistics.h>
@@ -48,4 +47,3 @@ class GetStorageResyncStatsRespMsg : public NetMessageSerdes<GetStorageResyncSta
       }
 };
 
-#endif /*GETSTORAGERESYNCSTATSRESPMSG_H_*/

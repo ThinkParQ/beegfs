@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+# BeeGFS Client Mount Utility / External Mount Helper
+# If placed in /sbin, this script is called automatically by `mount` whenever a filesystem with type
+# `beegfs` is being mounted. It's main purpose is to do name resolution of the management hostname
+# as the kernel module can't do that by itself. The hostname is taken from either the mount option
+# string itself ('sysMgmtdHost=') or from the config file given by the mount options ('cfgFile=').
+
+function usage() {
+  echo "Usage: $(basename "$0") <fs_name> <directory> [-sfnv] [-o options]"
+  exit 1
+}
+
+SPEC="$1"
+shift
+DIR="$1"
+shift
+
+[[ -n "$SPEC" && -n "$DIR" ]] || usage
+
+FLAGS=
+OPTIONS=
+
+# Read in all possible flags (see `man mount 8`)
+while getopts 'hsfnvo:t:' FLAG; do
+  case "$FLAG" in
+    s|f|n|v)
+      FLAGS+=("-$FLAG")
+      ;;
+    o)
+      OPTIONS="$OPTARG"
+      ;;
+    h|*)
+      usage
+      ;;
+  esac
+done
+shift "$((OPTIND -1))"
+
+# If there is a config file available and sysMgmtdHost is set, load the management hostname from the
+# config file
+CFG_FILE=$(echo "$OPTIONS" | grep -oP 'cfgFile=[^,]+' | cut -d= -f2)
+
+if [[ -n "$CFG_FILE" ]]; then
+  [[ -f "$CFG_FILE"  ]] || {
+    echo "Can not open config file '$CFG_FILE'"
+    exit 1
+  }
+
+  H=$(grep -oP '^\s*sysMgmtdHost\s*=\s*\S+\s*$' "$CFG_FILE" | tr -d ' ' | cut -d= -f2)
+  if [[ $H == *$'\n'* ]]; then
+    echo "Multiple definitions of 'sysMgmtdHost' found in '$CFG_FILE'."
+    exit 1
+  elif [[ -n "$H" ]]; then
+    HOST_NAME="$H"
+  fi
+fi
+
+# If it has explicitly been set as a mount option, use that (overrides config file).
+HOST_NAME_OPTION=$(echo "$OPTIONS" | grep -oP 'sysMgmtdHost=[^,]+' | cut -d= -f2)
+if [[ -n "$HOST_NAME_OPTION" ]]; then
+  HOST_NAME="$HOST_NAME_OPTION"
+fi
+
+# A management host must be provided
+[[ -n "$HOST_NAME" ]] || {
+  echo "Can not determine management host - neither through a mount option ('sysMgmtdHost') nor through \
+a client config file ('cfgFile')."
+  exit 1
+}
+
+# Resolve management address
+MGMTD_ADDR=$(getent ahostsv4 "$HOST_NAME" | cut -f1 -d' ' | head -n1)
+
+# If resolve fails, error out
+[[ -n "$MGMTD_ADDR" ]] || {
+  echo "Can not resolve management host address using hostname '$HOST_NAME'"
+  exit 1
+}
+
+# If the host argument was given, replace it with the resolved address, otherwise append
+if [[ -n "$HOST_NAME_OPTION" ]]; then
+  # shellcheck disable=SC2001
+  OPTIONS=$(echo "$OPTIONS" | sed "s/sysMgmtdHost=[^,]\\+/sysMgmtdHost=$MGMTD_ADDR/g")
+else
+  OPTIONS="$OPTIONS,sysMgmtdHost=$MGMTD_ADDR"
+fi
+
+# Take the part behind the "." as fstype (typically "beegfs"). This allows multiple mount utilities
+# and client modules being installed at the same time.
+FS_TYPE=$(basename "$0" | sed 's/^.*\.//')
+
+set -ex
+mount --internal -t "$FS_TYPE" --source "$SPEC" --target "$DIR" ${FLAGS[*]} -o"$OPTIONS"

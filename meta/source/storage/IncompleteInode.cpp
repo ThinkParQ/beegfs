@@ -23,10 +23,16 @@ FhgfsOpsErr IncompleteInode::setXattr(const char* name, const void* value, size_
    return FhgfsOpsErr_SUCCESS;
 }
 
-FhgfsOpsErr IncompleteInode::setContent(const void* value, size_t size)
+FhgfsOpsErr IncompleteInode::setContent(const char* attrName, const void* value, size_t size)
 {
    if (Program::getApp()->getConfig()->getStoreUseExtendedAttribs())
-      return setXattr(META_XATTR_NAME, value, size);
+      return setXattr(attrName, value, size);
+
+   if (strcmp(attrName, META_XATTR_NAME) != 0)
+   {
+      LOG(GENERAL, ERR, "Setting attribute data as file contents is not supported.", attrName);
+      return FhgfsOpsErr_INVAL;
+   }
 
    if (hasContent)
    {

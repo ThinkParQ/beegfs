@@ -22,9 +22,9 @@ static inline bool beegfs_getConfigFile(int fd, char** outCfgFile);
 static inline bool beegfs_getRuntimeConfigFile(int fd, char** outCfgFile);
 static inline bool beegfs_testIsBeeGFS(int fd);
 static inline bool beegfs_getMountID(int fd, char** outMountID);
-static inline bool beegfs_getStripeInfo(int fd, unsigned* outPatternType, unsigned* outChunkSize, 
+static inline bool beegfs_getStripeInfo(int fd, unsigned* outPatternType, unsigned* outChunkSize,
    uint16_t* outNumTargets);
-static inline bool beegfs_getStripeTarget(int fd, uint16_t targetIndex, uint16_t* outTargetNumID, 
+static inline bool beegfs_getStripeTarget(int fd, uint16_t targetIndex, uint16_t* outTargetNumID,
    uint16_t* outNodeNumID, char** outNodeStrID);
 static inline bool beegfs_getStripeTargetV2(int fd, uint32_t targetIndex,
    struct BeegfsIoctl_GetStripeTargetV2_Arg* outTargetInfo);
@@ -40,7 +40,7 @@ static inline bool beegfs_pingNode(int fd, struct BeegfsIoctl_PingNode_Arg* ping
 
 /**
  * Get the path to the client config file of an active BeeGFS mountpoint.
- * 
+ *
  * @param fd filedescriptor pointing to file or dir inside BeeGFS mountpoint.
  * @param outCfgFile buffer for config file path; will be malloc'ed and needs to be free'd by
  *        caller if success was returned.
@@ -64,7 +64,7 @@ bool beegfs_getConfigFile(int fd, char** outCfgFile)
 
 /**
  * Get the path to the client runtime config file in procfs.
- * 
+ *
  * @param fd filedescriptor pointing to file or dir inside BeeGFS mountpoint.
  * @param outCfgFile buffer for config file path; will be malloc'ed and needs to be free'd by
  *        caller if success was returned.
@@ -88,7 +88,7 @@ bool beegfs_getRuntimeConfigFile(int fd, char** outCfgFile)
 
 /**
  * Test if the underlying file system is a BeeGFS.
- * 
+ *
  * @param fd filedescriptor pointing to some file or dir that should be checked for whether it is
  *        located inside a BeeGFS mount.
  * @return true on success, false on error (in which case errno will be set).
@@ -118,7 +118,7 @@ bool beegfs_testIsBeeGFS(int fd)
 
 /**
  * Get the mountID aka clientID aka nodeID of client mount aka sessionID.
- * 
+ *
  * @param fd filedescriptor pointing to some file or dir that should be checked for whether it is
  *        located inside a BeeGFS mount.
  * @return true on success, false on error (in which case errno will be set).
@@ -139,28 +139,28 @@ bool beegfs_getMountID(int fd, char** outMountID)
    *outMountID = strndup(mountIDBuf, sizeof(mountIDBuf) );
    if(!*outMountID)
       return false;
-   
+
    return true;
 }
 
 /**
  * Get the stripe info of a file.
- * 
+ *
  * @param fd filedescriptor pointing to some file inside a BeeGFS mount.
  * @param outPatternType type of stripe pattern (BEEGFS_STRIPEPATTERN_...)
  * @param outChunkSize chunk size for striping.
  * @param outNumTargets number of targets for striping.
  * @return true on success, false on error (in which case errno will be set).
  */
-bool beegfs_getStripeInfo(int fd, unsigned* outPatternType, unsigned* outChunkSize, 
+bool beegfs_getStripeInfo(int fd, unsigned* outPatternType, unsigned* outChunkSize,
    uint16_t* outNumTargets)
 {
    struct BeegfsIoctl_GetStripeInfo_Arg getStripeInfo;
-   
+
    int res = ioctl(fd, BEEGFS_IOC_GET_STRIPEINFO, &getStripeInfo);
    if(res)
       return false;
-   
+
    *outPatternType = getStripeInfo.outPatternType;
    *outChunkSize = getStripeInfo.outChunkSize;
    *outNumTargets = getStripeInfo.outNumTargets;
@@ -170,32 +170,32 @@ bool beegfs_getStripeInfo(int fd, unsigned* outPatternType, unsigned* outChunkSi
 
 /**
  * Get the stripe target of a file (with 0-based index).
- * 
+ *
  * @param fd filedescriptor pointing to some file inside a BeeGFS mount.
  * @param targetIndex index of target that should be retrieved (start with 0 and then call this
  *        again with index up to "*outNumTargets-1" to retrieve remaining targets).
  * @param outTargetNumID numeric ID of target at given index.
  * @param outNodeNumID numeric ID to node to which this target is assigned.
- * @param outNodeStrID string ID of the node to which this target is assigned; buffer will be 
- *        alloc'ed and needs to be free'd by caller if success is returned.
+ * @param outNodeAlias alias (formerly string ID) of the node to which this target is assigned;
+ *        buffer will be alloc'ed and needs to be free'd by caller if success is returned.
  * @return true on success, false on error (in which case errno will be set).
  */
-bool beegfs_getStripeTarget(int fd, uint16_t targetIndex, uint16_t* outTargetNumID, 
-   uint16_t* outNodeNumID, char** outNodeStrID)
+bool beegfs_getStripeTarget(int fd, uint16_t targetIndex, uint16_t* outTargetNumID,
+   uint16_t* outNodeNumID, char** outNodeAlias)
 {
    struct BeegfsIoctl_GetStripeTarget_Arg getStripeTarget;
-   
+
    getStripeTarget.targetIndex = targetIndex;
 
    int res = ioctl(fd, BEEGFS_IOC_GET_STRIPETARGET, &getStripeTarget);
    if(res)
       return false;
-   
+
    *outTargetNumID = getStripeTarget.outTargetNumID;
    *outNodeNumID = getStripeTarget.outNodeNumID;
 
-   *outNodeStrID = strndup(getStripeTarget.outNodeStrID, BEEGFS_IOCTL_CFG_MAX_PATH);
-   if(!*outNodeStrID)
+   *outNodeAlias = strndup(getStripeTarget.outNodeAlias, BEEGFS_IOCTL_CFG_MAX_PATH);
+   if(!*outNodeAlias)
       return false;
 
    return true;
@@ -203,7 +203,7 @@ bool beegfs_getStripeTarget(int fd, uint16_t targetIndex, uint16_t* outTargetNum
 
 /**
  * Get the stripe target of a file (with 0-based index).
- * 
+ *
  * @param fd filedescriptor pointing to some file inside a BeeGFS mount.
  * @param targetIndex index of target that should be retrieved (start with 0 and then call this
  *        again with index up to "*outNumTargets-1" to retrieve remaining targets).

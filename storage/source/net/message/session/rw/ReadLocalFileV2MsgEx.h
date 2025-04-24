@@ -1,5 +1,4 @@
-#ifndef READLOCALFILEV2MSGEX_H_
-#define READLOCALFILEV2MSGEX_H_
+#pragma once
 
 #include <common/net/message/session/rw/ReadLocalFileV2Msg.h>
 #include <common/storage/StorageErrors.h>
@@ -215,4 +214,3 @@ class ReadLocalFileV2MsgSender : public ReadLocalFileV2Msg
 typedef ReadLocalFileMsgExBase<ReadLocalFileV2MsgSender,
                                ReadLocalFileV2MsgSender::ReadState> ReadLocalFileV2MsgEx;
 
-#endif /*READLOCALFILEV2MSGEX_H_*/

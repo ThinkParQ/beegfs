@@ -1,5 +1,4 @@
-#ifndef AUTHENTICATECHANNELMSGEX_H_
-#define AUTHENTICATECHANNELMSGEX_H_
+#pragma once
 
 #include <common/net/message/control/AuthenticateChannelMsg.h>
 
@@ -11,4 +10,3 @@ class AuthenticateChannelMsgEx : public AuthenticateChannelMsg
 };
 
 
-#endif /* AUTHENTICATECHANNELMSGEX_H_ */

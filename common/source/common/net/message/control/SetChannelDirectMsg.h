@@ -1,5 +1,4 @@
-#ifndef SETCHANNELDIRECTMSG_H_
-#define SETCHANNELDIRECTMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -18,4 +17,3 @@ class SetChannelDirectMsg : public SimpleIntMsg
       }
 };
 
-#endif /*SETCHANNELDIRECTMSG_H_*/

@@ -79,17 +79,17 @@ int main(int argc, char** argv)
             {
                std::cout << "  + " << outTargetInfo.targetOrGroup
                   << " @ " << outTargetInfo.primaryTarget
-                  << " @ " << outTargetInfo.primaryNodeStrID
+                  << " @ " << outTargetInfo.primaryNodeAlias
                   << " [ID: "<< outTargetInfo.primaryNodeID << "]" << std::endl;
                std::cout << "  + " << outTargetInfo.targetOrGroup
                   << " @ " << outTargetInfo.secondaryTarget
-                  << " @ " << outTargetInfo.secondaryNodeStrID
+                  << " @ " << outTargetInfo.secondaryNodeAlias
                   << " [ID: "<< outTargetInfo.secondaryNodeID << "]" << std::endl;
             }
             else
             {
                std::cout << "  + " << outTargetInfo.targetOrGroup
-                  << " @ " << outTargetInfo.primaryNodeStrID
+                  << " @ " << outTargetInfo.primaryNodeAlias
                   << " [ID: "<< outTargetInfo.primaryNodeID << "]" << std::endl;
             }
          }

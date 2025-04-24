@@ -146,8 +146,8 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
    if (shouldFixTimestamps())
    {
       fixInodeTimestamp(*toDir, dirTimestamps);
-
-      if (auto newFile = metaStore->referenceFile(&newFileInfo))
+      auto [newFile, referenceRes] = metaStore->referenceFile(&newFileInfo); 
+      if (newFile)
       {
          fixInodeTimestamp(*newFile, fileTimestamps, &newFileInfo);
          metaStore->releaseFile(toDir->getID(), newFile);
@@ -160,7 +160,8 @@ std::unique_ptr<MirroredMessageResponseState> MovingFileInsertMsgEx::executeLoca
       std::move(inodeBuf), overWrittenEntryInfo);
 
 xattr_error:
-   MsgHelperUnlink::unlinkMetaFile(*toDir, newName, NULL);
+   unsigned outNumHardlinks;  // Not used here!
+   MsgHelperUnlink::unlinkMetaFile(*toDir, newName, NULL, outNumHardlinks);
    metaStore->releaseDir(toDir->getID());
 
    return boost::make_unique<MovingFileInsertResponseState>(retVal);

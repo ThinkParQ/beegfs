@@ -1,5 +1,4 @@
-#ifndef COMMON_REFRESHSTORAGEPOOLSMSG_H_
-#define COMMON_REFRESHSTORAGEPOOLSMSG_H_
+#pragma once
 
 #include <common/net/message/AcknowledgeableMsg.h>
 
@@ -21,4 +20,3 @@ class RefreshStoragePoolsMsg : public AcknowledgeableMsgSerdes<RefreshStoragePoo
       }
 };
 
-#endif /*COMMON_REFRESHSTORAGEPOOLSMSG_H_*/

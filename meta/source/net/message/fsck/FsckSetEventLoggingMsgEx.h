@@ -1,5 +1,4 @@
-#ifndef FSCKSETEVENTLOGGINGMSGEX_H
-#define FSCKSETEVENTLOGGINGMSGEX_H
+#pragma once
 
 #include <common/net/message/fsck/FsckSetEventLoggingMsg.h>
 #include <common/net/message/fsck/FsckSetEventLoggingRespMsg.h>
@@ -10,4 +9,3 @@ class FsckSetEventLoggingMsgEx : public FsckSetEventLoggingMsg
       virtual bool processIncoming(ResponseContext& ctx);
 };
 
-#endif /*FSCKSETEVENTLOGGINGMSGEX_H*/

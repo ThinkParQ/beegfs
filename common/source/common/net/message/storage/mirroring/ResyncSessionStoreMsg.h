@@ -1,5 +1,4 @@
-#ifndef COMMON_RESYNCSESSIONSTOREMSG_H
-#define COMMON_RESYNCSESSIONSTOREMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/toolkit/MessagingTk.h>
@@ -70,4 +69,3 @@ class ResyncSessionStoreMsg : public NetMessageSerdes<ResyncSessionStoreMsg>
       }
 };
 
-#endif /* COMMON_RESYNCSESSIONSTOREMSG_H */

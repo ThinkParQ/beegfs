@@ -1,5 +1,4 @@
-#ifndef MKFILEMSGEX_H_
-#define MKFILEMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/MkFileMsg.h>
@@ -47,4 +46,3 @@ class MkFileMsgEx : public MirroredMessage<MkFileMsg,
       EntryInfo entryInfo;
 };
 
-#endif /*MKFILEMSGEX_H_*/

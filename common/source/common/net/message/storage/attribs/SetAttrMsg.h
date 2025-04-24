@@ -1,5 +1,4 @@
-#ifndef SETATTRMSG_H_
-#define SETATTRMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -107,4 +106,3 @@ class SetAttrMsg : public MirroredMessageBase<SetAttrMsg>
       bool supportsMirroring() const { return true; }
 };
 
-#endif /*SETATTRMSG_H_*/

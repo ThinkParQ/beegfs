@@ -1,5 +1,4 @@
-#ifndef HARDLINKEX_H_
-#define HARDLINKEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/HardlinkMsg.h>
@@ -37,4 +36,3 @@ class HardlinkMsgEx : public MirroredMessage<HardlinkMsg,
 };
 
 
-#endif /*HARDLINKEX_H_*/

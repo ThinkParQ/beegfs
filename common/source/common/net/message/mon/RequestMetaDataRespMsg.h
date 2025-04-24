@@ -1,5 +1,4 @@
-#ifndef REQUESTMETADATARESPMSG_H_
-#define REQUESTMETADATARESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/nodes/Node.h>
@@ -45,7 +44,7 @@ class RequestMetaDataRespMsg : public NetMessageSerdes<RequestMetaDataRespMsg>
             % obj->nodeID
             % obj->hostnameid
             % obj->nodeNumID
-            % serdes::backedPtr(obj->nicList, obj->parsed.nicList)
+            % serdesNicAddressList(obj->nicList, obj->parsed.nicList)
             % obj->isRoot
             % obj->indirectWorkListSize
             % obj->directWorkListSize
@@ -124,4 +123,3 @@ class RequestMetaDataRespMsg : public NetMessageSerdes<RequestMetaDataRespMsg>
       }
 };
 
-#endif /*REQUESTMETADATARESPMSG_H_*/

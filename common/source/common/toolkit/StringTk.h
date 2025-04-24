@@ -1,9 +1,7 @@
-#ifndef STRINGTK_H_
-#define STRINGTK_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/storage/StorageErrors.h>
-#include <common/toolkit/BufferTk.h>
 
 #include <iterator>
 
@@ -107,20 +105,6 @@ class StringTk
       }
 
       /**
-       * Calculate the hash of the string.
-       *
-       * @param buf    - string to caculate the hash for
-       * @param bufLen - length of buf
-       */
-      static unsigned strChecksum(const char* buf, int bufLen)
-      {
-         // Note: We use a 32bit checksum here to get the same result (fast) on x86 and x86_64
-
-         return BufferTk::hash32(buf, bufLen);
-      }
-
-
-      /**
        * Get the time-stamp part from an EntryID
        */
       static FhgfsOpsErr timeStampFromEntryID(const std::string& inEntryID, std::string &outEntryID)
@@ -218,4 +202,3 @@ class StringTk
       }
 };
 
-#endif /*STRINGTK_H_*/

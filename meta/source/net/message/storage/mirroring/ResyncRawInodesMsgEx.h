@@ -1,5 +1,4 @@
-#ifndef META_RESYNCRAWINODESMSGEX_H
-#define META_RESYNCRAWINODESMSGEX_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/Path.h>
@@ -48,4 +47,3 @@ class ResyncRawInodesMsgEx : public NetMessageSerdes<ResyncRawInodesMsgEx>
       FhgfsOpsErr removeUntouchedInodes();
 };
 
-#endif /* RESYNCRAWDENTRYMSGEX_H_ */

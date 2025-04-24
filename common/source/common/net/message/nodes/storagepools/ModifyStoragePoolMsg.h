@@ -1,5 +1,4 @@
-#ifndef COMMON_MODIFYSTORAGEPOOLMSG_H_
-#define COMMON_MODIFYSTORAGEPOOLMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/StoragePoolId.h>
@@ -97,4 +96,3 @@ class ModifyStoragePoolMsg : public NetMessageSerdes<ModifyStoragePoolMsg>
 };
 
 
-#endif /*COMMON_MODIFYSTORAGEPOOLMSG_H_*/

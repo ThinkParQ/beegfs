@@ -1,5 +1,4 @@
-#ifndef SIMPLEINT64MSG_H_
-#define SIMPLEINT64MSG_H_
+#pragma once
 
 #include "NetMessage.h"
 
@@ -29,4 +28,3 @@ class SimpleInt64Msg : public NetMessageSerdes<SimpleInt64Msg>
       int64_t getValue() const { return value; }
 };
 
-#endif /*SIMPLEINT64MSG_H_*/

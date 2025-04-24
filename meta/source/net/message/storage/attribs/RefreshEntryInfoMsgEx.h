@@ -1,5 +1,4 @@
-#ifndef REFRESHENTRYINFOMSGEX_H_
-#define REFRESHENTRYINFOMSGEX_H_
+#pragma once
 
 #include <storage/DirInode.h>
 #include <common/storage/StorageErrors.h>
@@ -39,4 +38,3 @@ class RefreshEntryInfoMsgEx : public MirroredMessage<RefreshEntryInfoMsg,
 };
 
 
-#endif /* REFRESHENTRYINFOMSGEX_H_ */

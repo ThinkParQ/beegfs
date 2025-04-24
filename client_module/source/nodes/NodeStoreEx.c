@@ -59,9 +59,12 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
    Logger* log = App_getLogger(this->app);
 
    NumNodeID nodeNumID = Node_getNumID(*node);
-   char* nodeID = Node_getID(*node);
-
+   NodeString incomingAlias;
+   NodeString activeAlias;
+   bool setAliasResult;
    Node* active;
+   NicAddressList nicList;
+   Node_copyAlias(*node, &incomingAlias);
 
    // check if numeric ID is defined
 
@@ -69,8 +72,7 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
    { // undefined numeric ID should never happen
       Logger_logErrFormatted(log, logContext,
          "Rejecting node with undefined numeric ID: %s; Type: %s",
-         nodeID, Node_nodeTypeToStr(this->storeType) );
-
+         incomingAlias.buf, Node_nodeTypeToStr(this->storeType) );
       Node_put(*node);
       *node = NULL;
       return false;
@@ -84,22 +86,39 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
 
    if(active)
    { // node was in the store already => update it
-      if(unlikely(strcmp(nodeID, Node_getID(active) ) ) )
-      { // bad: numeric ID collision for two different node string IDs
-         Logger_logErrFormatted(log, logContext,
-            "Numeric ID collision for two different string IDs: %s / %s; Type: %s",
-            nodeID, Node_getID(active), Node_nodeTypeToStr(this->storeType) );
+      Node_copyAlias(active, &activeAlias);
+      // If the string IDs differ, update the current active node ID from the incoming node ID.
+      // Ignore if the incomingNodeID is empty, this can happen when a node first starts up
+      // because it has to download its own alias from the mgmtd.
+      if(incomingAlias.buf[0] != '\0' && strcmp(incomingAlias.buf, activeAlias.buf))
+      {
+         // Before 8.0 BeeGFS logged "numeric ID collision for two different node string IDs".
+         // Starting in 8.0 string IDs are considered aliases and can be updated as needed.
+         Logger_logFormatted(log, 3, logContext,
+            "Updating alias for node: %s -> %s; Type: %s",
+            activeAlias.buf, incomingAlias.buf, Node_nodeTypeToStr(this->storeType) );
+         // The node type should not be updated this way so we set it to invalid (no update).
+         setAliasResult = Node_setNodeAliasAndType(active, incomingAlias.buf, NODETYPE_Invalid);
+
+         if (!setAliasResult) {
+            NodeString nodeAndType;
+            Node_copyAliasWithTypeStr(active, &nodeAndType);
+
+            Logger_logErrFormatted(log, logContext,
+               // Partial updates should never happen. Print what is set for both the alias and node
+               // alias with type string. We don't know what may be helpful for debugging.
+               "Error updating alias for node: %s : %s (ignoring)",
+               activeAlias.buf, nodeAndType.buf);
+         }
       }
-      else
-      { // update heartbeat time of existing node
-         NicAddressList nicList;
-         Node_cloneNicList(*node, &nicList);
-         Node_updateLastHeartbeatT(active);
-         Node_updateInterfaces(active, Node_getPortUDP(*node), Node_getPortTCP(*node),
-            &nicList);
-         ListTk_kfreeNicAddressListElems(&nicList);
-         NicAddressList_uninit(&nicList);
-      }
+
+      // update heartbeat time of existing node
+      Node_cloneNicList(*node, &nicList);
+      Node_updateLastHeartbeatT(active);
+      Node_updateInterfaces(active, Node_getPortUDP(*node), Node_getPortTCP(*node),
+         &nicList);
+      ListTk_kfreeNicAddressListElems(&nicList);
+      NicAddressList_uninit(&nicList);
 
       Node_put(*node);
    }
@@ -114,12 +133,12 @@ bool NodeStoreEx_addOrUpdateNode(NodeStoreEx* this, Node** node)
       {
          Logger_logErrFormatted(log, logContext,
             "Node type and store type differ. Node: %s %s; Store: %s",
-            Node_getNodeTypeStr(*node), nodeID, Node_nodeTypeToStr(this->storeType) );
+            Node_getNodeTypeStr(*node), incomingAlias.buf, Node_nodeTypeToStr(this->storeType) );
       }
       #endif // BEEGFS_DEBUG
 
       Node_setIsActive(*node, true);
-      Node_setNodeType(*node, this->storeType);
+      Node_setNodeAliasAndType(*node, NULL, this->storeType);
 
       __NodeStoreEx_handleNodeVersion(this, *node);
 
@@ -172,10 +191,13 @@ Node* NodeStoreEx_referenceNode(NodeStoreEx* this, NumNodeID id)
       refs = atomic_read(&node->references.refcount);
 #endif
 
-      if (refs > NODESTORE_WARN_REFNUM)
+      if (refs > NODESTORE_WARN_REFNUM) {
+         NodeString alias;
+         Node_copyAlias(node, &alias);
          Logger_logFormatted(log, Log_CRITICAL, __func__,
             "WARNING: Lots of references to node (=> leak?): %s %s; ref count: %d",
-            Node_getNodeTypeStr(node), Node_getID(node), refs);
+            Node_getNodeTypeStr(node), alias.buf, refs); // G E T
+      }
 #endif // BEEGFS_DEBUG
    }
 

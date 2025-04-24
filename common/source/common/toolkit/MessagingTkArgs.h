@@ -1,5 +1,4 @@
-#ifndef MESSAGINGTKARGS_H_
-#define MESSAGINGTKARGS_H_
+#pragma once
 
 #include <stdint.h>
 
@@ -163,4 +162,3 @@ struct RequestResponseArgs
 };
 
 
-#endif /* MESSAGINGTKARGS_H_ */

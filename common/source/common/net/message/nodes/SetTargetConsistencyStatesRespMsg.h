@@ -1,5 +1,4 @@
-#ifndef SETTARGETCONSISTENCYSTATERESPMSG_H_
-#define SETTARGETCONSISTENCYSTATERESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/SimpleIntMsg.h>
@@ -22,4 +21,3 @@ class SetTargetConsistencyStatesRespMsg : public SimpleIntMsg
       }
 };
 
-#endif /*SETTARGETCONSISTENCYSTATERESPMSG_H_*/

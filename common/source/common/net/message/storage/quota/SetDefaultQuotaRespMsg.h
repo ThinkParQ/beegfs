@@ -1,5 +1,4 @@
-#ifndef COMMON_NET_MESSAGE_STORAGE_QUOTA_SETDEFAULTQUOTARESPMSG_H_
-#define COMMON_NET_MESSAGE_STORAGE_QUOTA_SETDEFAULTQUOTARESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/SimpleIntMsg.h>
@@ -17,4 +16,3 @@ class SetDefaultQuotaRespMsg : public SimpleIntMsg
       SetDefaultQuotaRespMsg() : SimpleIntMsg(NETMSGTYPE_SetDefaultQuotaResp) {};
 };
 
-#endif /* COMMON_NET_MESSAGE_STORAGE_QUOTA_SETDEFAULTQUOTARESPMSG_H_ */

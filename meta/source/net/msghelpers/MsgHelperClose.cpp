@@ -20,19 +20,16 @@
  */
 FhgfsOpsErr MsgHelperClose::closeFile(const NumNodeID sessionID, const std::string& fileHandleID,
    EntryInfo* entryInfo, int maxUsedNodeIndex, unsigned msgUserID, bool* outUnlinkDisposalFile,
-   bool* outModificationEventsMissed, DynamicFileAttribsVec* dynAttribs,
+   unsigned* outNumHardlinks, bool& outLastWriterClosed, DynamicFileAttribsVec* dynAttribs,
    MirroredTimestamps* timestamps)
 {
    MetaStore* metaStore = Program::getApp()->getMetaStore();
 
    unsigned accessFlags;
-   unsigned numHardlinks;
    unsigned numInodeRefs;
 
    MetaFileHandle inode;
-
    *outUnlinkDisposalFile = false;
-
 
    FhgfsOpsErr sessionRes = closeSessionFile(sessionID, fileHandleID, entryInfo,
       &accessFlags, inode);
@@ -50,13 +47,10 @@ FhgfsOpsErr MsgHelperClose::closeFile(const NumNodeID sessionID, const std::stri
       *timestamps = sd.getMirroredTimestamps();
    }
 
-   if (outModificationEventsMissed)
-      *outModificationEventsMissed = inode->getNumHardlinks() > 1;
+   metaStore->closeFile(entryInfo, std::move(inode), accessFlags, outNumHardlinks, &numInodeRefs,
+      outLastWriterClosed);
 
-   metaStore->closeFile(entryInfo, std::move(inode), accessFlags, &numHardlinks, &numInodeRefs);
-
-
-   if (!numHardlinks && !numInodeRefs)
+   if (!*outNumHardlinks && !numInodeRefs)
       *outUnlinkDisposalFile = true;
 
    return chunksRes;

@@ -1,5 +1,4 @@
-#ifndef ROOTINFO_H_
-#define ROOTINFO_H_
+#pragma once
 
 #include <common/nodes/NumNodeID.h>
 
@@ -52,4 +51,3 @@ class RootInfo
       bool isMirrored;
 };
 
-#endif

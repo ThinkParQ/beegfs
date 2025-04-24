@@ -131,6 +131,86 @@ void FileInode::initFileInfoVec()
    }
 }
 
+/*
+ * set remote targets for FileInode
+ */
+FhgfsOpsErr FileInode::setRemoteStorageTarget(EntryInfo* entryInfo, const RemoteStorageTarget& rst)
+{
+   const char* logContext = "Set Remote Storage Target (FileInode)";
+
+   FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
+   SafeRWLock safeLock(&rwlock, SafeRWLock_WRITE);
+
+   auto [isValid, details] = rst.validateWithDetails();
+   if (!isValid)
+   {
+      LogContext(logContext).log(Log_WARNING, "Invalid RST data: " + details);
+      retVal = FhgfsOpsErr_INTERNAL;
+   }
+   else
+   {
+      // set file's rst now
+      this->rstInfo.set(rst);
+
+      if (this->storeRemoteStorageTargetUnlocked(entryInfo))
+      {
+         if (!this->getIsRstAvailableUnlocked())
+         {
+            addFeatureFlagUnlocked(FILEINODE_FEATURE_HAS_RST);
+            if (!this->storeUpdatedInodeUnlocked(entryInfo))
+               retVal = FhgfsOpsErr_INTERNAL;
+         }
+      }
+      else
+         retVal = FhgfsOpsErr_INTERNAL;
+   }
+
+   safeLock.unlock();
+   return retVal;
+}
+
+FhgfsOpsErr FileInode::clearRemoteStorageTarget(EntryInfo* entryInfo)
+{
+   const char* logContext = "Clear Remote Storage Target (FileInode)";
+   UniqueRWLock lock(rwlock, SafeRWLock_WRITE);
+
+   if (!this->getIsRstAvailableUnlocked())
+      return FhgfsOpsErr_SUCCESS;
+
+   // Clear inode feature flag and store updated inode
+   unsigned flags = this->inodeDiskData.getInodeFeatureFlags();
+   flags &= ~FILEINODE_FEATURE_HAS_RST;
+   this->inodeDiskData.setInodeFeatureFlags(flags);
+   if (!this->storeUpdatedInodeUnlocked(entryInfo))
+         return FhgfsOpsErr_INTERNAL;
+
+   // Clear in-memory RST info
+   this->rstInfo.reset();
+
+   // Remove RST xattr from meta file
+   std::string metafile = this->getMetaFilePath(entryInfo);
+   int res = removexattr(metafile.c_str(), RST_XATTR_NAME);
+   if (unlikely(res == -1))
+   {
+      // Not reporting as error to caller because:
+      // 1. Feature flag is already cleared in metadata
+      // 2. In-memory state is reset
+      // 3. Future operations will ignore xattr due to cleared flag
+      // Just log warning msgs for any unexpected errors or missing xattr.
+      if (errno == ENODATA)
+      {
+         LogContext(logContext).log(Log_WARNING, "RST xattr not found. Path: " + metafile);
+      }
+      else
+      {
+         LogContext(logContext).log(Log_WARNING, "Failed to remove RST xattr; entryID: " +
+            entryInfo->getEntryID() + "; error: " + System::getErrString());
+      }
+   }
+
+   return FhgfsOpsErr_SUCCESS;
+}
+
 /**
  * Decrease number of sessions for read or write (=> file close) and update persistent
  * metadata.
@@ -607,6 +687,67 @@ FhgfsOpsErr FileInode::storeUpdatedInlinedInodeUnlocked(EntryInfo* entryInfo,
    return retVal;
 }
 
+std::string FileInode::getMetaFilePath(EntryInfo* entryInfo)
+{
+   App* app = Program::getApp();
+   if (isInlined)
+    {
+        const Path* dentriesPath = getIsBuddyMirroredUnlocked()
+            ? app->getBuddyMirrorDentriesPath()
+            : app->getDentriesPath();
+
+        std::string dirEntryPath = MetaStorageTk::getMetaDirEntryPath(
+            dentriesPath->str(), entryInfo->getParentEntryID());
+            
+        return MetaStorageTk::getMetaDirEntryIDPath(dirEntryPath) + entryInfo->getEntryID();
+    }
+
+    const Path* inodesPath = getIsBuddyMirroredUnlocked()
+        ? app->getBuddyMirrorInodesPath()
+        : app->getInodesPath();
+
+    return MetaStorageTk::getMetaInodePath(inodesPath->str(), entryInfo->getEntryID());
+}
+
+bool FileInode::storeRemoteStorageTargetUnlocked(EntryInfo* entryInfo)
+{
+   std::string metafile = getMetaFilePath(entryInfo);
+
+   char buf[META_SERBUF_SIZE];
+   Serializer ser(buf, sizeof(buf));
+   ser % rstInfo;
+
+   if (!ser.good())
+      return false;
+
+   bool useXAttrs = Program::getApp()->getConfig()->getStoreUseExtendedAttribs();
+   if (useXAttrs)
+      return storeRemoteStorageTargetBufAsXAttr(buf, ser.size(), metafile);
+   else
+   {
+      LOG(GENERAL, WARNING, "Storing RST info as file contents is unsupported. "
+         "Please check the 'storeUseExtendedAttribs' setting in the BeeGFS meta config");
+      return false;
+   }
+}
+
+bool FileInode::storeRemoteStorageTargetBufAsXAttr(char* buf, unsigned bufLen, const std::string& metafilename)
+{
+   const char* logContext = "FileInode (store remote storage target as xattr)";
+
+   int setRes = setxattr(metafilename.c_str(), RST_XATTR_NAME, buf, bufLen, 0);
+
+   if (unlikely(setRes == -1))
+   {
+      // error
+      LogContext(logContext).logErr("Unable to write remote storage target info to disk: "
+      + metafilename + ". SysErr: " + System::getErrString());
+
+      return false;
+   }
+
+   return true;
+}
 
 bool FileInode::removeStoredMetaData(const std::string& id, bool isBuddyMirrored)
 {
@@ -765,6 +906,74 @@ bool FileInode::loadFromFileContents(const std::string& id, bool isBuddyMirrored
    return retVal;
 }
 
+bool FileInode::loadRstFromInodeFile(EntryInfo* entryInfo)
+{
+   bool useXAttrs = Program::getApp()->getConfig()->getStoreUseExtendedAttribs();
+
+   if (useXAttrs)
+      return loadRstFromFileXAttr(entryInfo);
+
+   return false;
+}
+
+bool FileInode::loadRstFromFileXAttr(EntryInfo* entryInfo)
+{
+   const char* logContext = "File inode RST (load from xattr file)";
+   App* app = Program::getApp();
+   std::string metafile;
+
+   if (isInlined)
+   {
+      const Path* dentriesPath =
+         getIsBuddyMirroredUnlocked() ? app->getBuddyMirrorDentriesPath() : app->getDentriesPath();
+
+      std::string dirEntryPath =
+         MetaStorageTk::getMetaDirEntryPath(dentriesPath->str(), entryInfo->getParentEntryID());
+
+      metafile = MetaStorageTk::getMetaDirEntryIDPath(dirEntryPath) + entryInfo->getEntryID();
+   }
+   else
+   {
+      const Path* inodesPath =
+         getIsBuddyMirroredUnlocked() ? app->getBuddyMirrorInodesPath(): app->getInodesPath();
+
+      metafile = MetaStorageTk::getMetaInodePath(inodesPath->str(), entryInfo->getEntryID());
+   }
+
+   char buf[META_SERBUF_SIZE];
+   ssize_t getRes = getxattr(metafile.c_str(), RST_XATTR_NAME, buf, META_SERBUF_SIZE);
+
+   if (getRes > 0)
+   {
+      // we got something => deserialize it
+      Deserializer des(buf, getRes);
+      des % this->rstInfo;
+
+      if (unlikely(!des.good()))
+      {
+         // deserialization failed
+         LogContext(logContext).logErr("Unable to deserialize remote storage targets"
+            ", file: " + metafile);
+         return false;
+      }
+
+      return true;
+   }
+   else
+   if( (getRes == -1) && (errno == ENOENT) )
+   { // file not exists
+      LOG_DEBUG_CONTEXT(LogContext(logContext), Log_DEBUG, "Inode file not exists: " +
+         metafile + ". " + "SysErr: " + System::getErrString() );
+   }
+   else
+   { // unhandled error
+      LogContext(logContext).logErr("Unable to open/read inode file: " + metafile + ". " +
+         "SysErr: " + System::getErrString() );
+   }
+
+   return false;
+}
+
 /**
  * Create an inode from an entryInfo.
  *
@@ -796,6 +1005,9 @@ FileInode* FileInode::createFromEntryInfo(EntryInfo* entryInfo)
       if (!inode)
          inode = createFromInlinedInode(entryInfo);
    }
+
+   if (likely(inode) && inode->getIsRstAvailableUnlocked())
+      inode->loadRstFromInodeFile(entryInfo);
 
    return inode;
 }

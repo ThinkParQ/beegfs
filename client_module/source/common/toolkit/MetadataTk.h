@@ -44,6 +44,8 @@ static inline void LookupIntentInfoIn_init(LookupIntentInfoIn* this,
    const EntryInfo* parentEntryInfo, const char* entryName);
 static inline void LookupIntentInfoIn_addEntryInfo(LookupIntentInfoIn* this,
    const EntryInfo* entryInfo);
+static inline void LookupIntentInfoIn_addMetaVersion(LookupIntentInfoIn* this,
+    uint32_t metaVersion);
 static inline void LookupIntentInfoIn_addOpenInfo(LookupIntentInfoIn* this,
    const OpenInfo* openInfo);
 static inline void LookupIntentInfoIn_addCreateInfo(LookupIntentInfoIn* this,
@@ -91,6 +93,7 @@ struct LookupIntentInfoIn
    bool isExclusiveCreate;       // true iff O_EXCL is set
 
    const OpenInfo* openInfo;           // only set on file open
+   uint32_t metaVersion;                   //only set on revalidate
 };
 
 
@@ -119,6 +122,11 @@ void LookupIntentInfoIn_addEntryInfo(LookupIntentInfoIn* this, const EntryInfo* 
    this->entryInfoPtr = entryInfo;
 }
 
+
+void LookupIntentInfoIn_addMetaVersion(LookupIntentInfoIn* this,  uint32_t version)
+{
+   this->metaVersion = version;
+}
 
 void LookupIntentInfoIn_addOpenInfo(LookupIntentInfoIn* this, const OpenInfo* openInfo)
 {

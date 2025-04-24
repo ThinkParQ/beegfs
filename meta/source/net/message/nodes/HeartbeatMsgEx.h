@@ -1,5 +1,4 @@
-#ifndef HEARTBEATMSGEX_H_
-#define HEARTBEATMSGEX_H_
+#pragma once
 
 #include <common/net/message/nodes/HeartbeatMsg.h>
 
@@ -12,4 +11,3 @@ class HeartbeatMsgEx : public HeartbeatMsg
       void processIncomingRoot();
 };
 
-#endif /*HEARTBEATMSGEX_H_*/

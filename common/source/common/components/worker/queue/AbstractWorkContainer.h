@@ -1,5 +1,4 @@
-#ifndef ABSTRACTWORKCONTAINER_H_
-#define ABSTRACTWORKCONTAINER_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/Common.h>
@@ -28,4 +27,3 @@ class AbstractWorkContainer
 };
 
 
-#endif /* ABSTRACTWORKCONTAINER_H_ */

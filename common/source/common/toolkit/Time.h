@@ -1,5 +1,4 @@
-#ifndef TIME_H_
-#define TIME_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/toolkit/serialization/Serialization.h>
@@ -188,4 +187,3 @@ class Time
       }
 };
 
-#endif /*TIME_H_*/

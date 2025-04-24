@@ -136,13 +136,52 @@ FhgfsOpsErr SyncSlaveBase::streamInode(Socket& socket, const Path& inodeRelPath,
 
    MetaStore& store = *Program::getApp()->getMetaStore();
 
-   std::vector<char> contents;
+   // Map to store attribute name and its data
+   std::map<std::string, std::vector<char>> contents;
 
    if (!isDirectory)
    {
-      const FhgfsOpsErr readRes = store.getRawMetadata(fullPath, contents);
-      if (readRes != FhgfsOpsErr_SUCCESS)
+      std::vector<char> attrData;
+      FhgfsOpsErr readRes;
+
+      // Helper function to read and store attribute data in map
+      auto readAndStoreMetaAttribute = [&](const std::string& attrName)
+      {
+         attrData.clear();
+         readRes = store.getRawMetadata(fullPath, attrName.c_str(), attrData);
+         if (readRes != FhgfsOpsErr_SUCCESS)
+            return false;
+         contents.insert(std::make_pair(attrName, std::move(attrData)));
+         return true;
+      };
+
+      // Handle META_XATTR_NAME ("user.fhgfs") separately because it can be stored as either
+      // file contents or an extended attribute, depending on the 'storeUseExtendedAttribs'
+      // configuration setting in the meta config. In contrast, all other metadata-specific
+      // attributes are strictly stored as extended attributes and do not have the option to
+      // be stored as file contents.
+      if (!readAndStoreMetaAttribute(META_XATTR_NAME))
          return readRes;
+
+      // Now handle all remaining metadata attributes
+      std::pair<FhgfsOpsErr, std::vector<std::string>> listXAttrs = XAttrTk::listXAttrs(fullPath.str());
+      if (listXAttrs.first != FhgfsOpsErr_SUCCESS)
+         return listXAttrs.first;
+
+      for (auto const& attrName : listXAttrs.second)
+      {
+         // Process all metadata-specific attributes except META_XATTR_NAME (already handled above)
+         // This approach ensures we only process attribute(s) that:
+         // 1. Exist on the inode.
+         // 2. Are listed in METADATA_XATTR_NAME_LIST, our collection of known metadata attributes.
+         // 3. Is not META_XATTR_NAME, to prevent duplicate processing.
+         if (std::find(METADATA_XATTR_NAME_LIST.begin(), METADATA_XATTR_NAME_LIST.end(), attrName)
+               != METADATA_XATTR_NAME_LIST.end() && (attrName != META_XATTR_NAME))
+         {
+             if (!readAndStoreMetaAttribute(attrName))
+                return readRes;
+         }
+      }
    }
 
    const FhgfsOpsErr sendRes = sendResyncPacket(socket, InodeInfo(

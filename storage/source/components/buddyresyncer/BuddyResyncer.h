@@ -1,5 +1,4 @@
-#ifndef BUDDYRESYNCER_H_
-#define BUDDYRESYNCER_H_
+#pragma once
 
 #include <components/buddyresyncer/BuddyResyncJob.h>
 
@@ -58,4 +57,3 @@ class BuddyResyncer
       }
 };
 
-#endif /* BUDDYRESYNCER_H_ */

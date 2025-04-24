@@ -1,5 +1,4 @@
-#ifndef FLOCKRANGEMSGEX_H_
-#define FLOCKRANGEMSGEX_H_
+#pragma once
 
 #include <common/net/message/session/locking/FLockRangeMsg.h>
 #include <common/net/message/session/locking/FLockRangeRespMsg.h>
@@ -35,4 +34,3 @@ class FLockRangeMsgEx : public MirroredMessage<FLockRangeMsg, FileIDLock>
       const char* mirrorLogContext() const override { return "FLockRangeMsgEx/forward"; }
 };
 
-#endif /* FLOCKRANGEMSGEX_H_ */

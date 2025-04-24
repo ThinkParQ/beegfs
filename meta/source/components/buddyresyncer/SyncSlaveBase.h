@@ -1,5 +1,4 @@
-#ifndef META_SYNCSLAVEBASE_H
-#define META_SYNCSLAVEBASE_H
+#pragma once
 
 #include <common/net/sock/Socket.h>
 #include <common/storage/StorageErrors.h>
@@ -123,9 +122,8 @@ class SyncSlaveBase : public PThread
       typedef std::tuple<
             MetaSyncFileType,
             const std::string&,       // relative path
-            const std::vector<char>&, // inode raw content
+            std::map<std::string, std::vector<char>>, // metadata specific attribute's raw contents
             bool                      // is deletion?
          > InodeInfo;
 };
 
-#endif

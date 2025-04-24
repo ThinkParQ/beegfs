@@ -1,5 +1,4 @@
-#ifndef POOLEDSOCKET_H_
-#define POOLEDSOCKET_H_
+#pragma once
 
 #include <common/net/sock/Socket.h>
 #include <common/toolkit/Time.h>
@@ -81,4 +80,3 @@ class PooledSocket : public Socket
 };
 
 
-#endif /*POOLEDSOCKET_H_*/

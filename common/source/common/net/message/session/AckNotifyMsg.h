@@ -1,5 +1,4 @@
-#ifndef COMMON_ACKNOTIFYMSG
-#define COMMON_ACKNOTIFYMSG
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
@@ -16,4 +15,3 @@ class AckNotifiyMsg : public MirroredMessageBase<AckNotifiyMsg>
       bool supportsMirroring() const override { return true; }
 };
 
-#endif

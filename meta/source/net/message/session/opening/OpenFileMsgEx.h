@@ -1,5 +1,4 @@
-#ifndef OPENFILEMSGEX_H_
-#define OPENFILEMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/session/opening/OpenFileMsg.h>
@@ -23,9 +22,9 @@ class OpenFileResponseState : public MirroredMessageResponseState
       }
 
       OpenFileResponseState(FhgfsOpsErr result, const std::string& fileHandleID,
-            const StripePattern& pattern, const PathInfo& pathInfo, uint64_t version)
+            const StripePattern& pattern, const PathInfo& pathInfo, uint32_t fileVersion)
          : isIndirectCommErr(false), result(result), fileHandleID(fileHandleID),
-           pattern(pattern.clone()), pathInfo(pathInfo), version(version)
+           pattern(pattern.clone()), pathInfo(pathInfo), fileVersion(fileVersion)
       {
       }
 
@@ -39,7 +38,7 @@ class OpenFileResponseState : public MirroredMessageResponseState
          else
             ctx.sendResponse(
                   OpenFileRespMsg(
-                     result, fileHandleID, pattern.get(), &pathInfo, version));
+                     result, fileHandleID, pattern.get(), &pathInfo, fileVersion));
       }
 
       bool changesObservableState() const override
@@ -76,7 +75,7 @@ class OpenFileResponseState : public MirroredMessageResponseState
       std::string fileHandleID;
       std::unique_ptr<StripePattern> pattern;
       PathInfo pathInfo;
-      uint64_t version;
+      uint32_t fileVersion;
 };
 
 class OpenFileMsgEx : public MirroredMessage<OpenFileMsg, FileIDLock>
@@ -104,4 +103,3 @@ class OpenFileMsgEx : public MirroredMessage<OpenFileMsg, FileIDLock>
       std::string fileHandleID;
 };
 
-#endif /*OPENFILEMSGEX_H_*/

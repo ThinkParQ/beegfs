@@ -43,8 +43,8 @@ bool StatData_deserialize(DeserializeCtx* ctx, StatData* outThis)
    if(!Serialization_deserializeUInt(ctx, &outThis->nlink) )
       return false;
 
-   // contentsVersion
-   if(!Serialization_deserializeUInt(ctx, &outThis->contentsVersion) )
+   // metaVersion
+   if(!Serialization_deserializeUInt(ctx, &outThis->metaVersion) )
       return false;
 
    // uid

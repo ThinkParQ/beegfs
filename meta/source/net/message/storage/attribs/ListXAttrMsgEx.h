@@ -1,5 +1,4 @@
-#ifndef LISTXATTRMSGEX_H_
-#define LISTXATTRMSGEX_H_
+#pragma once
 
 #include <common/net/message/storage/attribs/ListXAttrMsg.h>
 #include <common/net/message/storage/attribs/ListXAttrRespMsg.h>
@@ -73,4 +72,3 @@ class ListXAttrMsgEx : public MirroredMessage<ListXAttrMsg, FileIDLock>
       const char* mirrorLogContext() const override { return "ListXAttrMsgEx/forward"; }
 };
 
-#endif /*LISTXATTRMSGEX_H_*/

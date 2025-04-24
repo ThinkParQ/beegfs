@@ -1,5 +1,4 @@
-#ifndef CHUNKFILEINFO_H_
-#define CHUNKFILEINFO_H_
+#pragma once
 
 #include <common/toolkit/MathTk.h>
 
@@ -140,4 +139,3 @@ class ChunkFileInfo
       }
 };
 
-#endif /*CHUNKFILEINFO_H_*/

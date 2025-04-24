@@ -1,5 +1,4 @@
-#ifndef METASTORAGETK_H_
-#define METASTORAGETK_H_
+#pragma once
 
 #include <common/storage/Metadata.h>
 #include <common/toolkit/StorageTk.h>
@@ -65,4 +64,3 @@ class MetaStorageTk
 };
 
 
-#endif /* METASTORAGETK_H_ */

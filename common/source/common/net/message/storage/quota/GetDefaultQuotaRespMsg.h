@@ -1,5 +1,4 @@
-#ifndef COMMON_NET_MESSAGE_STORAGE_QUOTA_GETDEFAULTQUOTARESPMSG_H_
-#define COMMON_NET_MESSAGE_STORAGE_QUOTA_GETDEFAULTQUOTARESPMSG_H_
+#pragma once
 
 
 #include <common/net/message/NetMessage.h>
@@ -36,4 +35,3 @@ class GetDefaultQuotaRespMsg: public NetMessageSerdes<GetDefaultQuotaRespMsg>
       }
 };
 
-#endif /* COMMON_NET_MESSAGE_STORAGE_QUOTA_GETDEFAULTQUOTARESPMSG_H_ */

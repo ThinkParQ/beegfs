@@ -1,5 +1,4 @@
-#ifndef COMMON_STORAGEPOOLSTORE_H_
-#define COMMON_STORAGEPOOLSTORE_H_
+#pragma once
 
 #include <common/storage/StoragePool.h>
 #include <common/threading/RWLockGuard.h>
@@ -110,4 +109,3 @@ class StoragePoolStore
       }
 };
 
-#endif /* COMMON_STORAGEPOOLSTORE_H_ */

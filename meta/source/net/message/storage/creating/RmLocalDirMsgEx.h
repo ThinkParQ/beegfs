@@ -1,5 +1,4 @@
-#ifndef RMLOCALDIRMSGEX_H_
-#define RMLOCALDIRMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/RmLocalDirMsg.h>
@@ -37,4 +36,3 @@ class RmLocalDirMsgEx : public MirroredMessage<RmLocalDirMsg, std::tuple<HashDir
       const char* mirrorLogContext() const override { return "RmLocalDirMsgEx/forward"; }
 };
 
-#endif /*RMLOCALDIRMSGEX_H_*/

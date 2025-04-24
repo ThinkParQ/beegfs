@@ -338,8 +338,8 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
    EntryInfo_init(&entryInfo, NodeOrGroup_fromGroup(0), StringTk_strDup(""), StringTk_strDup(""),
       StringTk_strDup(""), DirEntryType_DIRECTORY, 0);
 
-   rootInode = __FhgfsOps_newInode(sb, &kstat, 0, &entryInfo, &iSizeHints);
-   if(!rootInode || IS_ERR(rootInode) )
+   rootInode = __FhgfsOps_newInode(sb, &kstat, 0, &entryInfo, &iSizeHints, 0);
+   if(!rootInode || IS_ERR(rootInode))
    {
       __FhgfsOps_destructFsInfo(sb);
       return IS_ERR(rootInode) ? PTR_ERR(rootInode) : -ENOMEM;

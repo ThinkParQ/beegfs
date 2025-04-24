@@ -33,7 +33,7 @@ struct OpenFileRespMsg
 
    PathInfo pathInfo;
 
-   uint64_t fileVersion;
+   uint32_t fileVersion;
 
    // for serialization
    StripePattern* pattern; // not owned by this object!

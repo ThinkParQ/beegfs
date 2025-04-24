@@ -55,7 +55,7 @@ void InfluxDB::insertMetaNodeData(std::shared_ptr<Node> node, const MetaNodeData
 {
    std::ostringstream point;
    point << "meta";
-   point << ",nodeID=" << escapeStringForWrite(node->getID());
+   point << ",nodeID=" << escapeStringForWrite(node->getAlias());
    point << ",nodeNumID=" << node->getNumID();
 
    if(data.isResponding)
@@ -79,7 +79,7 @@ void InfluxDB::insertStorageNodeData(std::shared_ptr<Node> node,
 {
    std::ostringstream point;
    point << "storage";
-   point << ",nodeID=" << escapeStringForWrite(node->getID());
+   point << ",nodeID=" << escapeStringForWrite(node->getAlias());
    point << ",nodeNumID=" << node->getNumID();
 
    if(data.isResponding)
@@ -105,7 +105,7 @@ void InfluxDB::insertHighResMetaNodeData(std::shared_ptr<Node> node,
 {
    std::ostringstream point;
    point << "highResMeta";
-   point << ",nodeID=" << escapeStringForWrite(node->getID());
+   point << ",nodeID=" << escapeStringForWrite(node->getAlias());
    point << ",nodeNumID=" << node->getNumID();
 
    point << " workRequests=" << data.incVals.workRequests;
@@ -125,7 +125,7 @@ void InfluxDB::insertHighResStorageNodeData(std::shared_ptr<Node> node,
 {
    std::ostringstream point;
    point << "highResStorage";
-   point << ",nodeID=" << escapeStringForWrite(node->getID());
+   point << ",nodeID=" << escapeStringForWrite(node->getAlias());
    point << ",nodeNumID=" << node->getNumID();
 
    point << " workRequests=" << data.incVals.workRequests;
@@ -147,7 +147,7 @@ void InfluxDB::insertStorageTargetsData(std::shared_ptr<Node> node,
 {
    std::ostringstream point;
    point << "storageTargets";
-   point << ",nodeID=" << escapeStringForWrite(node->getID());
+   point << ",nodeID=" << escapeStringForWrite(node->getAlias());
    point << ",nodeNumID=" << node->getNumID();
    point << ",storageTargetID=" << data.getTargetID();
 

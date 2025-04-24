@@ -1,5 +1,4 @@
-#ifndef SESSION_H_
-#define SESSION_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/threading/Mutex.h>
@@ -178,4 +177,3 @@ class Session
 };
 
 
-#endif /*SESSION_H_*/

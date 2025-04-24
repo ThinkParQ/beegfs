@@ -89,9 +89,9 @@ bool LookupIntentMsgEx::processIncoming(ResponseContext& ctx)
    const std::string& parentEntryID = getParentInfo()->getEntryID();
    const std::string& entryName = getEntryName();
 
-   lookupRes = FhgfsOpsErr_INTERNAL;
-
    inodeDataOutdated = false; // true if the file/inode is currently open (referenced)
+
+   lookupRes = FhgfsOpsErr_INTERNAL;
 
    LOG_DBG(GENERAL, DEBUG, "", parentEntryID, entryName, getParentInfo()->getIsBuddyMirrored());
 
@@ -193,7 +193,7 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
    {
       LOG_DBG(GENERAL, SPAM, "Revalidate");
 
-      auto revalidateRes = revalidate(&diskEntryInfo);
+      auto revalidateRes = revalidate(&diskEntryInfo, inodeData.getMetaVersion());
       response.addResponseRevalidate(revalidateRes);
 
       if (revalidateRes != FhgfsOpsErr_SUCCESS)
@@ -311,16 +311,22 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
 
 /**
  * compare entryInfo on disk with EntryInfo send by the client
- * @return FhgfsOpsErr_SUCCESS if revalidation successful, FhgfsOpsErr_PATHNOTEXISTS otherwise.
+ * @return FhgfsOpsErr_SUCCESS if revalidation successful, FhgfsOpsErr_PATHNOTEXISTS otherwise, FhgfsOpsErr_METAVERSIONMISMATCH in case of version change.
  */
-FhgfsOpsErr LookupIntentMsgEx::revalidate(EntryInfo* diskEntryInfo)
-{
+FhgfsOpsErr LookupIntentMsgEx::revalidate(EntryInfo* diskEntryInfo, uint32_t metaVersion)
+   {
    EntryInfo* clientEntryInfo = this->getEntryInfo();
+   uint32_t clientMetaVersion = this->getMetaVersion();
+
 
    if ( (diskEntryInfo->getEntryID()     == clientEntryInfo->getEntryID() ) &&
         (diskEntryInfo->getOwnerNodeID() == clientEntryInfo->getOwnerNodeID() ) )
+      {
+      if (clientMetaVersion != metaVersion) 
+         return FhgfsOpsErr_METAVERSIONMISMATCH;
+      
       return FhgfsOpsErr_SUCCESS;
-
+      }
 
    return FhgfsOpsErr_PATHNOTEXISTS;
 }
@@ -331,12 +337,20 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
    MkFileDetails mkDetails(entryName, getUserID(), getGroupID(), getMode(), getUmask(),
          TimeAbs().getTimeval()->tv_sec);
    StripePattern* pattern = nullptr;
+   std::unique_ptr<RemoteStorageTarget> rstInfo;
    FhgfsOpsErr res;
 
    DirInode* dir = Program::getApp()->getMetaStore()->referenceDir(
          parentInfo->getEntryID(), parentInfo->getIsBuddyMirrored(), true);
    if (!dir)
       return FhgfsOpsErr_PATHNOTEXISTS;
+
+   // create new RST object and set remote storage target info from parentDir if available
+   if (dir->getIsRstAvailable())
+   {
+      rstInfo = std::make_unique<RemoteStorageTarget>();
+      rstInfo->set(dir->getRemoteStorageTargetInfo());
+   }
 
    if (isSecondary)
    {
@@ -398,7 +412,7 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
    }
 
    res = MsgHelperMkFile::mkFile(*dir, &mkDetails, &getPreferredTargets(), 0, 0,
-      pattern, outEntryInfo, outInodeData);
+      pattern, rstInfo.get(), outEntryInfo, outInodeData);
 
    if (res == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
    {
@@ -411,10 +425,9 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
    if (!isSecondary && res == FhgfsOpsErr_SUCCESS && Program::getApp()->getFileEventLogger()
        && getFileEvent())
    {
-         Program::getApp()->getFileEventLogger()->log(
-                  *getFileEvent(),
-                  outEntryInfo->getEntryID(),
-                  outEntryInfo->getParentEntryID());
+      EventContext eventCtx = makeEventContext(outEntryInfo, outEntryInfo->getParentEntryID(),
+         getMsgHeaderUserID(), "", outInodeData->getInodeStatData()->getNumHardlinks(), isSecondary);
+      logEvent(Program::getApp()->getFileEventLogger(), *getFileEvent(), eventCtx);
    }
 
 releasedir_and_return:

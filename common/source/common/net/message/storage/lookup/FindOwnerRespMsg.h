@@ -1,5 +1,4 @@
-#ifndef FINDOWNERRESPMSG_H_
-#define FINDOWNERRESPMSG_H_
+#pragma once
 
 #include <common/Common.h>
 #include <common/net/message/NetMessage.h>
@@ -52,4 +51,3 @@ class FindOwnerRespMsg : public NetMessageSerdes<FindOwnerRespMsg>
       }
 };
 
-#endif /*FINDOWNERRESPMSG_H_*/

@@ -1,5 +1,4 @@
-#ifndef TESTSERIALIZATION_H_
-#define TESTSERIALIZATION_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <gtest/gtest.h>
@@ -51,4 +50,3 @@ class TestSerialization: public ::testing::Test
       }
 };
 
-#endif /* TESTSERIALIZATION_H_ */

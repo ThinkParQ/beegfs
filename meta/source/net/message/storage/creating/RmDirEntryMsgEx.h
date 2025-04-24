@@ -1,5 +1,4 @@
-#ifndef RMDIRENTRYMSGEX_H_
-#define RMDIRENTRYMSGEX_H_
+#pragma once
 
 #include <common/storage/StorageErrors.h>
 #include <common/net/message/storage/creating/RmDirEntryMsg.h>
@@ -16,4 +15,3 @@ class RmDirEntryMsgEx : public RmDirEntryMsg
       FhgfsOpsErr rmDirEntry(EntryInfo* parentInfo, std::string& entryName);
 };
 
-#endif /* RMDIRENTRYMSGEX_H_ */

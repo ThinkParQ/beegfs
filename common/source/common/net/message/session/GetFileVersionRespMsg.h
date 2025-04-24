@@ -1,12 +1,11 @@
-#ifndef GETFILEVERSIONRESPMSG_H
-#define GETFILEVERSIONRESPMSG_H
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 
 class GetFileVersionRespMsg : public NetMessageSerdes<GetFileVersionRespMsg>
 {
    public:
-      GetFileVersionRespMsg(FhgfsOpsErr result, uint64_t version) :
+      GetFileVersionRespMsg(FhgfsOpsErr result, uint32_t version) :
          BaseType(NETMSGTYPE_GetFileVersionResp),
          result(result), version(version)
       {
@@ -28,8 +27,7 @@ class GetFileVersionRespMsg : public NetMessageSerdes<GetFileVersionRespMsg>
 
    private:
       FhgfsOpsErr result;
-      uint64_t version;
+      uint32_t version;
 };
 
 
-#endif

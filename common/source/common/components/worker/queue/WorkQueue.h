@@ -1,5 +1,4 @@
-#ifndef WORKQUEUE_H_
-#define WORKQUEUE_H_
+#pragma once
 
 #include <common/components/worker/Work.h>
 #include <common/threading/Mutex.h>
@@ -47,4 +46,3 @@ class WorkQueue
       Condition newWorkCond;
 };
 
-#endif /*WORKQUEUE_H_*/

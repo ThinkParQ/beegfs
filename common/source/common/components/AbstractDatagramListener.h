@@ -1,5 +1,4 @@
-#ifndef ABSTRACTDATAGRAMLISTENER_H_
-#define ABSTRACTDATAGRAMLISTENER_H_
+#pragma once
 
 #include <common/app/log/LogContext.h>
 #include <common/threading/Atomics.h>
@@ -154,4 +153,3 @@ class AbstractDatagramListener : public PThread
 
 };
 
-#endif /*ABSTRACTDATAGRAMLISTENER_H_*/

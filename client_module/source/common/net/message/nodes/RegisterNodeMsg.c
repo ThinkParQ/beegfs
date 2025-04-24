@@ -40,4 +40,7 @@ void RegisterNodeMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 
    // portTCP
    Serialization_serializeUShort(ctx, thisCast->portTCP);
+
+   // machineUUID
+   Serialization_serializeStr(ctx, thisCast->machineUUIDLen, thisCast->machineUUID);
 }

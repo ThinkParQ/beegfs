@@ -1,5 +1,4 @@
-#ifndef HARDLINKRESPMSG_H_
-#define HARDLINKRESPMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntMsg.h>
 
@@ -22,4 +21,3 @@ class HardlinkRespMsg : public SimpleIntMsg
 };
 
 
-#endif /*HARDLINKRESPMSG_H_*/

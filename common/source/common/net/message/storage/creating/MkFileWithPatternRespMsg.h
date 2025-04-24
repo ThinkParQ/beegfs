@@ -1,5 +1,4 @@
-#ifndef MKFILEWITHPATTERNRESPMSG_H_
-#define MKFILEWITHPATTERNRESPMSG_H_
+#pragma once
 
 #include <common/net/message/NetMessage.h>
 #include <common/storage/EntryInfo.h>
@@ -56,4 +55,3 @@ class MkFileWithPatternRespMsg : public NetMessageSerdes<MkFileWithPatternRespMs
 
 };
 
-#endif /* MKFILEWITHPATTERNRESPMSG_H_ */

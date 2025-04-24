@@ -58,14 +58,24 @@ NodeStoreResult NodeStoreServers::addOrUpdateNodeEx(NodeHandle node, NumNodeID* 
 NodeStoreResult NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNodeID* outNodeNumID)
 {
    NumNodeID nodeNumID = node->getNumID();
-   std::string nodeID(node->getID());
+   std::string nodeID(node->getAlias());
 
-   // check if given node is localNode
-
-   if(localNode && (nodeNumID == localNode->getNumID() ) )
-   { // we don't allow to update local node this way (would lead to problems during sync etc.)
+   // Starting in b8.0 aliases (formerly string IDs) can be updated. This is currently the one
+   // update we allow to the local node. Aliases can be updated by the InternodeSyncer or from
+   // heartbeats received by the mgmtd when node changes are broadcast. Heartbeats from other nodes
+   // besides the mgmtd would also trigger an update, but we should never receive a heartbeat from a
+   // non-mgmtd node for the local node (also see the note below regarding remote node updates).
+   if (localNode && (nodeNumID == localNode->getNumID()))
+   {
+      if (!nodeID.empty() && nodeID != localNode->getAlias()) {
+         LogContext(__func__).log(3,
+            std::string("Updating alias for local node: ") +
+            localNode->getAlias() + " -> " + nodeID);
+         localNode->setAlias(nodeID);
+      }
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
-      return NodeStoreResult::Error;
+      // All other updates to the local node are not allowed as this could lead to problems during sync, etc.
+      return NodeStoreResult::Updated;
    }
 
    // check if numID is given. if not, we must generate an id - only mgmt may do that, which it
@@ -101,32 +111,48 @@ NodeStoreResult NodeStoreServers::addOrUpdateNodeUnlocked(NodeHandle node, NumNo
       Node& active = *iter->second;
       NicAddressList nicList(node->getNicList());
 
-      if (unlikely(active.getID() != node->getID()))
-      { // bad: numeric ID collision for two different node string IDs
-         LogContext(__func__).logErr(
-            std::string("Numeric ID collision for two different string IDs: ") +
-            nodeID + " / " + active.getID() );
-
-         nodeNumID = NumNodeID(); // set to invalid ID, so caller hopefully checks outNodeNumID
+      // Previously "numeric ID collision for two different node string IDs" was logged when string
+      // IDs changed. Starting in BeeGFS 8 string IDs are considered aliases and can be updated as
+      // needed by the mgmtd. Aliases can be updated by the InternodeSyncer or from heartbeats
+      // received by the mgmtd (on behalf of other nodes when it broadcasts node updates), or from
+      // heartbeats received directly from other nodes. Because aliases can be updated via
+      // heartbeats it is possible the mgmtd could update an alias for a remote node, this node
+      // receives that update then receives a heartbeat from the remote node with the old alias
+      // (before it updated its own alias from mgmtd) causing the remote node's alias to be reset on
+      // this node to the old value. In practice that has never been observed and is highly unlikely
+      // to happen unless an alias update happens at the same time something triggers a heartbeat
+      // from a remote node. If it did happen it would eventually be corrected by the
+      // InternodeSyncer and outdated aliases are not a major concern. This possibility is mentioned
+      // should future configuration updates be allowed via this path where it would cause an issue.
+      if (!nodeID.empty() && active.getAlias() != node->getAlias())
+      {
+         LogContext(__func__).log(3,
+            std::string("Updating alias for node: ") +
+            active.getAlias() + " -> " + nodeID);
+         active.setAlias(nodeID);
       }
-      else
-      { // update node
-         active.updateLastHeartbeatT();
-         if (active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList))
-         {
-            result = NodeStoreResult::Updated;
-         }
+      active.updateLastHeartbeatT();
+      if (active.updateInterfaces(node->getPortUDP(), node->getPortTCP(), nicList))
+      {
+         result = NodeStoreResult::Updated;
       }
-
       SAFE_ASSIGN(outNodeNumID, nodeNumID);
    }
    else
    { // node wasn't in active store yet
-
-      // make sure we don't have this stringID with a different numID already
-      NumNodeID existingNumID = retrieveNumIDFromStringID(node->getID());
+      // New nodes should always have the alias set unless there is a bug somewhere else, probably
+      // mgmtd as nodes are usually added via a heartbeat or the internode syncer. If if the alias
+      // is empty don't add the node otherwise this could lead to more confusing issues to
+      // troubleshoot later on.
+      if (node->getAlias().empty()) {
+         LogContext(__func__).log(1, std::string("Refusing to add node with an empty alias: ") + node->getNodeIDWithTypeStr());
+         SAFE_ASSIGN(outNodeNumID, NumNodeID());
+         return NodeStoreResult::Error;
+      }
+      // make sure we don't have this alias with a different numID already
+      NumNodeID existingNumID = retrieveNumIDFromStringID(node->getAlias());
       if(existingNumID && existingNumID != nodeNumID)
-      { // reject node (stringID was already registered with a different numID)
+      { // reject node (alias was already associated with a different numID)
          SAFE_ASSIGN(outNodeNumID, existingNumID);
       }
       else
@@ -461,7 +487,7 @@ NumNodeID NodeStoreServers::retrieveNumIDFromStringID(std::string nodeID) const
    {
       Node& currentNode = *iter->second;
 
-      if (currentNode.getID() == nodeID)
+      if (currentNode.getAlias() == nodeID)
          return currentNode.getNumID();
    }
 

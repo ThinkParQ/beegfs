@@ -1,5 +1,4 @@
-#ifndef COMMON_MIRRORBUDDYGROUP_H_
-#define COMMON_MIRRORBUDDYGROUP_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -34,4 +33,3 @@ typedef MirrorBuddyGroupMap::iterator MirrorBuddyGroupMapIter;
 typedef MirrorBuddyGroupMap::const_iterator MirrorBuddyGroupMapCIter;
 typedef MirrorBuddyGroupMap::value_type MirrorBuddyGroupMapVal;
 
-#endif

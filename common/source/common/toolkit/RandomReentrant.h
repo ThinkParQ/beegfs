@@ -1,5 +1,4 @@
-#ifndef RANDOMREENTRANT_H_
-#define RANDOMREENTRANT_H_
+#pragma once
 
 #include <common/Common.h>
 
@@ -57,4 +56,3 @@ class RandomReentrant
       volatile unsigned seed;
 };
 
-#endif /* RANDOMREENTRANT_H_ */

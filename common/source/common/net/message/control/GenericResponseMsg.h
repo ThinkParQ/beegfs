@@ -1,5 +1,4 @@
-#ifndef GENERICRESPONSEMSG_H_
-#define GENERICRESPONSEMSG_H_
+#pragma once
 
 #include <common/net/message/SimpleIntStringMsg.h>
 
@@ -66,4 +65,3 @@ class GenericResponseMsg : public SimpleIntStringMsg
 };
 
 
-#endif /* GENERICRESPONSEMSG_H_ */

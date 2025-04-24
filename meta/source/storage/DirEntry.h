@@ -1,5 +1,4 @@
-#ifndef DIRENTRY_H_
-#define DIRENTRY_H_
+#pragma once
 
 #include <common/storage/Metadata.h>
 #include <common/storage/StorageDefinitions.h>
@@ -331,4 +330,3 @@ class DirEntry
 };
 
 
-#endif /* DIRENTRY_H_*/
