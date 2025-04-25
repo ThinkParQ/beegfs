@@ -258,6 +258,10 @@ bool InodeFileStore::closeFile(EntryInfo* entryInfo, FileInode* inode, unsigned 
    if (iter != this->inodes.end() )
    { // outInode exists
 
+      FileInodeReferencer* inodeRefer = iter->second;
+      if(inodeRefer->getReferencedObject() != inode) 
+        return false;  
+      
       *outNumHardlinks = inode->getNumHardlinks();
 
       // Store inode information on disk, they have been set with inode->setDynAttribs() before
