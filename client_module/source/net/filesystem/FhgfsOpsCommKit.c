@@ -1322,7 +1322,8 @@ static unsigned __commkit_writefile_prepareHeader(CommKitContext* context,
    {
       WriteLocalFileMsg_initFromSession(&writeMsg, localNodeNumID,
          context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
-         context->ioInfo->accessFlags, currentState->offset, currentState->totalSize);
+         context->ioInfo->accessFlags, currentState->offset, currentState->totalSize, 
+		 context->ioInfo->writeHint);
 
       netMessage = &writeMsg.netMessage;
    }
@@ -1332,7 +1333,7 @@ static unsigned __commkit_writefile_prepareHeader(CommKitContext* context,
       WriteLocalFileRDMAMsg_initFromSession(&writeRDMAMsg, localNodeNumID,
          context->ioInfo->fileHandleID, info->targetID, context->ioInfo->pathInfo,
          context->ioInfo->accessFlags, currentState->offset, currentState->totalSize,
-         currentState->rdmap);
+         context->ioInfo->writeHint, currentState->rdmap);
 
       netMessage = &writeRDMAMsg.netMessage;
    }

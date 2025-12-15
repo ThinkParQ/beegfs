@@ -45,5 +45,8 @@ void WriteLocalFileRDMAMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 
    // RDMA info
    RdmaInfo_serialize(ctx, thisCast->rdmap);
+
+   // writeHint
+   Serialization_serializeUInt64(ctx, thisCast->writeHint);
 }
 #endif /* BEEGFS_NVFS */

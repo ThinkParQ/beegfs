@@ -12,6 +12,7 @@
 #define WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_SECOND  16 /* secondary of group, otherwise primary */
 #define WRITELOCALFILEMSG_FLAG_BUDDYMIRROR_FORWARD 32 /* forward msg to secondary */
 
+#define RW_HINT_INVALID 0xFF
 class WriteLocalFileMsgBase
 {
    public:
@@ -21,7 +22,7 @@ class WriteLocalFileMsgBase
        */
       WriteLocalFileMsgBase(const NumNodeID clientNumID, const char* fileHandleID,
          const uint16_t targetID, const PathInfo* pathInfo, const unsigned accessFlags,
-         const int64_t offset, const int64_t count)
+         const int64_t offset, const int64_t count, const unsigned writeHint)
       {
          this->clientNumID = clientNumID;
 
@@ -36,6 +37,7 @@ class WriteLocalFileMsgBase
 
          this->offset = offset;
          this->count = count;
+         this->writeHint = writeHint;
       }
 
       WriteLocalFileMsgBase() {}
@@ -57,7 +59,8 @@ class WriteLocalFileMsgBase
             % serdes::rawString(obj->fileHandleID, obj->fileHandleIDLen, 4)
             % obj->clientNumID
             % serdes::backedPtr(obj->pathInfoPtr, obj->pathInfo)
-            % obj->targetID;
+            % obj->targetID
+	    	% obj->writeHint;
       }
 
    protected:
@@ -71,7 +74,7 @@ class WriteLocalFileMsgBase
 
       uint32_t userID;
       uint32_t groupID;
-
+      uint64_t writeHint;
       // for serialization
       const PathInfo* pathInfoPtr;
 
@@ -126,6 +129,11 @@ class WriteLocalFileMsgBase
          return groupID;
       }
 
+      uint64_t getWriteHint() const
+      {
+          return writeHint;
+      }
+
       void setUserdataForQuota(unsigned userID, unsigned groupID)
       {
          this->userID = userID;
@@ -162,9 +170,9 @@ class WriteLocalFileMsg : public WriteLocalFileMsgBase, public NetMessageSerdes<
        */
       WriteLocalFileMsg(const NumNodeID clientNumID, const char* fileHandleID,
          const uint16_t targetID, const PathInfo* pathInfo, const unsigned accessFlags,
-         const int64_t offset, const int64_t count) :
+         const int64_t offset, const int64_t count, const uint64_t writeHint = RW_HINT_INVALID) :
          WriteLocalFileMsgBase(clientNumID, fileHandleID, targetID, pathInfo, accessFlags,
-            offset, count),
+            offset, count, writeHint),
             BaseType(NETMSGTYPE_WriteLocalFile) {}
 
       /**

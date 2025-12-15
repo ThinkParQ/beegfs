@@ -678,7 +678,7 @@ void __FhgfsOpsCommKitVec_writefileStagePREPARE(CommKitVecHelper* commHelper,
    // prepare message
    WriteLocalFileMsg_initFromSession(&writeMsg, localNodeNumID,
       commHelper->ioInfo->fileHandleID, comm->targetID, commHelper->ioInfo->pathInfo,
-      commHelper->ioInfo->accessFlags, offset, remainingDataSize);
+      commHelper->ioInfo->accessFlags, offset, remainingDataSize, commHelper->ioInfo->writeHint);
 
    NetMessage_setMsgHeaderTargetID( (NetMessage*)&writeMsg, nodeReferenceTargetID);
 

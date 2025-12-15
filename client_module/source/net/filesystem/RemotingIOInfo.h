@@ -44,6 +44,7 @@ struct RemotingIOInfo
 #ifdef BEEGFS_NVFS
       bool nvfs;
 #endif
+      uint64_t writeHint;
 };
 
 

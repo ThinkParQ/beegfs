@@ -26,7 +26,7 @@ typedef struct WriteLocalFileRDMAMsg WriteLocalFileRDMAMsg;
 static inline void WriteLocalFileRDMAMsg_init(WriteLocalFileRDMAMsg* this);
 static inline void WriteLocalFileRDMAMsg_initFromSession(WriteLocalFileRDMAMsg* this,
    NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID, PathInfo* pathInfo,
-   unsigned accessFlags, int64_t offset, int64_t count, RdmaInfo *rdmap);
+   unsigned accessFlags, int64_t offset, int64_t count, uint64_t writeHint, RdmaInfo *rdmap);
 
 // virtual functions
 extern void WriteLocalFileRDMAMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
@@ -53,6 +53,7 @@ struct WriteLocalFileRDMAMsg
    PathInfo* pathInfo;
    unsigned userID;
    unsigned groupID;
+   uint64_t writeHint;
    RdmaInfo *rdmap;
 };
 
@@ -69,7 +70,7 @@ void WriteLocalFileRDMAMsg_init(WriteLocalFileRDMAMsg* this)
  */
 void WriteLocalFileRDMAMsg_initFromSession(WriteLocalFileRDMAMsg* this,
    NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID, PathInfo* pathInfo,
-   unsigned accessFlags, int64_t offset, int64_t count, RdmaInfo *rdmap)
+   unsigned accessFlags, int64_t offset, int64_t count, uint64_t writeHint, RdmaInfo *rdmap)
 {
    WriteLocalFileRDMAMsg_init(this);
 
@@ -85,6 +86,7 @@ void WriteLocalFileRDMAMsg_initFromSession(WriteLocalFileRDMAMsg* this,
 
    this->offset = offset;
    this->count = count;
+   this->writeHint = writeHint;
 
    this->rdmap = rdmap;
 }
