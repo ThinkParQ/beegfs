@@ -11,6 +11,9 @@ bool userYNQuestion(const std::string& question,
                     boost::optional<bool> defaultAnswer=boost::none,
                     std::istream& input=std::cin);
 
+bool userExactConfirmPrompt(const std::string& question,
+                            const std::string& requiredInput,
+                            std::istream& input=std::cin);
 }
 
 #endif  //COMMON_UITK_H_

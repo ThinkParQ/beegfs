@@ -242,7 +242,7 @@ void ModeStartResync::printHelp()
    std::cout << "  # beegfs-ctl --startresync --nodetype=storage --mirrorgroupid=2 --timespan=36h" << std::endl;
    std::cout << std::endl;
    std::cout << " Example: Perform a full resync of target with ID 5" << std::endl;
-   std::cout << "  # beegfs-ctl --startresync --nodetype=storage --targetid=5 --timestamp=0" << std::endl;
+   std::cout << "  # beegfs-ctl --startresync --nodetype=storage --targetid=5 --timestamp=1" << std::endl;
 }
 
 /**

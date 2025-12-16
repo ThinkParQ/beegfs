@@ -14,89 +14,7 @@
 #include <toolkit/InodeRefStore.h>
 #include <toolkit/NoAllocBufferStore.h>
 
-
-#define PROCFSHELPER_CONFIGKEYS_SIZE \
-   ( sizeof(PROCFSHELPER_CONFIGKEYS) / sizeof(char*) )
-
-
-const char* const PROCFSHELPER_CONFIGKEYS[] =
-{
-   "cfgFile",
-   "logLevel",
-   "logType",
-   "logClientID",
-   "logHelperdIP",
-   "connUseRDMA",
-   "connMgmtdPortUDP",
-   "connClientPortUDP",
-   "connMetaPortUDP",
-   "connStoragePortUDP",
-   "connMgmtdPortTCP",
-   "connMetaPortTCP",
-   "connStoragePortTCP",
-   "connHelperdPortTCP",
-   "connMaxInternodeNum",
-   "connInterfacesFile",
-   "connRDMAInterfacesFile",
-   "connNetFilterFile",
-   "connAuthFile",
-   "connDisableAuthentication",
-   "connTcpOnlyFilterFile",
-   "connFallbackExpirationSecs",
-   "connRDMABufSize",
-   "connRDMAFragmentSize",
-   "connRDMABufNum",
-   "connRDMAMetaBufSize",
-   "connRDMAMetaFragmentSize",
-   "connRDMAMetaBufNum",
-   "connRDMATypeOfService",
-   "connRDMAKeyType",
-   "connCommRetrySecs",
-   "connNumCommRetries",
-   "connUnmountRetries",
-   "connMessagingTimeouts",
-   "connRDMATimeouts",
-   "tunePreferredMetaFile",
-   "tunePreferredStorageFile",
-   "tuneFileCacheType",
-   "tuneFileCacheBufSize",
-   "tuneRemoteFSync",
-   "tuneUseGlobalFileLocks",
-   "tuneRefreshOnGetAttr",
-   "tuneInodeBlockBits",
-   "tuneInodeBlockSize",
-   "tuneEarlyCloseResponse",
-   "tuneUseGlobalAppendLocks",
-   "tuneUseBufferedAppend",
-   "tuneStatFsCacheSecs",
-   "tuneCoherentBuffers",
-   "sysACLsEnabled",
-   "sysMgmtdHost",
-   "sysInodeIDStyle",
-   "sysCreateHardlinksAsSymlinks",
-   "sysMountSanityCheckMS",
-   "sysSyncOnClose",
-   "sysSessionCheckOnClose",
-   "sysSessionChecksEnabled",
-   "sysXAttrsEnabled",
-   "sysXAttrsCheckCapabilities",
-   "quotaEnabled",
-   "sysFileEventLogMask",
-   "sysRenameEbusyAsXdev",
-   "sysNoEnterpriseFeatureMsg",   
-
-#ifdef LOG_DEBUG_MESSAGES
-   "tunePageCacheValidityMS", // currently not public
-   "tuneFileCacheBufNum", // currently not public
-#endif // LOG_DEBUG_MESSAGES
-
-   "" // just some final dummy element (for the syntactical comma-less end) with no effect
-};
-
-
 #define NIC_INDENTATION_STR        "+ "
-
-
 
 int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
 {
@@ -114,6 +32,7 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connMgmtdPortTCP = %d\n", (int)Config_getConnMgmtdPortUDP(cfg) );
    seq_printf(file, "connHelperdPortTCP = %d\n", (int)Config_getConnHelperdPortTCP(cfg) );
    seq_printf(file, "connMaxInternodeNum = %u\n", Config_getConnMaxInternodeNum(cfg) );
+   seq_printf(file, "connMaxConcurrentAttempts = %u\n", Config_getConnMaxConcurrentAttempts(cfg) );
    seq_printf(file, "connInterfacesFile = %s\n", Config_getConnInterfacesFile(cfg) );
    seq_printf(file, "connRDMAInterfacesFile = %s\n", Config_getConnRDMAInterfacesFile(cfg) );
    seq_printf(file, "connNetFilterFile = %s\n", Config_getConnNetFilterFile(cfg) );
@@ -123,6 +42,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connTcpOnlyFilterFile = %s\n", Config_getConnTcpOnlyFilterFile(cfg) );
    seq_printf(file, "connFallbackExpirationSecs = %u\n",
       Config_getConnFallbackExpirationSecs(cfg) );
+   seq_printf(file, "connTCPRecvBufSize = %d\n", Config_getConnTCPRcvBufSize(cfg) );
+   seq_printf(file, "connUDPRecvBufSize = %d\n", Config_getConnUDPRcvBufSize(cfg) );
    seq_printf(file, "connRDMABufSize = %u\n", Config_getConnRDMABufSize(cfg) );
    seq_printf(file, "connRDMAFragmentSize = %u\n", Config_getConnRDMAFragmentSize(cfg) );
    seq_printf(file, "connRDMABufNum = %u\n", Config_getConnRDMABufNum(cfg) );
@@ -142,6 +63,11 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "tuneFileCacheType = %s\n",
       Config_fileCacheTypeNumToStr(Config_getTuneFileCacheTypeNum(cfg) ) );
    seq_printf(file, "tuneFileCacheBufSize = %d\n", Config_getTuneFileCacheBufSize(cfg) );
+   seq_printf(file, "tuneFileCacheBufNum = %d\n", Config_getTuneFileCacheBufNum(cfg) );
+   seq_printf(file, "tunePageCacheValidityMS = %u\n", Config_getTunePageCacheValidityMS(cfg) );
+   seq_printf(file, "tuneDirSubentryCacheValidityMS = %u\n", Config_getTuneDirSubentryCacheValidityMS(cfg) );
+   seq_printf(file, "tuneFileSubentryCacheValidityMS = %u\n", Config_getTuneFileSubentryCacheValidityMS(cfg) );
+   seq_printf(file, "tuneENOENTCacheValidityMS = %u\n", Config_getTuneENOENTCacheValidityMS(cfg) );
    seq_printf(file, "tuneRemoteFSync = %d\n", (int)Config_getTuneRemoteFSync(cfg) );
    seq_printf(file, "tuneUseGlobalFileLocks = %d\n", (int)Config_getTuneUseGlobalFileLocks(cfg) );
    seq_printf(file, "tuneRefreshOnGetAttr = %d\n", (int)Config_getTuneRefreshOnGetAttr(cfg) );
@@ -154,6 +80,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "tuneStatFsCacheSecs = %u\n", Config_getTuneStatFsCacheSecs(cfg) );
    seq_printf(file, "tuneCoherentBuffers = %u\n", Config_getTuneCoherentBuffers(cfg) );
    seq_printf(file, "sysACLsEnabled = %d\n", (int)Config_getSysACLsEnabled(cfg) );
+   seq_printf(file, "sysACLsRevalidate = %s\n",
+      Config_ACLsRevalidateToStr(Config_getSysACLsRevalidate(cfg) ) );
    seq_printf(file, "sysMgmtdHost = %s\n", Config_getSysMgmtdHost(cfg) );
    seq_printf(file, "sysInodeIDStyle = %s\n",
       Config_inodeIDStyleNumToStr(Config_getSysInodeIDStyleNum(cfg) ) );
@@ -166,245 +94,15 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
       Config_checkCapabilitiesTypeToStr(Config_getSysXAttrsCheckCapabilities(cfg) ) );
    seq_printf(file, "sysSessionCheckOnClose = %d\n", (int)Config_getSysSessionCheckOnClose(cfg) );
    seq_printf(file, "sysSessionChecksEnabled = %d\n", (int)Config_getSysSessionChecksEnabled(cfg) );
+   seq_printf(file, "sysUpdateTargetStatesSecs = %u\n", Config_getSysUpdateTargetStatesSecs(cfg) );
+   seq_printf(file, "sysTargetOfflineTimeoutSecs = %u\n", Config_getSysTargetOfflineTimeoutSecs(cfg) );
    seq_printf(file, "quotaEnabled = %d\n", (int)Config_getQuotaEnabled(cfg) );
    seq_printf(file, "sysFileEventLogMask = %s\n", Config_eventLogMaskToStr(cfg->eventLogMask));
    seq_printf(file, "sysRenameEbusyAsXdev = %u\n", (unsigned) cfg->sysRenameEbusyAsXdev);
    seq_printf(file, "sysNoEnterpriseFeatureMsg = %s\n",
       Config_getSysNoEnterpriseFeatureMsg(cfg) ? "true" : "false");
 
-
-#ifdef LOG_DEBUG_MESSAGES
-   seq_printf(file, "tunePageCacheValidityMS = %u\n", Config_getTunePageCacheValidityMS(cfg) );
-   seq_printf(file, "tuneFileCacheBufNum = %d\n", Config_getTuneFileCacheBufNum(cfg) );
-#endif // LOG_DEBUG_MESSAGES
-
-
    return 0;
-}
-
-int ProcFsHelper_read_config(char* buf, char** start, off_t offset, int size, int* eof, App* app)
-{
-   int count = 0;
-   Config* cfg = App_getConfig(app);
-   const char* currentKey = NULL;
-
-   if(offset >= (off_t)PROCFSHELPER_CONFIGKEYS_SIZE)
-   {
-      *eof = 1;
-      return 0;
-   }
-
-   currentKey = PROCFSHELPER_CONFIGKEYS[offset];
-
-
-   if(!strcmp(currentKey, "cfgFile") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey, Config_getCfgFile(cfg) );
-   else
-   if(!strcmp(currentKey, "logLevel") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getLogLevel(cfg) );
-   else
-   if(!strcmp(currentKey, "logType") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_logTypeNumToStr(Config_getLogTypeNum(cfg) ) );
-   else
-   if(!strcmp(currentKey, "logClientID") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, (int)Config_getLogClientID(cfg) );
-   else
-   if(!strcmp(currentKey, "logHelperdIP") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey, Config_getLogHelperdIP(cfg) );
-   else
-   if(!strcmp(currentKey, "connUseRDMA") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, (int)Config_getConnUseRDMA(cfg) );
-   else
-   if(!strcmp(currentKey, "connMgmtdPortUDP") )
-      count = scnprintf(buf, size, "%s = %d\n",
-         currentKey, (int)Config_getConnMgmtdPortUDP(cfg) );
-   else
-   if(!strcmp(currentKey, "connClientPortUDP") )
-      count = scnprintf(buf, size, "%s = %d\n",
-         currentKey, (int)Config_getConnClientPortUDP(cfg) );
-   else
-   if(!strcmp(currentKey, "connMgmtdPortTCP") )
-      count = scnprintf(buf, size, "%s = %d\n",
-         currentKey, (int)Config_getConnMgmtdPortUDP(cfg) );
-   else
-   if(!strcmp(currentKey, "connHelperdPortTCP") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         (int)Config_getConnHelperdPortTCP(cfg) );
-   else
-   if(!strcmp(currentKey, "connMaxInternodeNum") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnMaxInternodeNum(cfg) );
-   else
-   if(!strcmp(currentKey, "connInterfacesFile") )
-      count = scnprintf(buf, size, "%s = %s\n",
-         currentKey, Config_getConnInterfacesFile(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMAInterfacesFile") )
-      count = scnprintf(buf, size, "%s = %s\n",
-         currentKey, Config_getConnRDMAInterfacesFile(cfg) );
-   else
-   if(!strcmp(currentKey, "connNetFilterFile") )
-      count = scnprintf(buf, size, "%s = %s\n",
-         currentKey, Config_getConnNetFilterFile(cfg) );
-   else
-   if(!strcmp(currentKey, "connTcpOnlyFilterFile") )
-      count = scnprintf(buf, size, "%s = %s\n",
-         currentKey, Config_getConnTcpOnlyFilterFile(cfg) );
-   else
-   if(!strcmp(currentKey, "connFallbackExpirationSecs") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getConnFallbackExpirationSecs(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMABufSize") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMABufSize(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMAFragmentSize") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAFragmentSize(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMABufNum") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMABufNum(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMAMetaBufSize") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaBufSize(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMAMetaFragmentSize") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaFragmentSize(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMAMetaBufNum") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnRDMAMetaBufNum(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMATypeOfService") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getConnRDMATypeOfService(cfg) );
-   else
-   if(!strcmp(currentKey, "connRDMAKeyType") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_rdmaKeyTypeNumToStr(Config_getConnRDMAKeyTypeNum(cfg) ) );
-   else
-   if(!strcmp(currentKey, "connCommRetrySecs") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnCommRetrySecs(cfg) );
-   else
-   if(!strcmp(currentKey, "connNumCommRetries") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getConnNumCommRetries(cfg) );
-   else
-   if(!strcmp(currentKey, "connUnmountRetries") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         (int)Config_getConnUnmountRetries(cfg) );
-   else
-   if(!strcmp(currentKey, "tunePreferredMetaFile") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_getTunePreferredMetaFile(cfg) );
-   else
-   if(!strcmp(currentKey, "tunePreferredStorageFile") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_getTunePreferredStorageFile(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneFileCacheType") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_fileCacheTypeNumToStr(Config_getTuneFileCacheTypeNum(cfg) ) );
-   else
-   if(!strcmp(currentKey, "tuneFileCacheBufSize") )
-      count = scnprintf(buf, size, "%s = %d\n",
-         currentKey, Config_getTuneFileCacheBufSize(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneFileCacheBufNum") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getTuneFileCacheBufNum(cfg) );
-   else
-   if(!strcmp(currentKey, "tunePageCacheValidityMS") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getTunePageCacheValidityMS(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneRemoteFSync") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getTuneRemoteFSync(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneUseGlobalFileLocks") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         Config_getTuneUseGlobalFileLocks(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneRefreshOnGetAttr") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         Config_getTuneRefreshOnGetAttr(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneInodeBlockBits") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getTuneInodeBlockBits(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneInodeBlockSize") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getTuneInodeBlockSize(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneEarlyCloseResponse") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         Config_getTuneEarlyCloseResponse(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneUseGlobalAppendLocks") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         Config_getTuneUseGlobalAppendLocks(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneUseBufferedAppend") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         Config_getTuneUseBufferedAppend(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneStatFsCacheSecs") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getTuneStatFsCacheSecs(cfg) );
-   else
-   if(!strcmp(currentKey, "tuneCoherentBuffers") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, Config_getTuneCoherentBuffers(cfg) );
-   else
-   if(!strcmp(currentKey, "sysACLsEnabled") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getSysACLsEnabled(cfg) );
-   else
-   if(!strcmp(currentKey, "sysMgmtdHost") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey, Config_getSysMgmtdHost(cfg) );
-   else
-   if(!strcmp(currentKey, "sysInodeIDStyle") )
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_inodeIDStyleNumToStr(Config_getSysInodeIDStyleNum(cfg) ) );
-   else
-   if(!strcmp(currentKey, "sysCreateHardlinksAsSymlinks") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey,
-         Config_getSysCreateHardlinksAsSymlinks(cfg) );
-   else
-   if(!strcmp(currentKey, "sysMountSanityCheckMS") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getSysMountSanityCheckMS(cfg) );
-   else
-   if(!strcmp(currentKey, "sysSyncOnClose") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getSysSyncOnClose(cfg) );
-   else
-   if(!strcmp(currentKey, "sysSessionCheckOnClose") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getSysSessionCheckOnClose(cfg) );
-   else
-   if(!strcmp(currentKey, "sysSessionChecksEnabled") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getSysSessionChecksEnabled(cfg) );
-   else
-   if(!strcmp(currentKey, "sysXAttrsEnabled") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getSysXAttrsEnabled(cfg) );
-   else
-   if(!strcmp(currentKey, "sysXAttrsCheckCapabilities") )
-      count = scnprintf(buf, size, "%s = %d\n", currentKey, Config_getSysXAttrsCheckCapabilities(cfg) );
-   else
-   if (!strcmp(currentKey, "sysRenameEbusyAsXdev"))
-      count = scnprintf(buf, size, "%s = %u\n", currentKey, (unsigned) cfg->sysRenameEbusyAsXdev);
-   else
-   if(!strcmp(currentKey, "quotaEnabled") )
-      count = scnprintf(buf, size, "%s = %u\n", currentKey,
-         Config_getQuotaEnabled(cfg) );
-   else if (!strcmp(currentKey, "sysFileEventLogMask"))
-      count = scnprintf(buf, size, "%s = %s\n", currentKey,
-         Config_eventLogMaskToStr(cfg->eventLogMask));
-   else
-   { // undefined (or hidden) element
-      // nothing to be done here
-   }
-
-
-   *start = (char*)1; // move to next offset (note: yes, we're casting a number to a pointer here!)
-
-   return count;
 }
 
 int ProcFsHelper_readV2_status(struct seq_file* file, App* app)
@@ -486,103 +184,6 @@ int ProcFsHelper_readV2_status(struct seq_file* file, App* app)
    return 0;
 }
 
-int ProcFsHelper_read_status(char* buf, char** start, off_t offset, int size, int* eof, App* app)
-{
-   int count = 0;
-   int i=0; // just some virtual sequential index to match sequental offset
-
-   if(offset == i++)
-   {
-      NoAllocBufferStore* bufStore = App_getMsgBufStore(app);
-      size_t numAvailableMsgBufs = NoAllocBufferStore_getNumAvailable(bufStore);
-
-      count = scnprintf(buf, size, "numAvailableMsgBufs: %u\n", (unsigned)numAvailableMsgBufs);
-   }
-   else
-   if(offset == i++)
-   {
-      InternodeSyncer* syncer = App_getInternodeSyncer(app);
-      size_t delayedQSize = InternodeSyncer_getDelayedCloseQueueSize(syncer);
-
-      count = scnprintf(buf, size, "numDelayedClose: %u\n", (unsigned)delayedQSize);
-   }
-   else
-   if(offset == i++)
-   {
-      InternodeSyncer* syncer = App_getInternodeSyncer(app);
-      size_t delayedQSize = InternodeSyncer_getDelayedEntryUnlockQueueSize(syncer);
-
-      count = scnprintf(buf, size, "numDelayedEntryUnlock: %u\n", (unsigned)delayedQSize);
-   }
-   else
-   if(offset == i++)
-   {
-      InternodeSyncer* syncer = App_getInternodeSyncer(app);
-      size_t delayedQSize = InternodeSyncer_getDelayedRangeUnlockQueueSize(syncer);
-
-      count = scnprintf(buf, size, "numDelayedRangeUnlock: %u\n", (unsigned)delayedQSize);
-   }
-   else
-   if(offset == i++)
-   {
-      AckManager* ackMgr = App_getAckManager(app);
-      size_t queueSize = AckManager_getAckQueueSize(ackMgr);
-
-      count = scnprintf(buf, size, "numEnqueuedAcks: %u\n", (unsigned)queueSize);
-   }
-   else
-   if(offset == i++)
-   {
-      NoAllocBufferStore* cacheStore = App_getCacheBufStore(app);
-      if(cacheStore)
-      {
-         size_t numAvailable = NoAllocBufferStore_getNumAvailable(cacheStore);
-
-         count = scnprintf(buf, size, "numAvailableIOBufs: %u\n", (unsigned)numAvailable);
-      }
-   }
-   else
-   if(offset == i++)
-   {
-      InodeRefStore* refStore = App_getInodeRefStore(app);
-      if(refStore)
-      {
-         size_t storeSize = InodeRefStore_getSize(refStore);
-
-         count = scnprintf(buf, size, "numFlushRefs: %u\n", (unsigned)storeSize);
-      }
-   }
-#ifdef BEEGFS_DEBUG
-   else
-   if(offset == i++)
-   {
-      unsigned long long numRPCs = App_getNumRPCs(app);
-      count = scnprintf(buf, size, "numRPCs: %llu\n", numRPCs);
-   }
-   else
-   if(offset == i++)
-   {
-      unsigned long long numRemoteReads = App_getNumRemoteReads(app);
-      count = scnprintf(buf, size, "numRemoteReads: %llu\n", numRemoteReads);
-   }
-   else
-   if(offset == i++)
-   {
-      unsigned long long numRemoteWrites = App_getNumRemoteWrites(app);
-      count = scnprintf(buf, size, "numRemoteWrites: %llu\n", numRemoteWrites);
-   }
-#endif // BEEGFS_DEBUG
-   else
-   {
-      *eof = 1;
-      return 0;
-   }
-
-
-   *start = (char*)1; // move to next offset (note: yes, we're casting a number to a pointer here!)
-
-   return count;
-}
 
 /**
  * @param nodes show nodes from this store
@@ -607,50 +208,6 @@ int ProcFsHelper_readV2_nodes(struct seq_file* file, App* app, struct NodeStoreE
    }
 
    return 0;
-}
-
-
-/**
- * Note: This does not guarantee to return the complete list (e.g. in case the list changes during
- * two calls to this method)
- *
- * @param nodes show nodes from this store
- */
-int ProcFsHelper_read_nodes(char* buf, char** start, off_t offset, int size, int* eof,
-   struct NodeStoreEx* nodes)
-{
-   Node* currentNode = NULL;
-   off_t currentOffset = 0;
-   int count = 0;
-   NumNodeID nodeNumID;
-   const char* nodeID;
-
-   currentNode = NodeStoreEx_referenceFirstNode(nodes);
-   while(currentNode && (currentOffset < offset) )
-   {
-      currentNode = NodeStoreEx_referenceNextNodeAndReleaseOld(nodes, currentNode);
-      currentOffset++;
-   }
-
-   if(!currentNode)
-   { // this offset does not exist
-      *eof = 1;
-      return 0;
-   }
-
-   nodeNumID = Node_getNumID(currentNode);
-   nodeID = NumNodeID_str(&nodeNumID);
-   count += scnprintf(buf+count, size-count, "%s [ID: %s]\n", Node_getID(currentNode), nodeID);
-   kfree(nodeID);
-
-   __ProcFsHelper_printGotRoot(currentNode, nodes, buf, &count, &size);
-   __ProcFsHelper_printNodeConns(currentNode, buf, &count, &size);
-
-   *start = (char*)1; // move to next offset (note: yes, we're casting a number to a pointer here!)
-
-   Node_put(currentNode);
-
-   return count;
 }
 
 static void ProcFsHelper_readV2_nics(struct seq_file* file, NicAddressList* nicList)
@@ -708,59 +265,6 @@ int ProcFsHelper_readV2_clientInfo(struct seq_file* file, App* app)
    NicAddressList_uninit(&rdmaNicList);
 
    return 0;
-}
-
-
-int ProcFsHelper_read_clientInfo(char* buf, char** start, off_t offset, int size, int* eof,
-   App* app)
-{
-   int count = 0;
-
-   Node* localNode = App_getLocalNode(app);
-   char* localNodeID = Node_getID(localNode);
-
-   size_t nicListStrLen = 1024;
-   char* extendedNicListStr = vmalloc(nicListStrLen);
-   NicAddressList nicList;
-   NicAddressListIter nicIter;
-
-
-   Node_cloneNicList(localNode, &nicList);
-   // print local clientID
-   count += scnprintf(buf+count, size-count, "ClientID: %s\n", localNodeID);
-
-   // list usable network interfaces
-   NicAddressListIter_init(&nicIter, &nicList);
-   extendedNicListStr[0] = 0;
-
-   for( ; !NicAddressListIter_end(&nicIter); NicAddressListIter_next(&nicIter) )
-   {
-      char* nicAddrStr;
-      NicAddress* nicAddr = NicAddressListIter_value(&nicIter);
-      char* tmpStr = vmalloc(nicListStrLen);
-
-      // extended NIC info
-      nicAddrStr = NIC_nicAddrToString(nicAddr);
-      snprintf(tmpStr, nicListStrLen, "%s%s%s\n", extendedNicListStr, NIC_INDENTATION_STR,
-         nicAddrStr);
-      strcpy(extendedNicListStr, tmpStr); // tmpStr to avoid writing to a buffer that we're
-         // reading from at the same time
-      kfree(nicAddrStr);
-
-      SAFE_VFREE(tmpStr);
-   }
-
-   count += scnprintf(buf+count, size-count, "Interfaces:\n%s", extendedNicListStr);
-
-   // clean up
-   SAFE_VFREE(extendedNicListStr);
-
-   *eof = 1;
-
-   ListTk_kfreeNicAddressListElems(&nicList);
-   NicAddressList_uninit(&nicList);
-
-   return count;
 }
 
 int ProcFsHelper_readV2_targetStates(struct seq_file* file, App* app,
@@ -832,96 +336,6 @@ int ProcFsHelper_readV2_targetStates(struct seq_file* file, App* app,
    return 0;
 }
 
-int ProcFsHelper_read_targetStates(char* buf, char** start, off_t offset, int size, int* eof,
-   App* app, struct TargetStateStore* targetsStates, struct NodeStoreEx* nodes, bool isMeta)
-{
-   off_t currentOffset = 0;
-   int count = 0;
-
-   FhgfsOpsErr inOutError = FhgfsOpsErr_SUCCESS;
-
-   Node* currentNode = NULL;
-
-   UInt8List reachabilityStates;
-   UInt8List consistencyStates;
-   UInt16List targetIDs;
-
-   UInt8ListIter reachabilityStatesIter;
-   UInt8ListIter consistencyStatesIter;
-   UInt16ListIter targetIDsIter;
-
-   TargetMapper* targetMapper = App_getTargetMapper(app);
-
-   UInt8List_init(&reachabilityStates);
-   UInt8List_init(&consistencyStates);
-   UInt16List_init(&targetIDs);
-
-   TargetStateStore_getStatesAsLists(targetsStates, &targetIDs,
-      &reachabilityStates, &consistencyStates);
-
-   UInt16ListIter_init(&targetIDsIter, &targetIDs);
-   UInt8ListIter_init(&reachabilityStatesIter, &reachabilityStates);
-   UInt8ListIter_init(&consistencyStatesIter, &consistencyStates);
-
-   while( (!UInt16ListIter_end(&targetIDsIter) )
-      && (!UInt8ListIter_end(&reachabilityStatesIter) )
-      && (!UInt8ListIter_end(&consistencyStatesIter) )
-      && (currentOffset < offset) )
-   {
-      currentOffset++;
-
-      UInt16ListIter_next(&targetIDsIter);
-      UInt8ListIter_next(&reachabilityStatesIter);
-      UInt8ListIter_next(&consistencyStatesIter);
-   }
-
-   if(UInt16ListIter_end(&targetIDsIter) )
-   { // this offset does not exist
-      UInt8List_uninit(&consistencyStates);
-      UInt8List_uninit(&reachabilityStates);
-      UInt16List_uninit(&targetIDs);
-
-      *eof = 1;
-      return 0;
-   }
-
-   if(isMeta)
-   { // meta nodes
-      currentNode = NodeStoreEx_referenceNode(nodes,
-         (NumNodeID){UInt16ListIter_value(&targetIDsIter)} );
-   }
-   else
-   { // storage nodes
-      currentNode = NodeStoreEx_referenceNodeByTargetID(nodes, UInt16ListIter_value(&targetIDsIter),
-         targetMapper, &inOutError);
-   }
-
-   if(unlikely(!currentNode) )
-   {
-      UInt8List_uninit(&consistencyStates);
-      UInt8List_uninit(&reachabilityStates);
-      UInt16List_uninit(&targetIDs);
-
-      *eof = 1;
-      return 0;
-   }
-
-   count += scnprintf(buf+count, size-count, "[Target ID: %hu] @ %s: %s / %s \n",
-      UInt16ListIter_value(&targetIDsIter), Node_getNodeIDWithTypeStr(currentNode),
-      TargetStateStore_reachabilityStateToStr(UInt8ListIter_value(&reachabilityStatesIter) ),
-      TargetStateStore_consistencyStateToStr(UInt8ListIter_value(&consistencyStatesIter) ) );
-
-   Node_put(currentNode);
-
-   *start = (char*)1; // move to next offset (note: yes, we're casting a number to a pointer here!)
-
-   UInt8List_uninit(&consistencyStates);
-   UInt8List_uninit(&reachabilityStates);
-   UInt16List_uninit(&targetIDs);
-
-   return count;
-}
-
 int ProcFsHelper_readV2_connRetriesEnabled(struct seq_file* file, App* app)
 {
    bool retriesEnabled = App_getConnRetriesEnabled(app);
@@ -929,20 +343,6 @@ int ProcFsHelper_readV2_connRetriesEnabled(struct seq_file* file, App* app)
    seq_printf(file, "%d\n", retriesEnabled ? 1 : 0);
 
    return 0;
-}
-
-int ProcFsHelper_read_connRetriesEnabled(char* buf, char** start, off_t offset, int size, int* eof,
-   App* app)
-{
-   int count = 0;
-
-   bool retriesEnabled = App_getConnRetriesEnabled(app);
-
-   count += scnprintf(buf+count, size-count, "%d\n", retriesEnabled ? 1 : 0);
-
-   *eof = 1;
-
-   return count;
 }
 
 int ProcFsHelper_write_connRetriesEnabled(const char __user *buf, unsigned long count, App* app)
@@ -1038,25 +438,6 @@ int ProcFsHelper_readV2_netBenchModeEnabled(struct seq_file* file, App* app)
    return 0;
 }
 
-int ProcFsHelper_read_netBenchModeEnabled(char* buf, char** start, off_t offset, int size, int* eof,
-   App* app)
-{
-   int count = 0;
-
-   bool netBenchModeEnabled = App_getNetBenchModeEnabled(app);
-
-   count += scnprintf(buf+count, size-count,
-      "%d\n"
-      "# Enabled netbench_mode (=1) means that storage servers will not read from or\n"
-      "# write to the underlying file system, so that network throughput can be tested\n"
-      "# independent of storage device throughput from a netbench client.\n",
-      netBenchModeEnabled ? 1 : 0);
-
-   *eof = 1;
-
-   return count;
-}
-
 int ProcFsHelper_write_netBenchModeEnabled(const char __user *buf, unsigned long count, App* app)
 {
    const char* logContext = "procfs (netbench mode)";
@@ -1143,34 +524,6 @@ int ProcFsHelper_readV2_logLevels(struct seq_file* file, App* app)
    }
 
    return 0;
-}
-
-/**
- * Print all log topics and their current log level.
- */
-int ProcFsHelper_read_logLevels(char* buf, char** start, off_t offset, int size, int* eof, App* app)
-{
-   Logger* log = App_getLogger(app);
-
-   int count = 0;
-
-   if(offset < LogTopic_LAST)
-   {
-      const char* logTopicStr = Logger_getLogTopicStr( (LogTopic)offset);
-      int logLevel = Logger_getLogTopicLevel(log, (LogTopic)offset);
-
-      count = scnprintf(buf, size, "%s = %d\n", logTopicStr, logLevel);
-   }
-   else
-   {
-      *eof = 1;
-      return 0;
-   }
-
-
-   *start = (char*)1; // move to next offset (note: yes, we're casting a number to a pointer here!)
-
-   return count;
 }
 
 /**
@@ -1345,68 +698,6 @@ void __ProcFsHelper_printNodeConnsV2(struct seq_file* file, struct Node* node)
 
    // cleanup
    SAFE_KFREE(peerNameBuf);
-}
-
-/**
- * Prints number of connections for each conn type and adds the peer name of an available conn
- * to each type.
- */
-void __ProcFsHelper_printNodeConns(Node* node, char* buf, int* pcount, int* psize)
-{
-   int count = *pcount;
-   int size = *psize;
-
-   NodeConnPool* connPool;
-   NodeConnPoolStats poolStats;
-
-   const char* nonPrimaryTag = " [fallback route]"; // extra text to hint at non-primary conns
-   bool isNonPrimaryConn;
-
-   connPool = Node_getConnPool(node);
-   NodeConnPool_getStats(connPool, &poolStats);
-
-   count += scnprintf(buf+count, size-count, "   Connections: ");
-
-
-   if(!(poolStats.numEstablishedStd +
-        poolStats.numEstablishedSDP +
-        poolStats.numEstablishedRDMA) )
-      count += scnprintf(buf+count, size-count, "<none>");
-   else
-   { // print "<type>: <count> (<first_avail_peername>);"
-      if(poolStats.numEstablishedStd)
-      {
-         count += scnprintf(buf+count, size-count, "TCP: %u (", poolStats.numEstablishedStd);
-         count += NodeConnPool_getFirstPeerName(connPool, NICADDRTYPE_STANDARD,
-            size-count, buf+count, &isNonPrimaryConn);
-         count += scnprintf(buf+count, size-count, "%s", isNonPrimaryConn ? nonPrimaryTag : "");
-         count += scnprintf(buf+count, size-count, "); ");
-      }
-
-      if(poolStats.numEstablishedSDP)
-      {
-         count += scnprintf(buf+count, size-count, "SDP: %u (", poolStats.numEstablishedSDP);
-         count += NodeConnPool_getFirstPeerName(connPool, NICADDRTYPE_SDP,
-            size-count, buf+count, &isNonPrimaryConn);
-         count += scnprintf(buf+count, size-count, "%s", isNonPrimaryConn ? nonPrimaryTag : "");
-         count += scnprintf(buf+count, size-count, "); ");
-      }
-
-      if(poolStats.numEstablishedRDMA)
-      {
-         count += scnprintf(buf+count, size-count, "RDMA: %u (", poolStats.numEstablishedRDMA);
-         count += NodeConnPool_getFirstPeerName(connPool, NICADDRTYPE_RDMA,
-            size-count, buf+count, &isNonPrimaryConn);
-         count += scnprintf(buf+count, size-count, "%s", isNonPrimaryConn ? nonPrimaryTag : "");
-         count += scnprintf(buf+count, size-count, "); ");
-      }
-   }
-
-   count += scnprintf(buf+count, size-count, "\n");
-
-   // set out values
-   *pcount = count;
-   *psize = size;
 }
 
 const char* ProcFsHelper_getSessionID(App* app)

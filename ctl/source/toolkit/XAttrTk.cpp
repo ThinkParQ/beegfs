@@ -1,7 +1,3 @@
-#include <common/toolkit/StringTk.h>
-#include <common/system/System.h>
-#include <linux/limits.h>
-#include <sys/xattr.h>
 #include "XAttrTk.h"
 
 namespace
@@ -36,9 +32,14 @@ namespace XAttrTk {
  * @param xattrs  A map of extended attributes names and their respective values.
  *                Each map object is a tuple containing the attribute value array
  *                and its length.
- * @throw XAttrException if setting extended attributes fails.
+ * @param flags   Controls attribute overwrite behavior:
+ *                - XATTR_CREATE (default): Fail if attribute already exists.
+ *                - 0: Create or replace attribute.
+ *                - XATTR_REPLACE: Fail if attribute doesn't exist.
+ *
+ * @throws XAttrException if lsetxattr() fails.
  */
-void setXAttrs(const std::string& path, const XAttrMap& xattrs)
+void setXAttrs(const std::string& path, const XAttrMap& xattrs, int flags)
 {
    for (auto xattr = xattrs.begin(); xattr != xattrs.end(); xattr++)
    {
@@ -46,7 +47,7 @@ void setXAttrs(const std::string& path, const XAttrMap& xattrs)
       const char* xattrValue = &xattr->second.front();
       ssize_t xattrValueLength = xattr->second.size();
 
-      if (lsetxattr(path.c_str(), xattrName, xattrValue, xattrValueLength, XATTR_CREATE))
+      if (lsetxattr(path.c_str(), xattrName, xattrValue, xattrValueLength, flags))
       {
          throw createException("Failed to set extended attribute", path, xattrName);
       }

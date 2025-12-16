@@ -34,16 +34,15 @@
 static ssize_t FhgfsOps_buffered_write_iter(struct kiocb *iocb, struct iov_iter *from);
 static ssize_t FhgfsOps_buffered_read_iter(struct kiocb *iocb, struct iov_iter *to);
 
-#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
-int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
-      loff_t pos, unsigned len, unsigned flags, struct page** pagep, void** fsdata);
-#else
-int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
-      loff_t pos, unsigned len, struct page** pagep, void** fsdata);
+static int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
+    loff_t pos, unsigned len,
+#if BEEGFS_HAS_WRITE_FLAGS
+    unsigned flags,
 #endif
+    beegfs_pgfol_t *pgfolp, void** fsdata);
 
-int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
-      loff_t pos, unsigned len, unsigned copied, struct page* page, void* fsdata);
+static int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
+    loff_t pos, unsigned len, unsigned copied, beegfs_pgfol_t pgfol, void* fsdata);
 
 #define MMAP_RETRY_LOCK_EASY 100
 #define MMAP_RETRY_LOCK_HARD 500
@@ -1527,19 +1526,19 @@ exit:
  * prepare_write() doesn't have this)
  * @return 0 on success
  */
-#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
-int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
-   loff_t pos, unsigned len, unsigned flags, struct page** pagep, void** fsdata)
-#else
-int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
-   loff_t pos, unsigned len, struct page** pagep, void** fsdata)
+static int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
+    loff_t pos, unsigned len,
+#if BEEGFS_HAS_WRITE_FLAGS
+    unsigned flags,
 #endif
+    beegfs_pgfol_t *pgfolp, void** fsdata)
 {
    pgoff_t index = pos >> PAGE_SHIFT;
    loff_t offset = pos & (PAGE_SIZE - 1);
    loff_t page_start = pos & PAGE_MASK;
 
    loff_t i_size;
+
    struct page* page;
 
    int retVal = 0;
@@ -1549,11 +1548,13 @@ int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
    //   (long long)offset, (long long)page_start, len);
    IGNORE_UNUSED_VARIABLE(app);
 
-#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
-   page = grab_cache_page_write_begin(mapping, index, flags);
+   page = beegfs_grab_cache_page(mapping, index,
+#if BEEGFS_HAS_WRITE_FLAGS
+        flags
 #else
-   page = grab_cache_page_write_begin(mapping, index);
+        0
 #endif
+    );
 
    if(!page)
    {
@@ -1593,21 +1594,21 @@ int FhgfsOps_write_begin(struct file* file, struct address_space* mapping,
 
 clean_up:
    // clean-up
-
-   *pagep = page;
-
+   *pgfolp = beegfs_to_pgfol(page);
    return retVal;
 }
+
 
 /**
  * @param copied the amount that was able to be copied ("copied==len" is always true if
  * write_begin() was called with the AOP_FLAG_UNINTERRUPTIBLE flag)
  * @param fsdata whatever write_begin() set here
  * @return < 0 on failure, number of bytes copied into pagecache (<= 'copied') otherwise
- */
-int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
-   loff_t pos, unsigned len, unsigned copied, struct page* page, void* fsdata)
+ **/
+static int FhgfsOps_write_end(struct file* file, struct address_space* mapping,
+      loff_t pos, unsigned len, unsigned copied, beegfs_pgfol_t pgfol, void* fsdata)
 {
+   struct page* page = beegfs_get_page(pgfol);
    FsFileInfo* fileInfo = __FhgfsOps_getFileInfo(file);
 
    struct inode* inode = mapping->host;

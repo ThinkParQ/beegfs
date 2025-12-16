@@ -254,7 +254,7 @@ FhgfsOpsErr DirInode::setStripePattern(const StripePattern& newPattern, uint32_t
       }
       if (stripePattern->getPatternType() != newPattern.getPatternType()) {
          return FhgfsOpsErr_PERM;
-      }    
+      }
       oldPattern = stripePattern->clone();
       stripePattern->setDefaultNumTargets(newPattern.getDefaultNumTargets());
       stripePattern->setChunkSize(newPattern.getChunkSize());
@@ -314,16 +314,24 @@ FhgfsOpsErr DirInode::listIncremental(int64_t serverOffset,
  * "outNames.size() != maxOutNames".
  *
  * @param serverOffset zero-based offset
- * @param maxOutNames the maximum number of entries that will be added to the outNames
+ * @param maxOutNames maximum number of entries that will be added to the outNames (ignored if
+ *                   availableRespBufSize > 0).
  * @param filterDots true to not return "." and ".." entries.
  * @param outArgs outNewOffset is only valid if return value indicates success.
+ * @param availableRespBufSize  Optional limit (in bytes) for the response payload size.
+ *        When non-zero, the number of directory entries returned is determined by how many
+ *        can fit into this buffer, based on their actual size post-serialization, rather
+ *        than by entry count. This ensures the response fits safely within the client–server
+ *        message buffer limits. When zero (default), the number of entries is limited by
+ *        maxOutNames instead.
  */
 FhgfsOpsErr DirInode::listIncrementalEx(int64_t serverOffset,
-   unsigned maxOutNames, bool filterDots, ListIncExOutArgs& outArgs)
+   unsigned maxOutNames, bool filterDots, ListIncExOutArgs& outArgs, unsigned availableRespBufSize)
 {
    SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
 
-   FhgfsOpsErr listRes = entries.listIncrementalEx(serverOffset, maxOutNames, filterDots, outArgs);
+   FhgfsOpsErr listRes = entries.listIncrementalEx(serverOffset, maxOutNames, filterDots, outArgs,
+      availableRespBufSize);
 
    safeLock.unlock(); // U N L O C K
 

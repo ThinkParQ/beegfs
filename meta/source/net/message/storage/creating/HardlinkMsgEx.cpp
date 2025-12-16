@@ -106,6 +106,16 @@ std::unique_ptr<MirroredMessageResponseState> HardlinkMsgEx::executeLocally(Resp
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
    }
 
+   // Prevent hardlinks across directories with different buddy mirror configurations
+   if (getFromDirInfo()->getIsBuddyMirrored() != getToDirInfo()->getIsBuddyMirrored())
+   {
+      LogContext(logContext).logErr("Hardlinks not supported across directories with different "
+         "buddy mirror config setting. SourceDirID: " + getFromDirInfo()->getEntryID() +
+         "; TargetDirID: " + getToDirInfo()->getEntryID());
+      metaStore->releaseDir(toDir->getID());
+      return boost::make_unique<ResponseState>(FhgfsOpsErr_NOTSUPP);
+   }
+
    // check whether local node/group owns source file's inode or not
    NumNodeID ownerNodeID = getFromInfo()->getOwnerNodeID();
    bool isLocalOwner = ((!isMirrored() && ownerNodeID == app->getLocalNode().getNumID()) ||

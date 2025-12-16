@@ -817,8 +817,7 @@ static void __beegfs_writepages_work(struct beegfs_writepages_state* state)
       }
       else if (err)
       {
-         mapping_set_error(mapping, err);
-
+         fhgfs_set_wb_error(page, err);
          pvr_clear(page);
       }
       else
@@ -1443,32 +1442,37 @@ out:
    return result;
 }
 
-#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
-static int beegfs_write_begin(struct file* filp, struct address_space* mapping, loff_t pos,
-   unsigned len, unsigned flags, struct page** pagep, void** fsdata)
-#else
-static int beegfs_write_begin(struct file* filp, struct address_space* mapping, loff_t pos,
-   unsigned len, struct page** pagep, void** fsdata)
+static int beegfs_write_begin(struct file *filp, struct address_space *mapping,
+    loff_t pos, unsigned len,
+#if BEEGFS_HAS_WRITE_FLAGS
+    unsigned flags,
 #endif
+    beegfs_pgfol_t *pgfolp, void **fsdata)
 {
    pgoff_t index = pos >> PAGE_SHIFT;
 
-#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
-   *pagep = grab_cache_page_write_begin(mapping, index, flags);
+   struct page *page = beegfs_grab_cache_page(mapping, index,
+#if BEEGFS_HAS_WRITE_FLAGS
+        flags
 #else
-   *pagep = grab_cache_page_write_begin(mapping, index);
+        0
 #endif
+    );
 
-   if(!*pagep)
+   // Common check for all
+   if (!page)
       return -ENOMEM;
 
-   return __beegfs_write_begin(filp, pos, len, *pagep);
+   *pgfolp = beegfs_to_pgfol(page);
+   return __beegfs_write_begin(filp, pos, len, page);
+
 }
 
-static int beegfs_write_end(struct file* filp, struct address_space* mapping, loff_t pos,
-   unsigned len, unsigned copied, struct page* page, void* fsdata)
+static int beegfs_write_end(struct file *filp, struct address_space *mapping, loff_t pos,
+    unsigned len, unsigned copied, beegfs_pgfol_t pgfol, void *fsdata)
 {
-   return __beegfs_write_end(filp, pos, len, copied, page);
+    struct page *page = beegfs_get_page(pgfol);
+    return __beegfs_write_end(filp, pos, len, copied, page);
 }
 
 static int beegfs_releasepage(struct page* page, gfp_t gfp)

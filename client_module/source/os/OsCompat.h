@@ -19,6 +19,10 @@
 
 #include <linux/semaphore.h>
 
+#ifdef BEEGFS_RDMA
+#include <rdma/ib_verbs.h>
+#endif
+
 
 #ifndef KERNEL_HAS_MEMDUP_USER
    extern void *memdup_user(const void __user *src, size_t len);
@@ -35,6 +39,32 @@
 #ifndef KERNEL_HAS_HAVE_SUBMOUNTS
 extern int have_submounts(struct dentry *parent);
 #endif
+
+/*
+ * PG_error and SetPageError() have been deprecated and removed in Linux 6.12.
+ * We now use mapping_set_error() to record writeback errors at the address_space level.
+ *
+ * This ensures compatibility with kernels >= 4.19 and aligns with the new writeback
+ * error tracking model using errseq_t (see LWN: https://lwn.net/Articles/724307/).
+ *
+ * BeeGFS compatibility:
+ * - Buffered mode paths already use filemap_fdatawait(), which calls filemap_check_errors().
+ * - Native mode uses file_write_and_wait_range(), which calls file_check_and_advance_wb_err().
+ */
+
+/**
+ * fhgfs_set_wb_error - Record a writeback error at the mapping level
+ *
+ * Replaces SetPageError(); safe across all supported kernels.
+ *
+ * @page: the page associated with the mapping
+ * @err:  the error code
+ */
+static inline void fhgfs_set_wb_error(struct page *page, int err)
+{
+   if (page && page->mapping && err)
+      mapping_set_error(page->mapping, err);
+}
 
 /**
  * generic_permission() compatibility function
@@ -210,25 +240,23 @@ static inline int os_posix_acl_to_xattr(const struct posix_acl* acl, void* buffe
 }
 
 #if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_ACL_DENTRY)
-static inline int os_posix_acl_chmod(struct inode *inode, umode_t mode)
+static inline int os_posix_acl_chmod(struct dentry *dentry, umode_t mode)
 {
-#if defined(KERNEL_HAS_GET_ACL)
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-    return posix_acl_chmod(&nop_mnt_idmap, d_find_alias(inode), mode);
-#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
-#if defined(KERNEL_HAS_POSIX_ACL_CHMOD_NS_DENTRY)
-    return posix_acl_chmod(&init_user_ns, d_find_alias(inode), mode);
-#else
-    return posix_acl_chmod(&init_user_ns, inode, mode);
-#endif
-#else
-    return posix_acl_chmod(inode, mode);
-#endif
+   return posix_acl_chmod(&nop_mnt_idmap, dentry, mode);
 
+#elif defined(KERNEL_HAS_POSIX_ACL_CHMOD_NS_DENTRY)
+   return posix_acl_chmod(&init_user_ns, dentry, mode);
+
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+   return posix_acl_chmod(&init_user_ns, dentry->d_inode, mode);
+
+#else
+   return posix_acl_chmod(dentry->d_inode, mode);
 #endif
 }
-#endif // KERNEL_HAS_SET_ACL
+#endif // KERNEL_HAS_SET_ACL || KERNEL_HAS_SET_ACL_DENTRY
 
 #ifndef KERNEL_HAS_PAGE_ENDIO
 static inline void page_endio(struct page *page, int rw, int err)
@@ -242,7 +270,7 @@ static inline void page_endio(struct page *page, int rw, int err)
       else
       {
          ClearPageUptodate(page);
-         SetPageError(page);
+         fhgfs_set_wb_error(page, err);
       }
 
       unlock_page(page);
@@ -251,9 +279,7 @@ static inline void page_endio(struct page *page, int rw, int err)
    { /* rw == WRITE */
       if (err)
       {
-         SetPageError(page);
-         if (page->mapping)
-            mapping_set_error(page->mapping, err);
+         fhgfs_set_wb_error(page, err);
       }
 
       end_page_writeback(page);
@@ -370,5 +396,19 @@ static inline void os_inode_unlock(struct inode* inode)
 #  define os_access_ok(type, addr, size) access_ok(addr, size)
 #endif
 
+/* ibdev_to_node was moved from net/rds/ib.h to rdma/ib_verbs.h in Linux 5.15 */
+#if defined(BEEGFS_RDMA) && !defined(KERNEL_HAS_IBDEV_TO_NODE)
+/**
+ * ibdev_to_node - return the NUMA node for a given ib_device
+ * @dev:	device to get the NUMA node for.
+ */
+static inline int ibdev_to_node(struct ib_device *ibdev)
+{
+	struct device *parent = ibdev->dev.parent;
+	if (!parent)
+		return NUMA_NO_NODE;
+	return dev_to_node(parent);
+}
+#endif
 
 #endif /* OSCOMPAT_H_ */

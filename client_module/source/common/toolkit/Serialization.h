@@ -26,8 +26,11 @@
 #include <common/nodes/NodeListIter.h>
 #include <os/OsCompat.h>
 
+#ifdef KERNEL_HAS_LINUX_UNALIGNED_H
+#include <linux/unaligned.h>
+#else
 #include <asm/unaligned.h>
-
+#endif
 
 #define SERIALIZATION_NICLISTELEM_NAME_SIZE  (16)
 #define SERIALIZATION_NICLISTELEM_SIZE       (8+SERIALIZATION_NICLISTELEM_NAME_SIZE) /*

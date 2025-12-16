@@ -42,7 +42,7 @@ class InodeFileStore
 
       FhgfsOpsErr moveRemoteBegin(EntryInfo* entryInfo, char* buf, size_t bufLen,
          size_t* outUsedBufLen);
-      void moveRemoteComplete(const std::string& entryID);
+      FhgfsOpsErr moveRemoteComplete(const std::string& entryID);
 
       size_t getSize();
 
@@ -64,7 +64,7 @@ class InodeFileStore
       unsigned decreaseInodeRefCountUnlocked(InodeMapIter& iter);
       FileInode* referenceFileInodeUnlocked(EntryInfo* entryInfo, bool loadFromDisk);
       FhgfsOpsErr getUnreferencedInodeUnlocked(EntryInfo* entryInfo, FileInode*& outInode);
-      void deleteUnreferencedInodeUnlocked(const std::string& entryID);
+      FhgfsOpsErr deleteUnreferencedInodeUnlocked(const std::string& entryID);
 
       FhgfsOpsErr isUnlinkableUnlocked(EntryInfo* entryInfo);
 

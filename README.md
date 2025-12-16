@@ -15,7 +15,7 @@ Before building BeeGFS, install the following dependency packages:
 ```
 $ yum install libuuid-devel libibverbs-devel librdmacm-devel libattr-devel redhat-rpm-config \
   rpm-build xfsprogs-devel zlib-devel gcc-c++ gcc \
-  redhat-lsb-core java-devel unzip libcurl-devel elfutils-libelf-devel kernel-devel \
+  redhat-lsb-core unzip libcurl-devel elfutils-libelf-devel kernel-devel \
   libblkid-devel libnl3-devel
 ```
 

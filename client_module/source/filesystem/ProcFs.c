@@ -330,20 +330,6 @@ int __ProcFs_readV2_nothing(struct seq_file* file, void* p)
    return 0;
 }
 
-
-/**
- * Does not return anything to the reading process.
- * Intended for proc entries that are write-only.
- *
- * @param data specified at entry creation
- */
-int ProcFs_read_nothing(char* buf, char** start, off_t offset, int size, int* eof, void* data)
-{
-   *eof = 1;
-   return 0;
-}
-
-
 int __ProcFs_readV2_config(struct seq_file* file, void* p)
 {
    App* app = file->private;
@@ -351,27 +337,11 @@ int __ProcFs_readV2_config(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_config(file, app);
 }
 
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_config(char* buf, char** start, off_t offset, int size, int* eof, void* data)
-{
-   return ProcFsHelper_read_config(buf, start, offset, size, eof, (App*)data);
-}
-
 int __ProcFs_readV2_status(struct seq_file* file, void* v)
 {
    App* app = file->private;
 
    return ProcFsHelper_readV2_status(file, app);
-}
-
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_status(char* buf, char** start, off_t offset, int size, int* eof, void* data)
-{
-   return ProcFsHelper_read_status(buf, start, offset, size, eof, (App*)data);
 }
 
 int __ProcFs_readV2_mgmtNodes(struct seq_file* file, void* p)
@@ -382,30 +352,12 @@ int __ProcFs_readV2_mgmtNodes(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_nodes(file, app, nodes);
 }
 
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_mgmtNodes(char* buf, char** start, off_t offset, int size, int* eof, void* data)
-{
-   return ProcFsHelper_read_nodes(buf, start, offset, size, eof,
-      App_getMgmtNodes( (App*)data) );
-}
-
 int __ProcFs_readV2_metaNodes(struct seq_file* file, void* p)
 {
    App* app = file->private;
    NodeStoreEx* nodes = App_getMetaNodes(app);
 
    return ProcFsHelper_readV2_nodes(file, app, nodes);
-}
-
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_metaNodes(char* buf, char** start, off_t offset, int size, int* eof, void* data)
-{
-   return ProcFsHelper_read_nodes(buf, start, offset, size, eof,
-      App_getMetaNodes( (App*)data) );
 }
 
 int __ProcFs_readV2_storageNodes(struct seq_file* file, void* p)
@@ -416,15 +368,6 @@ int __ProcFs_readV2_storageNodes(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_nodes(file, app, nodes);
 }
 
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_storageNodes(char* buf, char** start, off_t offset, int size, int* eof, void* data)
-{
-   return ProcFsHelper_read_nodes(buf, start, offset, size, eof,
-      App_getStorageNodes( (App*)data) );
-}
-
 int __ProcFs_readV2_clientInfo(struct seq_file* file, void* p)
 {
    App* app = file->private;
@@ -432,11 +375,6 @@ int __ProcFs_readV2_clientInfo(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_clientInfo(file, app);
 }
 
-int ProcFs_read_clientInfo(char* buf, char** start, off_t offset, int size, int* eof,
-   void* data)
-{
-   return ProcFsHelper_read_clientInfo(buf, start, offset, size, eof, (App*)data);
-}
 
 int __ProcFs_readV2_metaTargetStates(struct seq_file* file, void* p)
 {
@@ -445,16 +383,6 @@ int __ProcFs_readV2_metaTargetStates(struct seq_file* file, void* p)
    NodeStoreEx* nodes = App_getMetaNodes(app);
 
    return ProcFsHelper_readV2_targetStates(file, app, metaStates, nodes, true);
-}
-
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_metaTargetStates(char* buf, char** start, off_t offset, int size, int* eof,
-   void* data)
-{
-   return ProcFsHelper_read_targetStates(buf, start, offset, size, eof, (App*)data,
-      App_getMetaStateStore( (App*)data), App_getMetaNodes( (App*)data), true);
 }
 
 int __ProcFs_readV2_storageTargetStates(struct seq_file* file, void* p)
@@ -466,16 +394,6 @@ int __ProcFs_readV2_storageTargetStates(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_targetStates(file, app, targetStates, nodes, false);
 }
 
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_storageTargetStates(char* buf, char** start, off_t offset, int size, int* eof,
-   void* data)
-{
-   return ProcFsHelper_read_targetStates(buf, start, offset, size, eof, (App*)data,
-      App_getTargetStateStore( (App*)data), App_getStorageNodes( (App*)data), false);
-}
-
 int __ProcFs_readV2_connRetriesEnabled(struct seq_file* file, void* p)
 {
    App* app = file->private;
@@ -483,11 +401,6 @@ int __ProcFs_readV2_connRetriesEnabled(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_connRetriesEnabled(file, app);
 }
 
-int ProcFs_read_connRetriesEnabled(char* buf, char** start, off_t offset, int size, int* eof,
-   void* data)
-{
-   return ProcFsHelper_read_connRetriesEnabled(buf, start, offset, size, eof, (App*)data);
-}
 
 /**
  * @param data specified at entry creation
@@ -503,16 +416,6 @@ ssize_t __ProcFs_writeV2_connRetriesEnabled(struct file *file, const char __user
       return -EFAULT;
 
    return ProcFsHelper_write_connRetriesEnabled(buf, count, app);
-}
-
-int ProcFs_write_connRetriesEnabled(struct file* file, const char __user *buf,
-   unsigned long count, void* data)
-{
-   // check user buffer
-   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
-      return -EFAULT;
-
-   return ProcFsHelper_write_connRetriesEnabled(buf, count, (App*)data);
 }
 
 int __ProcFs_read_remapConnectionFailure(struct seq_file* file, void* p)
@@ -542,15 +445,6 @@ int __ProcFs_readV2_netBenchModeEnabled(struct seq_file* file, void* p)
    return ProcFsHelper_readV2_netBenchModeEnabled(file, app);
 }
 
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_netBenchModeEnabled(char* buf, char** start, off_t offset, int size, int* eof,
-   void* data)
-{
-   return ProcFsHelper_read_netBenchModeEnabled(buf, start, offset, size, eof, (App*)data);
-}
-
 ssize_t __ProcFs_writeV2_netBenchModeEnabled(struct file *file, const char __user *buf,
    size_t count, loff_t *ppos)
 {
@@ -562,19 +456,6 @@ ssize_t __ProcFs_writeV2_netBenchModeEnabled(struct file *file, const char __use
       return -EFAULT;
 
    return ProcFsHelper_write_netBenchModeEnabled(buf, count, app);
-}
-
-/**
- * @param data specified at entry creation
- */
-int ProcFs_write_netBenchModeEnabled(struct file* file, const char __user *buf,
-   unsigned long count, void* data)
-{
-   // check user buffer
-   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
-      return -EFAULT;
-
-   return ProcFsHelper_write_netBenchModeEnabled(buf, count, (App*)data);
 }
 
 ssize_t __ProcFs_writeV2_dropConns(struct file *file, const char __user *buf,
@@ -590,33 +471,11 @@ ssize_t __ProcFs_writeV2_dropConns(struct file *file, const char __user *buf,
    return ProcFsHelper_write_dropConns(buf, count, app);
 }
 
-/**
- * @param data specified at entry creation
- */
-int ProcFs_write_dropConns(struct file* file, const char __user *buf,
-   unsigned long count, void* data)
-{
-   // check user buffer
-   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
-      return -EFAULT;
-
-   return ProcFsHelper_write_dropConns(buf, count, (App*)data);
-}
-
 int __ProcFs_readV2_logLevels(struct seq_file* file, void* p)
 {
    App* app = file->private;
 
    return ProcFsHelper_readV2_logLevels(file, app);
-}
-
-/**
- * @param data specified at entry creation
- */
-int ProcFs_read_logLevels(char* buf, char** start, off_t offset, int size, int* eof,
-   void* data)
-{
-   return ProcFsHelper_read_logLevels(buf, start, offset, size, eof, (App*)data);
 }
 
 ssize_t __ProcFs_writeV2_logLevels(struct file *file, const char __user *buf,
@@ -630,19 +489,6 @@ ssize_t __ProcFs_writeV2_logLevels(struct file *file, const char __user *buf,
       return -EFAULT;
 
    return ProcFsHelper_write_logLevels(buf, count, app);
-}
-
-/**
- * @param data specified at entry creation
- */
-int ProcFs_write_logLevels(struct file* file, const char __user *buf,
-   unsigned long count, void* data)
-{
-   // check user buffer
-   if(unlikely(!os_access_ok(VERIFY_READ, buf, count) ) )
-      return -EFAULT;
-
-   return ProcFsHelper_write_logLevels(buf, count, (App*)data);
 }
 
 /**

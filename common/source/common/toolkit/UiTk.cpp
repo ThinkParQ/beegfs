@@ -44,3 +44,24 @@ bool uitk::userYNQuestion(const std::string& question,
    }
 
 }
+
+bool uitk::userExactConfirmPrompt(const std::string& question,
+                                  const std::string& requiredInput,
+                                  std::istream& input)
+{
+   std::string requiredUpper = requiredInput;
+   boost::to_upper(requiredUpper);
+   while (true) {
+      std::cout << question << "\n\n"
+               << "Type \"" << requiredInput << "\" to confirm or \"no\" to abort: " << std::flush;
+
+      std::string answer;
+      std::getline(input, answer);
+      boost::to_upper(answer);
+      boost::trim(answer);
+      if (answer == requiredUpper)
+         return true;
+      if ("N" == answer || "NO" == answer)
+         return false;  
+   }
+}

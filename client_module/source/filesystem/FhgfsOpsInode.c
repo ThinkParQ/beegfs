@@ -497,6 +497,7 @@ int FhgfsOps_setxattr(struct inode* inode, const char* name, const void* value, 
 static struct posix_acl* Fhgfs_get_acl(struct inode* inode, int type)
 {
    App* app = FhgfsOps_getApp(inode->i_sb);
+   Config* cfg = App_getConfig(app);
 
    struct posix_acl* res = NULL;
    char* xAttrName;
@@ -510,7 +511,10 @@ static struct posix_acl* Fhgfs_get_acl(struct inode* inode, int type)
 
    int refreshRes;
 
-   forget_all_cached_acls(inode);
+   // drop ACL caches if configured to do so
+   if (Config_getSysACLsRevalidate(cfg) == ACLSREVALIDATE_Always) {
+      forget_all_cached_acls(inode);
+   }
 
    refreshRes = maybeRefreshInode(inode, true, false, false);
    if (refreshRes)
@@ -745,7 +749,7 @@ int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry)
 {
 #if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_ACL_DENTRY)
    if (iattr->ia_valid & ATTR_MODE)
-      return os_posix_acl_chmod(dentry->d_inode, iattr->ia_mode);
+      return os_posix_acl_chmod(dentry, iattr->ia_mode);
    else
       return 0;
 #else
@@ -912,7 +916,15 @@ int FhgfsOps_setattr(struct dentry* dentry, struct iattr* iattr)
 
 #ifdef KERNEL_HAS_GET_ACL
          if (Config_getSysACLsEnabled(cfg) )
-            FhgfsOps_aclChmod(iattr, dentry);
+         {
+            int aclRes = FhgfsOps_aclChmod(iattr, dentry);
+            if(aclRes < 0)
+            {
+               Logger_logFormatted(log, Log_ERR, logContext, "ACL chmod failed for '%s' (mode: 0%o), error: %d",
+                  dentry->d_name.name, iattr->ia_mode, aclRes);
+               return aclRes;
+            }
+         }
 #endif // KERNEL_HAS_GET_ACL
       }
 
@@ -2819,6 +2831,10 @@ int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* fhgfsSt
    Time_setToNow(&fhgfsInode->dataCacheTime); 
    spin_unlock(&inode->i_lock); // I _ U N L O C K
 
+   // drop ACL caches as ACLs might have been updated
+   if (Config_getSysACLsRevalidate(cfg) == ACLSREVALIDATE_Cache) {
+      forget_all_cached_acls(inode);
+   }
 
    // clean up
 cleanup:

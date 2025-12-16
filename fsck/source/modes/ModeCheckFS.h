@@ -16,9 +16,11 @@ class UserPrompter
          FsckRepairAction defaultRepairAction);
 
       FsckRepairAction chooseAction(const std::string& prompt);
+      bool confirmAction(const std::string& prompt, const std::string& requiredInput);
 
    private:
       bool askForAction;
+      bool actionConfirmed;
       std::vector<FsckRepairAction> possibleActions;
       FsckRepairAction repairAction;
 };

@@ -18,7 +18,6 @@ endif
 
 override_dh_auto_build:
 	make -j$(NUMJOBS) common-all daemons utils
-	make -j$(NUMJOBS) -C java_lib/build
 
 # no build-runnable tests exist (yet)
 override_dh_auto_test:
@@ -82,14 +81,6 @@ override_dh_install:
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.conf
 	install -D -m600 mon/build/dist/etc/beegfs-mon.auth \
 		debian/beegfs-mon/etc/beegfs/beegfs-mon.auth
-	install -D -m644 event_listener/build/dist/etc/beegfs-eventlistener.conf \
-		debian/beegfs-utils/etc/beegfs/beegfs-eventlistener.conf
-	mkdir -p debian/beegfs-utils/usr/lib/systemd/system
-	cp event_listener/build/dist/usr/lib/systemd/system/beegfs-eventlistener.service \
-		debian/beegfs-utils/usr/lib/systemd/system
-	mkdir -p debian/beegfs-utils/etc/init.d
-	cp event_listener/build/dist/etc/init.d/beegfs-eventlistener.init \
-		debian/beegfs-utils/etc/init.d/beegfs-eventlistener
 	@# mon-grafana
 	mkdir -p debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
 	cp -a mon/scripts/grafana/* debian/beegfs-mon-grafana/opt/beegfs/scripts/grafana
@@ -100,8 +91,6 @@ override_dh_install:
 	mkdir -p debian/beegfs-utils/usr/bin
 	cp -a utils/scripts/beegfs-* debian/beegfs-utils/usr/bin
 	mkdir -p debian/beegfs-utils/opt/beegfs/lib
-	cp java_lib/build/libjbeegfs.so java_lib/build/jbeegfs.jar \
-		debian/beegfs-utils/opt/beegfs/lib/
 	install -D -m644 utils/scripts/etc/bash_completion.d/beegfs-ctl \
 		debian/beegfs-utils/usr/share/bash-completion/completions/beegfs-ctl
 	mkdir -p debian/beegfs-utils/usr/sbin

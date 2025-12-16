@@ -20,17 +20,46 @@
 template<unsigned Actions>
 UserPrompter::UserPrompter(const FsckRepairAction (&possibleActions)[Actions],
    FsckRepairAction defaultRepairAction)
-   : askForAction(true), possibleActions(possibleActions, possibleActions + Actions),
+   : askForAction(true),
+     actionConfirmed(false),
+     possibleActions(possibleActions, possibleActions + Actions),
      repairAction(FsckRepairAction_UNDEFINED)
 {
    if(Program::getApp()->getConfig()->getReadOnly() )
+   {
       askForAction = false;
+      actionConfirmed = false;
+   }
    else
    if(Program::getApp()->getConfig()->getAutomatic() )
    {
       askForAction = false;
+      actionConfirmed = true;
       repairAction = defaultRepairAction;
    }
+}
+
+// confirmAction gives users one opportunity to confirm or abort a selected repair action. If the
+// action is confirmed, the confirmation persists and the user is not asked again. If the action is
+// aborted, the action is set to nothing and the user no longer prompted to select an action for
+// this error. This is particularly useful for recovery actions like deleting orphaned chunks, which
+// may result from underlying issues that are potentially fixable through manual intervention. Since
+// fsck is unable to resolve such issues automatically, permanently deleting orphaned chunks could
+// lead to unintended data loss if the issue was in fact recoverable.  
+bool UserPrompter::confirmAction(const std::string& prompt, const std::string& requiredInput)
+{
+   if (!actionConfirmed) {      
+      if (!uitk::userExactConfirmPrompt(prompt, requiredInput))
+      {
+         actionConfirmed = false;
+         repairAction = FsckRepairAction_NOTHING;
+         askForAction = false;
+         FsckTkEx::fsckOutput(">> User aborted this repair action. Setting the repair action to nothing for any remaining errors of this type.", OutputOptions_LINEBREAK);
+      }
+      else
+         actionConfirmed = true;
+   }
+   return actionConfirmed;
 }
 
 FsckRepairAction UserPrompter::chooseAction(const std::string& prompt)
@@ -644,6 +673,7 @@ FsckErrCount ModeCheckFS::checkAndRepairOrphanedChunk()
 {
    FsckRepairAction possibleActions[] = {
       FsckRepairAction_NOTHING,
+      FsckRepairAction_DELETECHUNK,
    };
 
    UserPrompter prompt(possibleActions, FsckRepairAction_NOTHING);
@@ -1458,6 +1488,25 @@ void ModeCheckFS::repairOrphanedChunk(FsckChunk& chunk, FsckErrCount& errCount, 
       break;
 
    case FsckRepairAction_DELETECHUNK: {
+      const std::string prompt = 
+            "           WARNING: RISK OF PERMANENT DATA LOSS!\n\n"
+
+            "Please read fully before choosing to proceed.\n\n"
+
+            "Chunk files might be orphaned due to correctable issues that cannot be repaired using fsck.\n"
+            "However, once chunk files are deleted they cannot be restored.\n"
+            "It is HIGHLY recommended you stop here and contact support.\n\n"
+
+            "If you do choose to proceed without contacting support, be absolutely certain all metadata\n"
+            "servers are online AND have the correct underlying file systems mounted for their targets.\n"
+            "At minimum, run fsck in read-only mode first and evaluate the number of orphaned chunks.\n"
+            "A large number of orphaned chunks likely points to this correctable scenario.\n\n"
+
+            "Proceed only if you are absolutely sure.\n";
+      if (!state.prompt->confirmAction(prompt, "I take responsibility for deleting orphaned chunk files")) {
+         return;
+      }
+
       FhgfsOpsErr refErr;
       NodeStore* storageNodeStore = Program::getApp()->getStorageNodes();
       auto node = storageNodeStore->referenceNodeByTargetID(chunk.getTargetID(),

@@ -1,6 +1,10 @@
 #pragma once
 
 #include <common/Common.h>
+#include <common/toolkit/StringTk.h>
+#include <common/system/System.h>
+#include <linux/limits.h>
+#include <sys/xattr.h>
 
 typedef std::vector<char> XAttrValue;
 typedef std::map<std::string, XAttrValue> XAttrMap;
@@ -11,7 +15,7 @@ namespace XAttrTk
 {
   //! \note Does _not_ offer strong exception guarantee: xattrs may
   //! end up partially set if setting one of them fails.
-  void setXAttrs(const std::string& path, const XAttrMap& xattrs);
+  void setXAttrs(const std::string& path, const XAttrMap& xattrs, int flags = XATTR_CREATE);
   XAttrMap getXAttrs(const std::string& path);
 
   std::vector<std::string> getXAttrNames(const std::string& path);

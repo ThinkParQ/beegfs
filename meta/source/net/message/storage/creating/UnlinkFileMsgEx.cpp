@@ -1,12 +1,5 @@
-#include <common/components/streamlistenerv2/IncomingPreprocessedMsgWork.h>
-#include <common/net/message/control/GenericResponseMsg.h>
-#include <common/net/message/storage/creating/UnlinkFileRespMsg.h>
-#include <common/net/message/storage/creating/UnlinkFileMsg.h>
-#include <common/net/message/storage/creating/UnlinkLocalFileMsg.h>
-#include <common/net/message/storage/creating/UnlinkLocalFileRespMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileInodeMsg.h>
 #include <common/net/message/storage/creating/UnlinkLocalFileInodeRespMsg.h>
-#include <common/toolkit/MessagingTk.h>
 #include <components/FileEventLogger.h>
 #include <net/msghelpers/MsgHelperUnlink.h>
 #include <program/Program.h>
@@ -69,9 +62,7 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
 {
    const char* logContext = "Unlink File Msg";
    App* app = Program::getApp();
-   FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
    MetaStore* metaStore = app->getMetaStore();
-   EntryInfo delFileInfo;
 
    // reference parent dir
    DirInode* dir = metaStore->referenceDir(getParentInfo()->getEntryID(),
@@ -102,48 +93,36 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
    }
 
-   // get entryInfo
-   dentryToRemove.getEntryInfo(getParentInfo()->getEntryID(), 0, &delFileInfo);
-
-   // release dir
-   metaStore->releaseDir(dir->getID());
+   // re-fetch entryInfo
+   dentryToRemove.getEntryInfo(getParentInfo()->getEntryID(), 0, &fileInfo);
 
    // check whether local node/group owns file's inode (dentry's owner may/maynot be same)
-   NumNodeID ownerNodeID = delFileInfo.getOwnerNodeID();
+   NumNodeID ownerNodeID = fileInfo.getOwnerNodeID();
    if ( (!isMirrored() && ownerNodeID == app->getLocalNode().getNumID()) ||
       (isMirrored() &&
          ownerNodeID.val() == app->getMetaBuddyGroupMapper()->getLocalGroupID()) )
    {
       // file's inode is present on local meta node/buddy-group
       if (isSecondary)
-         return executeSecondary(ctx);
+         return executeSecondary(ctx, *dir);
       else
-         return executePrimary(ctx);
+         return executePrimary(ctx, *dir);
    }
    else
-   {
-      // file's inode is on some different node/buddy-group
+   {  // Handle case where file inode is on a different metadata node/buddy group than dentry.
+      // Step 1: Remove file's dentry (local operation)
+      // Note: Dentry was already loaded and validated earlier
+      FhgfsOpsErr unlinkRes = FhgfsOpsErr_INTERNAL;
+      unlinkRes = dir->unlinkDirEntry(getDelFileName(), &dentryToRemove, DirEntry_UNLINK_FILENAME);
+      metaStore->releaseDir(dir->getID());
+      if (unlinkRes != FhgfsOpsErr_SUCCESS)
+         return boost::make_unique<ResponseState>(unlinkRes);
 
-      // reference parent dir again
-      DirInode* parentDir = metaStore->referenceDir(getParentInfo()->getEntryID(),
-         getParentInfo()->getIsBuddyMirrored(), true);
-      if (!parentDir)
-         return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
-
-      // dirEntry already loaded before - now remove it
-      retVal = parentDir->unlinkDirEntry(getDelFileName(), &dentryToRemove,
-                  DirEntry_UNLINK_FILENAME);
-
-      // release dir
-      metaStore->releaseDir(parentDir->getID());
-
-      if (retVal != FhgfsOpsErr_SUCCESS)
-         return boost::make_unique<ResponseState>(retVal);
-
+      // Step 2: Remove file's inode (remote operation)
       if (!isSecondary)
       {
          // now remove inode from remote meta node
-         UnlinkLocalFileInodeMsg unlinkInodeMsg(&delFileInfo);
+         UnlinkLocalFileInodeMsg unlinkInodeMsg(&fileInfo);
 
          RequestResponseArgs rrArgs(NULL, &unlinkInodeMsg, NETMSGTYPE_UnlinkLocalFileInodeResp);
          RequestResponseNode rrNode(ownerNodeID, app->getMetaNodes());
@@ -168,8 +147,8 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
             }
 
             // response received
-            const auto unlinkFileInodeRespMsg = (UnlinkLocalFileInodeRespMsg*) rrArgs.outRespMsg.get();
-            FhgfsOpsErr res = unlinkFileInodeRespMsg->getResult();
+            const auto respMsg = (UnlinkLocalFileInodeRespMsg*) rrArgs.outRespMsg.get();
+            FhgfsOpsErr res = respMsg->getResult();
             if (res != FhgfsOpsErr_SUCCESS)
             {
                // error: either inode file doesn't exists or some other error happened
@@ -183,70 +162,47 @@ std::unique_ptr<MirroredMessageResponseState> UnlinkFileMsgEx::executeLocally(
             // to return an error if unlinking remote inode fails due to some reasons.
             // we still need to remove dentry from secondary buddy so should not overwrite
             // local dentry removal success with some remote error
-            retVal = FhgfsOpsErr_SUCCESS;
+            unlinkRes = FhgfsOpsErr_SUCCESS;
          } while (false);
       }
 
-      return boost::make_unique<ResponseState>(retVal);
+      return boost::make_unique<ResponseState>(unlinkRes);
    }
 
-   // added to avoid compiler warnings
+   // Should never reach this point but added to please the compiler
    return boost::make_unique<ResponseState>(FhgfsOpsErr_SUCCESS);
 }
 
 std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
-   ResponseContext& ctx)
+   ResponseContext& ctx, DirInode& dir)
 {
    App* app = Program::getApp();
-   Config* cfg = app->getConfig();
 
-   // we do not need to load the directory here - if the dentry does not exist, it will not be
-   // modified. if the dentry does exist, it will be loaded.
-   DirInode* dir = app->getMetaStore()->referenceDir(getParentInfo()->getEntryID(),
-      getParentInfo()->getIsBuddyMirrored(), false);
-   if (!dir)
-      return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
-
-   const bool fileEventLoggingEnabled = getFileEvent() && app->getFileEventLogger();
-
-   // the entryID lookup here is done again in unlinkMetaFile() below, but not returend.
-   const auto getEntryId = [=] () {
-      EntryInfo entryInfo;
-      dir->getFileEntryInfo(getDelFileName(), entryInfo);
-      return entryInfo.getEntryID();
-    };
-   const auto entryIdBeforeUnlink = fileEventLoggingEnabled ? getEntryId() : "";
-
-   /* two alternatives:
-          1) early response before chunk files unlink.
-          2) normal response after chunk files unlink (incl. chunk files error). */
-
-   if(cfg->getTuneEarlyUnlinkResponse() && !isMirrored())
+   // Two alternatives:
+   // 1) early response before chunk files unlink.
+   // 2) normal response after chunk files unlink (incl. chunk files error).
+   if (app->getConfig()->getTuneEarlyUnlinkResponse() && !isMirrored())
    {
       // alternative 1: response before chunk files unlink
       std::unique_ptr<FileInode> unlinkedInode;
 
-      FhgfsOpsErr unlinkMetaRes = MsgHelperUnlink::unlinkMetaFile(*dir,
+      FhgfsOpsErr unlinkMetaRes = MsgHelperUnlink::unlinkMetaFile(dir,
          getDelFileName(), &unlinkedInode);
 
-      app->getMetaStore()->releaseDir(dir->getID());
+      app->getMetaStore()->releaseDir(dir.getID());
       earlyComplete(ctx, ResponseState(unlinkMetaRes));
 
       /* note: if the file is still opened or if there were hardlinks then unlinkedInode will be
          NULL even on FhgfsOpsErr_SUCCESS */
-      if( (unlinkMetaRes == FhgfsOpsErr_SUCCESS) && unlinkedInode)
+      if ((unlinkMetaRes == FhgfsOpsErr_SUCCESS) && unlinkedInode)
          MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(), getMsgHeaderUserID() );
 
-      if (unlinkMetaRes == FhgfsOpsErr_SUCCESS && app->getFileEventLogger())
+      if (unlinkMetaRes == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
       {
-         if (getFileEvent())
-         {
-            auto& ev = *getFileEvent();
-            app->getFileEventLogger()->log(ev,
-                                        entryIdBeforeUnlink,
-                                        getParentInfo()->getEntryID());
-         }
-
+         app->getFileEventLogger()->log(
+               *getFileEvent(),
+               fileInfo.getEntryID(),
+               getParentInfo()->getEntryID());
       }
 
       return {};
@@ -254,12 +210,12 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
 
    // alternative 2: response after chunk files unlink
    std::unique_ptr<FileInode> unlinkedInode;
-   FhgfsOpsErr unlinkRes = MsgHelperUnlink::unlinkMetaFile(*dir,
+   FhgfsOpsErr unlinkRes = MsgHelperUnlink::unlinkMetaFile(dir,
       getDelFileName(), &unlinkedInode);
 
    if (unlinkRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
    {
-      fixInodeTimestamp(*dir, dirTimestamps);
+      fixInodeTimestamp(dir, dirTimestamps);
 
       if (!unlinkedInode)
       {
@@ -267,7 +223,7 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
          if (file)
          {
             fixInodeTimestamp(*file, fileTimestamps, &fileInfo);
-            app->getMetaStore()->releaseFile(dir->getID(), file);
+            app->getMetaStore()->releaseFile(dir.getID(), file);
          }
       }
    }
@@ -277,13 +233,13 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
    if( (unlinkRes == FhgfsOpsErr_SUCCESS) && unlinkedInode)
       MsgHelperUnlink::unlinkChunkFiles(unlinkedInode.release(), getMsgHeaderUserID());
 
-   app->getMetaStore()->releaseDir(dir->getID());
+   app->getMetaStore()->releaseDir(dir.getID());
 
    if (unlinkRes == FhgfsOpsErr_SUCCESS && app->getFileEventLogger() && getFileEvent())
    {
          app->getFileEventLogger()->log(
                   *getFileEvent(),
-                  entryIdBeforeUnlink,
+                  fileInfo.getEntryID(),
                   getParentInfo()->getEntryID());
    }
 
@@ -291,24 +247,17 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executePrimary(
 }
 
 std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executeSecondary(
-   ResponseContext& ctx)
+   ResponseContext& ctx, DirInode& dir)
 {
    MetaStore* const metaStore = Program::getApp()->getMetaStore();
    std::unique_ptr<FileInode> unlinkedInode;
 
-   // we do not need to load the directory here - if the dentry does not exist, it will not be
-   // modified. if the dentry does exist, it will be loaded.
-    DirInode* dir = metaStore->referenceDir(getParentInfo()->getEntryID(),
-          getParentInfo()->getIsBuddyMirrored(), false);
-    if (!dir)
-       return boost::make_unique<ResponseState>(FhgfsOpsErr_PATHNOTEXISTS);
-
-   FhgfsOpsErr unlinkMetaRes = MsgHelperUnlink::unlinkMetaFile(*dir,
+   FhgfsOpsErr unlinkMetaRes = MsgHelperUnlink::unlinkMetaFile(dir,
       getDelFileName(), &unlinkedInode);
 
    if (unlinkMetaRes == FhgfsOpsErr_SUCCESS && shouldFixTimestamps())
    {
-      fixInodeTimestamp(*dir, dirTimestamps);
+      fixInodeTimestamp(dir, dirTimestamps);
 
       if (!unlinkedInode)
       {
@@ -316,13 +265,12 @@ std::unique_ptr<UnlinkFileMsgEx::ResponseState> UnlinkFileMsgEx::executeSecondar
          if (file)
          {
             fixInodeTimestamp(*file, fileTimestamps, &fileInfo);
-            metaStore->releaseFile(dir->getID(), file);
+            metaStore->releaseFile(dir.getID(), file);
          }
       }
    }
 
-   metaStore->releaseDir(dir->getID());
-
+   metaStore->releaseDir(dir.getID());
    return boost::make_unique<ResponseState>(unlinkMetaRes);
 }
 

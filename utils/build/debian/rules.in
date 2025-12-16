@@ -65,7 +65,6 @@ install: build
 
 	cp -a ../scripts/beegfs-* ${DEB_BUILD_ROOT}/usr/bin/
 	mkdir -p ${DEB_BUILD_ROOT}/opt/beegfs/lib
-	cp libjbeegfs.so jbeegfs.jar ${DEB_BUILD_ROOT}/opt/beegfs/lib/
 	mkdir -p ${DEB_BUILD_ROOT}/etc/bash_completion.d
 	cp -a ../scripts/etc/bash_completion.d/beegfs-ctl ${DEB_BUILD_ROOT}/etc/bash_completion.d/
 	install -D --mode=u+rwx,g+rx,o+rx beegfs-event-listener $(DEB_BUILD_ROOT)/opt/beegfs/sbin/beegfs-event-listener

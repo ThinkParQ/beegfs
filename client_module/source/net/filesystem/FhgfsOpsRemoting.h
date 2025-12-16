@@ -37,7 +37,7 @@ extern bool FhgfsOpsRemoting_initMsgBufCache(void);
 extern void FhgfsOpsRemoting_destroyMsgBufCache(void);
 
 extern FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo,
-   FsDirInfo* dirInfo, unsigned maxOutNames);
+   FsDirInfo* dirInfo, unsigned dirListLimit);
 extern FhgfsOpsErr FhgfsOpsRemoting_statRoot(App* app, fhgfs_stat* outFhgfsStat);
 static inline FhgfsOpsErr FhgfsOpsRemoting_statDirect(App* app, const EntryInfo* entryInfo,
    fhgfs_stat* outFhgfsStat);

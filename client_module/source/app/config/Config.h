@@ -28,6 +28,9 @@ typedef enum RDMAKeyType RDMAKeyType;
 enum CheckCapabilities;
 typedef enum CheckCapabilities CheckCapabilities;
 
+enum ACLsRevalidate;
+typedef enum ACLsRevalidate ACLsRevalidate;
+
 enum EventLogMask
 {
    EventLogMask_NONE = 0,
@@ -75,6 +78,7 @@ const char* Config_logTypeNumToStr(LogType logType);
 const char* Config_eventLogMaskToStr(enum EventLogMask mask);
 const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType);
 const char* Config_checkCapabilitiesTypeToStr(CheckCapabilities checkCapabilities);
+const char* Config_ACLsRevalidateToStr(ACLsRevalidate aclsRevalidate);
 
 // getters & setters
 static inline char* Config_getCfgFile(Config* this);
@@ -155,6 +159,7 @@ static inline unsigned Config_getSysTargetOfflineTimeoutSecs(Config* this);
 static inline bool Config_getSysXAttrsEnabled(Config* this);
 static inline CheckCapabilities Config_getSysXAttrsCheckCapabilities (Config* this);
 static inline bool Config_getSysACLsEnabled(Config* this);
+static inline ACLsRevalidate Config_getSysACLsRevalidate(Config* this);
 static inline bool Config_getSysXAttrsImplicitlyEnabled(Config* this);
 
 static inline bool Config_getQuotaEnabled(Config* this);
@@ -212,6 +217,15 @@ enum CheckCapabilities
    CHECKCAPABILITIES_Always = 0,
    CHECKCAPABILITIES_Cache,
    CHECKCAPABILITIES_Never
+};
+
+#define ACLSREVALIDATE_ALWAYS_STR      "always"
+#define ACLSREVALIDATE_CACHE_STR       "cache"
+
+enum ACLsRevalidate
+{
+   ACLSREVALIDATE_Always = 0,
+   ACLSREVALIDATE_Cache,
 };
 
 struct Config
@@ -312,6 +326,7 @@ struct Config
    bool     sysXAttrsEnabled;
    CheckCapabilities   sysXAttrsCheckCapabilities;
    bool     sysACLsEnabled;
+   ACLsRevalidate   sysACLsRevalidate;
    bool     sysXAttrsImplicitlyEnabled; // True when XAttrs have not been enabled in the config file
                                         // but have been enabled by __Config_initImplicitVals
                                         // because ACLs are enabled in the config and XAs are needed
@@ -731,6 +746,11 @@ CheckCapabilities Config_getSysXAttrsCheckCapabilities(Config* this)
 bool Config_getSysACLsEnabled(Config* this)
 {
    return this->sysACLsEnabled;
+}
+
+ACLsRevalidate Config_getSysACLsRevalidate(Config* this)
+{
+   return this->sysACLsRevalidate;
 }
 
 bool Config_getSysXAttrsImplicitlyEnabled(Config* this)

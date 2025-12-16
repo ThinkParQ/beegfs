@@ -85,7 +85,6 @@ make %make_j daemons utils
 # disabled, doesn't build
 #make -C beeond_thirdparty/build %make_j
 make -C beeond_thirdparty_gpl/build %make_j
-make -C utils/build %make_j java_lib
 
 %install
 
@@ -286,8 +285,6 @@ ln -s /opt/beegfs/sbin/beegfs-ctl ${RPM_BUILD_ROOT}/usr/bin/beegfs-ctl
 ln -s /opt/beegfs/sbin/beegfs-fsck ${RPM_BUILD_ROOT}/usr/bin/beegfs-fsck
 
 cp -a utils/scripts/beegfs-* ${RPM_BUILD_ROOT}/usr/bin/
-cp utils/build/libjbeegfs.so utils/build/jbeegfs.jar \
-   ${RPM_BUILD_ROOT}/opt/beegfs/lib/
 cp -a utils/scripts/etc/bash_completion.d/beegfs-ctl \
    ${RPM_BUILD_ROOT}/etc/bash_completion.d/
 
@@ -305,19 +302,6 @@ cp -a event_listener/source/beegfs-event-listener.cpp \
    ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/examples/beegfs-event-listener/source/
 
 install -m 644 -D debian/copyright ${RPM_BUILD_ROOT}/usr/share/doc/beegfs-utils-devel/copyright
-
-##########
-########## eventlistener extra files
-##########
-# copying event-listener config file
-cp -a event_listener/build/dist/etc/*.conf ${RPM_BUILD_ROOT}/etc/beegfs
-
-install -D event_listener/build/dist/etc/init.d/beegfs-eventlistener.init \
-   ${RPM_BUILD_ROOT}/etc/init.d/beegfs-eventlistener
-
-#install systemd unit description
-install -D -m644 event_listener/build/dist/usr/lib/systemd/system/beegfs-eventlistener.service \
-	${RPM_BUILD_ROOT}/usr/lib/systemd/system/beegfs-eventlistener.service
 
 ##########
 ########## client
@@ -653,16 +637,11 @@ This package contains BeeGFS utilities.
 %license /usr/share/doc/beegfs-utils/copyright
 %attr(0755, root, root) /opt/beegfs/sbin/beegfs-fsck
 %attr(4755, root, root) /opt/beegfs/sbin/beegfs-ctl
-/opt/beegfs/lib/jbeegfs.jar
-/opt/beegfs/lib/libjbeegfs.so
 /usr/bin/beegfs-check-servers
 /usr/bin/beegfs-ctl
 /usr/bin/beegfs-df
 /usr/bin/beegfs-fsck
 /usr/bin/beegfs-net
-/usr/lib/systemd/system/beegfs-eventlistener.service
-%config(noreplace) /etc/beegfs/beegfs-eventlistener.conf
-/etc/init.d/beegfs-eventlistener
 /etc/bash_completion.d/beegfs-ctl
 /sbin/fsck.beegfs
 /opt/beegfs/sbin/beegfs-event-listener

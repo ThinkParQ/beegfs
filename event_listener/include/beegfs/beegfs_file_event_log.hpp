@@ -25,8 +25,6 @@
 #define BEEGFS_EVENTLOG_FORMAT_MAJOR 1
 #define BEEGFS_EVENTLOG_FORMAT_MINOR 0
 
-#define BEEGFS_EVENTLOG_BDM_PORT 6000
-
 namespace BeeGFS {
 
 enum class FileEventType : uint32_t
@@ -391,101 +389,6 @@ class FileEventReceiver
       }
 
 };
-
-class BDMClient
-{
-   private:
-      int sock_fd;
-
-   public:
-      BDMClient() : sock_fd(-1) {}
-
-      bool connToBDM(const std::string& address, const int port)
-      {
-         //Crerating socket
-         sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-         if(sock_fd < 0)
-         {
-            perror("socket create failed");
-            return false;
-         }
-
-         const sockaddr_in server = {.sin_family = AF_INET,
-                                     .sin_port = htons(port),
-                                    };
-
-         int opt = 1;
-
-         if(setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
-            static_cast<void *>(&opt), sizeof(opt)))
-         {
-            perror("Unable to set socket for hive index");
-            return false;
-         }
-      
-         if (inet_pton(AF_INET, address.c_str(), (void *)&server.sin_addr) <= 0)
-         {
-            perror("Unable to convert address");
-            return false;
-         }
-
-         if (connect(sock_fd, (struct sockaddr *)&server, sizeof(server)) < 0)
-         {
-            perror("Unable to connect to socket");
-            return false;
-         }
-         return true;
-
-      }
-
-      ~BDMClient()
-      {
-         if (sock_fd > 0)
-            close(sock_fd);
-      }
-      int sendData (char * data, size_t dataSize);
-};
-
-/*
-   Send data to the connected host
-*/
-
-int BDMClient::sendData(char *data, size_t dataSize)
-{
-   size_t total_sent = 0;
-   int ret;
-
-   iovec iov = {
-     .iov_base = data,
-     .iov_len = dataSize,
-   };
-
-   for (size_t send_rc = 0; total_sent < dataSize;)
-   {
-      msghdr msg = {
-        .msg_name = 0,
-        .msg_namelen = 0,
-        .msg_iov = &iov,
-        .msg_iovlen = 1,
-      };
-
-      // Send data
-      send_rc = sendmsg(sock_fd, &msg, MSG_NOSIGNAL);
-      if (send_rc < 0)
-      {
-         std::cout << "Send failed : ";
-         return ret;
-      }
-      total_sent += send_rc;
-
-      char *base = (char *)iov.iov_base;
-      base += total_sent;
-      iov.iov_base = base;
-      iov.iov_len -= total_sent;
-   }
-
-   return 0;
-}
 
 } // namespace BeeGFS
 

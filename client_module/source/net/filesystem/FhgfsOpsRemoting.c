@@ -179,9 +179,10 @@ static struct RRPeer rrpeer_from_entryinfo(const EntryInfo* entryInfo)
  * Note: Also retrieves the optional entry types.
  *
  * @param dirInfo used as input (offsets) and output (contents etc.) parameter
+ * @param dirListLimit buffer size (bytes) in buffer-size mode, entry count in legacy mode
  */
 FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDirInfo* dirInfo,
-   unsigned maxOutNames)
+   unsigned dirListLimit)
 {
    FsObjectInfo* fsObjectInfo = (FsObjectInfo*)dirInfo;
    App* app = FsObjectInfo_getApp(fsObjectInfo);
@@ -204,7 +205,17 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
 
    // prepare request
    ListDirFromOffsetMsg_initFromEntryInfo(
-      &requestMsg, entryInfo, serverOffset, maxOutNames, false);
+      &requestMsg, entryInfo, serverOffset, dirListLimit, false);
+
+   // Set msg compat flag if server is known to support buffer mode.
+   // On first request, we don't know server capability yet, so we don't set the flag.
+   // New servers will advertise support via response compat flag for auto-detection.
+   if (FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE) &&
+       FsDirInfo_isMetaCapabilitySupported(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+   {
+      NetMessage_addMsgHeaderCompatFeatureFlag((NetMessage*)&requestMsg,
+         LISTDIROFFSETMSG_COMPATFLAG_CLIENT_SUPPORTS_BUFSIZE);
+   }
 
    RequestResponseArgs_prepare(&rrArgs, NULL, (NetMessage*)&requestMsg,
       NETMSGTYPE_ListDirFromOffsetResp);
@@ -220,6 +231,7 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
 
    // handle result
    listDirResp = (ListDirFromOffsetRespMsg*)rrArgs.outRespMsg;
+
    retVal = (FhgfsOpsErr)ListDirFromOffsetRespMsg_getResult(listDirResp);
 
    if(likely(retVal == FhgfsOpsErr_SUCCESS) )
@@ -229,6 +241,14 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
       StrCpyVec* dirContents = FsDirInfo_getDirContents(dirInfo);
       StrCpyVec* dirContentIDs = FsDirInfo_getEntryIDs(dirInfo);
       bool endOfDirReached;
+
+      // Auto-detect server capability on successful response (only once per directory handle)
+      if (!FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+      {
+         bool isSupported = NetMessage_isMsgHeaderCompatFeatureFlagSet(
+            (NetMessage*)listDirResp, LISTDIROFFSETRESPMSG_COMPATFLAG_SERVER_SUPPORTS_BUFSIZE);
+         FsDirInfo_setMetaCapability(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE, isSupported);
+      }
 
       FsDirInfo_setCurrentContentsPos(dirInfo, 0);
 
@@ -263,7 +283,16 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
 
       FsDirInfo_setServerOffset(dirInfo, ListDirFromOffsetRespMsg_getNewServerOffset(listDirResp) );
 
-      endOfDirReached = (StrCpyVec_length(dirContents) < maxOutNames);
+      // End-of-directory detection depends on the active mode:
+      // - Buffer size mode (new): server returns 0 entries when the directory is exhausted.
+      // - Entry count mode (legacy): server returns fewer entries than requested.
+      // We're in buffer size mode if we already know the server supports it
+      if (FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE) &&
+          FsDirInfo_isMetaCapabilitySupported(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+         endOfDirReached = (StrCpyVec_length(dirContents) == 0);
+      else
+         endOfDirReached = (StrCpyVec_length(dirContents) < dirListLimit);
+
       FsDirInfo_setEndOfDir(dirInfo, endOfDirReached);
    }
    else
@@ -1388,7 +1417,7 @@ ssize_t FhgfsOpsRemoting_writefileVec(struct iov_iter* iter, loff_t offset,
          // prepare for next loop
          {
             size_t count = iov_iter_count(&chunkIter);
-            currentOffset += count; 
+            currentOffset += count;
             toBeWritten -= count;
             expectedWritten += count;
             numWorks++;

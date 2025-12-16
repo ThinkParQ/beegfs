@@ -264,7 +264,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "tuneENOENTCacheValidityMS",        "0");
    _Config_configMapRedefine(this, "tunePathBufSize",                  "4096");
    _Config_configMapRedefine(this, "tunePathBufNum",                   "8");
-   _Config_configMapRedefine(this, "tuneMsgBufSize",                   "65536");
+   _Config_configMapRedefine(this, "tuneMsgBufSize",                   "1048576"); // 1MB
    _Config_configMapRedefine(this, "tuneMsgBufNum",                    "0");
    _Config_configMapRedefine(this, "tuneRemoteFSync",                  "true");
    _Config_configMapRedefine(this, "tuneUseGlobalFileLocks",           "false");
@@ -291,8 +291,9 @@ void _Config_loadDefaults(Config* this)
    // but the client only needs to fetch the states once during that period.
 
    _Config_configMapRedefine(this, "sysXAttrsEnabled",                 "false");
-   _Config_configMapRedefine(this, "sysXAttrsCheckCapabilities",       "never");
+   _Config_configMapRedefine(this, "sysXAttrsCheckCapabilities",       CHECKCAPABILITIES_NEVER_STR);
    _Config_configMapRedefine(this, "sysACLsEnabled",                   "false");
+   _Config_configMapRedefine(this, "sysACLsRevalidate",                ACLSREVALIDATE_CACHE_STR);
 
    _Config_configMapRedefine(this, "quotaEnabled",                     "false");
    _Config_configMapRedefine(this, "sysFileEventLogMask",              EVENTLOGMASK_NONE);
@@ -718,6 +719,14 @@ bool _Config_applyConfigMap(Config* this, bool enableException)
       else
       if(!strcmp(keyStr, "sysACLsEnabled") )
          this->sysACLsEnabled = StringTk_strToBool(valueStr);
+      else
+      if(!strcmp(keyStr, "sysACLsRevalidate") )
+      {
+         if (!strcmp(valueStr, ACLSREVALIDATE_ALWAYS_STR))
+            this->sysACLsRevalidate = ACLSREVALIDATE_Always;
+         else if (!strcmp(valueStr, ACLSREVALIDATE_CACHE_STR))
+            this->sysACLsRevalidate = ACLSREVALIDATE_Cache;
+      }
       else
       if (!strcmp(keyStr, "sysRenameEbusyAsXdev"))
          this->sysRenameEbusyAsXdev = StringTk_strToBool(valueStr);
@@ -1422,8 +1431,10 @@ const char* Config_rdmaKeyTypeNumToStr(RDMAKeyType keyType)
          return RDMAKEYTYPE_REGISTER_STR;
       case RDMAKEYTYPE_UnsafeDMA:
          return RDMAKEYTYPE_UNSAFE_DMA_STR;
-      default:
+      case RDMAKEYTYPE_UnsafeGlobal:
          return RDMAKEYTYPE_UNSAFE_GLOBAL_STR;
+      default:
+         return "(invalid value)";
    }
 }
 
@@ -1435,8 +1446,23 @@ const char* Config_checkCapabilitiesTypeToStr(CheckCapabilities checkCapabilitie
          return CHECKCAPABILITIES_CACHE_STR;
       case CHECKCAPABILITIES_Never:
          return CHECKCAPABILITIES_NEVER_STR;
-      default:
+      case CHECKCAPABILITIES_Always:
          return CHECKCAPABILITIES_ALWAYS_STR;
+      default:
+         return "(invalid value)";
+   }
+}
+
+const char* Config_ACLsRevalidateToStr(ACLsRevalidate aclsRevalidate)
+{
+   switch(aclsRevalidate)
+   {
+      case ACLSREVALIDATE_Cache:
+         return ACLSREVALIDATE_CACHE_STR;
+      case ACLSREVALIDATE_Always:
+         return ACLSREVALIDATE_ALWAYS_STR;
+      default:
+         return "(invalid value)";
    }
 }
 

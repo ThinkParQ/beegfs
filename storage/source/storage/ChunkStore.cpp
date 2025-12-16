@@ -337,12 +337,14 @@ size_t ChunkStore::getCacheSize()
    return dirsSize;
 }
 
-
 /**
  * Iterate through chunkDirPath and rmdir each path-element beginning with uidXYZ.
  *
- * Note: Only path elements starting with uidXYZ will be removed.
- * Note: chunkDirPath will be modified - all elements except the first one will be removed.
+ * Removes empty directories in bottom-up order upto UID level.
+ * Example for path "u0/688E/D/0-688EDD2F-1":
+ *   Removes: "u0/688E/D/0-688EDD2F-1" -> "u0/688E/D" -> "u0/688E" -> "u0" (if empty)
+ *
+ * Note: Only empty directories are actually removed. chunkDirPath is modified during traversal.
  */
 bool ChunkStore::rmdirChunkDirPath(int targetFD, Path* chunkDirPath)
 {
@@ -392,7 +394,7 @@ bool ChunkStore::rmdirChunkDirPath(int targetFD, Path* chunkDirPath)
       }
 
       *chunkDirPath = chunkDirPath->dirname();
-      chunkDirPos = chunkDirPath->size() - 1;
+      chunkDirPos--; // Move to parent directory level; avoids repeated Path::size() calls.
    }
 
    return retVal;

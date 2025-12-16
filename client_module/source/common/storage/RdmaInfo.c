@@ -45,7 +45,13 @@ void RdmaInfo_releaseNVFS(void)
    nvfs_put_ops();
 }
 
-int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
+/*
+ * RdmaInfo_detectNVFSRequest - Detect if an iov_iter uses memory owned by a GPU
+ * @dpctx: The device priority context that will be updated with the owning GPU's index
+ * @iter: iov_iter
+ * @returns a pseudo-bool: 1 if memory is owned by GPU, otherwise 0
+ */
+ int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
    const struct iov_iter *iter)
 {
    struct page     *page = NULL;
@@ -55,7 +61,11 @@ int RdmaInfo_detectNVFSRequest(DevicePriorityContext* dpctx,
    bool             is_gpu = false;
 
    // Test the first page of the request to determine the memory type.
+#ifdef KERNEL_HAS_IOV_ITER_GET_PAGES2
+   status = iov_iter_get_pages2(&iter_copy, &page, PAGE_SIZE, 1, &page_offset);
+#else
    status = iov_iter_get_pages(&iter_copy, &page, PAGE_SIZE, 1, &page_offset);
+#endif
    if (unlikely(status <= 0))
    {
       // 0 means the iter is empty, so just indicate that it's not an NVFS call.
@@ -128,7 +138,11 @@ static int RdmaInfo_iovToSglist(const struct iov_iter *iter,
 
    while (iov_iter_count(&iter_copy) > 0)
    {
+   #ifdef KERNEL_HAS_IOV_ITER_GET_PAGES2
+      result = iov_iter_get_pages_alloc2(&iter_copy, &pages, iov_iter_count(&iter_copy), &page_offset);
+   #else
       result = iov_iter_get_pages_alloc(&iter_copy, &pages, iov_iter_count(&iter_copy), &page_offset);
+   #endif
       if (result < 0)
       {
          printk_fhgfs(KERN_ERR, "RdmaInfo_iovToSglist: no memory pages\n");

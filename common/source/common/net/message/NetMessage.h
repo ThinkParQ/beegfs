@@ -16,7 +16,7 @@
 // ========================
 #define NETMSG_MIN_LENGTH        NETMSG_HEADER_LENGTH
 #define NETMSG_HEADER_LENGTH     40 /* length of the header (see struct NetMessageHeader) */
-#define NETMSG_MAX_MSG_SIZE      65536    // 64kB
+#define NETMSG_MAX_MSG_SIZE      1048576 // 1MB
 #define NETMSG_MAX_PAYLOAD_SIZE  ((unsigned)(NETMSG_MAX_MSG_SIZE - NETMSG_HEADER_LENGTH))
 
 #define NETMSG_DEFAULT_USERID    (~0) // non-zero to avoid mixing up with root userID

@@ -229,6 +229,7 @@ endif
 	cp KernelFeatureDetection.mk $(RELEASE_PATH_CLIENT)/build/
 	cp AutoRebuild.mk $(RELEASE_PATH_CLIENT)/build/
 	cp feature-detect.sh $(RELEASE_PATH_CLIENT)/build/
+	cp feature-detect-cacher.sh $(RELEASE_PATH_CLIENT)/build/
 	cp ../source/Makefile $(RELEASE_PATH_CLIENT)/source/
 
 	find ../source -mount -name '*.h' -type f | \
@@ -253,6 +254,9 @@ clean:
 	find ../source/ -mount -name '.*.o.cmd' -type f -delete
 	find ../source/ -mount -name '.*.o.d' -type f -delete
 	find ../source/ -mount -name '*.gcno' -type f -delete
+	@# delete outputs from feature-detect-cacher.sh
+	rm -f feature-detect.cache feature-detect.cache.tmp
+	rm -f feature-detect.cachekey feature-detect.cachekey.tmp
 
 help:
 	@echo "This makefile creates the kernel module: $(TARGET) (beegfs-client)"

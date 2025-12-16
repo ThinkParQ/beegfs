@@ -184,6 +184,10 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
 
          response.addResponseStat(lookupRes, statData);
 
+         // Use actual createRes to prevent incorrect forwarding to secondary
+         // See LookupIntentMsgEx::changeObservableState() for more details
+         response.addResponseCreate(createRes);
+
          return boost::make_unique<ResponseState>(std::move(response));
       }
    }
@@ -302,6 +306,21 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
          FhgfsOpsErr getRes = metaStore->getEntryData(outEntryInfo, outInodeStoreData);
          if (getRes != FhgfsOpsErr_SUCCESS)
             lookupRes1 = getRes;
+
+         // Check for NULL stripe pattern after getEntryData()
+         // This can happen when due to races, dangling dentry is left without
+         // a valid inode associated with it. In such cases, stripe pattern will be
+         // nullptr in outInodeStoreData and since we set FhgfsOpsErr_SUCCESS instead
+         // of FhgfsOpsErr_EXISTS during create() call - so as per result from changeObservableState()
+         // it will try to forward call to secondary and thats where crash happen while trying to
+         // serialize stripePattern (which is null). Check for nullptr and set correct lookup result.
+         if (!outInodeStoreData->getStripePattern())
+         {
+            LOG_DBG(GENERAL, WARNING, "Inode with NULL stripe pattern (likely dangling dentry).",
+                    ("entryID", outEntryInfo->getEntryID()), ("parentEntryID", parentEntryID),
+                    ("entryName", entryName));
+            lookupRes1 = FhgfsOpsErr_PATHNOTEXISTS;
+         }
       }
    }
 

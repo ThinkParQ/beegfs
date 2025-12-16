@@ -3,7 +3,11 @@
 
 #include <common/Common.h>
 #include <common/toolkit/Time.h>
+
 #ifdef BEEGFS_RDMA
+#ifndef KERNEL_HAS_IBDEV_TO_NODE
+#include <os/OsCompat.h>
+#endif
 #include <rdma/ib_verbs.h>
 #endif
 
@@ -86,8 +90,8 @@ int NicAddressStats_comparePriority(NicAddressStats* this, NicAddressStats* o,
    // device on the same numa node as current thread has higher priority
    if (likely(this->nic.ibdev && o->nic.ibdev))
    {
-      int thisNode = this->nic.ibdev->dma_device->numa_node;
-      int oNode = o->nic.ibdev->dma_device->numa_node;
+      int thisNode = ibdev_to_node(this->nic.ibdev);
+      int oNode = ibdev_to_node(o->nic.ibdev);
       if (thisNode != oNode)
       {
          if (thisNode == numa)

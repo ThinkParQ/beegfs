@@ -21,7 +21,7 @@ RandomReentrant MigrateFile::randomGen;
 
 /**
 * Retrieves a map that associates file types as defined in dirent.h with textual
-* representations of these types. This should only be used to "pretty print" the 
+* representations of these types. This should only be used to "pretty print" the
 * types for logging, and the authoritative source is the enum in dirent.h.
 */
 const std::map<int, std::string>& getFileTypeMap()
@@ -906,7 +906,7 @@ bool MigrateFile::copyXAttrs(const XAttrMap& fromXAttrs)
 {
    try
    {
-      XAttrTk::setXAttrs(this->filePath, fromXAttrs);
+      XAttrTk::setXAttrs(this->filePath, fromXAttrs, 0);
    }
    catch (const XAttrException& exception)
    {

@@ -15,7 +15,7 @@ class ListDirFromOffsetMsgEx : public ListDirFromOffsetMsg
    private:
       FhgfsOpsErr listDirIncremental(EntryInfo* entryInfo, StringList* outNames,
          UInt8List* outEntryTypes, StringList* outEntryIDs, Int64List* outServerOffsets,
-         int64_t* outNewOffset);
+         int64_t* outNewOffset, unsigned respBufSize);
 };
 
 

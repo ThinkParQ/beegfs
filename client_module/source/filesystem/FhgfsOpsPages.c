@@ -15,6 +15,7 @@
 
 #include <filesystem/ProcFs.h>
 #include <os/OsTypeConversion.h>
+#include <os/OsCompat.h>
 #include "FhgfsOpsDir.h"
 #include "FhgfsOpsFile.h"
 #include "FhgfsOpsHelper.h"
@@ -441,9 +442,6 @@ int FhgfsOpsPages_writePageCallBack(struct page *page, struct writeback_control 
             goto outWriteErr;
          }
 
-         if (PageError(page) )
-            ClearPageError(page);
-
          // set- and end page-writeback to remove the page from dirty-page-tree
          set_page_writeback(page);
          end_page_writeback(page);
@@ -703,7 +701,7 @@ void FhgfsOpsPages_endWritePage(struct page* page, int writeRes, struct inode* i
          set_page_dirty(page);
       else
       {
-         SetPageError(page);
+         fhgfs_set_wb_error(page, writeRes);
          FhgfsInode_decNumDirtyPages(fhgfsInode);
       }
    }
@@ -780,7 +778,9 @@ void FhgfsOpsPages_endReadPage(Logger* log, struct inode* inode, struct FhgfsPag
 
 
    if (readRes < 0)
-      SetPageError(page);
+   {
+      fhgfs_set_wb_error(page, readRes);
+   }
    else
    { /* note: There is no way to mark a page outside the filesize, so even with readRes == 0
       *       we need to SetPageUptodate(page) */

@@ -150,4 +150,56 @@ int64_t __FhgfsOps_getCurrentLockFD(struct file* file)
    return (size_t)file;
 }
 
+#ifdef KERNEL_WRITE_BEGIN_USES_FOLIO
+typedef struct folio* beegfs_pgfol_t;
+#else
+typedef struct page* beegfs_pgfol_t;
+#endif
+
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
+#define BEEGFS_HAS_WRITE_FLAGS 1
+#else
+#define BEEGFS_HAS_WRITE_FLAGS 0
+#endif
+
+/**
+ * Converts a struct page* into a beegfs_pgfol_t, which may be a folio* or page*.
+ */
+static inline beegfs_pgfol_t beegfs_to_pgfol(struct page *page)
+{
+#ifdef KERNEL_WRITE_BEGIN_USES_FOLIO
+    return page_folio(page);
+#else
+    return page;
+#endif
+}
+
+/**
+ * Retrieves the struct page* from a beegfs_pgfol_t (whether folio or page).
+ */
+static inline struct page* beegfs_get_page(beegfs_pgfol_t pgfol)
+{
+#ifdef KERNEL_WRITE_BEGIN_USES_FOLIO
+    return &pgfol->page;
+#else
+    return pgfol;
+#endif
+}
+
+/**
+ * Wrapper for grab_cache_page_write_begin that accounts for whether the kernel
+ * expects a flags parameter or not.
+ */
+static inline struct page* beegfs_grab_cache_page(struct address_space* mapping,
+                                                  pgoff_t index,
+                                                  unsigned flags)
+{
+#ifdef KERNEL_WRITE_BEGIN_HAS_FLAGS
+    return grab_cache_page_write_begin(mapping, index, flags);
+#else
+    IGNORE_UNUSED_VARIABLE(flags);
+    return grab_cache_page_write_begin(mapping, index);
+#endif
+}
+
 #endif /*FHGFSOPSFILE_H_*/

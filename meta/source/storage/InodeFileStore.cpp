@@ -129,9 +129,20 @@ FhgfsOpsErr InodeFileStore::getUnreferencedInodeUnlocked(EntryInfo* entryInfo, F
          retVal = FhgfsOpsErr_SUCCESS;
    }
 
-   if (inode && inode->getNumHardlinks() > 1)
-   {  /* So the inode is not referenced and we set our exclusive lock. However, there are several
-       * hardlinks for this file. Currently only rename with a linkCount == 1 is supported! */
+   if (inode && !inode->getIsInlined())
+   {
+      // At this point, we hold an exclusive lock on an unreferenced inode. Historically, this
+      // lock was required to prevent concurrent operations (like open or lookup) from accessing
+      // the inode while a rename was in progress — ensuring the inode state remained stable until
+      // the operation completed.
+      // However, this locking requirement only applies to inlined inodes, which are tightly
+      // coupled with their dentries and directly affected by dentry-level changes. In contrast,
+      // non-inlined inodes — which gets de-inlined when the first hardlink is created — are stored
+      // independently from dentries on the disk. Even if the file now has only one remaining link,
+      // it may still be non-inlined due to prior hardlinks.
+      // Since rename operations only modify the dentry and not the inode itself, and because this
+      // inode is non-inlined and already isolated from dentry coupling, we no longer need to retain
+      // the exclusive lock. Instead, we simply trigger cleanup for this unreferenced inode.
       deleteUnreferencedInodeUnlocked(entryInfo->getEntryID() );
       inode = NULL;
       retVal = FhgfsOpsErr_INUSE;
@@ -370,28 +381,55 @@ FhgfsOpsErr InodeFileStore::moveRemoteBegin(EntryInfo* entryInfo, char* buf, siz
 /**
  * Finish the rename/move operation by deleting the inode object.
  */
-void InodeFileStore::moveRemoteComplete(const std::string& entryID)
+FhgfsOpsErr InodeFileStore::moveRemoteComplete(const std::string& entryID)
 {
    // moving succeeded => delete original
-
    RWLockGuard lock(rwlock, SafeRWLock_WRITE);
-
-   deleteUnreferencedInodeUnlocked(entryID);
+   return deleteUnreferencedInodeUnlocked(entryID);
 }
 
 /**
  * Finish the rename/move operation by deleting the inode object.
+ *
+ * @param entryID The ID of the inode to delete
+ * @return FhgfsOpsErr_SUCCESS if inode is deleted successfully,
+ *         FhgfsOpsErr_INUSE if inode is referenced by concurrent operations,
+ *         FhgfsOpsErr_PATHNOTEXISTS if inode not found in this store
  */
-void InodeFileStore::deleteUnreferencedInodeUnlocked(const std::string& entryID)
+FhgfsOpsErr InodeFileStore::deleteUnreferencedInodeUnlocked(const std::string& entryID)
 {
    InodeMapIter iter = inodes.find(entryID);
-   if(iter != inodes.end() )
-   { // file exists
+   if (iter != inodes.end() )
+   {  // inode exists
       FileInodeReferencer* fileRefer = iter->second;
+
+      // CRITICAL: Check for active inode references before deletion.
+      //
+      // This prevents a race condition involving rename(), hardlink(), and open():
+      // 1. Just before moveRemoteFileBegin(), a concurrent hardlink() operation makes
+      //    the inode non-inlined.
+      // 2. Since EntryInfo::getIsInlined() still returns true, we incorrectly load an
+      //    "unreferenced" inode into the parent directory's file store and acquire
+      //    an exclusive lock on it.
+      // 3. A concurrent open() operation references the inode in the global store
+      //    (since non-inlined inodes are always accessed there), setting refCount to 1.
+      // 4. moveRemoteComplete() calls this function to delete the inode from
+      //    the global store (which is always checked first), even though the "unreferenced"
+      //    inode is still present in the parent directory's file store.
+      // 5. Without this check, we would delete an actively used inode, causing use-after-free
+      //    errors during the subsequent close() operation, leading to a crash.
+      if (fileRefer->getRefCount())
+      {
+         LOG(GENERAL, WARNING, "Tried to delete unreferenced inode, but it is referenced.",
+            ("EntryID", entryID), ("RefCount", fileRefer->getRefCount() ) );
+         return FhgfsOpsErr_INUSE; // cannot free inode object, because it is referenced
+      }
 
       delete fileRefer;
       inodes.erase(entryID);
+      return FhgfsOpsErr_SUCCESS;
    }
+   return FhgfsOpsErr_PATHNOTEXISTS;
 }
 
 /**

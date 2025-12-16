@@ -121,8 +121,8 @@ bool ModeSetMetadataMirroring::verifyNoClientsActive()
       [] (const auto& data) {
             const auto& clients = data.second;
             if (!clients.empty())
-               std::cerr << "Error: There are still " << clients.size() << " clients activce.\n"
-                            "To activate metadata mirroring, all cients have to stopped.\n"
+               std::cerr << "Error: There are still " << clients.size() << " clients active.\n"
+                            "To activate metadata mirroring, all clients have to stopped.\n"
                             "See beegfs-ctl --listnodes --nodetype=client for more information."
                          << std::endl;
             return clients.empty();

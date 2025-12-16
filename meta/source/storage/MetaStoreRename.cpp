@@ -201,11 +201,9 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
       return FhgfsOpsErr_PATHNOTEXISTS;
 
    // of the file being renamed
-   DirEntry* fromEntry  = dir.dirEntryCreateFromFileUnlocked(fromName);
+   std::unique_ptr<DirEntry> fromEntry(dir.dirEntryCreateFromFileUnlocked(fromName));
    if (!fromEntry)
-   {
       return FhgfsOpsErr_PATHNOTEXISTS;
-   }
 
    EntryInfo fromEntryInfo;
    const std::string& parentEntryID = dir.getID();
@@ -213,7 +211,7 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
 
    // reference the inode
    MetaFileHandle fromFileInode;
-   // DirInode*  fromDirInode  = NULL;
+
    if (DirEntryType_ISDIR(fromEntryInfo.getEntryType() ) )
    {
       // TODO, exclusive lock
@@ -235,7 +233,8 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
       }
    }
 
-   DirEntry* overWriteEntry = dir.dirEntryCreateFromFileUnlocked(toName);
+   // Check if we're overwriting an existing entry
+   std::unique_ptr<DirEntry> overWriteEntry(dir.dirEntryCreateFromFileUnlocked(toName));
    if (overWriteEntry)
    {
       // sanity checks if we really shall overwrite the entry
@@ -253,8 +252,7 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
 
       if (isSameInode)
       {
-         delete(overWriteEntry);
-         overWriteEntry = NULL;
+         overWriteEntry.reset(); // Smart cleanup
          goto out; // nothing to do then, rename request will be silently ignored
       }
 
@@ -263,7 +261,7 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
    }
 
    // eventually rename here
-   retVal = dir.renameDirEntryUnlocked(fromName, toName, overWriteEntry);
+   retVal = dir.renameDirEntryUnlocked(fromName, toName, overWriteEntry.get());
 
    /* Note: If rename faild and and an existing toName was to be overwritten, we don't need to care
     *       about it, the underlying file system has to handle it. */
@@ -273,22 +271,17 @@ FhgfsOpsErr MetaStore::performRenameEntryInSameDir(DirInode& dir, const std::str
     *        the #fsIDs# dir.
     */
 
-   if (fromFileInode)
-      releaseFileUnlocked(dir, fromFileInode);
-   else
-   {
-      // TODO dir
-   }
-
-
 out:
 
-   if (retVal == FhgfsOpsErr_SUCCESS)
-      *outOverwrittenEntry = overWriteEntry;
-   else
-      SAFE_DELETE(overWriteEntry);
+   if (fromFileInode)
+   {
+      releaseFileUnlocked(dir, fromFileInode);
+   }
 
-   SAFE_DELETE(fromEntry); // always exists when we are here
+   if (retVal == FhgfsOpsErr_SUCCESS)
+   {
+      *outOverwrittenEntry = overWriteEntry.release(); // Transfer ownership to caller
+   }
 
    return retVal;
 }
@@ -480,12 +473,9 @@ outUnlock:
 FhgfsOpsErr MetaStore::moveRemoteFileBegin(DirInode& dir, EntryInfo* entryInfo,
    char* buf, size_t bufLen, size_t* outUsedBufLen)
 {
+   RWLockGuard metaLock(rwlock, SafeRWLock_READ); // L O C K (M E T A )
+   RWLockGuard dirLock(dir.rwlock, SafeRWLock_READ); // L O C K ( D I R )
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
-
-   SafeRWLock safeLock(&this->rwlock, SafeRWLock_READ); // L O C K
-
-   // lock the dir to make sure no renameInSameDir is going on
-   SafeRWLock safeDirLock(&dir.rwlock, SafeRWLock_READ);
 
    if (entryInfo->getIsInlined())
    {
@@ -507,28 +497,23 @@ FhgfsOpsErr MetaStore::moveRemoteFileBegin(DirInode& dir, EntryInfo* entryInfo,
       fileDentry.serializeDentry(ser);
       *outUsedBufLen = ser.size();
    }
-
-   safeDirLock.unlock();
-   safeLock.unlock(); // U N L O C K
-
    return retVal;
 }
 
-void MetaStore::moveRemoteFileComplete(DirInode& dir, const std::string& entryID)
+FhgfsOpsErr MetaStore::moveRemoteFileComplete(DirInode& dir, const std::string& entryID)
 {
-   SafeRWLock safeLock(&this->rwlock, SafeRWLock_WRITE); // L O C K
+   RWLockGuard metaLock(this->rwlock, SafeRWLock_WRITE); // L O C K ( M E T A )
+   FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
 
    if (this->fileStore.isInStore(entryID) )
-      this->fileStore.moveRemoteComplete(entryID);
-   else
    {
-      SafeRWLock safeDirLock(&dir.rwlock, SafeRWLock_READ);
-
-      dir.fileStore.moveRemoteComplete(entryID);
-
-      safeDirLock.unlock();
-
+      retVal = this->fileStore.moveRemoteComplete(entryID);
    }
 
-   safeLock.unlock(); // U N L O C K
+   if (retVal != FhgfsOpsErr_SUCCESS)
+   {
+      RWLockGuard dirLock(dir.rwlock, SafeRWLock_READ); // L O C K ( D I R )
+      retVal = dir.fileStore.moveRemoteComplete(entryID);
+   }
+   return retVal;
 }

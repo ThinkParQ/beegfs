@@ -2324,7 +2324,7 @@
             "type": "influxdb",
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
           },
-          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"diskio\")\r\n  |> filter(fn: (r) => r[\"host\"] == \"${hoststorage}\" and r.name =~ /$disk$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"read_bytes\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> derivative(unit: 10s, nonNegative: true)\r\n  |> yield(name: \"mean\")",
+          "query": "from(bucket: \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"diskio\")\r\n  |> filter(fn: (r) => r[\"host\"] == \"${hoststorage}\" and r.name =~ /$disk$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"read_time\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> derivative(nonNegative: true)\r\n  |> yield(name: \"mean\")",
           "refId": "A"
         },
         {
@@ -2333,7 +2333,7 @@
             "uid": "${DS_BEEGFS_MON_INFLUXDB}"
           },
           "hide": false,
-          "query": "from(bucket:  \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"diskio\")\r\n  |> filter(fn: (r) => r.host == \"${hoststorage}\" and r.name =~ /$disk$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"write_time\")\r\n  |> derivative(unit: 10s, nonNegative: true)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"mean\")",
+          "query": "from(bucket:  \"${bucket}\")\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"diskio\")\r\n  |> filter(fn: (r) => r[\"host\"] == \"${hoststorage}\" and r.name =~ /$disk$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"write_time\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> derivative(nonNegative: true)\r\n  |> yield(name: \"mean\")",
           "refId": "B"
         }
       ],

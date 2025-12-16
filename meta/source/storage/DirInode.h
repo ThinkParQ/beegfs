@@ -73,7 +73,8 @@ class DirInode
       FhgfsOpsErr listIncremental(int64_t serverOffset,
          unsigned maxOutNames, StringList* outNames, int64_t* outNewServerOffset);
       FhgfsOpsErr listIncrementalEx(int64_t serverOffset,
-         unsigned maxOutNames, bool filterDots, ListIncExOutArgs& outArgs);
+         unsigned maxOutNames, bool filterDots, ListIncExOutArgs& outArgs,
+         unsigned availableRespBufSize = 0);
       FhgfsOpsErr listIDFilesIncremental(int64_t serverOffset, uint64_t incrementalOffset,
          unsigned maxOutNames, ListIncExOutArgs& outArgs);
 

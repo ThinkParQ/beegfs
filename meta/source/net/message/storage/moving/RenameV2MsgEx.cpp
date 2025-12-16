@@ -46,7 +46,8 @@ struct DirHandle {
 
 RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
 {
-   MetaStore* metaStore = Program::getApp()->getMetaStore();
+   App* app = Program::getApp();
+   MetaStore* metaStore = app->getMetaStore();
 
    // if the directory could not be referenced it does not exist on the current node. this will
    // cause the operation to fail lateron during executeLocally() when we reference the same
@@ -141,10 +142,49 @@ RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
          result.fromNameLock = {&store, getFromDirInfo()->getEntryID(), getOldName()};
       }
 
-      if (DirEntryType_ISFILE(fromFileInfo.getEntryType()) && fromFileInfo.getIsInlined())
+      // Acquire necessary file locks based on inode ownership.
+      //
+      // In BeeGFS, a file's dentry and its inode may reside on different metadata nodes,
+      // especially in the presence of hardlinks across directories. This means that although
+      // a dentry might be present on the current node, the inode itself could be remote.
+      // For correct locking and to avoid unnecessary lock acquisition:
+      // - We lock only those files whose inodes are owned by this node or local buddy group.
+      // - Inlined inodes are always local, but non-inlined inodes must be checked for ownership.
+      // Note: To avoid deadlocks when locking multiple inodes, we always acquire locks
+      // in a deterministic lexicographic order of EntryIDs.
+      if (DirEntryType_ISFILE(fromFileInfo.getEntryType()))
       {
-         if (DirEntryType_ISFILE(toFileInfo.getEntryType()) && toFileInfo.getIsInlined())
+         // Returns true if the inode associated with the given EntryInfo is owned
+         // by this node or local buddy mirror group.
+         auto isFileOwnedLocally = [&app](const EntryInfo& fileInfo) -> bool
          {
+            NumNodeID ownerNodeID = fileInfo.getOwnerNodeID();
+            if (!fileInfo.getIsBuddyMirrored())
+               return ownerNodeID == app->getLocalNode().getNumID();
+            else
+               return ownerNodeID.val() == app->getMetaBuddyGroupMapper()->getLocalGroupID();
+         };
+
+         // Check ownership for both source and target files.
+         bool isFromFileLocal = isFileOwnedLocally(fromFileInfo);
+         bool isToFileLocal = false;
+         if (toFileExists && DirEntryType_ISFILE(toFileInfo.getEntryType()))
+         {
+            isToFileLocal = isFileOwnedLocally(toFileInfo);
+         }
+
+         // Acquire inode locks in lexicographic order of EntryIDs:
+         // Case 1: Both inodes are local:
+         //    Lock both files lexicographically based on EntryID.
+         // Case 2: Only source inode is local:
+         //    Lock only the source file.
+         // Case 3: Only target inode is local:
+         //    Lock only the target file, required for unlink scenario.
+         // Case 4: Neither inode is local:
+         //    Skip file locking; both inodes are remote.!
+         if (isFromFileLocal && isToFileLocal)
+         {
+            // Both files are local - Lock both files in lexicographic EntryID order.
             if (fromFileInfo.getEntryID() < toFileInfo.getEntryID())
             {
                result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
@@ -152,6 +192,7 @@ RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
             }
             else if (fromFileInfo.getEntryID() == toFileInfo.getEntryID())
             {
+               // Rename-to-self case: same inode — acquire lock once.
                result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
             }
             else
@@ -160,9 +201,15 @@ RenameV2Locks RenameV2MsgEx::lock(EntryLockStore& store)
                result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
             }
          }
-         else
+         else if (isFromFileLocal)
          {
+            // Only source file is local - lock it exclusively.
             result.fromFileLockF = {&store, fromFileInfo.getEntryID(), true};
+         }
+         else if (isToFileLocal)
+         {
+            // Only target file is local - lock it for potential unlinking.
+            result.unlinkedFileLock = {&store, toFileInfo.getEntryID(), true};
          }
       }
 

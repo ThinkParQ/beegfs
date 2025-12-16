@@ -327,3 +327,8 @@ $(call define_if_matches, KERNEL_HAS_IOV_ITER_GET_PAGES2, "iov_iter_get_pages2",
 
 $(call define_if_matches, KERNEL_HAS_GET_RANDOM_INT, "get_random_int", random.h)
 
+# Detect if write_begin() uses struct folio**
+KERNEL_FEATURE_DETECTION += $(shell \
+    grep -sFA2 "int (*write_begin)" ${KSRCDIR_PRUNED_HEAD}/include/linux/fs.h \
+      | grep -qs "struct folio **" \
+      && echo "-DKERNEL_WRITE_BEGIN_USES_FOLIO")

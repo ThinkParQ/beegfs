@@ -76,7 +76,7 @@ class MetaStore
 
       FhgfsOpsErr moveRemoteFileBegin(DirInode& dir, EntryInfo* entryInfo, char* buf, size_t bufLen,
          size_t* outUsedBufLen);
-      void moveRemoteFileComplete(DirInode& dir, const std::string& entryID);
+      FhgfsOpsErr moveRemoteFileComplete(DirInode& dir, const std::string& entryID);
 
       FhgfsOpsErr getAllInodesIncremental(unsigned hashDirNum, int64_t lastOffset,
           unsigned maxOutInodes, FsckDirInodeList* outDirInodes, FsckFileInodeList* outFileInodes,
