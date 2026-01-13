@@ -473,9 +473,14 @@ void __FhgfsInode_initOpenIOInfo(FhgfsInode* this, FhgfsInodeFileHandle* fileHan
 
    outIOInfo->userID  = i_uid_read(&this->vfs_inode);
    outIOInfo->groupID = i_gid_read(&this->vfs_inode);
-   outIOInfo->writeHint = this->vfs_inode.i_write_hint;
 #ifdef BEEGFS_NVFS
    outIOInfo->nvfs = false;
+#endif
+
+#if defined(KERNEL_HAS_INODE_I_WRITE_HINT)
+   outIOInfo->writeHint = this->vfs_inode.i_write_hint;
+#else
+   outIOInfo->writeHint = RW_HINT_INVALID;
 #endif
 }
 

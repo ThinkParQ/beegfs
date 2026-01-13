@@ -22,7 +22,7 @@ class WriteLocalFileMsgBase
        */
       WriteLocalFileMsgBase(const NumNodeID clientNumID, const char* fileHandleID,
          const uint16_t targetID, const PathInfo* pathInfo, const unsigned accessFlags,
-         const int64_t offset, const int64_t count, const unsigned writeHint)
+         const int64_t offset, const int64_t count, const uint64_t writeHint)
       {
          this->clientNumID = clientNumID;
 

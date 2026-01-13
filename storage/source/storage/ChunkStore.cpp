@@ -583,10 +583,15 @@ std::pair<FhgfsOpsErr, int> ChunkStore::openAndChown(const int targetFD, const s
          return {FhgfsOpsErrTk::fromSysErr(errno), -1};
    }
 
-   int r = fcntl(fd, F_SET_RW_HINT, &writeHint);
-   if (r < 0) {
-      LOG(GENERAL, ERR, "Failed to set writeHint.",
-      ("writeHint", StringTk::uint64ToStr(writeHint)));
+   if (writeHint != RW_HINT_INVALID)
+   {
+      int r = fcntl(fd, F_SET_RW_HINT, &writeHint);
+      if (r < 0) 
+	  {
+         LOG(GENERAL, ERR, 
+		 "Client requested a write lifetime hint, but server failed to set it.",
+         ("writeHint", StringTk::uint64ToStr(writeHint)), sysErr);
+	  }
    }
 
    if (!quota.useQuota)
