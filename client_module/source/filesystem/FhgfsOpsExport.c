@@ -428,6 +428,7 @@ struct dentry* __FhgfsOpsExport_lookupDentryFromNfsHandle(struct super_block *sb
       char* statParentEntryID;
 
       unsigned int metaVersion;
+      const struct inode *ns_anchor = NULL;
 
       if (!lookupParent)
       {
@@ -483,7 +484,9 @@ struct dentry* __FhgfsOpsExport_lookupDentryFromNfsHandle(struct super_block *sb
 
       // entry found => create inode
       metaVersion = fhgfsStat.metaVersion;
-      OsTypeConv_kstatFhgfsToOs(&fhgfsStat, &kstat);
+      /* Map server ids into the sb's userns using the root inode as the anchor. */
+      ns_anchor = sb->s_root ? d_inode(sb->s_root) : NULL;
+      OsTypeConv_kstatFhgfsToOs(ns_anchor, &fhgfsStat, &kstat);
 
       kstat.ino = inodeHash;
 
@@ -691,6 +694,7 @@ struct dentry* FhgfsOpsExport_getParentDentry(struct dentry* childDentry)
 
          NumNodeID parentNodeID = (NumNodeID){0};
          char* parentEntryID = NULL;
+         const struct inode *ns_anchor = NULL;
 
          NumNodeID parentOwnerNodeID;
 
@@ -744,8 +748,13 @@ struct dentry* FhgfsOpsExport_getParentDentry(struct dentry* childDentry)
 
          // entry found => create inode
          metaVersion = fhgfsStat.metaVersion;
-
-         OsTypeConv_kstatFhgfsToOs(&fhgfsStat, &kstat);
+         /*
+          * Map server ids into the mount/sb user namespace.
+          * Prefer the child inode as the anchor; fall back to sb->s_root.
+          */
+         ns_anchor = childInode ? childInode :
+                     (superBlock->s_root ? d_inode(superBlock->s_root) : NULL);
+         OsTypeConv_kstatFhgfsToOs(ns_anchor, &fhgfsStat, &kstat);
 
          kstat.ino = comparisonInfo.inodeHash;
 

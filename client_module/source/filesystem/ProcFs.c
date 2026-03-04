@@ -9,6 +9,7 @@
 #define BEEGFS_PROC_NAMEBUF_LEN   4096
 
 #define BEEGFS_PROC_ENTRY_CONFIG              "config"
+#define BEEGFS_PROC_ENTRY_BUILDCONFIG         "build_config"
 #define BEEGFS_PROC_ENTRY_STATUS              ".status"
 #define BEEGFS_PROC_ENTRY_FSUUID              "fs_uuid"
 #define BEEGFS_PROC_ENTRY_MGMTNODES           "mgmt_nodes"
@@ -75,6 +76,7 @@ struct fhgfs_proc_file
 static const struct fhgfs_proc_file fhgfs_proc_files[] =
 {
    { BEEGFS_PROC_ENTRY_CONFIG, &__ProcFs_readV2_config },
+   { BEEGFS_PROC_ENTRY_BUILDCONFIG, &__ProcFs_readV2_buildConfig },
    { BEEGFS_PROC_ENTRY_STATUS, &__ProcFs_readV2_status },
    { BEEGFS_PROC_ENTRY_FSUUID, &__ProcFs_readV2_fsUUID },
    { BEEGFS_PROC_ENTRY_MGMTNODES, &__ProcFs_readV2_mgmtNodes },
@@ -255,6 +257,10 @@ void ProcFs_removeEntries(App* app)
    remove_proc_entry(entryNameBuf, NULL);
 
    scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
+      dirNameBuf, BEEGFS_PROC_ENTRY_BUILDCONFIG);
+   remove_proc_entry(entryNameBuf, NULL);
+
+   scnprintf(entryNameBuf, BEEGFS_PROC_NAMEBUF_LEN, "%s/%s",
       dirNameBuf, BEEGFS_PROC_ENTRY_STATUS);
    remove_proc_entry(entryNameBuf, NULL);
 
@@ -342,6 +348,13 @@ int __ProcFs_readV2_config(struct seq_file* file, void* p)
    App* app = file->private;
 
    return ProcFsHelper_readV2_config(file, app);
+}
+
+int __ProcFs_readV2_buildConfig(struct seq_file* file, void* p)
+{
+   App* app = file->private;
+
+   return ProcFsHelper_readV2_buildConfig(file, app);
 }
 
 int __ProcFs_readV2_status(struct seq_file* file, void* v)

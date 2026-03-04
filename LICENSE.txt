@@ -3,8 +3,8 @@ BeeGFS END USER LICENSE AGREEMENT
 
 Copyright (c) 2009 Fraunhofer ITWM, 2022 ThinkParQ GmbH
 
-Use of the provided software and libraries is governed by the BeeGFS End User License Agreement
-found at https://www.beegfs.io/docs/BeeGFS_EULA.txt.
+Use of the provided software and libraries is governed by the BeeGFS License Agreement
+found at https://www.beegfs.io/docs/BeeGFS_License_Agreement.txt.
 
 THIRD PARTY LICENSES
 ====================

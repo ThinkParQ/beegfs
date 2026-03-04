@@ -142,6 +142,8 @@ static inline bool Config_getTuneUseGlobalAppendLocks(Config* this);
 static inline bool Config_getTuneUseBufferedAppend(Config* this);
 static inline unsigned Config_getTuneStatFsCacheSecs(Config* this);
 static inline bool Config_getTuneCoherentBuffers(Config* this);
+static inline unsigned Config_getTuneFileOpenRetryTimeoutMS(Config* this);
+static inline unsigned Config_getTuneFileOpenRetryIntervalMS(Config* this);
 
 static inline char* Config_getSysMgmtdHost(Config* this);
 static inline char* Config_getSysInodeIDStyle(Config* this);
@@ -314,6 +316,8 @@ struct Config
    bool     tuneUseBufferedAppend; // false disables buffering of append writes
    unsigned       tuneStatFsCacheSecs; // 0 disables caching of free space info from servers
    bool           tuneCoherentBuffers; // try to keep buffer cache and page cache coherent
+   unsigned       tuneFileOpenRetryTimeoutMS;  // Max time to retry open() on FILEACCESS_DENIED error
+   unsigned       tuneFileOpenRetryIntervalMS; // Sleep interval between retries
 
    char*          sysMgmtdHost;
    char*          sysInodeIDStyle;
@@ -344,7 +348,6 @@ struct Config
 
    /* workaround for rename of closed files on nfs */
    bool sysRenameEbusyAsXdev;
-
 
    // internals
    StrCpyMap configMap;
@@ -629,6 +632,16 @@ bool Config_getTuneCoherentBuffers(Config* this)
    return this->tuneCoherentBuffers;
 }
 
+unsigned Config_getTuneFileOpenRetryTimeoutMS(Config* this)
+{
+   return this->tuneFileOpenRetryTimeoutMS;
+}
+
+unsigned Config_getTuneFileOpenRetryIntervalMS(Config* this)
+{
+   return this->tuneFileOpenRetryIntervalMS;
+}
+
 /**
  * Special function to automatically enable TuneRefreshOnGetAttr, e.g. for NFS exports.
  *
@@ -773,6 +786,7 @@ bool Config_getQuotaEnabled(Config* this)
 {
    return this->quotaEnabled;
 }
+
 
 char* Config_getConnMessagingTimeouts(Config* this)
 {

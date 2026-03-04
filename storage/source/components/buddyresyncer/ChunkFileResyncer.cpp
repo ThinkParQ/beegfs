@@ -17,7 +17,7 @@ ChunkFileResyncer::ChunkFileResyncer(uint16_t targetID,
       + std::to_string(slaveID))
 {
    this->isRunning = false;
-   this->localTargetID = targetID;  
+   this->targetID = targetID;
 }
 
 ChunkFileResyncer::~ChunkFileResyncer()
@@ -121,7 +121,7 @@ FhgfsOpsErr ChunkFileResyncer::doResync(std::string& chunkPathStr, uint16_t loca
             {
                // chunk was deleted => no error
                // delete the chunk and return
-               bool rmRes = removeChunkUnlocked(*node, destinationTargetID, chunkPathStr);
+               bool rmRes = removeChunkUnlocked(*node, localTargetID, destinationTargetID, chunkPathStr);
 
                if (!rmRes) // rm failed; stop resync
                {
@@ -289,7 +289,7 @@ FhgfsOpsErr ChunkFileResyncer::doResync(std::string& chunkPathStr, uint16_t loca
                LOG_DEBUG(__func__, Log_NOTICE,
                   "Unable to communicate, but target is not offline; sleeping "
                   + std::to_string(msgRetryIntervalMS) + "ms before retry. targetID: "
-                  + std::to_string(targetID));
+                  + std::to_string(localTargetID));
 
                PThread::sleepMS(msgRetryIntervalMS);
 
@@ -381,7 +381,7 @@ cleanup:
 /**
  * Note: Chunk has to be locked by caller.
  */
-bool ChunkFileResyncer::removeChunkUnlocked(Node& node, uint16_t destinationTargetID, std::string& pathStr)
+bool ChunkFileResyncer::removeChunkUnlocked(Node& node, uint16_t localTargetID, uint16_t destinationTargetID, std::string& pathStr)
 {
    bool retVal = true;
    unsigned msgRetryIntervalMS = 5000;
@@ -411,7 +411,7 @@ bool ChunkFileResyncer::removeChunkUnlocked(Node& node, uint16_t destinationTarg
          LOG_DEBUG(__func__, Log_NOTICE,
             "Unable to communicate, but target is not offline; "
             "sleeping " + std::to_string(msgRetryIntervalMS) + " ms before retry. "
-            "targetID: " + std::to_string(targetID) );
+            "targetID: " + std::to_string(localTargetID) );
 
          PThread::sleepMS(msgRetryIntervalMS);
 
@@ -448,7 +448,7 @@ bool ChunkFileResyncer::removeChunkUnlocked(Node& node, uint16_t destinationTarg
       {
          LogContext(__func__).logErr("Chunk path could not be deleted; "
             "path: " + *iter + "; "
-            "targetID: " + std::to_string(targetID) + "; "
+            "targetID: " + std::to_string(localTargetID) + "; "
             "node: " + node.getTypedNodeID());
          retVal = false;
       }

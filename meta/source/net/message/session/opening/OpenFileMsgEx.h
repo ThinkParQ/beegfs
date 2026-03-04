@@ -12,7 +12,7 @@ class OpenFileResponseState : public MirroredMessageResponseState
 {
    public:
       OpenFileResponseState()
-         : isIndirectCommErr(true)
+         : isIndirectCommErr(true), haveFileState(false)
       {
       }
 
@@ -22,9 +22,11 @@ class OpenFileResponseState : public MirroredMessageResponseState
       }
 
       OpenFileResponseState(FhgfsOpsErr result, const std::string& fileHandleID,
-            const StripePattern& pattern, const PathInfo& pathInfo, uint32_t fileVersion)
+            const StripePattern& pattern, const PathInfo& pathInfo, uint32_t fileVersion,
+            FileState fileState, bool haveFileState = false)
          : isIndirectCommErr(false), result(result), fileHandleID(fileHandleID),
-           pattern(pattern.clone()), pathInfo(pathInfo), fileVersion(fileVersion)
+           pattern(pattern.clone()), pathInfo(pathInfo), fileVersion(fileVersion),
+           fileState(fileState), haveFileState(haveFileState)
       {
       }
 
@@ -36,9 +38,16 @@ class OpenFileResponseState : public MirroredMessageResponseState
                      GenericRespMsgCode_INDIRECTCOMMERR,
                      "Communication with storage targets failed"));
          else
-            ctx.sendResponse(
-                  OpenFileRespMsg(
-                     result, fileHandleID, pattern.get(), &pathInfo, fileVersion));
+         {
+            OpenFileRespMsg resp(result, fileHandleID, pattern.get(), &pathInfo, fileVersion, fileState.getRawValue());
+
+            if (haveFileState)
+            {
+               resp.addMsgHeaderCompatFeatureFlag(OPENFILERESPMSG_HAS_FILESTATE);
+            }
+
+            ctx.sendResponse(resp);
+         }
       }
 
       bool changesObservableState() const override
@@ -61,6 +70,8 @@ class OpenFileResponseState : public MirroredMessageResponseState
                % obj->fileHandleID
                % obj->pattern
                % obj->pathInfo;
+         // We intentionally don't serialize fileState as part of the mirror response state because
+         // (a) its not needed and (b) mirrored responses don't seem to have compat feature flags.
       }
 
       void serializeContents(Serializer& ser) const override
@@ -76,6 +87,8 @@ class OpenFileResponseState : public MirroredMessageResponseState
       std::unique_ptr<StripePattern> pattern;
       PathInfo pathInfo;
       uint32_t fileVersion;
+      FileState fileState;
+      bool haveFileState;
 };
 
 class OpenFileMsgEx : public MirroredMessage<OpenFileMsg, FileIDLock>

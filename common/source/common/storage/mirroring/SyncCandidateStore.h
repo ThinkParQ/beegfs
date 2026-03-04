@@ -156,12 +156,44 @@ class SyncCandidateStore
       {
          std::lock_guard<Mutex> mutexLock(candidatesFileMutex);
 
-         if (candidatesFile.empty() )
+         if (timeoutMS == 0)
          {
-            if (timeoutMS == 0)
+            // Use while loop to handle spurious wakeups
+            while (candidatesFile.empty())
+            {
                filesAddedCond.wait(&candidatesFileMutex);
-            else
+            }
+         }
+         else
+         {
+            if (candidatesFile.empty())
+            {
                filesAddedCond.timedwait(&candidatesFileMutex, timeoutMS);
+            }
+         }
+      }
+
+      bool waitForFilesWithResult(const unsigned timeoutMS)
+      {
+         std::lock_guard<Mutex> lock(candidatesFileMutex);
+
+         if (timeoutMS == 0)
+         {
+            // Use while loop to handle spurious wakeups
+            while (candidatesFile.empty())
+            {
+               filesAddedCond.wait(&candidatesFileMutex);
+            }
+            return true;  // Guaranteed to have items
+         }
+         else
+         {
+            if (candidatesFile.empty())
+            {
+               filesAddedCond.timedwait(&candidatesFileMutex, timeoutMS);
+            }
+            // Return actual queue state, not signal state
+            return !candidatesFile.empty();
          }
       }
 
@@ -203,6 +235,12 @@ class SyncCandidateStore
             candidatesFile.clear();
             numQueuedFiles = 0;
          }
+      }
+
+      void notifyFilesAdded()
+      {
+         std::lock_guard<Mutex> fileMutexLock(candidatesFileMutex);
+         filesAddedCond.broadcast();
       }
 };
 

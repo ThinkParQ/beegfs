@@ -259,12 +259,12 @@ static inline unsigned FhgfsCommon_getCurrentGroupID(void);
 
 unsigned FhgfsCommon_getCurrentUserID(void)
 {
-   return from_kuid(&init_user_ns, current_fsuid());
+   return from_kuid_munged(&init_user_ns, current_fsuid());
 }
 
 unsigned FhgfsCommon_getCurrentGroupID(void)
 {
-   return from_kgid(&init_user_ns, current_fsgid());
+   return from_kgid_munged(&init_user_ns, current_fsgid());
 }
 
 // Helper function for getting file pointer

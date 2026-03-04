@@ -40,8 +40,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "connDisableIPv6 = %d\n", Config_getConnDisableIPv6(cfg) );
    seq_printf(file, "connFallbackExpirationSecs = %u\n",
       Config_getConnFallbackExpirationSecs(cfg) );
-   seq_printf(file, "connTCPRecvBufSize = %d\n", Config_getConnTCPRcvBufSize(cfg) );
-   seq_printf(file, "connUDPRecvBufSize = %d\n", Config_getConnUDPRcvBufSize(cfg) );
+   seq_printf(file, "connTCPRcvBufSize = %d\n", Config_getConnTCPRcvBufSize(cfg) );
+   seq_printf(file, "connUDPRcvBufSize = %d\n", Config_getConnUDPRcvBufSize(cfg) );
    seq_printf(file, "connRDMABufSize = %u\n", Config_getConnRDMABufSize(cfg) );
    seq_printf(file, "connRDMAFragmentSize = %u\n", Config_getConnRDMAFragmentSize(cfg) );
    seq_printf(file, "connRDMABufNum = %u\n", Config_getConnRDMABufNum(cfg) );
@@ -62,6 +62,10 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
       Config_fileCacheTypeNumToStr(Config_getTuneFileCacheTypeNum(cfg) ) );
    seq_printf(file, "tuneFileCacheBufSize = %d\n", Config_getTuneFileCacheBufSize(cfg) );
    seq_printf(file, "tuneFileCacheBufNum = %d\n", Config_getTuneFileCacheBufNum(cfg) );
+   seq_printf(file, "tunePathBufSize = %d\n", Config_getTunePathBufSize(cfg) );
+   seq_printf(file, "tunePathBufNum = %d\n", Config_getTunePathBufNum(cfg) );
+   seq_printf(file, "tuneMsgBufSize = %d\n", Config_getTuneMsgBufSize(cfg) );
+   seq_printf(file, "tuneMsgBufNum = %d\n", Config_getTuneMsgBufNum(cfg) );
    seq_printf(file, "tunePageCacheValidityMS = %u\n", Config_getTunePageCacheValidityMS(cfg) );
    seq_printf(file, "tuneDirSubentryCacheValidityMS = %u\n", Config_getTuneDirSubentryCacheValidityMS(cfg) );
    seq_printf(file, "tuneFileSubentryCacheValidityMS = %u\n", Config_getTuneFileSubentryCacheValidityMS(cfg) );
@@ -77,6 +81,8 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "tuneUseBufferedAppend = %d\n", (int)Config_getTuneUseBufferedAppend(cfg) );
    seq_printf(file, "tuneStatFsCacheSecs = %u\n", Config_getTuneStatFsCacheSecs(cfg) );
    seq_printf(file, "tuneCoherentBuffers = %u\n", Config_getTuneCoherentBuffers(cfg) );
+   seq_printf(file, "tuneFileOpenRetryTimeoutMS = %u\n", Config_getTuneFileOpenRetryTimeoutMS(cfg) );
+   seq_printf(file, "tuneFileOpenRetryIntervalMS = %u\n", Config_getTuneFileOpenRetryIntervalMS(cfg) );
    seq_printf(file, "sysSELinuxEnabled = %d\n", (int)Config_getsysSELinuxEnabled(cfg) );
    seq_printf(file, "sysSELinuxRevalidate = %s\n",
       Config_checkSELinuxRevalidateModeTypeToStr(Config_getsysSELinuxRevalidate(cfg) ) );
@@ -104,6 +110,31 @@ int ProcFsHelper_readV2_config(struct seq_file* file, App* app)
    seq_printf(file, "quotaEnabled = %d\n", (int)Config_getQuotaEnabled(cfg) );
    seq_printf(file, "sysFileEventLogMask = %s\n", Config_eventLogMaskToStr(cfg->eventLogMask));
    seq_printf(file, "sysRenameEbusyAsXdev = %u\n", (unsigned) cfg->sysRenameEbusyAsXdev);
+
+   return 0;
+}
+
+int ProcFsHelper_readV2_buildConfig(struct seq_file* file, App* app)
+{
+   IGNORE_UNUSED_VARIABLE(app);
+
+#ifdef KERNEL_HAS_FS_ALLOW_IDMAP
+   seq_printf(file, "KERNEL_HAS_FS_ALLOW_IDMAP = 1\n");
+#else
+   seq_printf(file, "KERNEL_HAS_FS_ALLOW_IDMAP = 0\n");
+#endif
+
+#ifdef BEEGFS_DISABLE_IDMAPPING
+   seq_printf(file, "BEEGFS_DISABLE_IDMAPPING = 1\n");
+#else
+   seq_printf(file, "BEEGFS_DISABLE_IDMAPPING = 0\n");
+#endif
+
+#if defined(KERNEL_HAS_FS_ALLOW_IDMAP) && !defined(BEEGFS_DISABLE_IDMAPPING)
+   seq_printf(file, "FS_ALLOW_IDMAP = 1\n");
+#else
+   seq_printf(file, "FS_ALLOW_IDMAP = 0\n");
+#endif
 
    return 0;
 }

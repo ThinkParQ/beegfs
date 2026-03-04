@@ -187,7 +187,7 @@ std::unique_ptr<MirroredMessageResponseState> LookupIntentMsgEx::executeLocally(
          response.addResponseStat(lookupRes, statData);
 
          // Use actual createRes to prevent incorrect forwarding to secondary
-         // See LookupIntentMsgEx::changeObservableState() for more details
+         // See LookupIntentMsgEx::changesObservableState() for more details
          response.addResponseCreate(createRes);
 
          return boost::make_unique<ResponseState>(std::move(response));
@@ -321,7 +321,7 @@ FhgfsOpsErr LookupIntentMsgEx::lookup(const std::string& parentEntryID,
          // This can happen when due to races, dangling dentry is left without
          // a valid inode associated with it. In such cases, stripe pattern will be
          // nullptr in outInodeStoreData and since we set FhgfsOpsErr_SUCCESS instead
-         // of FhgfsOpsErr_EXISTS during create() call - so as per result from changeObservableState()
+         // of FhgfsOpsErr_EXISTS during create() call - so as per result from changesObservableState()
          // it will try to forward call to secondary and thats where crash happen while trying to
          // serialize stripePattern (which is null). Check for nullptr and set correct lookup result.
          if (!outInodeStoreData->getStripePattern())
@@ -448,7 +448,8 @@ FhgfsOpsErr LookupIntentMsgEx::create(EntryInfo* parentInfo, const std::string& 
    if (!pattern)
    {
       LogContext("Lookup Create").logErr(
-         "StripePattern is NULL. Can't proceed. Filename: " + getEntryName());
+         "StripePattern is NULL. Can't proceed. Filename: " + getEntryName() + 
+         " (hint: verify the storage pool assigned to the parent directory contains targets or buddy groups depending on the stripe pattern type)");
 
       res = FhgfsOpsErr_INTERNAL;
       goto releasedir_and_return;

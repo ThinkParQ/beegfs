@@ -187,7 +187,6 @@ extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type, bool rc
 extern struct posix_acl* FhgfsOps_get_acl(struct inode* inode, int type);
 #endif
 
-int FhgfsOps_aclChmod(struct iattr* iattr, struct dentry* dentry);
 #endif
 
 #if defined(KERNEL_HAS_SET_ACL)
@@ -310,8 +309,16 @@ extern void FhgfsOps_destroy_inode(struct inode* inode);
 extern struct inode* __FhgfsOps_newInodeWithParentID(struct super_block* sb, struct kstat* kstat,
    dev_t dev, EntryInfo* entryInfo, NumNodeID parentNodeID, FhgfsIsizeHints* iSizeHints, unsigned int metaVersion);
 
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+extern int __FhgfsOps_instantiateInode(struct mnt_idmap* idmap, struct dentry* dentry, EntryInfo* entryInfo,
+   fhgfs_stat* fhgfsStat, FhgfsIsizeHints* iSizeHints);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+extern int __FhgfsOps_instantiateInode(struct user_namespace* mnt_userns, struct dentry* dentry, EntryInfo* entryInfo,
+   fhgfs_stat* fhgfsStat, FhgfsIsizeHints* iSizeHints);
+#else
 extern int __FhgfsOps_instantiateInode(struct dentry* dentry, EntryInfo* entryInfo,
    fhgfs_stat* fhgfsStat, FhgfsIsizeHints* iSizeHints);
+#endif
 int __FhgfsOps_compareInodeID(struct inode* cachedInode, void* newInodeInfo);
 int __FhgfsOps_initNewInodeDummy(struct inode* newInode, void* newInodeInfo);
 
@@ -321,7 +328,6 @@ extern int __FhgfsOps_doRefreshInode(App* app, struct inode* inode, fhgfs_stat* 
    FhgfsIsizeHints* iSizeHints, bool noFlush);
 extern int __FhgfsOps_revalidateMapping(App* app, struct inode* inode);
 extern int __FhgfsOps_flushInodeFileCache(App* app, struct inode* inode);
-extern void __FhgfsOps_clearInodeStripePattern(App* app, struct inode* inode);
 
 // inliners
 static inline void __FhgfsOps_applyStatDataToInode(struct kstat* kstat, FhgfsIsizeHints* iSizeHints,

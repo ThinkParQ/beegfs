@@ -15,8 +15,8 @@ void ListDirFromOffsetMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
    // serverOffset
    Serialization_serializeInt64(ctx, thisCast->serverOffset);
 
-   // maxOutNames
-   Serialization_serializeUInt(ctx, thisCast->maxOutNames);
+   // dirListLimit
+   Serialization_serializeUInt(ctx, thisCast->dirListLimit);
 
    // EntryInfo
    EntryInfo_serialize(ctx, thisCast->entryInfoPtr);

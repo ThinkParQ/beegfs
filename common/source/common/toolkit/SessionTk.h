@@ -74,6 +74,9 @@ class SessionTk
          if(accessFlags & OPENFILE_ACCESS_SYNC)
             openFlags |= O_SYNC;
 
+         if(accessFlags & OPENFILE_ACCESS_NONBLOCKING)
+            openFlags |= O_NONBLOCK;
+
          return openFlags;
       }
 };

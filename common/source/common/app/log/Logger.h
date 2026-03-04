@@ -142,6 +142,8 @@ class Logger
    public:
       ~Logger();
 
+      static void logStdErr(int level, const char* context, int line, const char* msg);
+
    private:
       static std::unique_ptr<Logger> logger;
 
@@ -170,7 +172,7 @@ class Logger
       void logBacktraceGranted(const char* context, int backtraceLength, char** backtraceSymbols);
 
       void prepareLogFiles();
-      size_t getTimeStr(uint64_t seconds, char* buf, size_t bufLen);
+      static size_t getTimeStr(uint64_t seconds, char* buf, size_t bufLen, const char* timeFormat);
       void rotateLogFile(std::string filename);
       void rotateStdLogChecked();
 
@@ -337,12 +339,16 @@ class Logger
       BOOST_PP_SEQ_FOR_EACH(LOG_CTX_TOP_L_ITEM, , items) \
    } while (0)
 
+// This (and the other macros that call it) can be called without an initialized logger. In that
+// case, anything is logged, regardless of its level.
 #define LOG_CTX_TOP_L(Topic, Level, Context, Line, Message, ...) \
    do { \
+      int _log_level = Log_ERR; \
       Logger* const _log_logger = Logger::getLogger(); \
-      if (!_log_logger || _log_logger->getLogLevel(Topic) < Level) \
+      if (_log_logger && _log_logger->getLogLevel(Topic) < Level) \
          break; \
-      auto _log_level = _log_logger->getLogLevel(Topic); \
+      else if (_log_logger) \
+         _log_level = _log_logger->getLogLevel(Topic); \
       (void) _log_level; \
       unsigned _log_items = 0; \
       (void) _log_items; \
@@ -353,7 +359,10 @@ class Logger
       _log_line << Message; \
       LOG_CTX_TOP_L_ITEMS( \
             BOOST_PP_SEQ_POP_FRONT(BOOST_PP_TUPLE_TO_SEQ((, ##__VA_ARGS__)))); \
-      _log_logger->log(Topic, Level, Context, Line, _log_line.str().c_str()); \
+      if (_log_logger) \
+         _log_logger->log(Topic, Level, Context, Line, _log_line.str().c_str()); \
+      else \
+         Logger::logStdErr(Level, Context, Line, _log_line.str().c_str()); \
    } while (0)
 
 #define LOG(Topic, Level, Message, ...) \

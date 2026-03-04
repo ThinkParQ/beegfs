@@ -47,6 +47,7 @@ struct FhgfsOpsErrListEntry const __FHGFSOPS_ERRLIST[] =
    {"Metadata version mismatch", ESTALE}, // FhgfsOpsErr_METAVERSIONMISMATCH
    {"Inode is locked", EBUSY},      // FhgfsOpsErr_INODELOCKED
    {"File access denied by state restrictions", EWOULDBLOCK}, // FhgfsOpsErr_FILEACCESS_DENIED
+   {"Remote I/O error", EREMOTEIO}, // FhgfsOpsErr_REMOTEIO
    {NULL, 0}
 };
 

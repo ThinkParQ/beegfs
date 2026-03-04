@@ -273,7 +273,7 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "tuneENOENTCacheValidityMS",        "0");
    _Config_configMapRedefine(this, "tunePathBufSize",                  "4096");
    _Config_configMapRedefine(this, "tunePathBufNum",                   "8");
-   _Config_configMapRedefine(this, "tuneMsgBufSize",                   "65536");
+   _Config_configMapRedefine(this, "tuneMsgBufSize",                   "1048576"); // 1MB
    _Config_configMapRedefine(this, "tuneMsgBufNum",                    "0");
    _Config_configMapRedefine(this, "tuneRemoteFSync",                  "true");
    _Config_configMapRedefine(this, "tuneUseGlobalFileLocks",           "false");
@@ -311,6 +311,9 @@ void _Config_loadDefaults(Config* this)
    _Config_configMapRedefine(this, "quotaEnabled",                     "false");
    _Config_configMapRedefine(this, "sysFileEventLogMask",              EVENTLOGMASK_NONE);
    _Config_configMapRedefine(this, "sysRenameEbusyAsXdev",             "false");
+
+   _Config_configMapRedefine(this, "tuneFileOpenRetryTimeoutMS",       "300000"); // 5 minutes
+   _Config_configMapRedefine(this, "tuneFileOpenRetryIntervalMS",      "10000");  // 10 seconds
 
    _Config_configMapRedefine(this, "remapConnectionFailureStatus",     "0");
 }
@@ -804,6 +807,10 @@ bool _Config_applyConfigMap(Config* this)
             StrCpyList_uninit(&parts);
          }
       }
+      else if(!strcmp(keyStr, "tuneFileOpenRetryTimeoutMS"))
+         this->tuneFileOpenRetryTimeoutMS = StringTk_strToUInt(valueStr);
+      else if(!strcmp(keyStr, "tuneFileOpenRetryIntervalMS"))
+         this->tuneFileOpenRetryIntervalMS = StringTk_strToUInt(valueStr);
       else if(!strcmp(keyStr, "remapConnectionFailureStatus"))
          this->remapConnectionFailureStatus = StringTk_strToUInt(valueStr);
       else if(!strcmp(keyStr, "logType"))
@@ -1614,4 +1621,3 @@ bool __Config_initConnAuthHash(Config* this, char* connAuthFile, uint64_t* outCo
 
    return true;
 }
-

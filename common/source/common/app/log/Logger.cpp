@@ -65,6 +65,20 @@ Logger::~Logger()
    pthread_rwlock_destroy(&this->rwLock);
 }
 
+void Logger::logStdErr(int level, const char *context, int line, const char *msg)
+{
+   std::string threadName = PThread::getCurrentThreadName();
+
+   char timeStr[LOGGER_TIMESTR_SIZE];
+   TimeAbs nowTime;
+   getTimeStr(nowTime.getTimeS(), timeStr, LOGGER_TIMESTR_SIZE, "%X");
+
+   if (line > 0)
+      fprintf(stderr, "(%d) %s %s [%s:%i] >> %s\n", level, timeStr, threadName.c_str(), context, line, msg);
+   else
+      fprintf(stderr, "(%d) %s %s [%s] >> %s\n", level, timeStr, threadName.c_str(), context, msg);
+}
+
 /**
  * Prints a message to the standard log.
  * Note: Doesn't lock the outputLock
@@ -79,7 +93,7 @@ void Logger::logGrantedUnlocked(int level, const char* threadName, const char* c
 
    TimeAbs nowTime;
 
-   getTimeStr(nowTime.getTimeS(), timeStr, LOGGER_TIMESTR_SIZE);
+   getTimeStr(nowTime.getTimeS(), timeStr, LOGGER_TIMESTR_SIZE, this->timeFormat);
 
    if (line >= 0)
    {
@@ -165,7 +179,7 @@ void Logger::logBacktraceGranted(const char* context, int backtraceLength, char*
  * @param bufLen length of buf (depends on current locale, at least 32 recommended)
  * @return 0 on error, strLen of buf otherwise
  */
-size_t Logger::getTimeStr(uint64_t seconds, char* buf, size_t bufLen)
+size_t Logger::getTimeStr(uint64_t seconds, char* buf, size_t bufLen, const char* timeFormat)
 {
    struct tm nowStruct;
    localtime_r((time_t*) &seconds, &nowStruct);

@@ -101,6 +101,7 @@ class StorageTk
       static void deprecateNodeStringIDFiles(const std::string pathStr);
 
       static void readTargetIDFile(const std::string pathStr, std::string* outTargetID);
+      static std::string readOrCreateRegistrationToken(const std::string pathStr, const NumNodeID localNodeID);
       static void readOrCreateTargetIDFile(const std::string pathStr, const NumNodeID localNodeID,
          std::string* outTargetID);
       static void readNumIDFile(const std::string pathStr, const std::string filename,

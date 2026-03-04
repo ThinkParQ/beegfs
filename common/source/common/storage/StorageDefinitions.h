@@ -15,8 +15,9 @@
 // open extra flags
 #define OPENFILE_ACCESS_APPEND         8
 #define OPENFILE_ACCESS_TRUNC         16
-#define OPENFILE_ACCESS_DIRECT        32 /* for direct IO */
-#define OPENFILE_ACCESS_SYNC          64 /* for sync'ed IO */
+#define OPENFILE_ACCESS_DIRECT        32  /* for direct IO */
+#define OPENFILE_ACCESS_SYNC          64  /* for sync'ed IO */
+#define OPENFILE_ACCESS_NONBLOCKING   128 /* for non-blocking IO (O_NONBLOCK) */
 // open masks
 #define OPENFILE_ACCESS_MASK_RW       \
    (OPENFILE_ACCESS_READ | OPENFILE_ACCESS_WRITE | OPENFILE_ACCESS_READWRITE)

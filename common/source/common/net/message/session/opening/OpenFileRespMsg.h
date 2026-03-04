@@ -5,6 +5,9 @@
 #include <common/storage/PathInfo.h>
 #include <common/Common.h>
 
+// OPENFILERESPMSG_HAS_FILESTATE is a compat feature flag that indicates the metadata server has
+// serialized the fileState field as part of the response message. 
+#define OPENFILERESPMSG_HAS_FILESTATE     1
 
 class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
 {
@@ -13,9 +16,10 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
        * @param fileHandleID just a reference, so do not free it as long as you use this object!
        */
       OpenFileRespMsg(int result, const char* fileHandleID, StripePattern* pattern,
-            PathInfo* pathInfo, uint32_t fileVersion = 0) :
+            PathInfo* pathInfo, uint32_t fileVersion = 0, uint8_t fileStateRaw = 0) :
          BaseType(NETMSGTYPE_OpenFileResp),
-         fileVersion(fileVersion)
+         fileVersion(fileVersion),
+         fileStateRaw(fileStateRaw)
       {
          this->result = result;
 
@@ -31,9 +35,10 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
        * @param fileHandleID just a reference, so do not free it as long as you use this object!
        */
       OpenFileRespMsg(int result, std::string& fileHandleID, StripePattern* pattern,
-            PathInfo* pathInfo, uint32_t fileVersion) :
+            PathInfo* pathInfo, uint32_t fileVersion, uint8_t fileStateRaw = 0) :
          BaseType(NETMSGTYPE_OpenFileResp),
-         fileVersion(fileVersion)
+         fileVersion(fileVersion),
+         fileStateRaw(fileStateRaw)
       {
          this->result = result;
 
@@ -59,6 +64,9 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
             % obj->pathInfo
             % serdes::backedPtr(obj->pattern, obj->parsed.pattern)
             % obj->fileVersion;
+         if (obj->isMsgHeaderCompatFeatureFlagSet(OPENFILERESPMSG_HAS_FILESTATE))
+            ctx
+               % obj->fileStateRaw;
       }
 
    private:
@@ -75,6 +83,7 @@ class OpenFileRespMsg : public NetMessageSerdes<OpenFileRespMsg>
       struct {
          std::unique_ptr<StripePattern> pattern;
       } parsed;
+      uint8_t fileStateRaw;
 
    public:
       StripePattern& getPattern()

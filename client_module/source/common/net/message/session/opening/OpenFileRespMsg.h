@@ -6,6 +6,9 @@
 #include <common/storage/striping/StripePattern.h>
 #include <common/Common.h>
 
+// OPENFILERESPMSG_HAS_FILESTATE is a compat feature flag that indicates the metadata server has
+// serialized the fileState field as part of the response message. 
+#define OPENFILERESPMSG_HAS_FILESTATE        0x01  // Bit 0
 
 struct OpenFileRespMsg;
 typedef struct OpenFileRespMsg OpenFileRespMsg;
@@ -41,6 +44,12 @@ struct OpenFileRespMsg
    // for deserialization
    const char* patternStart;
    uint32_t patternLength;
+
+   // Older servers never include the fileState. Newer servers might include it if the open was
+   // blocked due to FhgfsOpsErr_FILEACCESS_DENIED. Always check the compatFeatureFlag
+   // OPENFILERESPMSG_HAS_FILESTATE is set to determine if fileState is actually set before using
+   // this field because the default value is a valid file state (but may not be the actual state).
+   uint8_t fileState;
 };
 
 extern const struct NetMessageOps OpenFileRespMsg_Ops;

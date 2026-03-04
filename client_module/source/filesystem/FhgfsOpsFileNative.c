@@ -495,7 +495,7 @@ static int __beegfs_fsync(struct file* filp, loff_t start, loff_t end, int datas
       FhgfsOpsErr res;
 
       FsFileInfo_getIOInfo(__FhgfsOps_getFileInfo(filp), fhgfsInode, &ioInfo);
-      res = FhgfsOpsRemoting_fsyncfile(&ioInfo, true, true, false);
+      res = FhgfsOpsRemoting_fsyncfile(&ioInfo, filp, true, true, false);
       if(res != FhgfsOpsErr_SUCCESS)
       {
          atomic_set(&fhgfsInode->modified, 0);

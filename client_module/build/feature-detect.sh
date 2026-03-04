@@ -45,6 +45,15 @@ run_job()
 
 CFLAGS="-D__KERNEL__ $LINUXINCLUDE $* -DKBUILD_BASENAME=\"beegfs\" -DKBUILD_MODNAME=\"beegfs\""
 
+# 2026-01, somewhere between kernel 6.12 and 6.14, our feature detect code was broken.
+# It no longer compiles with the compile flags passed from the kernel makefile.
+# It looks like the kernel makefile now adds -Werror as well as some warnings
+# like -Wmissing-prototypes and -Wunused.
+# We could try and change the code snippets to prevent warnings but it's
+# somewhat silly, instead let's undo the -Werror for now.
+
+CFLAGS+=" -Wno-error"
+
 _generate_includes() {
    for i in "$@"; do
       echo "#include <$i>"
@@ -55,9 +64,13 @@ _marker_if_compiles() {
    local marker=$1
    shift
 
-   if $CC $CFLAGS -x c -o /dev/null -c - 2>/dev/null
+   content=$(cat)
+   if echo "$content" | $CC $CFLAGS -x c -o /dev/null -c - 2>/dev/null
    then
       echo -D$marker
+   #else
+      #echo "$content" | $CC $CFLAGS -x c -o /dev/null -c - || true
+      #echo "Failed to compile: $CC $CFLAGS $content" >&2
    fi
 }
 
@@ -445,6 +458,12 @@ run_job check_struct_field_type \
    KERNEL_HAS_SET_ACL_DENTRY \
    linux/fs.h
 
+# ID mapping kernel API detection.
+# These features describe the kernel's VFS function signatures and must ALWAYS be
+# detected for correct compilation regardless of BEEGFS_DISABLE_IDMAPPING.
+# The behavioral disable is handled separately via KERNEL_HAS_FS_ALLOW_IDMAP
+# (guarded in KernelFeatureDetection.mk) and BEEGFS_DISABLE_IDMAPPING checks
+# in C code function bodies.
 run_job check_function \
    vfs_create "int (struct user_namespace *, struct inode *, struct dentry *, umode_t, bool)" \
    KERNEL_HAS_USER_NS_MOUNTS \
@@ -454,6 +473,12 @@ run_job check_function \
    vfs_create "int (struct mnt_idmap *, struct inode *, struct dentry *, umode_t, bool)" \
    KERNEL_HAS_IDMAPPED_MOUNTS \
    linux/fs.h
+
+# Detect if kernel provides mapped_kuid_fs() (introduced in 5.15)
+run_job check_function \
+   mapped_kuid_fs "kuid_t (struct user_namespace *, struct user_namespace *, kuid_t)" \
+   KERNEL_HAS_MAPPED_KUID_FS \
+   linux/mnt_idmapping.h
 
 run_job check_struct_field_type \
    file_operations::iterate "int (*)(struct file *, struct dir_context *)" \
@@ -512,6 +537,11 @@ run_job check_function \
    ibdev_to_node "int (struct ib_device *ibdev)" \
    KERNEL_HAS_IBDEV_TO_NODE \
    rdma/ib_verbs.h
+
+run_job check_struct_field_type \
+   dentry_operations::d_revalidate "int (*)(struct inode *parentInode, const struct qstr *name, struct dentry* dentry, unsigned flags)" \
+   KERNEL_HAS_D_REVALIDATE_STABLE_REFERENCES \
+   linux/namei.h
 
 wait_jobs 0
 

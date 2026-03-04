@@ -8,5 +8,5 @@ class CpChunkPathsMsgEx : public CpChunkPathsMsg
    public:
       virtual bool processIncoming(ResponseContext& ctx);
    private: 
-      ChunkBalancerJob* addChunkBalanceJob();
+      ChunkBalancerJob* addChunkBalanceJob(bool& outIsNew);
 };

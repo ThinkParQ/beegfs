@@ -17,6 +17,7 @@
 #define OPENFILE_ACCESS_TRUNC         16
 #define OPENFILE_ACCESS_DIRECT        32 /* for direct IO */
 #define OPENFILE_ACCESS_SYNC          64 /* for sync'ed IO */
+#define OPENFILE_ACCESS_NONBLOCKING   128 /* for non-blocking IO (O_NONBLOCK) */
 // open masks
 #define OPENFILE_ACCESS_MASK_RW       \
    (OPENFILE_ACCESS_READ | OPENFILE_ACCESS_WRITE | OPENFILE_ACCESS_READWRITE)
@@ -94,5 +95,21 @@ struct SettableFileAttribs
    int64_t lastAccessTimeSecs;   // unix atime
 };
 
+enum DataStates {
+    DATASTATE_AVAILABLE       = 0, // 000 (0) - Default: present on BeeGFS
+    DATASTATE_MANUAL_RESTORE  = 1, // 001 (1)
+    DATASTATE_AUTO_RESTORE    = 2, // 010 (2)
+    DATASTATE_DELAYED_RESTORE = 3, // 011 (3)
+    DATASTATE_UNAVAILABLE     = 4, // 100 (4)
+    DATASTATE_RESERVED5       = 5, // 101 (5)
+    DATASTATE_RESERVED6       = 6, // 110 (6)
+    DATASTATE_RESERVED7       = 7, // 111 (7)
+};
+typedef enum DataStates DataState;
+
+// These must match the definitions in FileInodeStorageData.h on the server side.
+#define ACCESS_FLAGS_MASK    0x1F  // 0001 1111 (5 bits)
+#define DATA_STATE_MASK      0xE0  // 1110 0000 (3 bits)
+#define DATA_STATE_SHIFT     5     // Number of bits to shift
 
 #endif /*STORAGEDEFINITIONS_H_*/

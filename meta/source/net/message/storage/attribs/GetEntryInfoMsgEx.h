@@ -35,7 +35,7 @@ class GetEntryInfoMsgResponseState : public MirroredMessageResponseState
       // GetEntryInfoMsgEx is transformed into a mirrored message to utilize
       // MirroredMessage::lock(), thereby preventing races with operations such
       // as unlink. However, forwarding this message to the secondary is unnecessary.
-      // Overriding the changeObservableState() function to always return false ensures
+      // Overriding the changesObservableState() function to always return false ensures
       // that this message never gets forwarded to seconadary.
       bool changesObservableState() const override
       {

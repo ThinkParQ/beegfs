@@ -157,8 +157,10 @@
 
 // chunk balancing
 #include <common/net/message/storage/chunkbalancing/CpChunkPathsRespMsg.h>
+#include <common/net/message/storage/chunkbalancing/UpdateStripePatternRespMsg.h>
 #include <net/message/storage/chunkbalancing/StartChunkBalanceMsgEx.h>
 #include <net/message/storage/chunkbalancing/UpdateStripePatternMsgEx.h>
+#include <net/message/storage/chunkbalancing/GetChunkBalanceJobStatsMsgEx.h>
 
 
 #include <common/net/message/SimpleMsg.h>
@@ -217,8 +219,7 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_SetTargetConsistencyStatesResp: { msg = new SetTargetConsistencyStatesRespMsg(); } break;
 
       // storage messages
-      case NETMSGTYPE_StartChunkBalance: { msg = new StartChunkBalanceMsgEx(); } break;
-      case NETMSGTYPE_CpChunkPathsResp: { msg = new CpChunkPathsRespMsg(); } break; 
+
       case NETMSGTYPE_FindLinkOwner: { msg = new FindLinkOwnerMsgEx(); } break;
       case NETMSGTYPE_FindOwner: { msg = new FindOwnerMsgEx(); } break;
       case NETMSGTYPE_FindOwnerResp: { msg = new FindOwnerRespMsg(); } break;
@@ -290,8 +291,6 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_UnlinkLocalFileResp: { msg = new UnlinkLocalFileRespMsg(); } break;
       case NETMSGTYPE_UpdateDirParent: { msg = new UpdateDirParentMsgEx(); } break;
       case NETMSGTYPE_UpdateDirParentResp: { msg = new UpdateDirParentRespMsg(); } break;
-      case NETMSGTYPE_UpdateStripePattern: { msg = new UpdateStripePatternMsgEx(); } break;
-      case NETMSGTYPE_UpdateStripePatternResp: { msg = new UpdateStripePatternRespMsg(); } break;
       case NETMSGTYPE_MoveFileInode: { msg = new MoveFileInodeMsgEx(); } break;
       case NETMSGTYPE_MoveFileInodeResp: {msg = new MoveFileInodeRespMsg(); } break;
       case NETMSGTYPE_UnlinkLocalFileInode: {msg = new UnlinkLocalFileInodeMsgEx(); } break;
@@ -343,6 +342,14 @@ std::unique_ptr<NetMessage> NetMessageFactory::createFromMsgType(unsigned short 
       case NETMSGTYPE_FsckSetEventLogging: { msg = new FsckSetEventLoggingMsgEx(); } break;
       case NETMSGTYPE_AdjustChunkPermissions: { msg = new AdjustChunkPermissionsMsgEx(); } break;
       case NETMSGTYPE_CheckAndRepairDupInode: { msg = new CheckAndRepairDupInodeMsgEx(); } break;
+
+      //chunk balancing messages
+      case NETMSGTYPE_StartChunkBalance: { msg = new StartChunkBalanceMsgEx(); } break;
+      case NETMSGTYPE_CpChunkPathsResp: { msg = new CpChunkPathsRespMsg(); } break;
+      case NETMSGTYPE_GetChunkBalanceJobStats: { msg = new GetChunkBalanceJobStatsMsgEx(); } break;
+      case NETMSGTYPE_UpdateStripePattern: { msg = new UpdateStripePatternMsgEx(); } break;
+      case NETMSGTYPE_UpdateStripePatternResp: { msg = new UpdateStripePatternRespMsg(); } break;
+
 
       default:
       {

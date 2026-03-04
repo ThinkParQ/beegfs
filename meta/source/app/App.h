@@ -495,14 +495,6 @@ class App : public AbstractApp
          chunkBalancerJob=chunkBalancerJobPtr;
       }
 
-      //should be called ONLY by the ChunkBalancerJob itself using selfShutdown()
-      void cleanupChunkBalancerJob()
-      {
-         chunkBalancerJob->join();
-         SAFE_DELETE(chunkBalancerJob); 
-         chunkBalancerJob = NULL;
-      }
-
       int getAppResult() const
       {
          return appResult;

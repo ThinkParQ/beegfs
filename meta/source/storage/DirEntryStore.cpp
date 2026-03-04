@@ -434,17 +434,23 @@ FhgfsOpsErr DirEntryStore::renameEntry(const std::string& fromEntryName,
  * "outNames.size() != maxOutNames".
  *
  * @param serverOffset zero-based offset; represents the native local fs offset (as in telldir() ).
+ * @param maxOutNames maximum number of entries to return (ignored if availableRespBufSize > 0).
  * @param filterDots true if "." and ".." should not be returned.
  * @param outArgs outNewOffset is only valid if return value indicates success,
  *    outEntryTypes and outEntryIDs may be NULL, the rest is required.
+ * @param availableRespBufSize Buffer size limit in bytes for response payload. When non-zero, the
+ *                             server fills the response based on serialized entry size rather than
+ *                             entry count, stopping before buffer overflow. This enables dynamic
+ *                             response sizing within safe message buffer limits. When zero (default),
+ *                             maxOutNames will be interpreted as the entry count limit.
  */
 FhgfsOpsErr DirEntryStore::listIncrementalEx(int64_t serverOffset,
-   unsigned maxOutNames, bool filterDots, ListIncExOutArgs& outArgs)
+   unsigned maxOutNames, bool filterDots, ListIncExOutArgs& outArgs, unsigned availableRespBufSize)
 {
    // note: we need offsets here that are stable after unlink, because apps like bonnie++ use
-      // readdir(), then unlink() the returned files and expect readdir() to continue after that.
-      // this won't work if we use our own offset number and skip the given number of initial
-      // entries each time. that's why we use the native local file system offset and seek here.
+   // readdir(), then unlink() the returned files and expect readdir() to continue after that.
+   // this won't work if we use our own offset number and skip the given number of initial
+   // entries each time. that's why we use the native local file system offset and seek here.
 
    const char* logContext = "DirEntryStore (list inc)";
 
@@ -452,17 +458,31 @@ FhgfsOpsErr DirEntryStore::listIncrementalEx(int64_t serverOffset,
    uint64_t numEntries = 0;
    struct dirent* dirEntry = NULL;
 
-   SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
+   // Should we track serialization size limit and enforce it in below for-loop?
+   bool enforceSizeLimit = (availableRespBufSize > 0);
+   unsigned consumedRespBufSize = 0;
+
+   if (enforceSizeLimit)
+   {
+      // Calculate fixed overhead for list serialization:
+      // Each list has: [4B length field] + [4B count field] = 8 bytes per list
+      // We have 4 lists: {names, entryTypes, entryIDs & serverOffsets}
+      consumedRespBufSize = 4 * 8; // 32 bytes for list headers
+      // Note: This doesn't include the message header (40 bytes) or other
+      // message-level fields, which should be accounted for by the caller
+      // when setting availableRespBufSize
+   }
+
+   UniqueRWLock lock(rwlock, SafeRWLock_READ); // L O C K
 
    DIR* dirHandle = opendir(getDirEntryPathUnlocked().c_str() );
-   if(!dirHandle)
+   if (!dirHandle)
    {
       LogContext(logContext).logErr(std::string("Unable to open dentry directory: ") +
          getDirEntryPathUnlocked() + ". SysErr: " + System::getErrString() );
 
-      goto err_unlock;
+      return retVal;
    }
-
 
    // seek to offset (if provided)
    if(serverOffset)
@@ -470,41 +490,50 @@ FhgfsOpsErr DirEntryStore::listIncrementalEx(int64_t serverOffset,
       seekdir(dirHandle, serverOffset); // (seekdir has no return value)
    }
 
-
    // loop over the actual directory entries
+   // If availableRespBufSize is non-zero - ignore maxOutNames (use buffer size limit instead)
+   // Else, use maxOutNames as entry count limit
    for( ;
-       (numEntries < maxOutNames) &&
+       (enforceSizeLimit || numEntries < maxOutNames) &&
           (dirEntry = StorageTk::readdirFilteredEx(dirHandle, filterDots, true) );
        numEntries++)
    {
-      outArgs.outNames->push_back(dirEntry->d_name);
+      unsigned currEntrySize = 0; // size of this entry in serialized form
 
-      if(outArgs.outServerOffsets)
-         outArgs.outServerOffsets->push_back(dirEntry->d_off);
+      DirEntryType entryType = DirEntryType_INVALID;
+      std::string entryID;
+      const char* entryName = dirEntry->d_name;
+      size_t entryNameLen = strlen(entryName);
 
-      SAFE_ASSIGN(outArgs.outNewServerOffset, dirEntry->d_off);
-
-      if(outArgs.outEntryTypes || outArgs.outEntryIDs)
+      if (enforceSizeLimit)
       {
-         DirEntryType entryType;
-         std::string entryID;
+         // Size calculation based on serialization format:
+         // - name: length + 1 (null terminator)
+         currEntrySize += entryNameLen + 1;
 
-         if(!filterDots && !strcmp(dirEntry->d_name, ".") )
+         // - serverOffset: 8 bytes (if requested)
+         if (outArgs.outServerOffsets)
+            currEntrySize += 8;
+      }
+
+      // Load entry metadata if needed (for entryType and entryID)
+      if (outArgs.outEntryTypes || outArgs.outEntryIDs)
+      {
+         if (!filterDots && !strcmp(entryName, "."))
          {
             entryType = DirEntryType_DIRECTORY;
             entryID = "<.>";
          }
-         else
-         if(!filterDots && !strcmp(dirEntry->d_name, "..") )
+         else if (!filterDots && !strcmp(entryName, ".."))
          {
             entryType = DirEntryType_DIRECTORY;
             entryID = "<..>";
          }
          else
          { // load dentry metadata
-            DirEntry entry(dirEntry->d_name);
+            DirEntry entry(entryName);
 
-            bool loadSuccess = entry.loadFromFileName(getDirEntryPathUnlocked(), dirEntry->d_name);
+            bool loadSuccess = entry.loadFromFileName(getDirEntryPathUnlocked(), entryName);
             if (likely(loadSuccess) )
             {
                entryType = entry.getEntryType();
@@ -519,13 +548,48 @@ FhgfsOpsErr DirEntryStore::listIncrementalEx(int64_t serverOffset,
             }
          }
 
-         if(outArgs.outEntryTypes)
-            outArgs.outEntryTypes->push_back( (int)entryType);
+         if (enforceSizeLimit)
+         {
+            // - entryType: 1 byte (if requested)
+            if (outArgs.outEntryTypes)
+               currEntrySize += 1;
 
-         if (outArgs.outEntryIDs)
-            outArgs.outEntryIDs->push_back(entryID);
+            // - entryID: length + 1 (null terminator, if requested)
+            if (outArgs.outEntryIDs)
+               currEntrySize += entryID.length() + 1;
+         }
       }
 
+      // Check if adding this entry would exceed the available buffer size
+      if (enforceSizeLimit && (consumedRespBufSize + currEntrySize > availableRespBufSize) )
+      {
+         // Stop here - don't add this entry in output to avoid buffer overflow
+         LogContext(logContext).log(Log_DEBUG,
+            "Stopping directory listing due to serialization size limit. "
+            "Would need: " + std::to_string(consumedRespBufSize) + " bytes, "
+            "Current Entry size: " + std::to_string(currEntrySize) + " bytes, "
+            "Available: " + std::to_string(availableRespBufSize) + " bytes, "
+            "Total Entries returned: " + std::to_string(numEntries));
+         break;
+      }
+
+      // Add entry to output lists
+      outArgs.outNames->push_back(entryName);
+
+      if(outArgs.outServerOffsets)
+         outArgs.outServerOffsets->push_back(dirEntry->d_off);
+
+      SAFE_ASSIGN(outArgs.outNewServerOffset, dirEntry->d_off);
+
+      if(outArgs.outEntryTypes)
+         outArgs.outEntryTypes->push_back( (int)entryType);
+
+      if (outArgs.outEntryIDs)
+         outArgs.outEntryIDs->push_back(entryID);
+
+      // Update consumed buffer size
+      if (enforceSizeLimit)
+         consumedRespBufSize += currEntrySize;
    }
 
    if(!dirEntry && errno)
@@ -538,12 +602,7 @@ FhgfsOpsErr DirEntryStore::listIncrementalEx(int64_t serverOffset,
       retVal = FhgfsOpsErr_SUCCESS;
    }
 
-
    closedir(dirHandle);
-
-err_unlock:
-   safeLock.unlock(); // U N L O C K
-
    return retVal;
 }
 
@@ -640,14 +699,14 @@ err_unlock:
 bool DirEntryStore::exists(const std::string& entryName)
 {
    bool existsRes = false;
-   
+
    SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
-   
+
    existsRes = existsUnlocked(entryName);
 
    safeLock.unlock(); // U N L O C K
-   
-   return existsRes;   
+
+   return existsRes;
 }
 
 bool DirEntryStore::existsUnlocked(const std::string& entryName)
@@ -673,7 +732,7 @@ FhgfsOpsErr DirEntryStore::getEntryData(const std::string& entryName, EntryInfo*
    FileInodeStoreData* outInodeMetaData)
 {
    FhgfsOpsErr retVal = FhgfsOpsErr_PATHNOTEXISTS;
-   
+
    SafeRWLock safeLock(&rwlock, SafeRWLock_READ); // L O C K
 
    DirEntry entry(entryName);
@@ -708,7 +767,7 @@ FhgfsOpsErr DirEntryStore::getEntryData(const std::string& entryName, EntryInfo*
    }
 
    safeLock.unlock(); // U N L O C K
-   
+
    return retVal;
 }
 

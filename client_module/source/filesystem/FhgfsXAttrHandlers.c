@@ -5,8 +5,8 @@
 #include "common/Common.h"
 #include "FhgfsOpsInode.h"
 #include "FhgfsOpsHelper.h"
-
 #include "FhgfsXAttrHandlers.h"
+
 #define FHGFS_XATTR_USER_PREFIX "user."
 #define FHGFS_XATTR_SECURITY_PREFIX "security."
 
@@ -26,7 +26,7 @@
  */
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct mnt_idmap* id_map,
+static int FhgfsXAttrSetACL(const struct xattr_handler* handler, struct mnt_idmap* idmap,
    struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
    int flags)
 #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
@@ -59,8 +59,16 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
    if(strcmp(name, "") )
       return -EINVAL;
 
-   if(!os_inode_owner_or_capable(inode) )
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+   if (!inode_owner_or_capable(idmap, inode))
       return -EPERM;
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+   if (!inode_owner_or_capable(mnt_userns, inode))
+      return -EPERM;
+#else
+   if (!inode_owner_or_capable(inode))
+      return -EPERM;
+#endif
 
    if(S_ISLNK(inode->i_mode) )
       return -EOPNOTSUPP;
@@ -76,7 +84,13 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
       attr.ia_mode = inode->i_mode;
       attr.ia_valid = ATTR_MODE;
 
-      acl = os_posix_acl_from_xattr(value, size);
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      acl = os_posix_acl_from_xattr(inode->i_sb->s_user_ns, value, size);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+      acl = os_posix_acl_from_xattr(mnt_userns, value, size);
+#else
+      acl = os_posix_acl_from_xattr(&init_user_ns, value, size);
+#endif
 
       if(IS_ERR(acl) )
          return PTR_ERR(acl);
@@ -93,9 +107,9 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
       }
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-      setAttrRes = FhgfsOps_setattr(&nop_mnt_idmap, dentry, &attr);
+      setAttrRes = FhgfsOps_setattr(idmap, dentry, &attr);
 #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
-      setAttrRes = FhgfsOps_setattr(&init_user_ns, dentry, &attr);
+      setAttrRes = FhgfsOps_setattr(mnt_userns, dentry, &attr);
 #else
       setAttrRes = FhgfsOps_setattr(dentry, &attr);
 #endif
@@ -112,7 +126,13 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
       // Note: The default acl is not reflected in any file mode permission bits.
       // Just check for correctness here, and delete the xattr if the acl is empty.
       struct posix_acl* acl;
-      acl = os_posix_acl_from_xattr(value, size);
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      acl = os_posix_acl_from_xattr(inode->i_sb->s_user_ns, value, size);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+      acl = os_posix_acl_from_xattr(mnt_userns, value, size);
+#else
+      acl = os_posix_acl_from_xattr(&init_user_ns, value, size);
+#endif
 
       if (IS_ERR(acl))
          return PTR_ERR(acl);
@@ -137,7 +157,6 @@ static int FhgfsXAttrSetACL(struct dentry *dentry, const char *name, const void 
       else
          return removeRes;
    }
-
 }
 
 /**
@@ -217,7 +236,7 @@ static int FhgfsXAttr_getUser(const struct xattr_handler* handler, struct dentry
 #if defined(KERNEL_HAS_XATTR_HANDLERS_INODE_ARG)
 
 #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-static int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct mnt_idmap* id_map,
+static int FhgfsXAttr_setUser(const struct xattr_handler* handler, struct mnt_idmap* idmap,
    struct dentry* dentry, struct inode* inode, const char* name, const void* value, size_t size,
    int flags)
 #elif defined(KERNEL_HAS_USER_NS_MOUNTS)

@@ -4,7 +4,7 @@
 #include <common/net/message/storage/chunkbalancing/UpdateStripePatternRespMsg.h>
 #include <components/chunkbalancer/ChunkBalancerJob.h>
 #include <net/message/MirroredMessage.h>
-#include <components/chunkbalancer/ChunkBalancerJob.h>
+#include <app/App.h>
 #include <session/EntryLock.h>
 
 class  UpdateStripePatternMsgEx : public MirroredMessage<UpdateStripePatternMsg, FileIDLock>

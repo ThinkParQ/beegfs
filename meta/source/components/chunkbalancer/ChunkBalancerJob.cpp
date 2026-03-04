@@ -1,30 +1,30 @@
 #include <components/chunkbalancer/ChunkBalancerMetaSlave.h>
 #include <program/Program.h>
-
+#include <chrono>
 
 #include "ChunkBalancerJob.h"
 
-ChunkBalancerJob::ChunkBalancerJob(std::function<void()> shutdown) :
-   PThread("ChunkBalancerJob"),
-   status(ChunkBalancerJobState_NOTSTARTED), 
-   startTime(0), endTime(0),
-   selfShutdownApp(shutdown)
+ChunkBalancerJob::ChunkBalancerJob() :
+   PThread("ChunkBalancerJob")
    {}
 
 ChunkBalancerJob::~ChunkBalancerJob()
 {
-   for (ChunkBalancerMetaSlaveVecIter iter = ChunkSlaveVec.begin(); iter != ChunkSlaveVec.end();
-      iter++)
+   for (int i = static_cast<int>(ChunkSlaveVec.size()) - 1; i >= 0; i--)
    {
-      ChunkBalancerMetaSlave* slave = *iter;
-      SAFE_DELETE(slave);
+      SAFE_DELETE(ChunkSlaveVec[i]);  //delete slave from vector
+      ChunkSlaveVec.erase(ChunkSlaveVec.begin() + i);
    }
+   std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+   stats.reset();
 }
 
 void ChunkBalancerJob::run()
 {
-   const char* logContext = "ChunkBalanceJob running";
-   int64_t time_checks = 0; 
+   const char* logContext = "ChunkBalancerJob running";
+   int64_t emptyQueueDuration = 0;
+   std::chrono::seconds iterationDuration = std::chrono::seconds::zero();
+   std::chrono::steady_clock::time_point lastUpdateTime = std::chrono::steady_clock::now();
 
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
@@ -32,132 +32,186 @@ void ChunkBalancerJob::run()
    unsigned CHUNKBALANCERJOB_MAX_TIME_LIMIT = 1.6 * CHUNKBALANCERJOB_MAX_LOCK_TIME_LIMIT; // maximum time in  seconds of empty queues before ChunkBalancerJob shuts itself and slaves down
 
    MetaStore* metaStore = app->getMetaStore();
-   inodeLockStore = metaStore->getInodeLockStore();  
-
+   inodeLockStore = metaStore->getInodeLockStore();
    // make sure only one job at a time can run!
    {
-      std::lock_guard<Mutex> mutexLock(statusMutex);
+      std::lock_guard<Mutex> mutexLock(jobStatsMutex);
       
-      if (status == ChunkBalancerJobState_RUNNING)  //check if there is already a chunkbalancer job running
+      if (stats.status == ChunkBalancerJobState_RUNNING)  //check if there is already a chunkbalancer job running
       {
          LogContext(__func__).logErr("Refusing to run same ChunkBalancerJob twice!");
          return;
       }
       else
       {
-         status = ChunkBalancerJobState_RUNNING;
+         stats.status = ChunkBalancerJobState_RUNNING;
+         //reset Job stats
+         stats.reset();
          ChunkSlaveVec.push_back(createSyncSlave( &copyCandidates, 0, &createSlaveRes)); //create first chunk balance slave
-                     
+
          if (!createSlaveRes)
          {
-            LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_WARNING,"Unable to start first chunk balance slave."); 
-            setStatus(ChunkBalancerJobState_FAILURE);                
+            LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_WARNING,"Unable to start first chunk balance slave.");
+            setStatus(ChunkBalancerJobState_FAILURE);
             goto cleanup;
          }
+         this->stats.workerNum++;
       }
    }
 
-   while (true) 
+   while (true)
    {
+      uint64_t migratedChunksSum = 0;
+      uint64_t slaveErrorsSum = 0;
+
       if (getSelfTerminate())
       {
          setStatus(ChunkBalancerJobState_INTERRUPTED);
          break;
       }
-      if (copyCandidates.getNumFiles() >=  CHUNKBALANCERJOB_MAX_FILE_PER_SLAVE_LIMIT ) // check if queue is full
       {
-         time_checks = 0;
-         
-         if (ChunkSlaveVec.size() >= CHUNKBALANCERJOB_MAX_SLAVE_LIMIT) 
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         stats.workQueue = copyCandidates.getNumFiles();
+         stats.lockedInodes = inodeLockStore->getNumLockedInodes(LockOperationType::CHUNK_REBALANCING);
+      }
+
+      if (stats.workQueue >=  CHUNKBALANCERJOB_MAX_FILE_PER_SLAVE_LIMIT ) // check if queue is full
+      {
+         emptyQueueDuration = 0;
+         if (ChunkSlaveVec.size() >= CHUNKBALANCERJOB_MAX_SLAVE_LIMIT)
          {
-            LogContext(logContext).log(LogTopic_CHUNKBALANCING, Log_NOTICE,"Unable to start chunk balance slave; Number of slaves is equal to MAX_SLAVE_LIMIT."); 
+            LogContext(logContext).log(LogTopic_CHUNKBALANCING, Log_SPAM,"Unable to start chunk balance slave; Number of slaves is equal to MAX_SLAVE_LIMIT.");
          }
          else
          {
             //start another chunk balance slave if queue is full and number of slaves is less then max
-            ChunkSlaveVec.push_back(createSyncSlave(&copyCandidates, ChunkSlaveVec.size(), &createSlaveRes)); 
+            ChunkSlaveVec.push_back(createSyncSlave(&copyCandidates, ChunkSlaveVec.size(), &createSlaveRes));
             
             if (!createSlaveRes)
             {
-               LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_WARNING,"Unable to start additional chunk balance slave."); 
+               LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_WARNING,"Unable to start additional chunk balance slave.");
             }
+            incStatsWorker();
          }
+         sleep(CHUNKBALANCERJOB_SLEEP_TIME); //sleep to wait for workQueue to decrease
       }
-      else if(copyCandidates.getNumFiles()==0 )  //check if queue is empty and if yes increment timing counter
+      else if(stats.workQueue == 0)  //check if queue is empty and if yes increment timing counter
       {
-         time_checks ++;  
-
-         if (time_checks > CHUNKBALANCERJOB_MAX_TIME_LIMIT / CHUNKBALANCERJOB_SLEEP_TIME)  //if queue is empty for sufficient time, shut down
+         emptyQueueDuration += iterationDuration.count();
+         setStatus(ChunkBalancerJobState_IDLE);
+         if (emptyQueueDuration > CHUNKBALANCERJOB_MAX_TIME_LIMIT)  //if queue is empty for sufficient time, shut down
          {
             for (size_t i = 0; i < ChunkSlaveVec.size(); i++)
             {
-               ChunkSlaveVec[i]->selfTerminate();  
+               ChunkSlaveVec[i]->selfTerminate();
             }
             setStatus(ChunkBalancerJobState_SUCCESS);   
-            LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_NOTICE,"Shutting down ChunkBalanceJob and Slave components after timeout. "); 
+            LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_NOTICE,"Marking ChunkBalanceJob as complete since no new work was queued for "+ std::to_string(CHUNKBALANCERJOB_MAX_TIME_LIMIT)+ "seconds. ");
             break;
+         }
+         //sleep since queue is empty
+         bool itemsArrived = copyCandidates.waitForFilesWithResult(CHUNKBALANCERJOB_SLEEP_TIME * 1000);
+
+         if (itemsArrived)
+         {
+            emptyQueueDuration = 0; // fresh batch arrived since we were idle
+            setStatus(ChunkBalancerJobState_RUNNING);
          }
       }
       else   // normal operation when there are items in queue, reset timer
       {
-         time_checks = 0;
+         emptyQueueDuration = 0;
+         setStatus(ChunkBalancerJobState_RUNNING);
          // Iterate backwards to avoid index shifting when erasing elements
          for (int i = static_cast<int>(ChunkSlaveVec.size()) - 1; i >= 0; i--)
-         {   
+         {
             if (!(ChunkSlaveVec[i]->getIsRunning())) // check if slaves are running, if not, terminate them
             {
                LogContext(logContext).log(LogTopic_CHUNKBALANCING, Log_NOTICE,"Chunk Balance slave (ID:"+ std::to_string(i)+ ") is not running and will be terminated");
-               ChunkSlaveVec[i]->selfTerminate(); 
+               ChunkSlaveVec[i]->selfTerminate();
                SAFE_DELETE(ChunkSlaveVec[i]);  //delete slave from vector
                ChunkSlaveVec.erase(ChunkSlaveVec.begin() + i);
-
+               decStatsWorker();
             }   
          }
-      
+
          if (ChunkSlaveVec.empty())
          {
-            ChunkSlaveVec.push_back(createSyncSlave(&copyCandidates, ChunkSlaveVec.size(), &createSlaveRes)); //create slave if there is not one running        
+            ChunkSlaveVec.push_back(createSyncSlave(&copyCandidates, ChunkSlaveVec.size(), &createSlaveRes)); //create slave if there is not one running
             if (!createSlaveRes)
             {
-               LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_WARNING,"Unable to start chunk balance slave."); 
-               setStatus(ChunkBalancerJobState_FAILURE);                
+               LogContext(logContext).log(LogTopic_CHUNKBALANCING,  Log_WARNING,"Unable to start chunk balance slave.");
+               setStatus(ChunkBalancerJobState_FAILURE);
                goto cleanup;
             }   
+            incStatsWorker();
          }
       }
-      inodeLockStore->updateInodeLockTimesteps(CHUNKBALANCERJOB_MAX_LOCK_TIME_LIMIT / CHUNKBALANCERJOB_SLEEP_TIME);
-      sleep(CHUNKBALANCERJOB_SLEEP_TIME);
+      //get stat updates on work done by slaves
+      for (int i = static_cast<int>(ChunkSlaveVec.size()) - 1; i >= 0; i--)
+      {
+         ChunkBalancerMetaSlave* slave = ChunkSlaveVec[i];
+         if (slave)
+         {
+            slaveErrorsSum += slave->getErrorCount();
+            migratedChunksSum += slave->getNumChunksSynced();
+         }
+      }
+      addStatsErrors(slaveErrorsSum);
+      addStatsMigratedChunks(migratedChunksSum);
+
+      //calculate time since last iteration
+      std::chrono::steady_clock::time_point currTime = std::chrono::steady_clock::now();
+      iterationDuration = std::chrono::duration_cast<std::chrono::seconds>(currTime - lastUpdateTime);
+      inodeLockStore->updateInodeLockTimesteps(iterationDuration.count(), CHUNKBALANCERJOB_MAX_LOCK_TIME_LIMIT, LockOperationType::CHUNK_REBALANCING);
+      lastUpdateTime = currTime;
    }
 
 cleanup:
+   uint64_t migratedChunksSum = 0;
+   uint64_t slaveErrorsSum = 0;
+
+   // signal sync slaves to stop
+   for (int i = static_cast<int>(ChunkSlaveVec.size()) - 1; i >= 0; i--)
+   {
+      if (ChunkSlaveVec[i])
+         ChunkSlaveVec[i]->selfTerminate();
+   }
 
    // wait for sync slaves to stop and save if any errors occured
-   for (ChunkBalancerMetaSlaveVecIter iter = ChunkSlaveVec.begin();
-      iter != ChunkSlaveVec.end(); iter++)
+   for (int i = static_cast<int>(ChunkSlaveVec.size()) - 1; i >= 0; i--)
    {
-      ChunkBalancerMetaSlave* slave = *iter;
+      ChunkBalancerMetaSlave* slave = ChunkSlaveVec[i];
       if (slave)
       {
          {
             std::lock_guard<Mutex> safeLock(slave->stateMutex);
-            while (slave->isRunning) 
+            while (slave->isRunning)
                slave->isRunningChangeCond.wait(&(slave->stateMutex));
          }
 
-         if (slave->getErrorCount() != 0)
-         {
-            setStatus(ChunkBalancerJobState_ERRORS);
-         }
+         slaveErrorsSum += slave->getErrorCount();
+         migratedChunksSum += slave->getNumChunksSynced();
+         SAFE_DELETE(slave);  //delete slave from vector
       }
+      ChunkSlaveVec.erase(ChunkSlaveVec.begin() + i);
+      decStatsWorker();
    }
-   inodeLockStore->clearLockStore(); //clear the inode locking store
-   endTime = time(NULL);
-   selfShutdown(); //call the shutdown method from app
+   const auto status = getStatus();
+   if (slaveErrorsSum > 0 && (status == ChunkBalancerJobState_SUCCESS
+         || status == ChunkBalancerJobState_RUNNING
+         || status == ChunkBalancerJobState_IDLE))
+      setStatus(ChunkBalancerJobState_ERRORS);
+   addStatsErrors(slaveErrorsSum);
+   addStatsMigratedChunks(migratedChunksSum);
+   inodeLockStore->clearLockStoreByOpType(LockOperationType::CHUNK_REBALANCING); // Clear chunk balancing locks
+   std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+   stats.endTime = time(NULL);
 }
 
 ChunkBalancerMetaSlave*  ChunkBalancerJob::createSyncSlave(ChunkSyncCandidateStore* copyCandidates, uint8_t slaveID, bool* createSlaveRes)
 {   
-      ChunkBalancerMetaSlave* slave = new ChunkBalancerMetaSlave(*this, copyCandidates, slaveID); 
+      ChunkBalancerMetaSlave* slave = new ChunkBalancerMetaSlave(*this, copyCandidates, slaveID);
       try
       {
          slave->resetSelfTerminate();
@@ -176,14 +230,8 @@ ChunkBalancerMetaSlave*  ChunkBalancerJob::createSyncSlave(ChunkSyncCandidateSto
       return slave;
 }
 
-void ChunkBalancerJob::joinSyncSlaves()
-{
-   for (size_t i = 0; i < ChunkSlaveVec.size(); i++)
-      ChunkSlaveVec[i]->join();
-}
 
-
-FhgfsOpsErr ChunkBalancerJob::addChunkSyncCandidate(ChunkSyncCandidateFile* candidate) 
+FhgfsOpsErr ChunkBalancerJob::addChunkSyncCandidate(ChunkSyncCandidateFile* candidate)
 {
    App* app = Program::getApp();
    Config* cfg = app->getConfig();
@@ -192,19 +240,14 @@ FhgfsOpsErr ChunkBalancerJob::addChunkSyncCandidate(ChunkSyncCandidateFile* cand
       LogContext(__func__).log(Log_WARNING, "Chunk Balancing queue is full, cannot add more chunks for balancing.");
       return FhgfsOpsErr_AGAIN;
    }
-   copyCandidates.add(*candidate, this); 
+   copyCandidates.add(*candidate, this);
    return FhgfsOpsErr_SUCCESS;
 }
 
 
 void ChunkBalancerJob::shutdown()
 {  
-   for (size_t i = 0; i < ChunkSlaveVec.size(); i++)
-   {
-      ChunkSlaveVec[i]->selfTerminate(); // terminate all slave threads 
-   }
-   joinSyncSlaves(); //wait for all slave threads to finish
-   inodeLockStore->clearLockStore(); //clear the inode locking store
-   endTime = time(NULL);
-   this->selfTerminate();
+   setStatus(ChunkBalancerJobState_INTERRUPTED);
+   this->selfTerminate(); //exit run() loop to enter cleanup
+   copyCandidates.notifyFilesAdded(); // wake Job thread from sleep
 }

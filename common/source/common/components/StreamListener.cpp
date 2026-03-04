@@ -1,5 +1,6 @@
 #include <common/app/AbstractApp.h>
 #include <common/toolkit/StringTk.h>
+#include "common/net/sock/IPAddress.h"
 #include "worker/IncomingDataWork.h"
 #include "StreamListener.h"
 
@@ -246,7 +247,7 @@ void StreamListener::onIncomingStandardConnection(StandardSocket* sock)
 
       // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
       log.log(Log_DEBUG, std::string("Accepted new connection from ") +
-         Socket::endpointAddrToStr(&peerAddr) +
+         SocketAddress(&peerAddr).toString() +
          std::string(" [SockFD: ") + StringTk::intToStr(acceptedSock->getFD() ) +
          std::string("]") );
 
@@ -301,7 +302,7 @@ void StreamListener::onIncomingRDMAConnection(RDMASocket* sock)
 
          // (note: level Log_DEBUG to avoid spamming the log until we have log topics)
          log.log(Log_DEBUG, std::string("Accepted new RDMA connection from ") +
-            Socket::endpointAddrToStr(&peerAddr) +
+            SocketAddress(&peerAddr).toString() +
             std::string(" [SockFD: ") + StringTk::intToStr(acceptedSock->getFD() ) +
             std::string("]") );
 

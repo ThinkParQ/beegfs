@@ -20,7 +20,7 @@ class StartChunkBalanceMsgResponseState : public ErrorCodeResponseState<StartChu
       }
 
       /*
-      // Always return false from changeObservableState() to prohibit forwarding
+      // Always return false from changesObservableState() to prohibit forwarding
       // to secondary. See MirroredMessage::finishOperation() for more details.
       */
 
@@ -50,7 +50,7 @@ class StartChunkBalanceMsgEx : public MirroredMessage<StartChunkBalanceMsg, File
 
 
    private: 
-      ChunkBalancerJob* addChunkBalanceJob();
+      ChunkBalancerJob* addChunkBalanceJob(bool& outIsNew);
 
       void forwardToSecondary(ResponseContext& ctx) override {}; 
       FhgfsOpsErr processSecondaryResponse(NetMessage& resp) override

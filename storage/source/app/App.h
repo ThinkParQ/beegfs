@@ -71,6 +71,7 @@ class App : public AbstractApp
       void handleNetworkInterfacesChanged(NicAddressList nicList);
       Mutex ChunkBalanceJobMutex;
 
+
    private:
       int appResult;
       int argc;
@@ -402,13 +403,6 @@ class App : public AbstractApp
          this->chunkBalancerJob=chunkBalancerJob;
       }
 
-      //should be called ONLY by the ChunkBalancerJob itself using selfShutdown()
-      void cleanupChunkBalancerJob()
-      {
-         chunkBalancerJob->join();
-         SAFE_DELETE(chunkBalancerJob); 
-         chunkBalancerJob = NULL;
-      }
       
       StoragePoolStore* getStoragePoolStore() const
       {

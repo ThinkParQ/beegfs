@@ -100,7 +100,7 @@ void ChunkBalancerFileSyncSlave::syncLoop()
          LogContext(logContext).log(LogTopic_CHUNKBALANCING, Log_WARNING,
             "Resync of chunk failed. chunkPath: " + relativePath + "; targetID: "
                + std::to_string(localTargetID));
-         errorCount.increase();  //do not exit loop here, need to propagate the error to meta node
+         //do not exit loop here, need to propagate the error to meta node
       }
       
       //if mirrored, replace targetIDs with mirror groupIDs
@@ -135,8 +135,11 @@ void ChunkBalancerFileSyncSlave::syncLoop()
          continue;
       }
 
-      if (resyncRes != FhgfsOpsErr_SUCCESS) //resync of chunk failed, we sent the error to meta and exit here
+      if (resyncRes != FhgfsOpsErr_SUCCESS)
+      //resync of chunk failed, but stripe pattern update was SUCCESS
+      //no need to remove original chunk since it should not exist on storage, exit here
       {
+         numChunksSynced.increase();
          continue;
       }
 
@@ -168,9 +171,11 @@ void ChunkBalancerFileSyncSlave::syncLoop()
          continue;
       }
       // removal succeeded
+      numChunksSynced.increase();
       // try to remove parent directory if this was the only chunk file in it
       Path parentDirPath(StorageTk::getPathDirname(relativePath));
       chunkDirStore->rmdirChunkDirPath(fd, &parentDirPath);
+
    }
 }
 
@@ -189,7 +194,7 @@ FhgfsOpsErr ChunkBalancerFileSyncSlave::removeChunk(int& targetFD, std::string& 
    {
       LogContext(__func__).log(LogTopic_CHUNKBALANCING, Log_WARNING,
          "Removal of chunk failed. chunkPath: " + relativePath + "; targetfD: "
-            + std::to_string(targetFD)+ "; error code: " + std::to_string(errno) );   
+            + std::to_string(targetFD)+ "; error code: " + std::to_string(errno) );
       return FhgfsOpsErr_INTERNAL;
    }
    return FhgfsOpsErr_SUCCESS;

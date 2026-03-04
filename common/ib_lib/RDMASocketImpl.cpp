@@ -150,7 +150,7 @@ Socket* RDMASocketImpl::accept(struct sockaddr_storage *addr, socklen_t *addrlen
    IPAddress acceptIP(addr);
    uint16_t acceptPort = extractPort(reinterpret_cast<const sockaddr*>(addr));
 
-   std::string acceptPeername = endpointAddrToStr(acceptIP, acceptPort);
+   std::string acceptPeername = acceptIP.toSocketAddress(acceptPort).toString();
 
    Socket* acceptedSock = new RDMASocketImpl(acceptedIBVSocket, acceptIP, acceptPeername);
 

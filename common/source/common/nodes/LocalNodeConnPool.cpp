@@ -227,7 +227,7 @@ bool LocalNodeConnPool::updateInterfaces(unsigned short streamPort, const NicAdd
    // ignore streamPort
    bool changed = false;
    if (this->nicList.size() != nicList.size() ||
-      !std::equal(this->nicList.begin(), this->nicList.end(), nicList.begin()))
+      !std::equal(this->nicList.begin(), this->nicList.end(), nicList.begin(), nicList.end()))
    {
       changed = true;
       this->nicList = nicList;

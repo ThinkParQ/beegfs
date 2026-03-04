@@ -288,7 +288,7 @@ Socket* StandardSocket::accept(struct sockaddr_storage* addr, socklen_t* addrLen
    uint16_t acceptPort = extractPort(reinterpret_cast<sockaddr*>(addr));
    IPAddress acceptIP(addr);
 
-   std::string acceptPeername = endpointAddrToStr(acceptIP, acceptPort);
+   std::string acceptPeername = acceptIP.toSocketAddress(acceptPort).toString();
 
    try
    {
@@ -581,7 +581,7 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
    if (isDgramSocket)
    {
          LOG(COMMUNICATION, DEBUG, std::string("recvfrom"),
-            ("addr",  (recvRes != -1 ? (from? Socket::endpointAddrToStr(from) : "null") : "error")),
+            ("addr",  (recvRes != -1 ? (from? SocketAddress(from).toString() : "null") : "error")),
             ("bindIP", bindIP.toString()),
             ("recvRes", recvRes));
    }
@@ -597,7 +597,7 @@ ssize_t StandardSocket::recvfrom(void  *buf, size_t len, int flags,
       if (isDgramSocket)
       {
          LOG(COMMUNICATION, NOTICE, "Received empty UDP datagram.", peername,
-            ("addr", (from? Socket::endpointAddrToStr(from) : std::string("null"))));
+            ("addr", (from? SocketAddress(from).toString() : std::string("null"))));
          return 0;
       }
       else

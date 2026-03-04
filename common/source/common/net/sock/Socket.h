@@ -20,18 +20,6 @@
 class Socket : public Channel
 {
    public:
-
-      static std::string ipaddrToStr(const struct sockaddr* sa);
-      // port is host order
-      static std::string endpointAddrToStr(const IPAddress& ipaddress, uint16_t port);
-      // port is host order
-      static std::string endpointAddrToStr(const char* hostname, uint16_t port);
-      static std::string endpointAddrToStr(const struct sockaddr* sa);
-      static std::string endpointAddrToStr(const struct sockaddr_storage* sas)
-      {
-         return endpointAddrToStr(reinterpret_cast<const struct sockaddr*>(sas));
-      }
-
       virtual ~Socket();
       // port is in host order
       virtual void connect(const char* hostname, uint16_t port) = 0;

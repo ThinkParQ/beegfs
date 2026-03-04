@@ -9,7 +9,6 @@
 #define CPCHUNKPATHSMSG_FLAG_BUDDYMIRROR          1 /* given targetID is a buddymirrorgroup ID */
 #define CPCHUNKPATHSMSG_FLAG_HAS_EVENT            2  /* contains file event logging information */
 
-
 class CpChunkPathsMsg : public NetMessageSerdes<CpChunkPathsMsg>
 {
    public:

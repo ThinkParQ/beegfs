@@ -27,6 +27,8 @@
 #include <common/net/message/storage/attribs/RemoveXAttrRespMsg.h>
 #include <common/net/message/storage/attribs/SetXAttrMsg.h>
 #include <common/net/message/storage/attribs/SetXAttrRespMsg.h>
+#include <common/net/message/storage/attribs/SetFileStateMsg.h>
+#include <common/net/message/storage/attribs/SetFileStateRespMsg.h>
 #include <common/net/message/storage/attribs/RefreshEntryInfoMsg.h>
 #include <common/net/message/storage/attribs/RefreshEntryInfoRespMsg.h>
 #include <common/net/message/storage/attribs/SetAttrMsg.h>
@@ -178,9 +180,10 @@ static struct RRPeer rrpeer_from_entryinfo(const EntryInfo* entryInfo)
  * Note: Also retrieves the optional entry types.
  *
  * @param dirInfo used as input (offsets) and output (contents etc.) parameter
+ * @param dirListLimit buffer size (bytes) in buffer-size mode, entry count in legacy mode
  */
 FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDirInfo* dirInfo,
-   unsigned maxOutNames)
+   unsigned dirListLimit)
 {
    FsObjectInfo* fsObjectInfo = (FsObjectInfo*)dirInfo;
    App* app = FsObjectInfo_getApp(fsObjectInfo);
@@ -203,7 +206,17 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
 
    // prepare request
    ListDirFromOffsetMsg_initFromEntryInfo(
-      &requestMsg, entryInfo, serverOffset, maxOutNames, false);
+      &requestMsg, entryInfo, serverOffset, dirListLimit, false);
+
+   // Set msg compat flag if server is known to support buffer mode.
+   // On first request, we don't know server capability yet, so we don't set the flag.
+   // New servers will advertise support via response compat flag for auto-detection.
+   if (FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE) &&
+       FsDirInfo_isMetaCapabilitySupported(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+   {
+      NetMessage_addMsgHeaderCompatFeatureFlag((NetMessage*)&requestMsg,
+         LISTDIROFFSETMSG_COMPATFLAG_CLIENT_SUPPORTS_BUFSIZE);
+   }
 
    RequestResponseArgs_prepare(&rrArgs, NULL, (NetMessage*)&requestMsg,
       NETMSGTYPE_ListDirFromOffsetResp);
@@ -219,6 +232,7 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
 
    // handle result
    listDirResp = (ListDirFromOffsetRespMsg*)rrArgs.outRespMsg;
+
    retVal = (FhgfsOpsErr)ListDirFromOffsetRespMsg_getResult(listDirResp);
 
    if(likely(retVal == FhgfsOpsErr_SUCCESS) )
@@ -228,6 +242,14 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
       StrCpyVec* dirContents = FsDirInfo_getDirContents(dirInfo);
       StrCpyVec* dirContentIDs = FsDirInfo_getEntryIDs(dirInfo);
       bool endOfDirReached;
+
+      // Auto-detect server capability on successful response (only once per directory handle)
+      if (!FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+      {
+         bool isSupported = NetMessage_isMsgHeaderCompatFeatureFlagSet(
+            (NetMessage*)listDirResp, LISTDIROFFSETRESPMSG_COMPATFLAG_SERVER_SUPPORTS_BUFSIZE);
+         FsDirInfo_setMetaCapability(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE, isSupported);
+      }
 
       FsDirInfo_setCurrentContentsPos(dirInfo, 0);
 
@@ -262,7 +284,16 @@ FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo, FsDir
 
       FsDirInfo_setServerOffset(dirInfo, ListDirFromOffsetRespMsg_getNewServerOffset(listDirResp) );
 
-      endOfDirReached = (StrCpyVec_length(dirContents) < maxOutNames);
+      // End-of-directory detection depends on the active mode:
+      // - Buffer size mode (new): server returns 0 entries when the directory is exhausted.
+      // - Entry count mode (legacy): server returns fewer entries than requested.
+      // We're in buffer size mode if we already know the server supports it
+      if (FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE) &&
+          FsDirInfo_isMetaCapabilitySupported(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+         endOfDirReached = (StrCpyVec_length(dirContents) == 0);
+      else
+         endOfDirReached = (StrCpyVec_length(dirContents) < dirListLimit);
+
       FsDirInfo_setEndOfDir(dirInfo, endOfDirReached);
    }
    else
@@ -790,6 +821,109 @@ FhgfsOpsErr FhgfsOpsRemoting_openfile(const EntryInfo* entryInfo, RemotingIOInfo
    // handle result
    openResp = (OpenFileRespMsg*)rrArgs.outRespMsg;
    retVal = (FhgfsOpsErr)OpenFileRespMsg_getResult(openResp);
+
+   // Retry on FILEACCESS_DENIED (file state lock blocking) unless O_NONBLOCK
+   if (retVal == FhgfsOpsErr_FILEACCESS_DENIED &&
+       !(ioInfo->accessFlags & OPENFILE_ACCESS_NONBLOCKING))
+   {
+      unsigned long retryTimeoutMS = Config_getTuneFileOpenRetryTimeoutMS(cfg);
+      unsigned long retryIntervalMS = Config_getTuneFileOpenRetryIntervalMS(cfg);
+      unsigned long startTime = jiffies;
+      unsigned long timeoutJiffies = msecs_to_jiffies(retryTimeoutMS);
+
+      while (retryTimeoutMS > 0 && time_before(jiffies, startTime + timeoutJiffies))
+      {
+         uint8_t dataState = 0;
+
+         // Check if the server included file state in the message.
+         if (NetMessage_isMsgHeaderCompatFeatureFlagSet((NetMessage*)openResp, OPENFILERESPMSG_HAS_FILESTATE))
+         {
+            // Extract data state from the file state.
+            dataState = (openResp->fileState & DATA_STATE_MASK) >> DATA_STATE_SHIFT;
+         }
+         else
+         {
+            // Server did not communicate data state (pre-8.3 server or
+            // unable to read file state). Return error without retrying.
+            RequestResponseArgs_freeRespBuffers(&rrArgs, app);
+            Logger_logFormatted(log, Log_NOTICE, logContext, "OpenFileResp error code: %s",
+               FhgfsOpsErr_toErrString(retVal) );
+            goto cleanup_request;
+         }
+
+         // Data state determines further action on FILEACCESS_DENIED error.
+         // Only DATASTATE_AVAILABLE (0) and DATASTATE_AUTO_RESTORE (2) should retry with timeout.
+         switch (dataState)
+         {
+            case DATASTATE_AVAILABLE:      // State 0: File present on BeeGFS, retry with timeout
+            case DATASTATE_AUTO_RESTORE:   // State 2: Auto restore in progress, retry with timeout
+               // Continue retrying until timeout
+               break;
+
+            case DATASTATE_UNAVAILABLE:    // State 4: Backend media lost/destroyed/deleted
+               RequestResponseArgs_freeRespBuffers(&rrArgs, app);
+               retVal = FhgfsOpsErr_REMOTEIO;
+               Logger_logFormatted(log, Log_NOTICE, logContext, "OpenFileResp error code: %s "
+                  "(the file data state indicates the contents are permanently unavailable).",
+                  FhgfsOpsErr_toErrString(retVal) );
+               goto cleanup_request;
+
+            case DATASTATE_MANUAL_RESTORE:  // State 1: Manual intervention needed
+            case DATASTATE_DELAYED_RESTORE: // State 3: Restore will take very long time
+            case DATASTATE_RESERVED5:       // State 5: Reserved for future use
+            case DATASTATE_RESERVED6:       // State 6: Reserved for future use
+            case DATASTATE_RESERVED7:       // State 7: Reserved for future use
+            default:                        // Unknown state
+               // Return error, do not retry
+               RequestResponseArgs_freeRespBuffers(&rrArgs, app);
+               Logger_logFormatted(log, Log_NOTICE, logContext, "OpenFileResp error code: %s "
+                  "(the file data state indicates manual intervention or extended delay to restore file contents).",
+                  FhgfsOpsErr_toErrString(retVal) );
+               goto cleanup_request;
+         }
+
+         // Free response buffers before retry
+         RequestResponseArgs_freeRespBuffers(&rrArgs, app);
+
+         // Use interruptible sleep to allow immediate response to signals (kill/unmount)
+         if (msleep_interruptible(retryIntervalMS) != 0)
+         {
+            // Interrupted by signal
+            retVal = FhgfsOpsErr_INTERRUPTED;
+            Logger_logFormatted(log, Log_NOTICE, logContext, "OpenFileResp error code: %s "
+               "(open() retry interrupted by signal).",
+               FhgfsOpsErr_toErrString(retVal) );
+            goto cleanup_request;
+         }
+
+         // Retry the open
+         OpenFileMsg_initFromSession(&requestMsg, localNodeNumID, entryInfo, ioInfo->accessFlags,
+               event);
+
+         if(Config_getQuotaEnabled(cfg) )
+            NetMessage_addMsgHeaderFeatureFlag((NetMessage*)&requestMsg, OPENFILEMSG_FLAG_USE_QUOTA);
+
+         if(Config_getSysBypassFileAccessCheckOnMeta(cfg))
+            NetMessage_addMsgHeaderFeatureFlag((NetMessage*)&requestMsg, OPENFILEMSG_FLAG_BYPASS_ACCESS_CHECK);
+
+         RequestResponseArgs_prepare(&rrArgs, NULL, (NetMessage*)&requestMsg, NETMSGTYPE_OpenFileResp);
+
+         requestRes = MessagingTk_requestResponseNodeRetryAutoIntr(app, &rrNode, &rrArgs);
+
+         if (unlikely(requestRes != FhgfsOpsErr_SUCCESS))
+         {
+            retVal = requestRes;
+            goto cleanup_request;
+         }
+
+         openResp = (OpenFileRespMsg*)rrArgs.outRespMsg;
+         retVal = (FhgfsOpsErr)OpenFileRespMsg_getResult(openResp);
+
+         // Break if success or different error
+         if (retVal != FhgfsOpsErr_FILEACCESS_DENIED)
+            break;
+      }
+   }
 
    if(likely(retVal == FhgfsOpsErr_SUCCESS) )
    { // success => store file details
@@ -1840,7 +1974,7 @@ cleanup_request:
    return retVal;
 }
 
-FhgfsOpsErr FhgfsOpsRemoting_fsyncfile(RemotingIOInfo* ioInfo, bool forceRemoteFlush,
+FhgfsOpsErr FhgfsOpsRemoting_fsyncfile(RemotingIOInfo* ioInfo, const struct file *file, bool forceRemoteFlush,
    bool checkSession, bool doSyncOnClose)
 {
    const char* logContext = "Remoting (fsync file)";
@@ -1858,13 +1992,25 @@ FhgfsOpsErr FhgfsOpsRemoting_fsyncfile(RemotingIOInfo* ioInfo, bool forceRemoteF
       : 0;
 
    int i;
+   uid_t user_id;
+   struct FsyncContext context;
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)   /* >= 6.3 */
+   struct mnt_idmap *idmap = (file) ? mnt_idmap(file->f_path.mnt) : &nop_mnt_idmap;
+   user_id = Fhgfs_uid_for_fs((file) ? file_inode(file) : NULL,
+         idmap, current_fsuid());
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)  /* 5.15–6.2 */
+   struct user_namespace *mnt_userns = (file) ? mnt_user_ns(file->f_path.mnt) : &init_user_ns;
+   user_id = Fhgfs_uid_for_fs((file) ? file_inode(file) : NULL,
+         mnt_userns, current_fsuid());
+#else  /* < 5.12 */
+   user_id = Fhgfs_uid_for_fs(file ? file_inode(file) : NULL,
+         current_fsuid());
+#endif
 
-   struct FsyncContext context = {
-      .userID = FhgfsCommon_getCurrentUserID(),
-      .forceRemoteFlush = forceRemoteFlush,
-      .checkSession = checkSession,
-      .doSyncOnClose = doSyncOnClose,
-   };
+   context.userID = user_id;
+   context.forceRemoteFlush = forceRemoteFlush;
+   context.checkSession = checkSession;
+   context.doSyncOnClose = doSyncOnClose;
 
    INIT_LIST_HEAD(&context.states);
 
@@ -2605,6 +2751,53 @@ FhgfsOpsErr FhgfsOpsRemoting_getFileVersion(App* app, const EntryInfo* entryInfo
    if (retVal != FhgfsOpsErr_SUCCESS)
    {
       LOG_DEBUG_FORMATTED(app->logger, Log_DEBUG, __func__, "GetFileVersion error code: %s",
+         FhgfsOpsErr_toErrString(retVal));
+   }
+
+   // clean-up
+   RequestResponseArgs_freeRespBuffers(&rrArgs, app);
+
+cleanup_request:
+   return retVal;
+}
+
+FhgfsOpsErr FhgfsOpsRemoting_SetFileState(App* app, const EntryInfo* entryInfo,
+   uint8_t state)
+{
+   struct SetFileStateMsg requestMsg;
+   RequestResponseNode rrNode = {
+      .peer = rrpeer_from_entryinfo(entryInfo),
+      .nodeStore = app->metaNodes,
+      .targetStates = app->metaStateStore,
+      .mirrorBuddies = app->metaBuddyGroupMapper
+   };
+   RequestResponseArgs rrArgs;
+   FhgfsOpsErr requestRes;
+   struct SetFileStateRespMsg* setResp;
+   FhgfsOpsErr retVal;
+
+   // prepare request
+   SetFileStateMsg_initFromEntryInfoAndState(&requestMsg, entryInfo, state);
+
+   RequestResponseArgs_prepare(&rrArgs, NULL, &requestMsg.netMessage,
+         NETMSGTYPE_SetFileStateResp);
+
+   // communicate
+   requestRes = MessagingTk_requestResponseNodeRetryAutoIntr(app, &rrNode, &rrArgs);
+
+   if (requestRes != FhgfsOpsErr_SUCCESS)
+   { // clean-up
+      retVal = requestRes;
+      goto cleanup_request;
+   }
+
+   // handle result
+   setResp = (struct SetFileStateRespMsg*) rrArgs.outRespMsg;
+   retVal = SetFileStateRespMsg_getValue(setResp);
+
+   if (retVal != FhgfsOpsErr_SUCCESS)
+   {
+      LOG_DEBUG_FORMATTED(app->logger, Log_DEBUG, __func__, "SetFileState error code: %s",
          FhgfsOpsErr_toErrString(retVal));
    }
 

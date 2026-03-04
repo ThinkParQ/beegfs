@@ -184,6 +184,8 @@
 #define NETMSGTYPE_UpdateStripePatternResp         2130
 #define NETMSGTYPE_SetFileState                    2131
 #define NETMSGTYPE_SetFileStateResp                2132
+#define NETMSGTYPE_GetChunkBalanceJobStats         2133
+#define NETMSGTYPE_GetChunkBalanceJobStatsResp     2134
 
 // session messages
 #define NETMSGTYPE_OpenFile                        3001
@@ -281,4 +283,3 @@
 #define NETMSGTYPE_MoveChunkFileResp               7043
 #define NETMSGTYPE_CheckAndRepairDupInode          7044
 #define NETMSGTYPE_CheckAndRepairDupInodeResp      7045
-

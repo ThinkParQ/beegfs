@@ -21,13 +21,7 @@ else
    $(info feature-detect.sh output: $(BEEGFS_FEATURE_DETECTION))
 endif
 
-# ccflags-y was introduced in 2.6.24, earlier kernels use EXTRA_CFLAGS for the same purpose
-ifeq ($(origin ccflags-y),file)
-ccflags-y += $(BEEGFS_FEATURE_DETECTION)
-else
-# the client makefile sets this already
-override EXTRA_CFLAGS += $(BEEGFS_FEATURE_DETECTION)
-endif
+ccflags-y += $(BEEGFS_FEATURE_DETECTION) $(BEEGFS_CFLAGS)
 
 kernel-version = $(shell printf "%02d%02d" $(VERSION) $(PATCHLEVEL))
 kernel-if-version-or-later = $(shell [ $(kernel-version) -ge $(1) ] && echo $(2))
@@ -107,6 +101,7 @@ SOURCES := \
    common/net/message/storage/attribs/GetXAttrMsg.c \
    common/net/message/storage/attribs/RemoveXAttrMsg.c \
    common/net/message/storage/attribs/SetXAttrMsg.c \
+   common/net/message/storage/attribs/SetFileStateMsg.c \
    common/net/message/storage/lookup/LookupIntentRespMsg.c \
    common/net/message/storage/lookup/LookupIntentMsg.c \
    common/net/message/storage/TruncFileMsg.c \

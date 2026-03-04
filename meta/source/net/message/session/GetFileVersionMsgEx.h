@@ -27,7 +27,7 @@ class GetFileVersionMsgResponseState : public MirroredMessageResponseState
       // GetFileVersionMsgEx is transformed into a mirrored message to leverage
       // MirroredMessage::lock(), preventing races with operations such as unlink.
       // However, forwarding this message to the secondary is unnecessary.
-      // Overriding the changeObservableState() function to always return false ensures
+      // Overriding the changesObservableState() function to always return false ensures
       // that this message is never forwarded unnecessarily.
       bool changesObservableState() const override
       {

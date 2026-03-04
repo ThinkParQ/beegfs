@@ -40,6 +40,8 @@ cachekeyfile="$cachedir"/feature-detect.cachekey
    # Environment can easily change, for example between "make" and "make -j"
    # So let's not include the environment variables in the cache-key for now.
    #env
+   # However, build options that gate feature detection must be included.
+   echo "BEEGFS_DISABLE_IDMAPPING=${BEEGFS_DISABLE_IDMAPPING:-}"
 } > "$cachekeyfile".tmp
 
 cachevalid=false

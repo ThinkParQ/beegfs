@@ -173,6 +173,16 @@ void App_uninit(App* this)
    kfree(this->dirInodeOps);
    kfree(this->specialInodeOps);
 
+   // free fsUUID (allocated via StringTk_strDup)
+   Mutex_lock(&this->fsUUIDMutex);
+   if (this->fsUUID) {
+      kfree(this->fsUUID);
+   }
+   Mutex_unlock(&this->fsUUIDMutex);
+
+   // uninit fsUUID mutex
+   Mutex_uninit(&this->fsUUIDMutex);
+
    Mutex_uninit(&this->nicListMutex);
 
 #ifdef BEEGFS_DEBUG

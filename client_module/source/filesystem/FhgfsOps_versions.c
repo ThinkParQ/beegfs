@@ -42,7 +42,13 @@
          return -ECHILD;
    #endif // LINUX_VERSION_CODE
 
-   return os_generic_permission(inode, mask);
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+      return generic_permission(idmap, inode, mask);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+      return generic_permission(mnt_userns, inode, mask);
+   #else
+      return os_generic_permission(inode, mask);
+   #endif
 }
 
 

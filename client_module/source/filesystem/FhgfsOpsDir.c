@@ -18,13 +18,7 @@
 
 #include <linux/namei.h>
 
-static int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dentry);
-
-struct dentry_operations fhgfs_dentry_ops =
-{
-   .d_revalidate   = FhgfsOps_revalidateIntent,
-   .d_delete       = FhgfsOps_deleteDentry,
-};
+static int __FhgfsOps_revalidateIntent(struct inode* parentInode, struct dentry* dentry);
 
 /**
  * Called when the dcache has a lookup hit (and wants to know whether the cache data
@@ -33,10 +27,14 @@ struct dentry_operations fhgfs_dentry_ops =
  * @return value is quasi-boolean: 0 if entry invalid, 1 if still valid (no other return values
  * allowed).
  */
-#ifndef KERNEL_HAS_ATOMIC_OPEN
-int FhgfsOps_revalidateIntent(struct dentry* dentry, struct nameidata* nameidata)
-#else
+static
+#if defined(KERNEL_HAS_D_REVALIDATE_STABLE_REFERENCES)
+int FhgfsOps_revalidateIntent(struct inode *parentInode, const struct qstr *name,
+      struct dentry* dentry, unsigned flags)
+#elif defined(KERNEL_HAS_ATOMIC_OPEN)
 int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
+#else
+int FhgfsOps_revalidateIntent(struct dentry* dentry, struct nameidata* nameidata)
 #endif // LINUX_VERSION_CODE
 {
    App* app;
@@ -45,8 +43,10 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    const char* logContext;
 
    int isValid = 0; // quasi-boolean (return value)
+#if ! defined(KERNEL_HAS_D_REVALIDATE_STABLE_REFERENCES)
    struct dentry* parentDentry;
    struct inode* parentInode;
+#endif
    struct inode* inode;
    Time now;
 
@@ -79,8 +79,10 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    log = App_getLogger(app);
    logContext = "FhgfsOps_revalidateIntent";
 
+#if ! defined(KERNEL_HAS_D_REVALIDATE_STABLE_REFERENCES)
    parentDentry = dget_parent(dentry);
    parentInode = parentDentry->d_inode;
+#endif
 
    if(unlikely(Logger_getLogLevel(log) >= 5) )
       FhgfsOpsHelper_logOp(Log_SPAM, app, dentry, inode, logContext);
@@ -115,11 +117,13 @@ int FhgfsOps_revalidateIntent(struct dentry* dentry, unsigned flags)
    }
 
    // active dentry => remote-stat and local-compare
-   isValid = __FhgfsOps_revalidateIntent(parentDentry, dentry );
+   isValid = __FhgfsOps_revalidateIntent(parentInode, dentry);
 
 cleanup_put_parent:
    // clean-up
+#if ! defined(KERNEL_HAS_D_REVALIDATE_STABLE_REFERENCES)
    dput(parentDentry);
+#endif
 
    LOG_DEBUG_FORMATTED(log, 5, logContext, "'%s': isValid: %s",
       dentry->d_name.name, isValid ? "yes" : "no");
@@ -134,7 +138,7 @@ cleanup_put_parent:
  * @return value is quasi-boolean: 0 if entry invalid, 1 if still valid (no other return values
  * allowed).
  */
-int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dentry)
+static int __FhgfsOps_revalidateIntent(struct inode* parentInode, struct dentry* dentry)
 {
    const char* logContext = "__FhgfsOps_revalidateIntent";
    App* app = FhgfsOps_getApp(dentry->d_sb);
@@ -146,7 +150,6 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
    fhgfs_stat fhgfsStat;
    fhgfs_stat* fhgfsStatPtr;
 
-   struct inode* parentInode = parentDentry->d_inode;
    FhgfsInode* parentFhgfsInode = BEEGFS_INODE(parentInode);
 
    struct inode* inode = dentry->d_inode;
@@ -155,6 +158,7 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
    bool cacheValid = FhgfsInode_isCacheValid(fhgfsInode, inode->i_mode, cfg);
    int isValid = 0; // quasi-boolean (return value)
    bool needDrop = false;
+   bool setStripePatternStale = false;
    FhgfsIsizeHints iSizeHints;
 
 
@@ -169,6 +173,7 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
    if (inode && Config_getsysSELinuxEnabled(cfg)) {
       security_inode_invalidate_secctx(inode);
    }
+
 
    if(IS_ROOT(dentry) )
       fhgfsStatPtr = NULL;
@@ -232,10 +237,33 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
       {
          // case when we want to invalidate the inode cache due to inode version change
          // this case will not drop the dentry 
-         // must goto out, since we clear the inode stripe pattern 
-         fhgfsStatPtr = NULL; // stat values not available
-         __FhgfsOps_clearInodeStripePattern(app, inode);
-         goto out;
+         // must goto out, since we set the stripe pattern to stale
+         setStripePatternStale = true;
+         if (!FhgfsInode_getIsFileOpen(fhgfsInode, setStripePatternStale))
+         {
+            //Set stripe pattern to stale under fileHandlesMutex via FhgfsInode_getIsFileOpen
+            //prevents possible race condition
+            // goto out if file is not open
+            goto out;
+         }
+         else
+         {
+            //existing file handle found, mark the inode as bad to prevent stale pattern access
+            //added as a precaution but should not happen
+            umode_t savedMode = inode->i_mode; // save mode
+            make_bad_inode(inode);
+            inode->i_mode = savedMode; // restore mode
+
+            FhgfsOpsHelper_logOpMsg(Log_WARNING, app, NULL, inode, logContext,
+               "Blocked access to inode due to unexpected inode access during cache invalidation");
+
+            // invalidate cached pages
+            if(!S_ISDIR(inode->i_mode) )
+            {
+               invalidate_remote_inode(inode);
+            }
+            goto out;
+         }
       }
       else
       {
@@ -248,8 +276,6 @@ int __FhgfsOps_revalidateIntent(struct dentry* parentDentry, struct dentry* dent
          goto out;
       }
    }
-
-   
    if (!__FhgfsOps_refreshInode(app, inode, fhgfsStatPtr, &iSizeHints) )
       isValid = 1;
    else
@@ -268,6 +294,7 @@ out:
  *
  * @return !=0 to delete dentry, 0 to keep it
  */
+static
 #ifndef KERNEL_HAS_D_DELETE_CONST_ARG
    int FhgfsOps_deleteDentry(struct dentry* dentry)
 #else
@@ -319,3 +346,10 @@ char* __FhgfsOps_pathResolveToStoreBuf(NoAllocBufferStore* bufStore, struct dent
 
    return path;
 }
+
+struct dentry_operations fhgfs_dentry_ops =
+{
+   .d_revalidate   = FhgfsOps_revalidateIntent,
+   .d_delete       = FhgfsOps_deleteDentry,
+};
+

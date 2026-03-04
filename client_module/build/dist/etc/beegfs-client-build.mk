@@ -17,3 +17,6 @@
 # source.
 # Example:
 #NVIDIA_INCLUDE_PATH=/usr/src/nvidia-520.61.05/nvidia
+# To disable ID-mapped mounts support at compile time, define BEEGFS_DISABLE_IDMAPPING.
+# This removes all idmapping code paths and skips related kernel feature detection.
+#BEEGFS_DISABLE_IDMAPPING=1

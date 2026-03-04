@@ -35,10 +35,19 @@ struct FileEvent;
 extern bool MetadataTk_getRootEntryInfoCopy(App* app, EntryInfo* outEntryInfo);
 
 // inliners
-
-void CreateInfo_init(App* app, struct inode* parentDirInode, const char* entryName,
-   int mode, int umask, bool isExclusiveCreate, const struct FileEvent* fileEvent,
-   struct CreateInfo* outCreateInfo);
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+void CreateInfo_init(App *app, struct mnt_idmap *idmap, struct inode *parentDirInode,
+    const char *entryName, int mode, int umask, bool isExclusiveCreate,
+    const struct FileEvent *fileEvent, CreateInfo *outCreateInfo);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+void CreateInfo_init(App *app, struct user_namespace *mnt_userns, struct inode *parentDirInode,
+    const char *entryName, int mode, int umask, bool isExclusiveCreate,
+    const struct FileEvent *fileEvent, CreateInfo *outCreateInfo);
+#else
+void CreateInfo_init(App *app, struct inode *parentDirInode, const char *entryName,
+    int mode, int umask, bool isExclusiveCreate, const struct FileEvent *fileEvent,
+    CreateInfo *outCreateInfo);
+#endif
 static inline void CreateInfo_setStoragePoolId(CreateInfo* this, StoragePoolId storagePoolId);
 static inline void LookupIntentInfoIn_init(LookupIntentInfoIn* this,
    const EntryInfo* parentEntryInfo, const char* entryName);

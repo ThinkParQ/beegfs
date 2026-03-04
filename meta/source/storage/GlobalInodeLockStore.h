@@ -4,20 +4,43 @@
 #include <storage/FileInode.h>
 #include <components/FileEventLogger.h>
 
+/**
+ * Enum to identify the type of operation that acquired an inode lock.
+ * This allows selective release of locks by operation type to prevent
+ * unintended release of locks held by other operations.
+ */
+enum class LockOperationType
+{
+   CHUNK_REBALANCING,    // Chunk balancing operations
+   FILE_STATE_UPDATE     // File state update operations
+};
 
 typedef ObjectReferencer<FileInode*> GlobalInodeLockReferencer;
-typedef std::map<std::string, GlobalInodeLockReferencer*> GlobalInodeLockMap;
-typedef GlobalInodeLockMap::iterator GlobalInodeLockMapIter;
 
-typedef std::map<std::string, float> GlobalInodeTimestepMap;
-typedef GlobalInodeTimestepMap::iterator GlobalInodeTimestepMapIter;
+/**
+ * Wrapper structure that holds the inode lock reference, operation type,
+ * and timestamp. This ensures operation type and timestamp are always
+ * kept in sync with the lock, eliminating the need for separate maps.
+ */
+struct GlobalInodeLockEntry
+{
+   GlobalInodeLockReferencer* inodeRefer;
+   LockOperationType opType;
+   int64_t timeElapsed;  // Seconds since lock acquisition
+
+   GlobalInodeLockEntry(GlobalInodeLockReferencer* ref, LockOperationType type)
+      : inodeRefer(ref), opType(type), timeElapsed(0) {}
+};
+
+typedef std::map<std::string, GlobalInodeLockEntry*> GlobalInodeLockMap;
+typedef GlobalInodeLockMap::iterator GlobalInodeLockMapIter;
 
 /**
  * Global store for file inodes which are locked for referencing.
- * Used for chunk balancing operations.
- * This object initalizes the GlobalInodeLockMap
- * It is used for taking and releasing locks on the inodes of file chunks.
- * * "locking" here means we successfully insert an element into a map.
+ * Used for chunk balancing and other operations that require exclusive
+ * inode access. This object initializes the GlobalInodeLockMap with
+ * operation type tracking. It is used for taking and releasing locks on
+ * the inodes. "locking" here means we successfully insert an element into the map.
  */
 class GlobalInodeLockStore
 {
@@ -27,25 +50,31 @@ class GlobalInodeLockStore
          this->clearLockStore();
       }
 
-      bool insertFileInode(EntryInfo* entryInfo, FileEvent* fileEvent, bool increaseRefCount);
-      void releaseFileInode(const std::string& entryID); 
-      bool lookupFileInode(EntryInfo* entryInfo); 
+      FhgfsOpsErr insertFileInode(EntryInfo* entryInfo, FileEvent* fileEvent, bool increaseRefCount,
+                                  LockOperationType opType);
+      bool releaseFileInode(const std::string& entryID, LockOperationType opType);
+
+      bool lookupFileInode(EntryInfo* entryInfo);
       FileInode* getFileInode(EntryInfo* entryInfo);
       FileInode* getFileInodeUnreferenced(EntryInfo* entryInfo);
-      void clearLockStore(); 
-      void updateInodeLockTimesteps(unsigned int);
+      void updateInodeLockTimesteps(int64_t timeElapsed, unsigned int maxTimeLimit, LockOperationType opType);
+
+      // Cleanup functions
+      void clearLockStore();
+      void clearLockStoreByOpType(LockOperationType opType);
+
+      uint64_t getNumLockedInodes();
+      uint64_t getNumLockedInodes(LockOperationType opType);
 
    private:
       GlobalInodeLockMap inodes;
-      GlobalInodeTimestepMap inodeTimes;
-      GlobalInodeTimestepMapIter releaseInodeTimeUnlocked(const std::string& entryID);
-      GlobalInodeTimestepMapIter releaseFileInodeUnlocked(const std::string& entryID);
+      RWLock rwlock;
+
+      static const char* opTypeToString(LockOperationType opType);
+
+      bool releaseFileInodeUnlocked(const std::string& entryID, LockOperationType opType);
       unsigned decreaseInodeRefCountUnlocked(GlobalInodeLockMapIter& iter);
       FileInode* increaseInodeRefCountUnlocked(GlobalInodeLockMapIter& iter);
       bool resetTimeCounterUnlocked(const std::string& entryID);
-   
-
-      RWLock rwlock;
-      void clearTimeStoreUnlocked(); 
 };
 

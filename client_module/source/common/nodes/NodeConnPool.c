@@ -223,7 +223,6 @@ static NicAddressStats* NodeConnPool_rdmaNicPriority(NodeConnPool* this, DeviceP
 #ifdef BEEGFS_NVFS
    int minNvfsPrio = INT_MAX;
    int nvfsPrio;
-   numa = cpu_to_node(current->cpu);
 #endif
 
    if (this->rdmaNicCount < 1)

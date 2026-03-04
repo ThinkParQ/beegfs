@@ -12,6 +12,7 @@ TARGET ?= beegfs
 export TARGET
 export OFED_INCLUDE_PATH
 export BEEGFS_NO_RDMA
+export BEEGFS_DISABLE_IDMAPPING
 
 BEEGFS_DKMS_BUILD=0
 ifdef KERNELRELEASE
@@ -38,7 +39,8 @@ BEEGFS_CFLAGS += -DBEEGFS_NO_RDMA
 else
 
 $(info $$OFED_INCLUDE_PATH = [${OFED_INCLUDE_PATH}])
-
+$(info $$NVFS_INCLUDE_PATH = [${NVFS_INCLUDE_PATH}])
+$(info $$NVIDIA_INCLUDE_PATH = [${NVIDIA_INCLUDE_PATH}])
 ifneq ($(OFED_INCLUDE_PATH),)
 BEEGFS_CFLAGS += -I$(OFED_INCLUDE_PATH)
 export KBUILD_EXTRA_SYMBOLS += $(OFED_INCLUDE_PATH)/../Module.symvers
@@ -125,6 +127,10 @@ BEEGFS_CFLAGS  :=  $(BUILD_ARCH) $(KERNEL_FEATURE_DETECTION) \
 	-Wextra -Wno-sign-compare -Wno-empty-body -Wno-unused-parameter -Wno-missing-field-initializers \
 	-DBEEGFS_MODULE_NAME_STR='\"$(TARGET)\"'
 
+ifeq ($(BEEGFS_DISABLE_IDMAPPING),1)
+BEEGFS_CFLAGS += -DBEEGFS_DISABLE_IDMAPPING
+endif
+
 # Update 2022-12: BeeGFS module source code had already switched to -std=gnu99,
 # but now the kernel has caught up with us - kernel moved from gnu89 to
 # gnu11.
@@ -198,7 +204,7 @@ endif
 
 	@echo "Building beegfs client module"
 	$(MAKE) -C $(KDIR_PRUNED_HEAD) "M=$(BEEGFS_BUILDDIR)/../source" \
-	"EXTRA_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)"  modules
+	"BEEGFS_CFLAGS=$(BEEGFS_CFLAGS) $(EXTRA_CFLAGS)"  modules
 
 	@cp ../source/$(TARGET).ko .
 	@ cp ${TARGET}.ko ${TARGET}-unstripped.ko
@@ -292,6 +298,10 @@ help:
 	@echo '     Enables file sytem debug log messages etc.'
 	@echo '   TARGET=<MODULE_NAME>'
 	@echo '     Set a different module and file system name.'
+	@echo '   BEEGFS_DISABLE_IDMAPPING=1:'
+	@echo '     Disables ID-mapped mounts support at compile time.'
+	@echo '     Removes all idmapping code paths and skips related kernel'
+	@echo '     feature detection.'
 	@echo ' '
 	@echo 'Infiniband (RDMA) arguments (optional):'
 	@echo '   OFED_INCLUDE_PATH=<path>:'

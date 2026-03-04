@@ -88,15 +88,29 @@ static inline int os_generic_permission(struct inode *inode, int mask)
    #endif
 }
 
-static inline bool os_inode_owner_or_capable(const struct inode *inode)
+/**
+ * os_inode_permission - idmap-aware VFS permission check
+ * @file:  Optional file to derive mount idmap/userns (may be NULL)
+ * @inode: Inode to check permission on
+ * @mask:  Right to check for (%MAY_READ, %MAY_WRITE, %MAY_EXEC)
+ *
+ * Runs the full VFS policy path (LSM/audit) and evaluates access in the
+ * mount’s idmap/userns. Use this in helpers/ioctls; keep direct
+ * generic_permission() only inside ->permission to avoid recursion.
+ *
+ * Returns 0 on success, -EACCES/-EPERM on denial.
+ */
+static inline int os_inode_permission(struct file *file, struct inode *inode, int mask)
 {
-   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-      return inode_owner_or_capable(&nop_mnt_idmap, inode);
-   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)
-      return inode_owner_or_capable(&init_user_ns, inode);
-   #else
-      return inode_owner_or_capable(inode);
-   #endif
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
+    struct mnt_idmap *idmap = file ? file_mnt_idmap(file) : &nop_mnt_idmap;
+    return inode_permission(idmap, inode, mask);
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
+    struct user_namespace *mnt_userns = file ? file_mnt_user_ns(file) : &init_user_ns;
+    return inode_permission(mnt_userns, inode, mask);
+#else
+    return inode_permission(inode, mask);
+#endif
 }
 
 #ifndef KERNEL_HAS_D_MATERIALISE_UNIQUE
@@ -188,39 +202,18 @@ struct kmem_cache* OsCompat_initKmemCache(const char* cacheName, size_t cacheSiz
    list_entry((ptr)->next, type, member)
 #endif // list_first_entry
 
-
-static inline struct posix_acl* os_posix_acl_from_xattr(const void* value, size_t size)
+static inline struct posix_acl* os_posix_acl_from_xattr(
+        struct user_namespace *userns, const void *value, size_t size)
 {
-#ifndef KERNEL_HAS_POSIX_ACL_XATTR_USERNS_ARG
-   return posix_acl_from_xattr(value, size);
-#else
-   return posix_acl_from_xattr(&init_user_ns, value, size);
-#endif
+    return posix_acl_from_xattr(userns, value, size);
 }
 
-static inline int os_posix_acl_to_xattr(const struct posix_acl* acl, void* buffer, size_t size)
+static inline int os_posix_acl_to_xattr(
+        struct user_namespace *userns,
+        const struct posix_acl* acl, void* buffer, size_t size)
 {
-#ifndef KERNEL_HAS_POSIX_ACL_XATTR_USERNS_ARG
-   return posix_acl_to_xattr(acl, buffer, size);
-#else
-   return posix_acl_to_xattr(&init_user_ns, acl, buffer, size);
-#endif
+    return posix_acl_to_xattr(userns, acl, buffer, size);
 }
-
-#if defined(KERNEL_HAS_SET_ACL) || defined(KERNEL_HAS_SET_ACL_DENTRY)
-static inline int os_posix_acl_chmod(struct dentry *dentry, umode_t mode)
-{
-#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)
-    return posix_acl_chmod(&nop_mnt_idmap, dentry, mode);
-#elif defined(KERNEL_HAS_POSIX_ACL_CHMOD_NS_DENTRY)
-    return posix_acl_chmod(&init_user_ns, dentry, mode);
-#elif defined(KERNEL_HAS_USER_NS_MOUNTS)
-    return posix_acl_chmod(&init_user_ns, dentry->d_inode, mode);
-#else
-    return posix_acl_chmod(dentry->d_inode, mode);
-#endif
-}
-#endif // KERNEL_HAS_SET_ACL || KERNEL_HAS_SET_ACL_DENTRY
 
 #ifndef KERNEL_HAS_PAGE_ENDIO
 static inline void page_endio(struct page *page, int rw, int err)

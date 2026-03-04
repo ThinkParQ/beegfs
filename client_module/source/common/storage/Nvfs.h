@@ -42,6 +42,9 @@ extern atomic_t nvfs_shutdown;
 
 DECLARE_PER_CPU(long, nvfs_n_ops);
 
+int REGISTER_FUNC(struct nvfs_dma_rw_ops *ops);
+void UNREGISTER_FUNC(void);
+
 static inline long nvfs_count_ops(void)
 {
    int i;

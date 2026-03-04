@@ -215,14 +215,37 @@ int FhgfsOpsHelper_refreshDirInfoIncremental(App* app, const EntryInfo* entryInf
 {
    Logger* log = App_getLogger(app);
    const char* logContext = "FhgfsOpsHelper (refresh dir info incremental)";
-
-   const unsigned maxNames = 100; // max number of retrieved names
-
+   Config* config = App_getConfig(app);
+   size_t dirListLimit;  // Buffer size (bytes) in buffer-size mode, entry count in legacy mode
    int retVal = 0;
    FhgfsOpsErr listRes = FhgfsOpsErr_SUCCESS;
    StrCpyVec* dirContents = FsDirInfo_getDirContents(dirInfo);
    size_t dirContentsLen = StrCpyVec_length(dirContents);
    size_t currentContentsPos = FsDirInfo_getCurrentContentsPos(dirInfo); // pos inside contents vec
+
+   // Automatic meta server capability detection for buffer-size aware directory listing.
+   // Each directory handle tracks metadata server capabilities using bitmasks
+   // (metaCapabilities and metaCapabilitiesKnown in FsDirInfo).
+   //
+   // Three possible states for META_CAP_LISTDIR_BUFSIZE_MODE:
+   //   1. Known + Supported:
+   //        Use buffer-size mode (server packs entries up to client's buffer size limit)
+   //   2. Known + Not Supported:
+   //        Use legacy entry-count mode (fixed limit of 100 entries per RPC)
+   //   3. Unknown (first request):
+   //        Send safe probe request with 100 entries limit. Server capability is detected
+   //        from response compat flag and cached in dirInfo for subsequent requests.
+   if (FsDirInfo_isMetaCapabilityKnown(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE) &&
+       FsDirInfo_isMetaCapabilitySupported(dirInfo, META_CAP_LISTDIR_BUFSIZE_MODE))
+   {
+      // Server supports buffer-size mode — use the client's configured buffer size
+      dirListLimit = Config_getTuneMsgBufSize(config);
+   }
+   else
+   {
+      // Server does not support buffer mode, or capability is still unknown
+      dirListLimit = 100;
+   }
 
    LOG_DEBUG_FORMATTED(log, Log_SPAM, logContext, "called. EntryID: %s, Owner: %hu",
       entryInfo->entryID, entryInfo->owner.node.value);
@@ -234,7 +257,7 @@ int FhgfsOpsHelper_refreshDirInfoIncremental(App* app, const EntryInfo* entryInf
    { // user seeked backwards (or something else makes an update necessary)
       LOG_DEBUG(log, Log_SPAM, logContext, "forced update of dir contents");
 
-      listRes = FhgfsOpsRemoting_listdirFromOffset(entryInfo, dirInfo, maxNames);
+      listRes = FhgfsOpsRemoting_listdirFromOffset(entryInfo, dirInfo, dirListLimit);
    }
    else
    if(FsDirInfo_getEndOfDir(dirInfo) && (currentContentsPos >= dirContentsLen) )
@@ -254,7 +277,7 @@ int FhgfsOpsHelper_refreshDirInfoIncremental(App* app, const EntryInfo* entryInf
    { // initial retrieval or offset outside current local contents region
       LOG_DEBUG(log, Log_SPAM, logContext, "retrieving by offset");
 
-      listRes = FhgfsOpsRemoting_listdirFromOffset(entryInfo, dirInfo, maxNames);
+      listRes = FhgfsOpsRemoting_listdirFromOffset(entryInfo, dirInfo, dirListLimit);
    }
 
 

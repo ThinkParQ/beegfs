@@ -1,17 +1,9 @@
 #pragma once
 
 #include <components/buddyresyncer/SyncCandidate.h>
+#include <common/storage/chunkbalancer/ChunkBalancerJobStatistics.h>
 #include <components/chunkbalancer/ChunkBalancerFileSyncSlave.h>
 
-enum ChunkBalancerJobState
-{
-   ChunkBalancerJobState_NOTSTARTED = 0,
-   ChunkBalancerJobState_RUNNING,
-   ChunkBalancerJobState_SUCCESS,
-   ChunkBalancerJobState_INTERRUPTED,
-   ChunkBalancerJobState_FAILURE,
-   ChunkBalancerJobState_ERRORS
-};
 
 /**
  * A storage chunk balancing job component. Starts, stops and controls the storage chunk balance slaves. 
@@ -20,8 +12,10 @@ enum ChunkBalancerJobState
 
 class ChunkBalancerJob : public PThread
 {
+   friend class CpChunkPathsMsgEx;
+
    public:
-      ChunkBalancerJob(std::function<void()> shutdown); 
+      ChunkBalancerJob();
       virtual ~ChunkBalancerJob();
 
       virtual void run();
@@ -35,13 +29,8 @@ class ChunkBalancerJob : public PThread
    
       static constexpr unsigned CHUNKBALANCERJOB_SLEEP_TIME = 5; //seconds of idle time before chunkbalancerJob checks status of queues again
       static constexpr unsigned CHUNKBALANCERJOB_MAX_TIME_LIMIT = 600;  //maximum time in seconds of empty queue before ChunkBalancerJob shuts itself and slaves down
-   
-      uint16_t targetID;
-      Mutex statusMutex;
-      ChunkBalancerJobState status;
+      Mutex jobStatsMutex;
 
-      int64_t startTime;
-      int64_t endTime;
 
       ChunkSyncCandidateStore syncCandidates;
 
@@ -51,49 +40,64 @@ class ChunkBalancerJob : public PThread
       AtomicInt16 targetWasOffline;
 
       bool createSlaveRes;
-      ChunkBalancerFileSyncSlave* createSyncSlave(uint16_t targetID, ChunkSyncCandidateStore* syncCandidates, uint8_t slaveID, bool* createSlaveResPtr);
+      ChunkBalancerFileSyncSlave* createSyncSlave(ChunkSyncCandidateStore* syncCandidates, uint8_t slaveID, bool* createSlaveResPtr);
 
-      void joinSyncSlaves();
-      std::function<void()> selfShutdownApp;
+      ChunkBalancerJobStatistics stats;
 
    public:
-      uint16_t getTargetID() const
+
+      void getJobStats(ChunkBalancerJobStatistics* outStats)
       {
-         return targetID;
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         *outStats = stats;
       }
 
       ChunkBalancerJobState getStatus()
       {
-         std::lock_guard<Mutex> mutexLock(statusMutex);
-         return status;
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         return this->stats.status;
       }
 
-      bool isRunning()
+      bool isRunningStarting()
       {
-         std::lock_guard<Mutex> mutexLock(statusMutex);
-         return status == ChunkBalancerJobState_RUNNING;
-      }
-
-      void setTargetOffline()
-      {
-         targetWasOffline.set(1);
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         return this->stats.status == ChunkBalancerJobState_RUNNING || this->stats.status == ChunkBalancerJobState_STARTING || this->stats.status == ChunkBalancerJobState_IDLE;
       }
 
       FhgfsOpsErr addChunkSyncCandidate(ChunkSyncCandidateFile* candidate);
-
       void shutdown();
 
    private:
       void setStatus(ChunkBalancerJobState status)
       {
-         std::lock_guard<Mutex> mutexLock(statusMutex);
-         this->status = status;
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         this->stats.status = status;
       }
-      
-      void selfShutdown()
-      {   
-         this->selfTerminate();
-         selfShutdownApp(); //call the method from app
-      }    
-};
 
+      void incStatsWorker()
+      {
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         this->stats.workerNum++;
+      }
+
+
+      void decStatsWorker()
+      {
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         this->stats.workerNum--;
+      }
+
+
+      void addStatsErrors(uint64_t slaveErrorCount)
+      {
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         stats.errorCount = slaveErrorCount;
+      }
+
+      void addStatsMigratedChunks(uint64_t slaveMigratedChunks)
+      {
+         std::lock_guard<Mutex> mutexLock(jobStatsMutex);
+         stats.migratedChunks = slaveMigratedChunks;
+      }
+
+};

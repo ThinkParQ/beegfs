@@ -4,6 +4,10 @@
 #include <common/net/message/NetMessage.h>
 #include <common/Common.h>
 
+// Response compat flag: server supports buffer size mode
+// Using compat flags for backward compatibility (old clients ignore unknown compat flags)
+#define LISTDIROFFSETRESPMSG_COMPATFLAG_SERVER_SUPPORTS_BUFSIZE  1
+
 class ListDirFromOffsetRespMsg : public NetMessageSerdes<ListDirFromOffsetRespMsg>
 {
    public:

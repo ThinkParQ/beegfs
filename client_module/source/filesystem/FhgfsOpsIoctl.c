@@ -4,6 +4,7 @@
 #include <common/nodes/MirrorBuddyGroupMapper.h>
 #include <common/net/message/nodes/HeartbeatMsgEx.h>
 #include <common/net/message/nodes/HeartbeatRequestMsgEx.h>
+#include <net/filesystem/FhgfsOpsRemoting.h>
 #include <common/toolkit/MathTk.h>
 #include <filesystem/helper/IoctlHelper.h>
 #include <filesystem/FhgfsOpsFile.h>
@@ -45,6 +46,7 @@ static long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *
 static long FhgfsOpsIoctl_getInodeID(struct file *file, void __user *argp);
 static long FhgfsOpsIoctl_getEntryInfo(struct file *file, void __user *argp);
 static long FhgfsOpsIoctl_pingNode(struct file *file, void __user *argp);
+static long FhgfsOpsIoctl_setFileState(struct file *file, void __user *argp);
 
 static NodeType FhgfsOpsIoctl_strToNodeType(const char* str, size_t len)
 {
@@ -152,6 +154,11 @@ long FhgfsOpsIoctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
       {
          return FhgfsOpsIoctl_pingNode(file, (void __user *) arg);
       }
+
+      case BEEGFS_IOC_SET_FILE_STATE:
+      {
+         return FhgfsOpsIoctl_setFileState(file, (void __user *) arg);
+      } break;
 
       case TCGETS:
       { // filter isatty() test ioctl, which is often used by various standard tools
@@ -623,6 +630,11 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
 
    struct FileEvent event = FILEEVENT_EMPTY;
    struct FileEvent* eventSent = NULL;
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)   /* >= 6.3 */
+   struct mnt_idmap *idmap = (file) ? mnt_idmap(file->f_path.mnt) : &nop_mnt_idmap;
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)  /* 5.15–6.2 */
+   struct user_namespace *mnt_userns = (file) ? mnt_user_ns(file->f_path.mnt) : &init_user_ns;
+   #endif
 
    struct CreateInfo createInfo =
    {
@@ -643,7 +655,8 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
       return -ENOTDIR;
    }
 
-   retVal = os_generic_permission(parentInode, MAY_WRITE | MAY_EXEC);
+   /* Parent must be writable & searchable to create */
+   retVal = os_inode_permission(file, parentInode, MAY_WRITE | MAY_EXEC);
    if (retVal)
       return retVal;
 
@@ -703,7 +716,13 @@ long FhgfsOpsIoctl_mkfileWithStripeHints(struct file *file, void __user *argp)
       eventSent = &event;
    }
 
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)   /* >= 6.3 */
+   CreateInfo_init(app, idmap, parentInode, filename, mode, umask, true, eventSent, &createInfo);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)  /* 5.15–6.2 */
+   CreateInfo_init(app, mnt_userns, parentInode, filename, mode, umask, true, eventSent, &createInfo);
+   #else  /* < 5.12 */
    CreateInfo_init(app, parentInode, filename, mode, umask, true, eventSent, &createInfo);
+   #endif
 
    FhgfsInode_entryInfoReadLock(fhgfsParentInode); // L O C K EntryInfo
 
@@ -765,21 +784,20 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
 
    struct FileEvent event = FILEEVENT_EMPTY;
    const struct FileEvent* eventSent = NULL;
-
-   #ifdef KERNEL_HAS_FILE_F_VFSMNT
-      struct vfsmount* mnt = file->f_vfsmnt;
-   #else
-      struct vfsmount* mnt = file->f_path.mnt;
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)   /* >= 6.3 */
+   struct mnt_idmap *idmap = (file) ? mnt_idmap(file->f_path.mnt) : &nop_mnt_idmap;
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)  /* 5.15–6.2 */
+   struct user_namespace *mnt_userns = (file) ? mnt_user_ns(file->f_path.mnt) : &init_user_ns;
    #endif
-
 
    Logger_logFormatted(log, Log_SPAM, logContext, "Create file from ioctl");
 
-   retVal = os_generic_permission(inode, MAY_WRITE | MAY_EXEC);
+   retVal = os_inode_permission(file, inode, MAY_WRITE | MAY_EXEC);
    if (retVal)
       return retVal;
 
-   retVal = mnt_want_write(mnt); // check and rw-reference counter
+   /* check if target volume is readonly and take reference */
+   retVal = mnt_want_write_file(file); // check and rw-reference counter
    if (retVal)
       return retVal;
 
@@ -805,8 +823,16 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
    if (app->cfg->eventLogMask & EventLogMask_LINK_OP)
       eventSent = &event;
 
+   #if defined(KERNEL_HAS_IDMAPPED_MOUNTS)   /* >= 6.3 */
+   CreateInfo_init(app, idmap, inode, fileInfo.entryName, fileInfo.mode, umask, true, eventSent,
+      &createInfo);
+   #elif defined(KERNEL_HAS_USER_NS_MOUNTS)  /* 5.15–6.2 */
+   CreateInfo_init(app, mnt_userns, inode, fileInfo.entryName, fileInfo.mode, umask, true, eventSent,
+      &createInfo);
+   #else  /* < 5.12 */
    CreateInfo_init(app, inode, fileInfo.entryName, fileInfo.mode, umask, true, eventSent,
       &createInfo);
+   #endif
 
    StoragePoolId_set(&storagePoolId, fileInfo.storagePoolId);
    CreateInfo_setStoragePoolId(&createInfo, storagePoolId);
@@ -820,8 +846,16 @@ static long FhgfsOpsIoctl_createFile(struct file *file, void __user *argp, int v
       we should change that. */
    if (FhgfsCommon_getCurrentUserID() == 0 || FhgfsCommon_getCurrentGroupID() == 0)
    {
-      createInfo.userID  = fileInfo.uid;
-      createInfo.groupID = fileInfo.gid;
+#if defined(KERNEL_HAS_IDMAPPED_MOUNTS)   /* >= 6.3 */
+      createInfo.userID  = Fhgfs_uid_for_fs(inode, idmap, KUIDT_INIT(fileInfo.uid));
+      createInfo.groupID = Fhgfs_gid_for_fs(inode, idmap, KGIDT_INIT(fileInfo.gid));
+#elif defined(KERNEL_HAS_USER_NS_MOUNTS)  /* 5.15–6.2 */
+      createInfo.userID  = Fhgfs_uid_for_fs(inode, mnt_userns, KUIDT_INIT(fileInfo.uid));
+      createInfo.groupID = Fhgfs_gid_for_fs(inode, mnt_userns, KGIDT_INIT(fileInfo.gid));
+#else  /* < 5.12 */
+      createInfo.userID  = Fhgfs_uid_for_fs(inode, KUIDT_INIT(fileInfo.uid));
+      createInfo.groupID = Fhgfs_gid_for_fs(inode, KGIDT_INIT(fileInfo.gid));
+#endif
    }
 
    if (fileInfo.parentIsBuddyMirrored)
@@ -929,7 +963,7 @@ cleanup:
       SAFE_KFREE(createInfo.preferredMetaTargets);
    }
 
-   mnt_drop_write(mnt); // release the rw-reference counter
+   mnt_drop_write_file(file); // release the rw-reference counter
 
    return retVal;
 }
@@ -1185,4 +1219,161 @@ fail:
    FhgfsInode_entryInfoReadUnlock(beegfsInode);
    Logger_logFormatted(log, Log_DEBUG, __func__, "Copying entryInfo to userspace memory failed.");
    return -EFAULT;
+}
+
+/**
+ * Set file state (combined AccessFlags and DataState) via RPC to metadata server.
+ *
+ * This ioctl allows setting access and data state on a file identified by filename,
+ * provided relative to the opened parent directory.
+ * 'fileState' is a packed 8-bit value: [7:5] = dataState, [4:0] = accessFlags.
+ *
+ * @param file      File descriptor of the parent directory
+ * @param argp      Pointer to user-space BeegfsIoctl_SetFileState_Arg
+ * @return          0 on success, or negative errno on failure
+ */
+static long FhgfsOpsIoctl_setFileState(struct file *file, void __user *argp)
+{
+   App* app = FhgfsOps_getApp(file_dentry(file)->d_sb);
+   Logger* log = App_getLogger(app);
+   const char* logContext = __func__;
+
+   struct inode* parentInode = file_inode(file);
+   FhgfsInode* fhgfsParentInode = BEEGFS_INODE(parentInode);
+
+   struct BeegfsIoctl_SetFileState_Arg args;
+   LookupIntentInfoIn inInfo;
+   LookupIntentInfoOut outInfo;
+   EntryInfo targetEntryInfo;
+   const EntryInfo* parentEntryInfo;
+   fhgfs_stat fhgfsStat = {0}; // It won't be used, but we need to initialize it.
+
+   bool freeTargetEntryInfo = false;
+   long retVal = 0;
+
+#ifdef KERNEL_HAS_FILE_F_VFSMNT
+   struct vfsmount* mnt = file->f_vfsmnt;
+#else
+   struct vfsmount* mnt = file->f_path.mnt;
+#endif
+
+   FhgfsOpsErr remotingRes;
+   FhgfsOpsErr setStateRes;
+   size_t nameLen;
+
+   // Validate and copy input from user space
+   if (copy_from_user(&args, argp, sizeof(args)))
+   {
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "Failed to copy arguments from user space");
+      return -EFAULT;
+   }
+
+   // Ensure null-terminated filename
+   args.filename[BEEGFS_IOCTL_FILENAME_MAXLEN - 1] = '\0';
+
+   // Validate parent is a directory
+   if (!S_ISDIR(parentInode->i_mode))
+   {
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "File descriptor must be a directory");
+      return -ENOTDIR;
+   }
+
+   // Basic filename validation
+   nameLen = strnlen(args.filename, BEEGFS_IOCTL_FILENAME_MAXLEN);
+   if (nameLen == 0)
+   {
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "Filename cannot be empty");
+      return -EINVAL;
+   }
+
+   if (nameLen > NAME_MAX)
+   {
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "Filename too long: %zu > %d", nameLen, NAME_MAX);
+      return -ENAMETOOLONG;
+   }
+
+   if (strchr(args.filename, '/'))
+   {
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "Filename must not contain path separators: %s", args.filename);
+      return -EINVAL;
+   }
+
+   // Only allow privileged users to modify file state (matching CTL behavior)
+   if (!capable(CAP_SYS_ADMIN))
+      return -EPERM;
+
+   retVal = mnt_want_write(mnt);
+   if (retVal)
+      return retVal;
+
+   Logger_logFormatted(log, Log_DEBUG, logContext,
+      "Requested fileState: 0x%02x for filename: %s", args.fileState, args.filename);
+
+   // Acquire parent entry info under lock
+   FhgfsInode_entryInfoReadLock(fhgfsParentInode);
+
+   parentEntryInfo = FhgfsInode_getEntryInfo(fhgfsParentInode);
+
+   LookupIntentInfoIn_init(&inInfo, parentEntryInfo, args.filename);
+   LookupIntentInfoOut_prepare(&outInfo, &targetEntryInfo, &fhgfsStat);
+   remotingRes = FhgfsOpsRemoting_lookupIntent(app, &inInfo, &outInfo);
+
+   FhgfsInode_entryInfoReadUnlock(fhgfsParentInode);
+
+   if (remotingRes != FhgfsOpsErr_SUCCESS || outInfo.lookupRes != FhgfsOpsErr_SUCCESS)
+   {
+      FhgfsOpsErr lookupError = (remotingRes != FhgfsOpsErr_SUCCESS) ? remotingRes : outInfo.lookupRes;
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "Lookup failed for '%s': %s", args.filename, FhgfsOpsErr_toErrString(lookupError));
+      retVal = FhgfsOpsErr_toSysErr(lookupError);
+      goto cleanup;
+   }
+
+   freeTargetEntryInfo = true;
+   LookupIntentInfoOut_setEntryInfoPtr(&outInfo, NULL); // we now own targetEntryInfo
+
+   // File state can only be set on regular files (matching CTL behavior)
+   if (!DirEntryType_ISREGULARFILE(targetEntryInfo.entryType))
+   {
+      Logger_logFormatted(log, Log_WARNING, logContext,
+         "Target '%s' is not a regular file; file state can only be set on regular files",
+         args.filename);
+      retVal = -EOPNOTSUPP;
+      goto cleanup;
+   }
+
+   Logger_logFormatted(log, Log_DEBUG, logContext,
+      "Sending SetFileState RPC for '%s' (fileState=0x%02x)",
+      args.filename, args.fileState);
+
+   setStateRes = FhgfsOpsRemoting_SetFileState(app, &targetEntryInfo, args.fileState);
+
+   if (setStateRes != FhgfsOpsErr_SUCCESS)
+   {
+      Logger_logFormatted(log, Log_ERR, logContext,
+         "SetFileState failed for '%s': %s",
+         args.filename, FhgfsOpsErr_toErrString(setStateRes));
+      retVal = FhgfsOpsErr_toSysErr(setStateRes);
+   }
+   else
+   {
+      Logger_logFormatted(log, Log_DEBUG, logContext,
+         "Successfully set file state 0x%02x for '%s'",
+         args.fileState, args.filename);
+      retVal = 0;
+   }
+
+cleanup:
+   LookupIntentInfoOut_uninit(&outInfo);
+   if (freeTargetEntryInfo)
+      EntryInfo_uninit(&targetEntryInfo);
+
+   mnt_drop_write(mnt); // Release mnt write reference counter
+
+   return retVal;
 }

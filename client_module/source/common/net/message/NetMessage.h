@@ -22,7 +22,7 @@
 #define NETMSG_PREFIX            ((0x42474653ULL << 32) + BEEGFS_DATA_VERSION)
 #define NETMSG_MIN_LENGTH        NETMSG_HEADER_LENGTH
 #define NETMSG_HEADER_LENGTH     40 /* length of the header (see struct NetMessageHeader) */
-#define NETMSG_MAX_MSG_SIZE      65536    // 64kB
+#define NETMSG_MAX_MSG_SIZE      1048576 // 1MB
 #define NETMSG_MAX_PAYLOAD_SIZE  ((unsigned)(NETMSG_MAX_MSG_SIZE - NETMSG_HEADER_LENGTH))
 
 #define NETMSG_DEFAULT_USERID    (~0) // non-zero to avoid mixing up with root userID
@@ -65,6 +65,9 @@ static inline unsigned short NetMessage_getMsgType(NetMessage* this);
 static inline unsigned NetMessage_getMsgHeaderFeatureFlags(NetMessage* this);
 static inline bool NetMessage_isMsgHeaderFeatureFlagSet(NetMessage* this, unsigned flag);
 static inline void NetMessage_addMsgHeaderFeatureFlag(NetMessage* this, unsigned flag);
+static inline unsigned NetMessage_getMsgHeaderCompatFeatureFlags(NetMessage* this);
+static inline bool NetMessage_isMsgHeaderCompatFeatureFlagSet(NetMessage* this, uint8_t flag);
+static inline void NetMessage_addMsgHeaderCompatFeatureFlag(NetMessage* this, uint8_t flag);
 static inline unsigned NetMessage_getMsgLength(NetMessage* this);
 static inline void NetMessage_setMsgHeaderUserID(NetMessage* this, unsigned userID);
 static inline void NetMessage_setMsgHeaderTargetID(NetMessage* this, uint16_t userID);
@@ -202,6 +205,11 @@ unsigned NetMessage_getMsgHeaderFeatureFlags(NetMessage* this)
    return this->msgHeader.msgFeatureFlags;
 }
 
+unsigned NetMessage_getMsgHeaderCompatFeatureFlags(NetMessage* this)
+{
+   return this->msgHeader.msgCompatFeatureFlags;
+}
+
 /**
  * Test flag. (For convenience and readability.)
  *
@@ -220,6 +228,27 @@ bool NetMessage_isMsgHeaderFeatureFlagSet(NetMessage* this, unsigned flag)
 void NetMessage_addMsgHeaderFeatureFlag(NetMessage* this, unsigned flag)
 {
    this->msgHeader.msgFeatureFlags |= flag;
+}
+
+/**
+ * Check if a specific compat feature flag is set in the message header.
+ *
+ * @param flag The compat flag bit to test (e.g., LISTDIROFFSETMSG_COMPATFLAG_*)
+ * @return true if the specified flag is set, false otherwise.
+ */
+bool NetMessage_isMsgHeaderCompatFeatureFlagSet(NetMessage* this, uint8_t flag)
+{
+   return (this->msgHeader.msgCompatFeatureFlags & flag) != 0;
+}
+
+/**
+ * Add a compat feature flag to the message header without clearing existing flags.
+ *
+ * @param flag The compat flag bit to add (e.g., LISTDIROFFSETMSG_COMPATFLAG_*)
+ */
+void NetMessage_addMsgHeaderCompatFeatureFlag(NetMessage* this, uint8_t flag)
+{
+   this->msgHeader.msgCompatFeatureFlags |= flag;
 }
 
 unsigned NetMessage_getMsgLength(NetMessage* this)

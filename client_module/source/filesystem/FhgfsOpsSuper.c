@@ -36,6 +36,9 @@ static struct file_system_type fhgfs_fs_type =
    .owner      = THIS_MODULE,
    .kill_sb    = FhgfsOps_killSB,
    //.fs_flags   = FS_BINARY_MOUNTDATA, // not required currently
+#if defined(KERNEL_HAS_FS_ALLOW_IDMAP) && !defined(BEEGFS_DISABLE_IDMAPPING)
+   .fs_flags   = FS_ALLOW_IDMAP,
+#endif
 
 #ifdef KERNEL_HAS_GET_SB_NODEV
    .get_sb     = FhgfsOps_getSB,
@@ -274,7 +277,7 @@ int FhgfsOps_fillSuper(struct super_block* sb, void* rawMountOptions, int silent
    cfg = App_getConfig(app);
 
    // set up super block data
-
+   /* Note: FS_ALLOW_IDMAP is handled at compile time via filesystem registration */
    sb->s_maxbytes = MAX_LFS_FILESIZE;
    sb->s_blocksize = PAGE_SIZE;
    sb->s_blocksize_bits = PAGE_SHIFT;

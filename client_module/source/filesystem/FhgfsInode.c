@@ -141,7 +141,6 @@ FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry, 
       if(retVal != FhgfsOpsErr_SUCCESS)
          goto err_unlock;
 
-
       desiredHandle->refCount++;
       //*outFileHandleID = desiredHandle->fileHandleID;
    }
@@ -178,8 +177,13 @@ FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry, 
       {  // file yet opened by lookup or atomic open
          struct FileEvent event = FILEEVENT_EMPTY;
          const struct FileEvent* eventSent = NULL;
-
          __FhgfsInode_initOpenIOInfo(this, desiredHandle, openFlags, pathInfo, &ioInfo);
+
+         if (FhgfsInode_isStripePatternStale(this)) //check if pattern is stale (due to internal metadata changes)
+         //protected by fileHandlesMutex against races here
+         {
+            ioInfo.pattern = NULL;
+         }
 
          FhgfsInode_entryInfoReadLock(this); // LOCK EntryInfo
 
@@ -231,7 +235,17 @@ FhgfsOpsErr FhgfsInode_referenceHandle(FhgfsInode* this, struct dentry* dentry, 
          unsigned stripeCount;
 
          desiredHandle->fileHandleID = ioInfo.fileHandleID;
+         // Free memory allocated to stale stripe pattern
+         if (FhgfsInode_isStripePatternStale(this) && this->pattern != NULL)
+         {
+            StripePattern_virtualDestruct(this->pattern);
+         }
          this->pattern = ioInfo.pattern;
+
+         if (FhgfsInode_isStripePatternStale(this))
+         {
+            FhgfsInode_clearStripePatternStaleFlag(this); // clear stale pattern flag
+         }
 
          stripeCount = FhgfsInode_getStripeCount(this);
          BitStore_setSize(&desiredHandle->firstWriteDone, stripeCount);
@@ -464,6 +478,7 @@ void __FhgfsInode_initOpenIOInfo(FhgfsInode* this, FhgfsInodeFileHandle* fileHan
 
    outIOInfo->fileHandleID = fileHandle->fileHandleID;
    outIOInfo->pattern = this->pattern;
+
    outIOInfo->pathInfo = pathInfo;
    outIOInfo->accessFlags = accessFlags;
 

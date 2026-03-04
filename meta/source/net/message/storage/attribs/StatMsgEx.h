@@ -40,7 +40,7 @@ class StatMsgResponseState : public MirroredMessageResponseState
       // StatMsgEx is converted to mirrored message to leverage locking part of
       // mirrored messages to prevent races with unlink, open etc.
       //
-      // Always return false from changeObservableState() to prohibit forwarding
+      // Always return false from changesObservableState() to prohibit forwarding
       // to secondary. See MirroredMessage::finishOperation() for more details.
       bool changesObservableState() const override
       {

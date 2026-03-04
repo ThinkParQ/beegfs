@@ -32,6 +32,10 @@ bool OpenFileRespMsg_deserializePayload(NetMessage* this, DeserializeCtx* ctx)
 
    if (!Serialization_deserializeUInt(ctx, &thisCast->fileVersion))
       return false;
+   
+   if (NetMessage_isMsgHeaderCompatFeatureFlagSet(this, OPENFILERESPMSG_HAS_FILESTATE))
+      if (!Serialization_deserializeUInt8(ctx, &thisCast->fileState))
+         return false;
 
    return true;
 }

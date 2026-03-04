@@ -5,6 +5,10 @@
 #include <common/storage/Path.h>
 #include <common/storage/EntryInfo.h>
 
+// Request compat flag: client supports buffer size mode
+// Using compat flags for backward compatibility (old servers ignore unknown compat flags)
+#define LISTDIROFFSETMSG_COMPATFLAG_CLIENT_SUPPORTS_BUFSIZE  1
+
 /**
  * This message supports only serialization. (deserialization not implemented)
  */
@@ -14,7 +18,7 @@ typedef struct ListDirFromOffsetMsg ListDirFromOffsetMsg;
 
 static inline void ListDirFromOffsetMsg_init(ListDirFromOffsetMsg* this);
 static inline void ListDirFromOffsetMsg_initFromEntryInfo(ListDirFromOffsetMsg* this,
-   const EntryInfo* entryInfo, int64_t serverOffset, unsigned maxOutNames, bool filterDots);
+   const EntryInfo* entryInfo, int64_t serverOffset, unsigned dirListLimit, bool filterDots);
 
 // virtual functions
 extern void ListDirFromOffsetMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
@@ -26,7 +30,7 @@ struct ListDirFromOffsetMsg
    NetMessage netMessage;
 
    int64_t serverOffset;
-   unsigned maxOutNames;
+   unsigned dirListLimit;
    bool filterDots;
 
    // for serialization
@@ -45,10 +49,11 @@ void ListDirFromOffsetMsg_init(ListDirFromOffsetMsg* this)
 
 /**
  * @param entryInfo just a reference, so do not free it as long as you use this object!
+ * @param dirListLimit buffer size (bytes) in buffer-size mode, entry count in legacy mode
  * @param filterDots true if you don't want "." and ".." in the result list.
  */
 void ListDirFromOffsetMsg_initFromEntryInfo(ListDirFromOffsetMsg* this, const EntryInfo* entryInfo,
-   int64_t serverOffset, unsigned maxOutNames, bool filterDots)
+   int64_t serverOffset, unsigned dirListLimit, bool filterDots)
 {
    ListDirFromOffsetMsg_init(this);
 
@@ -56,7 +61,7 @@ void ListDirFromOffsetMsg_initFromEntryInfo(ListDirFromOffsetMsg* this, const En
 
    this->serverOffset = serverOffset;
 
-   this->maxOutNames = maxOutNames;
+   this->dirListLimit = dirListLimit;
 
    this->filterDots = filterDots;
 }

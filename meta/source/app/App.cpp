@@ -1028,6 +1028,7 @@ void App::joinComponents()
 
    workersJoin();
 
+   waitForComponentTermination(chunkBalancerJob);
    waitForComponentTermination(modificationEventFlusher);
    waitForComponentTermination(dgramListener);
    waitForComponentTermination(connAcceptor);

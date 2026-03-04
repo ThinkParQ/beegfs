@@ -24,6 +24,7 @@
 #include <common/net/message/storage/attribs/GetXAttrRespMsg.h>
 #include <common/net/message/storage/attribs/RemoveXAttrRespMsg.h>
 #include <common/net/message/storage/attribs/SetXAttrRespMsg.h>
+#include <common/net/message/storage/attribs/SetFileStateRespMsg.h>
 #include <common/net/message/storage/attribs/RefreshEntryInfoRespMsg.h>
 #include <common/net/message/storage/moving/RenameRespMsg.h>
 #include <common/net/message/storage/lookup/LookupIntentRespMsg.h>
@@ -183,6 +184,7 @@ NetMessage* NetMessageFactory_createFromMsgType(unsigned short msgType)
       HANDLE(UnlinkFileResp, UnlinkFileRespMsg);
       HANDLE(ListDirFromOffsetResp, ListDirFromOffsetRespMsg);
       HANDLE(SetAttrResp, SetAttrRespMsg);
+      HANDLE(SetFileStateResp, SetFileStateRespMsg);
       HANDLE(StatResp, StatRespMsg);
       HANDLE(StatStoragePathResp, StatStoragePathRespMsg);
       HANDLE(TruncFileResp, TruncFileRespMsg);

@@ -1408,7 +1408,7 @@ int __FhgfsOps_flush(App* app, struct file *file, bool discardCacheOnError,
 
    if(forceRemoteFlush || (checkSession && Config_getSysSessionCheckOnClose(cfg)) || doSyncOnClose)
    {
-      FhgfsOpsErr fsyncRes = FhgfsOpsRemoting_fsyncfile(&ioInfo, forceRemoteFlush, checkSession,
+      FhgfsOpsErr fsyncRes = FhgfsOpsRemoting_fsyncfile(&ioInfo, file, forceRemoteFlush, checkSession,
          doSyncOnClose);
       if(unlikely(fsyncRes != FhgfsOpsErr_SUCCESS) )
       {

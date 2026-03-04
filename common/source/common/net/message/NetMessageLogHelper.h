@@ -191,6 +191,8 @@ inline std::string netMessageTypeToStr(int type)
       case NETMSGTYPE_UpdateStripePatternResp: return "UpdateStripePatternResp (2130)";
       case NETMSGTYPE_SetFileState: return "SetFileState (2131)";
       case NETMSGTYPE_SetFileStateResp: return "SetFileStateResp (2132)";
+      case NETMSGTYPE_GetChunkBalanceJobStats: return "GetChunkBalanceJobStats (2133)";
+      case NETMSGTYPE_GetChunkBalanceJobStatsResp: return "GetChunkBalanceJobStatsResp (2134)";
       case NETMSGTYPE_OpenFile: return "OpenFile (3001)";
       case NETMSGTYPE_OpenFileResp: return "OpenFileResp (3002)";
       case NETMSGTYPE_CloseFile: return "CloseFile (3003)";

@@ -109,6 +109,13 @@ $(call define_if_matches, KERNEL_HAS_D_MATERIALISE_UNIQUE, \
 # Note: This method was added in vanilla linux-3.10
 $(call define_if_matches, KERNEL_HAS_PDE_DATA, -F "PDE_DATA(const struct inode *)", proc_fs.h)
 
+# Find out whether the kernel has an FS_ALLOW_IDMAP mnt idmap flag. Both KERNEL_HAS_FS_ALLOW_IDMAP
+# and BEEGFS_DISABLE_IDMAPPING should be checked anywhere that needs to determine if FS_ALLOW_IDMAP
+# is actually enabled for this instance of the BeeGFS driver.
+#
+# Note: This flag was added in vanilla linux-5.12
+$(call define_if_matches, KERNEL_HAS_FS_ALLOW_IDMAP, "FS_ALLOW_IDMAP", fs.h)
+
 # Find out whether the kernel has i_uid_read
 #
 # Note: added to 3.5

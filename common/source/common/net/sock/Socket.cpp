@@ -64,6 +64,12 @@ void Socket::connect(const char* hostname, uint16_t port, int ai_socktype)
 
    // set port and peername
    peername = (strlen(addrSelected->ai_canonname) ? addrSelected->ai_canonname : hostname);
+
+   sockaddr_in6 sa6;
+   if (inet_pton(AF_INET6, peername.c_str(), &sa6.sin6_addr) == 1) {
+      peername = "[" + peername + "]";
+   }
+
    peername += std::string(":") + StringTk::intToStr(port);
 
    freeaddrinfo(addressList);
@@ -80,30 +86,6 @@ void Socket::connect(const char* hostname, uint16_t port, int ai_socktype)
 void Socket::bind(uint16_t port)
 {
    this->bindToAddr(IPAddress().toSocketAddress(port));
-}
-
-std::string Socket::ipaddrToStr(const struct sockaddr* sa)
-{
-   IPAddress a(sa);
-   return a.toString();
-}
-
-std::string Socket::endpointAddrToStr(const IPAddress& ipaddress, uint16_t port)
-{
-   return ipaddress.toString() + ":" + StringTk::uintToStr(port);
-}
-
-std::string Socket::endpointAddrToStr(const char* hostname, uint16_t port)
-{
-   return std::string(hostname) + ":" + StringTk::uintToStr(port);
-}
-
-std::string Socket::endpointAddrToStr(const struct sockaddr* sa)
-{
-   if (!sa)
-      return "null";
-   IPAddress ip(sa);
-   return Socket::endpointAddrToStr(ip, extractPort(sa));
 }
 
 static std::atomic<std::optional<bool>> ipv6Available;

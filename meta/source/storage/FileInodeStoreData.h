@@ -49,7 +49,16 @@ namespace AccessFlags {
 }
 
 // Represents data state (HSM application defined) (0-7)
-using DataState = uint8_t;
+namespace DataStates {
+    constexpr uint8_t DATASTATE_AVAILABLE       = 0; // 000 (0) - Default: present on BeeGFS
+    constexpr uint8_t DATASTATE_MANUAL_RESTORE  = 1; // 001 (1)
+    constexpr uint8_t DATASTATE_AUTO_RESTORE    = 2; // 010 (2)
+    constexpr uint8_t DATASTATE_DELAYED_RESTORE = 3; // 011 (3)
+    constexpr uint8_t DATASTATE_UNAVAILABLE     = 4; // 100 (4)
+    constexpr uint8_t DATASTATE_RESERVED5       = 5; // 101 (5)
+    constexpr uint8_t DATASTATE_RESERVED6       = 6; // 110 (6)
+    constexpr uint8_t DATASTATE_RESERVED7       = 7; // 111 (7)
+}
 
 class FileState {
    public:
@@ -65,7 +74,7 @@ class FileState {
          return raw & ACCESS_FLAGS_MASK;
       }
 
-      DataState getDataState() const
+      uint8_t getDataState() const
       {
          return (raw & DATA_STATE_MASK) >> DATA_STATE_SHIFT;
       }

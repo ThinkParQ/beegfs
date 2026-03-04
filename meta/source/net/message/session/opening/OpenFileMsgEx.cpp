@@ -44,6 +44,8 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
 
    const bool eventLoggingEnabled = !isSecondary && app->getFileEventLogger() && getFileEvent();
    MetaFileHandle inode;
+   FileState fileState;
+   bool haveFileState = false;
 
    PathInfo pathInfo;
    StripePattern* pattern;
@@ -64,27 +66,37 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
 
    if (openRes != FhgfsOpsErr_SUCCESS)
    {
-      // If open() fails due to file state restrictions, emit an OPEN_BLOCKED event
-      // (when event logging is enabled). The numHardlinks in event context will be 0
-      // since inode is nullptr after access denial.
-      if ((openRes == FhgfsOpsErr_FILEACCESS_DENIED) && eventLoggingEnabled)
+      // Handle file access denied - get file state and optionally log event
+      if (openRes == FhgfsOpsErr_FILEACCESS_DENIED)
       {
-         FileEvent* fileEvent = const_cast<FileEvent*>(getFileEvent());
-         fileEvent->type = FileEventType::OPEN_BLOCKED;
+         // Reference inode to read file state. No isSecondary guard needed here
+         // because FILEACCESS_DENIED is never forwarded to secondary
+         // (changesObservableState() returns true only on SUCCESS).
+         auto [refInode, refRes] = app->getMetaStore()->referenceFile(entryInfo);
+         if (refInode)
+         {
+            fileState = refInode->getFileState();
+            haveFileState = true;
+            app->getMetaStore()->releaseFile(entryInfo->getParentEntryID(), refInode);
+         }
 
-         EventContext eventCtx = makeEventContext(
-            entryInfo,
-            entryInfo->getParentEntryID(),
-            getMsgHeaderUserID(),
-            "",
-            inode ? inode->getNumHardlinks() : 0,
-            isSecondary
-         );
-         logEvent(app->getFileEventLogger(), *fileEvent, eventCtx);
+         // Emit OPEN_BLOCKED event if logging enabled
+         if (eventLoggingEnabled)
+         {
+            FileEvent* fileEvent = const_cast<FileEvent*>(getFileEvent());
+            fileEvent->type = FileEventType::OPEN_BLOCKED;
+
+            EventContext eventCtx = makeEventContext(
+               entryInfo,
+               entryInfo->getParentEntryID(),
+               getMsgHeaderUserID(),
+               "",
+               inode ? inode->getNumHardlinks() : 0,
+               isSecondary
+            );
+            logEvent(app->getFileEventLogger(), *fileEvent, eventCtx);
+         }
       }
-
-      // error occurred
-      Raid0Pattern dummyPattern(1, UInt16Vector{});
 
       // generate response
       if(unlikely(openRes == FhgfsOpsErr_COMMUNICATION))
@@ -93,8 +105,9 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
       }
       else
       { // normal response
+         Raid0Pattern dummyPattern(1, UInt16Vector{});
          return boost::make_unique<OpenFileResponseState>(openRes, std::string(), dummyPattern,
-               pathInfo, 0);
+               pathInfo, 0, fileState, haveFileState);
       }
    }
 
@@ -147,8 +160,11 @@ std::unique_ptr<MirroredMessageResponseState> OpenFileMsgEx::executeLocally(Resp
 
    sessionFile->getInode()->getPathInfo(&pathInfo);
 
+   // On successful open(), fileState is not encoded in compat flags (haveFileState stays false)
+   // because the client only needs it when open() is denied due to file state restrictions. We
+   // don't pass a fileState here to avoid having to call sessionFile->getInode()->getFileState().
    return boost::make_unique<OpenFileResponseState>(openRes, fileHandleID, *pattern, pathInfo,
-         sessionFile->getInode()->getFileVersion());
+         sessionFile->getInode()->getFileVersion(), FileState{});
 }
 
 void OpenFileMsgEx::forwardToSecondary(ResponseContext& ctx)

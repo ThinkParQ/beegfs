@@ -185,7 +185,9 @@ class SocketAddress {
       IPAddress addr;
 
       SocketAddress() = delete;
-      SocketAddress(const sockaddr* sa);
+      explicit SocketAddress(const sockaddr* sa);
+      explicit SocketAddress(const sockaddr_storage* sas)
+         : SocketAddress(reinterpret_cast<const sockaddr*>(sas)) {}
       SocketAddress(IPAddress address, uint16_t port) : port(port), addr(address) {}
 
       sockaddr_in toIPv4Sockaddr() const;

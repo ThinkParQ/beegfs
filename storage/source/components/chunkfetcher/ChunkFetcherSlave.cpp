@@ -124,7 +124,18 @@ bool ChunkFetcherSlave::walkChunkPath(const std::string& path, uint16_t buddyGro
       int statRes = ::stat(pathBuf.c_str(), &statBuf);
       if(statRes)
       {
-         LOG(GENERAL, WARNING, "Could not stat directory.", ("path", pathBuf), targetID, sysErr);
+         // The chunk fetcher has called readdir to get the next directory entry, but before we
+         // could call stat something else deleted that entry. Most likely this is a chunk file
+         // associated with a deleted file, but BeeGFS also cleans up chunk directory trees once the
+         // last chunk file inside is removed. The window for this race is pretty small, but has
+         // prevented some customers from running fsck on an online system so we ignore ENOENT here.
+         if (errno == ENOENT)
+         {
+            LOG(GENERAL, NOTICE, "Could not stat path (ignoring).", ("path", pathBuf),
+               targetID, sysErr);
+            continue;
+         }
+         LOG(GENERAL, WARNING, "Could not stat path.", ("path", pathBuf), targetID, sysErr);
          result = false;
          break;
       }

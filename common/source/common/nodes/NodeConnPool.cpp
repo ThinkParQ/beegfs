@@ -188,7 +188,7 @@ Socket* NodeConnPool::acquireStreamSocketEx(bool allowWaiting)
          // socketOptions without runtime type info)
 
       std::string endpointStr = boost::lexical_cast<std::string>(parentNode.getNodeType()) + "@" +
-         Socket::endpointAddrToStr(iter->ipAddr, port);
+         iter->ipAddr.toSocketAddress(port).toString();
 
       IPAddress srcIp;
       // If we try to connect to ipv4, this needs to be an ipv4 any address to not mess up the

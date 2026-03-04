@@ -36,7 +36,7 @@ void RegistrationDatagramListener::handleIncomingMsg(struct sockaddr* fromAddr, 
       { // valid, but not within this context
          log.log(Log_SPAM,
             "Received a message that is invalid within the current context "
-            "from: " + Socket::ipaddrToStr(fromAddr) + "; "
+            "from: " + SocketAddress(fromAddr).toString() + "; "
             "type: " + netMessageTypeToStr(msg->getMsgType() ) );
       } break;
    };

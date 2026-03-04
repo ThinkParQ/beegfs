@@ -18,6 +18,7 @@ extern int __ProcFs_open(struct inode* inode, struct file* file);
 
 extern int __ProcFs_readV2_nothing(struct seq_file* file, void* p);
 extern int __ProcFs_readV2_config(struct seq_file* file, void* p);
+extern int __ProcFs_readV2_buildConfig(struct seq_file* file, void* p);
 extern int __ProcFs_readV2_status(struct seq_file* file, void* p);
 extern int __ProcFs_readV2_fsUUID(struct seq_file* file, void* p);
 extern int __ProcFs_readV2_mgmtNodes(struct seq_file* file, void* p);

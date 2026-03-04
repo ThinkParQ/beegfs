@@ -23,7 +23,7 @@ class ChunkBalancerFileSyncSlave : public ChunkFileResyncer
    private:
       
       ChunkSyncCandidateStore* syncCandidates;
-
+      uint16_t targetID;
       bool isBuddyMirrorChunk;
       virtual void syncLoop();
       virtual int getFD(const std::unique_ptr<StorageTarget> & target);

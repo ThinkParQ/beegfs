@@ -210,18 +210,26 @@ bool InternodeSyncer::checkNetwork()
 {
    App* app = Program::getApp();
    NicAddressList newLocalNicList;
-   bool res = false;
 
    app->findAllowedInterfaces(newLocalNicList);
    app->findAllowedRDMAInterfaces(newLocalNicList);
-   if (!std::equal(newLocalNicList.begin(), newLocalNicList.end(), app->getLocalNicList().begin()))
+   auto currentLocalNicList = app->getLocalNicList();
+
+   if (!std::equal(newLocalNicList.begin(), newLocalNicList.end(),
+         currentLocalNicList.begin(), currentLocalNicList.end()))
    {
       log.log(Log_NOTICE, "checkNetwork: local interfaces have changed");
+
+      if (newLocalNicList.empty()) {
+         log.log(Log_ERR, "checkNetwork: Couldn't find any usable NIC");
+         return false;
+      }
+
       app->updateLocalNicList(newLocalNicList);
-      res = true;
+      return true;
    }
 
-   return res;
+   return false;
 }
 
 bool InternodeSyncer::updateMetaCapacityPools()
@@ -385,7 +393,9 @@ bool InternodeSyncer::registerNode(AbstractDatagramListener* dgramLis)
    bool rootIsBuddyMirrored = app->getMetaRoot().getIsMirrored();
    NicAddressList nicList(localNode.getNicList());
 
-   HeartbeatMsg msg(localNode.getAlias(), localNodeNumID, NODETYPE_Meta, &nicList);
+   std::string regToken = StorageTk::readOrCreateRegistrationToken(app->getMetaPath(), localNodeNumID);
+
+   HeartbeatMsg msg(regToken, localNodeNumID, NODETYPE_Meta, &nicList);
    msg.setRootNumID(rootNodeID);
    msg.setRootIsBuddyMirrored(rootIsBuddyMirrored);
    msg.setPorts(cfg->getConnMetaPort(), cfg->getConnMetaPort() );

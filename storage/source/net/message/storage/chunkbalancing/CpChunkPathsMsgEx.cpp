@@ -8,23 +8,24 @@
 
 bool CpChunkPathsMsgEx::processIncoming(ResponseContext& ctx)
 {
-   const char* logContext = "CpChunkPathsMsg incoming"; 
-   
+   const char* logContext = "CpChunkPathsMsg incoming";
+
    uint16_t targetID = getTargetID();
    uint16_t destinationID = getDestinationID();
    std::string& relativePath = getRelativePath();
    EntryInfo* entryInfo = getEntryInfo();
    FileEvent* fileEvent = getFileEvent();
    StorageTarget* target;
-   FhgfsOpsErr cpMsgRes;
+   FhgfsOpsErr cpMsgRes = FhgfsOpsErr_INTERNAL;;
+   bool isNewJob = false;
 
    App* app = Program::getApp();
    bool isBuddyMirrorChunk = isMsgHeaderFeatureFlagSet(CPCHUNKPATHSMSG_FLAG_BUDDYMIRROR);
-   
+
    if (isBuddyMirrorChunk)
    { // given source targetID refers to a buddy mirror group ID, turn it into primary targetID
       MirrorBuddyGroupMapper* mirrorBuddies = app->getMirrorBuddyGroupMapper();
-      
+
       targetID = mirrorBuddies->getPrimaryTargetID(targetID);
       if (unlikely(!targetID) )
       { // unknown target
@@ -62,9 +63,40 @@ bool CpChunkPathsMsgEx::processIncoming(ResponseContext& ctx)
    }
 
    { // valid targetID
+      std::lock_guard<Mutex> mutexLock(app->ChunkBalanceJobMutex);
+      // Try to start a ChunkBalance job; if it already exists, we get that job
+      ChunkBalancerJob* chunkBalanceJob = CpChunkPathsMsgEx::addChunkBalanceJob(isNewJob);
+      if (unlikely(!chunkBalanceJob))
+      {
+         LogContext(__func__).log(LogTopic_CHUNKBALANCING, Log_WARNING, "Failed to start ChunkBalancerJob component, chunk will not be balanced: " + relativePath);
+         goto send_response;
+      }
+      // Start thread if job already exists but is not running
+      if (!isNewJob && !chunkBalanceJob->isRunningStarting())
+      {
+         bool isJoined = false;
+         try
+         {
+            isJoined = chunkBalanceJob->timedjoin(0); // harvest the finished job, returns immediately if still running
+         }
+         catch (const PThreadException& e)
+         {
+            LogContext(__func__).logErr(std::string("ChunkBalancerJob join failed: ") + e.what());
+            goto send_response;
+         }
 
-      // try to start a ChunkBalance  job; if it already exists, we get that job
-      ChunkBalancerJob* chunkBalanceJob = CpChunkPathsMsgEx::addChunkBalanceJob();
+         if (!isJoined)
+         {
+            LogContext(__func__).logErr("Cannot restart ChunkBalancerJob - thread still running despite status indicating otherwise.");
+            cpMsgRes = FhgfsOpsErr_AGAIN;
+            goto send_response;
+         }
+
+         chunkBalanceJob->resetSelfTerminate();
+         chunkBalanceJob->start();
+         chunkBalanceJob->setStatus(ChunkBalancerJobState_STARTING);
+         LogContext(__func__).log(Log_NOTICE, "Starting new ChunkBalancerJob and accepting work requests.");
+      }
       ChunkSyncCandidateFile candidate((relativePath).c_str(), targetID, destinationID, entryInfo, isBuddyMirrorChunk, fileEvent);
       cpMsgRes = chunkBalanceJob->addChunkSyncCandidate(&candidate);
    }
@@ -74,19 +106,18 @@ send_response:
    return true;
 }
 
-ChunkBalancerJob* CpChunkPathsMsgEx::addChunkBalanceJob()
+ChunkBalancerJob* CpChunkPathsMsgEx::addChunkBalanceJob(bool& outIsNew)
 {
    App* app = Program::getApp();
-   std::lock_guard<Mutex> mutexLock(app->ChunkBalanceJobMutex);
-      
    ChunkBalancerJob* chunkBalanceJob = app->getChunkBalancerJob();
    if (chunkBalanceJob == nullptr)
    {
-      chunkBalanceJob = new ChunkBalancerJob(std::bind(&App::cleanupChunkBalancerJob, app));
+      chunkBalanceJob = new ChunkBalancerJob();
       chunkBalanceJob->start();
-      LogContext(__func__).log(Log_NOTICE, "Starting ChunkBalanceJob on storage.");
+      chunkBalanceJob->setStatus(ChunkBalancerJobState_STARTING);
+      LogContext(__func__).log(Log_NOTICE, "Starting new ChunkBalancerJob and accepting work requests.");
       app->setChunkBalancerJob(chunkBalanceJob);
+      outIsNew = true;
    }
-   return chunkBalanceJob; 
+   return chunkBalanceJob;
 }
-

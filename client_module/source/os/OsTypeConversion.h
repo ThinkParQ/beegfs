@@ -5,19 +5,14 @@
 #include <os/OsTypeConversion.h>
 #include <common/toolkit/Time.h>
 #include <common/storage/StorageDefinitions.h>
-
 #include <linux/fs.h>
 #if defined(KERNEL_HAS_LINUX_FILELOCK_H)
 #include <linux/filelock.h>
 #endif
 
 static inline int OsTypeConv_openFlagsOsToFhgfs(int osFlags, bool isPagedMode);
-static inline void OsTypeConv_kstatFhgfsToOs(fhgfs_stat* fhgfsStat, struct kstat* kStat);
-static inline void OsTypeConv_iattrOsToFhgfs(struct iattr* iAttr, SettableFileAttribs* fhgfsAttr,
-   int* outValidAttribs);
 static inline unsigned OsTypeConv_dirEntryTypeToOS(DirEntryType entryType);
 static inline int OsTypeConv_flockTypeToFhgfs(struct file_lock* fileLock);
-
 
 /**
  * @param osFlags file open mode flags
@@ -56,84 +51,13 @@ int OsTypeConv_openFlagsOsToFhgfs(int osFlags, bool isPagedMode)
    if(osFlags & O_SYNC)
       fhgfsFlags |= OPENFILE_ACCESS_SYNC;
 
+   if(osFlags & O_NONBLOCK)
+      fhgfsFlags |= OPENFILE_ACCESS_NONBLOCKING;
+
 
    return fhgfsFlags;
 }
 
-/**
- * @param kStat unused fields will be set to zero
- */
-void OsTypeConv_kstatFhgfsToOs(fhgfs_stat* fhgfsStat, struct kstat* kStat)
-{
-   memset(kStat, 0, sizeof(*kStat) );
-
-   kStat->mode = fhgfsStat->mode;
-   kStat->nlink = fhgfsStat->nlink;
-   kStat->uid = make_kuid(&init_user_ns, fhgfsStat->uid);
-   kStat->gid = make_kgid(&init_user_ns, fhgfsStat->gid);
-   kStat->size = fhgfsStat->size;
-   kStat->blocks = fhgfsStat->blocks;
-   kStat->atime.tv_sec = fhgfsStat->atime.tv_sec;
-   kStat->atime.tv_nsec = fhgfsStat->atime.tv_nsec;
-   kStat->mtime.tv_sec = fhgfsStat->mtime.tv_sec;
-   kStat->mtime.tv_nsec = fhgfsStat->mtime.tv_nsec;
-   kStat->ctime.tv_sec = fhgfsStat->ctime.tv_sec; // attrib change time (not creation time)
-   kStat->ctime.tv_nsec = fhgfsStat->ctime.tv_nsec; // attrib change time (not creation time)
-}
-
-/**
- * Convert kernel iattr to fhgfsAttr. Also update the inode with the new attributes.
- */
-void OsTypeConv_iattrOsToFhgfs(struct iattr* iAttr, SettableFileAttribs* fhgfsAttr,
-   int* outValidAttribs)
-{
-   Time now;
-   Time_setToNowReal(&now);
-
-   *outValidAttribs = 0;
-
-   if(iAttr->ia_valid & ATTR_MODE)
-   {
-      (*outValidAttribs) |= SETATTR_CHANGE_MODE;
-      fhgfsAttr->mode  = iAttr->ia_mode;
-   }
-
-   if(iAttr->ia_valid & ATTR_UID)
-   {
-      (*outValidAttribs) |= SETATTR_CHANGE_USERID;
-      fhgfsAttr->userID = from_kuid(&init_user_ns, iAttr->ia_uid);
-   }
-
-   if(iAttr->ia_valid & ATTR_GID)
-   {
-      (*outValidAttribs) |= SETATTR_CHANGE_GROUPID;
-      fhgfsAttr->groupID = from_kgid(&init_user_ns, iAttr->ia_gid);
-   }
-
-   if(iAttr->ia_valid & ATTR_MTIME_SET)
-   {
-      (*outValidAttribs) |= SETATTR_CHANGE_MODIFICATIONTIME;
-      fhgfsAttr->modificationTimeSecs = iAttr->ia_mtime.tv_sec;
-   }
-   else
-   if(iAttr->ia_valid & ATTR_MTIME)
-   { // set mtime to "now"
-      (*outValidAttribs) |= SETATTR_CHANGE_MODIFICATIONTIME;
-      fhgfsAttr->modificationTimeSecs = now.tv_sec;
-   }
-
-   if(iAttr->ia_valid & ATTR_ATIME_SET)
-   {
-      (*outValidAttribs) |= SETATTR_CHANGE_LASTACCESSTIME;
-      fhgfsAttr->lastAccessTimeSecs = iAttr->ia_atime.tv_sec;
-   }
-   else
-   if(iAttr->ia_valid & ATTR_ATIME)
-   { // set atime to "now"
-      (*outValidAttribs) |= SETATTR_CHANGE_LASTACCESSTIME;
-      fhgfsAttr->lastAccessTimeSecs = now.tv_sec;
-   }
-}
 
 /**
  * Convert fhgfs DirEntryType to OS DT_... for readdir()'s filldir.

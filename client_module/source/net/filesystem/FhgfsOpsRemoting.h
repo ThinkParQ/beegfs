@@ -37,7 +37,7 @@ extern bool FhgfsOpsRemoting_initMsgBufCache(void);
 extern void FhgfsOpsRemoting_destroyMsgBufCache(void);
 
 extern FhgfsOpsErr FhgfsOpsRemoting_listdirFromOffset(const EntryInfo* entryInfo,
-   FsDirInfo* dirInfo, unsigned maxOutNames);
+   FsDirInfo* dirInfo, unsigned dirListLimit);
 extern FhgfsOpsErr FhgfsOpsRemoting_statRoot(App* app, fhgfs_stat* outFhgfsStat);
 static inline FhgfsOpsErr FhgfsOpsRemoting_statDirect(App* app, const EntryInfo* entryInfo,
    fhgfs_stat* outFhgfsStat);
@@ -114,7 +114,7 @@ extern FhgfsOpsErr FhgfsOpsRemoting_rename(App* app, const char* oldName, unsign
    const EntryInfo* toDirInfo, const struct FileEvent* event);
 extern FhgfsOpsErr FhgfsOpsRemoting_truncfile(App* app, const EntryInfo* entryInfo, loff_t size,
    const struct FileEvent* event);
-extern FhgfsOpsErr FhgfsOpsRemoting_fsyncfile(RemotingIOInfo* ioInfo, bool forceRemoteFlush,
+extern FhgfsOpsErr FhgfsOpsRemoting_fsyncfile(RemotingIOInfo* ioInfo,  const struct file *file, bool forceRemoteFlush,
    bool checkSession, bool doSyncOnClose);
 extern FhgfsOpsErr FhgfsOpsRemoting_statStoragePath(App* app, bool ignoreErrors,
    int64_t* outSizeTotal, int64_t* outSizeFree);
@@ -141,6 +141,8 @@ extern FhgfsOpsErr FhgfsOpsRemoting_bumpFileVersion(App* app, const EntryInfo* e
    bool persistent, const struct FileEvent* event);
 extern FhgfsOpsErr FhgfsOpsRemoting_getFileVersion(App* app, const EntryInfo* entryInfo,
    uint32_t* outVersion);
+
+extern FhgfsOpsErr FhgfsOpsRemoting_SetFileState(App* app, const EntryInfo* entryInfo, uint8_t state);
 
 FhgfsOpsErr __FhgfsOpsRemoting_flockGenericEx(struct NetMessage* requestMsg, unsigned respMsgType,
    NodeOrGroup owner, bool isBuddyMirrored, App* app, const char* fileHandleID, int lockTypeFlags,

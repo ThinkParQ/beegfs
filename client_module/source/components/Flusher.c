@@ -87,7 +87,7 @@ void __Flusher_flushBuffers(Flusher* this)
          InodeRefStore_addOrPutInode(refStore, inode);
       }
       else
-      if( (flushRes != FhgfsOpsErr_COMMUNICATION) || !FhgfsInode_getIsFileOpen(fhgfsInode) )
+      if( (flushRes != FhgfsOpsErr_COMMUNICATION) || !FhgfsInode_getIsFileOpen(fhgfsInode, false) )
       { /* unrecoverable error and file is no longer open (so there is no chance that the user app
            can see an error code) so we have to discard the buffer to avoid retrying infintely
            on this inode */

@@ -296,12 +296,10 @@ setting instead.");
          // Set the new setting using the old values
          if(tcp != -1) {
             setting = tcp;
-            // TODO Doesn't work as the logger isn't initialized yet: https://github.com/ThinkParQ/beegfs-core/issues/4033
-            LOG(GENERAL, WARNING, "Using deprecated config argument '" + name + "TCP'");
+            LOG_CTX(GENERAL, WARNING, "Config", "Using deprecated config argument '" + name + "TCP'");
          } else if(udp != -1) {
             setting = udp;
-            // TODO Doesn't work as the logger isn't initialized yet: https://github.com/ThinkParQ/beegfs-core/issues/4033
-            LOG(GENERAL, WARNING, "Using deprecated config argument '" + name + "UDP'");
+            LOG_CTX(GENERAL, WARNING, "Config", "Using deprecated config argument '" + name + "UDP'");
          } else {
             setting = def;
          }
@@ -529,7 +527,7 @@ NetFilter loadNetworkList(const std::string& file) {
          auto net = IPNetwork::fromCidr(f);
          res.push_back(net);
       } catch (std::exception &e) {
-         LOG(GENERAL, WARNING, e.what());
+         LOG_CTX(GENERAL, WARNING, "Config", e.what());
       }
    }
 

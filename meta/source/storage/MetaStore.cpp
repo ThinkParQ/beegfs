@@ -2650,21 +2650,43 @@ FhgfsOpsErr MetaStore::setFileState(EntryInfo* entryInfo, const FileState& state
    fileEvent.type = FileEventType::INODE_LOCKED;
    fileEvent.path = entryInfo->getFileName();
    fileEvent.targetValid = false;
-   
+
    // Add inode to global lock store for exclusive access
    GlobalInodeLockStore* lockStore = this->getInodeLockStore();
-   if (!lockStore->insertFileInode(entryInfo, &fileEvent, true))
+   FhgfsOpsErr lockRes = lockStore->insertFileInode(entryInfo, &fileEvent, true,
+                                                    LockOperationType::FILE_STATE_UPDATE);
+   if (lockRes != FhgfsOpsErr_SUCCESS)
    {
-      LogContext(logContext).log(Log_DEBUG, "Inode is locked in global lock store; "
-         "state update rejected. EntryID: " + entryInfo->getEntryID());
-      return FhgfsOpsErr_INODELOCKED;
+      if (lockRes == FhgfsOpsErr_INODELOCKED)
+      {
+         // Locked by different operation (e.g., chunk balancer)
+         LogContext(logContext).log(Log_DEBUG,
+            "Inode locked by different operation; state update rejected. "
+            "EntryID: " + entryInfo->getEntryID());
+      }
+      else
+      {
+         // Failed to acquire lock (e.g., inode creation failed)
+         LogContext(logContext).log(Log_WARNING,
+            "Failed to lock inode; state update failed. "
+            "EntryID: " + entryInfo->getEntryID());
+      }
+      return lockRes;
    }
 
    DirInode* parentDir = referenceDirUnlocked(entryInfo->getParentEntryID(),
                                              entryInfo->getIsBuddyMirrored(), false);
    if (unlikely(!parentDir))
    {
-      lockStore->releaseFileInode(entryInfo->getEntryID());
+      bool releaseRes = lockStore->releaseFileInode(entryInfo->getEntryID(),
+                                                    LockOperationType::FILE_STATE_UPDATE);
+      if (unlikely(!releaseRes))
+      {
+         LogContext(logContext).logErr(
+            "Failed to release global inode lock! Inode will remain locked indefinitely. "
+            "It is crucial to restart the metadata service in order to restore access to this inode. "
+            "EntryID: " + entryInfo->getEntryID());
+      }
       return FhgfsOpsErr_PATHNOTEXISTS;
    }
 
@@ -2680,7 +2702,15 @@ FhgfsOpsErr MetaStore::setFileState(EntryInfo* entryInfo, const FileState& state
    if (unlikely(!inode))
    {
       releaseDirUnlocked(parentDir->getID());
-      lockStore->releaseFileInode(entryInfo->getEntryID());
+      bool releaseRes = lockStore->releaseFileInode(entryInfo->getEntryID(),
+                                                    LockOperationType::FILE_STATE_UPDATE);
+      if (unlikely(!releaseRes))
+      {
+         LogContext(logContext).logErr(
+            "Failed to release global inode lock! Inode will remain locked indefinitely. "
+            "It is crucial to restart the metadata service in order to restore access to this inode. "
+            "EntryID: " + entryInfo->getEntryID());
+      }
       return refRes;
    }
 
@@ -2694,7 +2724,15 @@ FhgfsOpsErr MetaStore::setFileState(EntryInfo* entryInfo, const FileState& state
    // Clean up resources in reverse order of acquisition
    releaseFileUnlocked(*parentDir, inode);
    releaseDirUnlocked(parentDir->getID());
-   lockStore->releaseFileInode(entryInfo->getEntryID());
+   bool releaseRes = lockStore->releaseFileInode(entryInfo->getEntryID(),
+                                                 LockOperationType::FILE_STATE_UPDATE);
+   if (unlikely(!releaseRes))
+   {
+      LogContext(logContext).logErr(
+         "Failed to release global inode lock! Inode will remain locked indefinitely. "
+         "It is crucial to restart the metadata service in order to restore access to this inode. "
+         "EntryID: " + entryInfo->getEntryID());
+   }
    return setRes;
 }
 

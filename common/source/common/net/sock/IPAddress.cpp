@@ -302,5 +302,9 @@ sockaddr_in6 SocketAddress::toSockaddr() const {
 }
 
 std::string SocketAddress::toString() const {
-   return this->addr.toString() + ":" + std::to_string(this->port);
+   if(this->addr.isIPv6()) {
+      return "[" + this->addr.toString() + "]:" + std::to_string(this->port);
+   } else {
+      return this->addr.toString() + ":" + std::to_string(this->port);
+   }
 }

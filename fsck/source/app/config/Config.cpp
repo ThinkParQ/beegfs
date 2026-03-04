@@ -172,6 +172,7 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       IGNORE_CONFIG_CLIENT_VALUE("sysSessionChecksEnabled")
       IGNORE_CONFIG_CLIENT_VALUE("sysTargetOfflineTimeoutSecs")
       IGNORE_CONFIG_CLIENT_VALUE("sysInodeIDStyle")
+
       IGNORE_CONFIG_CLIENT_VALUE("sysSELinuxEnabled")
       IGNORE_CONFIG_CLIENT_VALUE("sysSELinuxRevalidate")
       IGNORE_CONFIG_CLIENT_VALUE("sysACLsEnabled")
@@ -187,6 +188,8 @@ void Config::applyConfigMap(bool enableException, bool addDashes)
       IGNORE_CONFIG_CLIENT_VALUE("sysRenameEbusyAsXdev")
       IGNORE_CONFIG_CLIENT_VALUE("tuneNumRetryWorkers")
       IGNORE_CONFIG_CLIENT_VALUE("connHelperdPortTCP") // was removed, kept here for compat
+      IGNORE_CONFIG_CLIENT_VALUE("tuneFileOpenRetryTimeoutMS")
+      IGNORE_CONFIG_CLIENT_VALUE("tuneFileOpenRetryIntervalMS")      
 
       if (testConfigMapKeyMatch(iter, "connInterfacesFile", addDashes))
          connInterfacesFile = iter->second;

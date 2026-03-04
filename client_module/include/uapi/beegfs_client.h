@@ -42,24 +42,25 @@
  *       not really exchanged unless the drivers' ioctl handler explicity does the exchange).
  */
 
-#define BEEGFS_IOCTYPE_ID                     'f'
+#define BEEGFS_IOCTYPE_ID                    'f'
 
-#define BEEGFS_IOCNUM_GETVERSION_OLD           1 // value from FS_IOC_GETVERSION in linux/fs.h
-#define BEEGFS_IOCNUM_GETVERSION               3
-#define BEEGFS_IOCNUM_GET_CFG_FILE            20
-#define BEEGFS_IOCNUM_CREATE_FILE             21
-#define BEEGFS_IOCNUM_TEST_IS_FHGFS           22
-#define BEEGFS_IOCNUM_TEST_IS_BEEGFS          22
-#define BEEGFS_IOCNUM_GET_RUNTIME_CFG_FILE    23
-#define BEEGFS_IOCNUM_GET_MOUNTID             24
-#define BEEGFS_IOCNUM_GET_STRIPEINFO          25
-#define BEEGFS_IOCNUM_GET_STRIPETARGET        26
-#define BEEGFS_IOCNUM_MKFILE_STRIPEHINTS      27
-#define BEEGFS_IOCNUM_CREATE_FILE_V2          28
-#define BEEGFS_IOCNUM_CREATE_FILE_V3          29
-#define BEEGFS_IOCNUM_GETINODEID              30
-#define BEEGFS_IOCNUM_GETENTRYINFO            31
-#define BEEGFS_IOCNUM_PINGNODE                32
+#define BEEGFS_IOCNUM_GETVERSION_OLD         1 // value from FS_IOC_GETVERSION in linux/fs.h
+#define BEEGFS_IOCNUM_GETVERSION             3
+#define BEEGFS_IOCNUM_GET_CFG_FILE           20
+#define BEEGFS_IOCNUM_CREATE_FILE            21
+#define BEEGFS_IOCNUM_TEST_IS_FHGFS          22
+#define BEEGFS_IOCNUM_TEST_IS_BEEGFS         22
+#define BEEGFS_IOCNUM_GET_RUNTIME_CFG_FILE   23
+#define BEEGFS_IOCNUM_GET_MOUNTID            24
+#define BEEGFS_IOCNUM_GET_STRIPEINFO         25
+#define BEEGFS_IOCNUM_GET_STRIPETARGET       26
+#define BEEGFS_IOCNUM_MKFILE_STRIPEHINTS     27
+#define BEEGFS_IOCNUM_CREATE_FILE_V2         28
+#define BEEGFS_IOCNUM_CREATE_FILE_V3         29
+#define BEEGFS_IOCNUM_GETINODEID             30
+#define BEEGFS_IOCNUM_GETENTRYINFO           31
+#define BEEGFS_IOCNUM_PINGNODE               32
+#define BEEGFS_IOCNUM_SET_FILE_STATE         33 // set accessFlags and dataState on a file
 
 #define BEEGFS_IOC_GETVERSION     _IOR( \
    BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_GETVERSION, long)
@@ -95,7 +96,8 @@
    BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_GETENTRYINFO, struct BeegfsIoctl_GetEntryInfo_Arg)
 #define BEEGFS_IOC_PINGNODE                 _IOR( \
    BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_PINGNODE, struct BeegfsIoctl_PingNode_Arg)
-
+#define BEEGFS_IOC_SET_FILE_STATE _IOW( \
+   BEEGFS_IOCTYPE_ID, BEEGFS_IOCNUM_SET_FILE_STATE, struct BeegfsIoctl_SetFileState_Arg)
 
 /* used to return the client config file path using an IOCTL */
 struct BeegfsIoctl_GetCfgFile_Arg
@@ -296,5 +298,11 @@ struct BeegfsIoctl_PingNode_Arg
    struct BeegfsIoctl_PingNode_Arg_Results results;
 };
 
+/* used to set access flags and data state on a file */
+struct BeegfsIoctl_SetFileState_Arg
+{
+   char filename[BEEGFS_IOCTL_FILENAME_MAXLEN];
+   uint8_t fileState; // combined AccessFlags and DataState
+};
 
 #endif

@@ -374,10 +374,6 @@ void App::findAllowedInterfaces(NicAddressList& outList) const
 {
    // discover local NICs and filter them
    NetworkInterfaceCard::findAll(&allowedInterfaces, false, cfg->getConnDisableIPv6(), &outList);
-
-   if(outList.empty() )
-      throw InvalidConfigException("Couldn't find any usable NIC");
-
    outList.sort(NetworkInterfaceCard::NicAddrComp{&allowedInterfaces});
 }
 
@@ -410,6 +406,9 @@ void App::initBasicNetwork()
    }
 
    findAllowedInterfaces(localNicList);
+
+   if(localNicList.empty())
+      throw InvalidConfigException("Couldn't find any usable NIC");
 
    noDefaultRouteNets = std::make_shared<NetFilter>();
    if(!initNoDefaultRouteList(noDefaultRouteNets.get()))
@@ -708,6 +707,7 @@ void App::joinComponents()
    if(chunkFetcher)
       chunkFetcher->waitForStopFetching();
 
+   waitForComponentTermination(chunkBalancerJob);
    waitForComponentTermination(dgramListener);
    waitForComponentTermination(connAcceptor);
 

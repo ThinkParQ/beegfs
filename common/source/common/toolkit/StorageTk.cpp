@@ -7,6 +7,7 @@
 #include <common/toolkit/Time.h>
 #include <common/toolkit/UnitTk.h>
 #include "StorageTk.h"
+#include "common/nodes/NumNodeID.h"
 
 #include <cstdio>
 #include <fstream>
@@ -29,6 +30,8 @@
 
 #define STORAGETK_FREESPACE_FILENAME         "free_space.override"
 #define STORAGETK_FREEINODES_FILENAME        "free_inodes.override"
+
+const char* STORAGETK_REG_TOKEN_FILENAME = "registrationToken";
 
 #ifndef BTRFS_SUPER_MAGIC
 #define BTRFS_SUPER_MAGIC 0x9123683E /* <linux/magic.h>, which isn't available on older distros */
@@ -603,6 +606,28 @@ void StorageTk::deprecateNodeStringIDFiles(const std::string pathStr) {
    Path basePath(pathStr);
    deprecate(basePath / STORAGETK_NODEID_FILENAME);
    deprecate(basePath / STORAGETK_ORIGINALNODEID_FILENAME);
+}
+
+std::string StorageTk::readOrCreateRegistrationToken(const std::string pathStr, const NumNodeID localNodeID) {
+   // check if file exists already and read it, otherwise create it
+
+   Path p = Path(pathStr) / STORAGETK_REG_TOKEN_FILENAME;
+   StringList idList; // actually, the file would contain only a single line
+
+   if(StorageTk::pathExists(p.str()))
+      ICommonConfig::loadStringListFile(p.str().c_str(), idList);
+
+   if(!idList.empty()) {
+      return *idList.begin();
+   }
+
+   auto newID = StorageTk::generateFileID(localNodeID);
+
+   const auto writeRes = TempFileTk::storeTmpAndMove(p.str(), newID + "\n");
+   if (writeRes != FhgfsOpsErr_SUCCESS)
+      throw InvalidConfigException("Unable to create file for registration token " + p.str());
+
+   return newID;
 }
 
 /**
