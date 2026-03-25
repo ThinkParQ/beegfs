@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# License: BeeGFS EULA
+# License: BeeGFS License Agreement
 
 # only a dummy file at the moment
 # will be a wrapper for beegfs-fsck

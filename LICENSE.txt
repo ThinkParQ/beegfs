@@ -1,5 +1,5 @@
-BeeGFS END USER LICENSE AGREEMENT
-=================================
+BeeGFS License Agreement
+========================
 
 Copyright (c) 2009 Fraunhofer ITWM, 2022 ThinkParQ GmbH
 

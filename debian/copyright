@@ -3,9 +3,9 @@ Source: https://github.com/ThinkParQ/beegfs
 
 Files: *
 Copyright: 2009 Fraunhofer ITWM, 2022 ThinkParQ GmbH
-License: BeeGFS EULA
+License: BeeGFS License Agreement
  The complete text of this license can be found at
- https://www.beegfs.io/docs/BeeGFS_EULA.txt
+ https://www.beegfs.io/docs/BeeGFS_License_Agreement.txt
 
 Files: client_module/*
 Copyright: 2009 Fraunhofer ITWM, 2022 ThinkParQ GmbH

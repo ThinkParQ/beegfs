@@ -51,7 +51,7 @@ fi
 
 Name: beegfs
 Summary: BeeGFS parallel file system
-License: BeeGFS EULA
+License: BeeGFS License Agreement
 Version: %{VER}
 Release: %{RELEASE}
 URL: http://www.beegfs.io
