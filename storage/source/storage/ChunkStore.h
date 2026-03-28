@@ -11,9 +11,14 @@
 
 #include "ChunkDir.h"
 
+#define RW_HINT_INVALID 0xFF
 
 #define PATH_DEPTH_IDENTIFIER 'l' // we use 'l' (level) instead of 'd', as d is part of hex numbers
 
+#ifndef F_SET_RW_HINT
+#define F_LINUX_SPECIFIC_BASE 1024
+#define F_SET_RW_HINT (F_LINUX_SPECIFIC_BASE + 12)
+#endif
 
 class ChunkDir;
 
@@ -55,7 +60,7 @@ class ChunkStore
 
       FhgfsOpsErr openChunkFile(int targetFD, const Path* chunkDirPath,
          const std::string& chunkFilePathStr, bool hasOrigFeature, int openFlags, int* outFD,
-         const SessionQuotaInfo* quotaInfo, const ExceededQuotaStorePtr exQuotaStore);
+         const SessionQuotaInfo* quotaInfo, const ExceededQuotaStorePtr exQuotaStore, uint64_t writeHint = RW_HINT_INVALID);
 
       bool chmodV2ChunkDirPath(int targetFD, const Path* chunkDirPath, const std::string& entryID);
 
@@ -87,7 +92,7 @@ class ChunkStore
          ChunkDir** outChunkDir);
 
       std::pair<FhgfsOpsErr, int> openAndChown(const int targetFD, const std::string& path,
-         const int openFlags, const SessionQuotaInfo& quota);
+         const int openFlags, const SessionQuotaInfo& quota, uint64_t writeHint = RW_HINT_INVALID);
 
       // inlined
 

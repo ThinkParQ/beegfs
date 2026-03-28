@@ -491,6 +491,12 @@ void __FhgfsInode_initOpenIOInfo(FhgfsInode* this, FhgfsInodeFileHandle* fileHan
 #ifdef BEEGFS_NVFS
    outIOInfo->nvfs = false;
 #endif
+
+#if defined(KERNEL_HAS_INODE_I_WRITE_HINT)
+   outIOInfo->writeHint = this->vfs_inode.i_write_hint;
+#else
+   outIOInfo->writeHint = RW_HINT_INVALID;
+#endif
 }
 
 /**

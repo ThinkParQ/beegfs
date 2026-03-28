@@ -206,6 +206,11 @@ run_job check_struct_field \
    inode::i_mtime \
    KERNEL_HAS_INODE_MTIME \
    linux/fs.h
+   
+run_job check_struct_field \
+   inode::i_write_hint \
+   KERNEL_HAS_INODE_I_WRITE_HINT \
+   linux/fs.h
 
 run_job check_struct_field \
    dentry::d_subdirs \

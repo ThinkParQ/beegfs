@@ -7,6 +7,7 @@
 #include <toolkit/BitStore.h>
 #include <app/App.h>
 
+#define RW_HINT_INVALID 0xFF
 
 struct RemotingIOInfo;
 typedef struct RemotingIOInfo RemotingIOInfo;
@@ -44,6 +45,7 @@ struct RemotingIOInfo
 #ifdef BEEGFS_NVFS
       bool nvfs;
 #endif
+      uint64_t writeHint;
 };
 
 
@@ -78,6 +80,8 @@ void RemotingIOInfo_initOpen(App* app, unsigned accessFlags, AtomicInt* maxUsedT
 #ifdef BEEGFS_NVFS
    outIOInfo->nvfs = false;
 #endif
+   
+   outIOInfo->writeHint = RW_HINT_INVALID;
 }
 
 
@@ -104,6 +108,8 @@ void RemotingIOInfo_initSpecialClose(App* app, const char* fileHandleID,
 #ifdef BEEGFS_NVFS
    outIOInfo->nvfs = false;
 #endif
+
+   outIOInfo->writeHint = RW_HINT_INVALID;
 }
 
 /**

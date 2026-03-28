@@ -10,6 +10,7 @@
 
 #include <atomic>
 
+#define RW_HINT_INVALID 0xFF
 /**
  * Represents the client session information for an open chunk file.
  */
@@ -97,7 +98,7 @@ class SessionLocalFile
       }
 
       FhgfsOpsErr openFile(int targetFD, const PathInfo* pathInfo, bool isWriteOpen,
-         const SessionQuotaInfo* quotaInfo);
+         const SessionQuotaInfo* quotaInfo, uint64_t writeHint = RW_HINT_INVALID);
 
       NodeHandle setMirrorNodeExclusive(NodeHandle mirrorNode);
 

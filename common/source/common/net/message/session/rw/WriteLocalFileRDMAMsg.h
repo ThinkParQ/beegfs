@@ -17,8 +17,8 @@ class WriteLocalFileRDMAMsg : public WriteLocalFileMsgBase, public NetMessageSer
        */
       WriteLocalFileRDMAMsg(const NumNodeID clientNumID, const char* fileHandleID,
          const uint16_t targetID, const PathInfo* pathInfo, const unsigned accessFlags,
-         const int64_t offset, const int64_t count) :
-         WriteLocalFileMsgBase(clientNumID, fileHandleID, targetID, pathInfo, accessFlags, offset, count),
+         const int64_t offset, const int64_t count, const uint64_t writeHint = RW_HINT_INVALID) :
+         WriteLocalFileMsgBase(clientNumID, fileHandleID, targetID, pathInfo, accessFlags, offset, count, writeHint),
          BaseType(NETMSGTYPE_WriteLocalFileRDMA) {}
 
       /**
