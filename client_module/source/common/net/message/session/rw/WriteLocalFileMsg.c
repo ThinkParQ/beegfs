@@ -41,4 +41,7 @@ void WriteLocalFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx)
 
    // targetID
    Serialization_serializeUShort(ctx, thisCast->targetID);
+
+   // writeHint
+   Serialization_serializeUInt64(ctx, thisCast->writeHint);
 }

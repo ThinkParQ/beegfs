@@ -549,7 +549,7 @@ out:
 }
 
 std::pair<FhgfsOpsErr, int> ChunkStore::openAndChown(const int targetFD, const std::string& path,
-   const int openFlags, const SessionQuotaInfo& quota)
+   const int openFlags, const SessionQuotaInfo& quota, uint64_t writeHint)
 {
    // if we aren't using quota, we don't care about the file owner at all and may simply create the
    // file if it does exist (and if openFlags requests it).
@@ -583,6 +583,17 @@ std::pair<FhgfsOpsErr, int> ChunkStore::openAndChown(const int targetFD, const s
          return {FhgfsOpsErrTk::fromSysErr(errno), -1};
    }
 
+   if (writeHint != RW_HINT_INVALID)
+   {
+      int r = fcntl(fd, F_SET_RW_HINT, &writeHint);
+      if (r < 0) 
+	  {
+         LOG(GENERAL, ERR, 
+		 "Client requested a write lifetime hint, but server failed to set it.",
+         ("writeHint", StringTk::uint64ToStr(writeHint)), sysErr);
+	  }
+   }
+
    if (!quota.useQuota)
       return {FhgfsOpsErr_SUCCESS, fd};
 
@@ -607,7 +618,7 @@ std::pair<FhgfsOpsErr, int> ChunkStore::openAndChown(const int targetFD, const s
  */
 FhgfsOpsErr ChunkStore::openChunkFile(int targetFD, const Path* chunkDirPath,
    const std::string& chunkFilePathStr, bool hasOrigFeature, int openFlags, int* outFD,
-   const SessionQuotaInfo* quotaInfo, const ExceededQuotaStorePtr exQuotaStore)
+   const SessionQuotaInfo* quotaInfo, const ExceededQuotaStorePtr exQuotaStore, uint64_t writeHint)
 {
    const char* logContext = "ChunkStore create chunkFile";
    FhgfsOpsErr retVal = FhgfsOpsErr_INTERNAL;
@@ -637,7 +648,7 @@ FhgfsOpsErr ChunkStore::openChunkFile(int targetFD, const Path* chunkDirPath,
       }
    }
 
-   std::tie(retVal, *outFD) = openAndChown(targetFD, chunkFilePathStr, openFlags, *quotaInfo);
+   std::tie(retVal, *outFD) = openAndChown(targetFD, chunkFilePathStr, openFlags, *quotaInfo, writeHint);
    if (retVal == FhgfsOpsErr_SUCCESS)
       return FhgfsOpsErr_SUCCESS;
 
@@ -665,7 +676,7 @@ FhgfsOpsErr ChunkStore::openChunkFile(int targetFD, const Path* chunkDirPath,
       }
 
       // dir created => try file open/create again...
-      std::tie(retVal, *outFD) = openAndChown(targetFD, chunkFilePathStr, openFlags, *quotaInfo);
+      std::tie(retVal, *outFD) = openAndChown(targetFD, chunkFilePathStr, openFlags, *quotaInfo, writeHint);
 
       if (lastChunkDirElement) // old V2 files do not get this
       {

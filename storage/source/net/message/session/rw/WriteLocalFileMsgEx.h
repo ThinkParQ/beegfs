@@ -160,6 +160,11 @@ class WriteLocalFileMsgExBase : public Msg
       {
          return static_cast<Msg&>(*this).getPathInfo();
       }
+
+      inline uint64_t getWriteHint() const
+      {
+         return static_cast<const Msg&>(*this).getWriteHint();
+      }
 };
 
 /**

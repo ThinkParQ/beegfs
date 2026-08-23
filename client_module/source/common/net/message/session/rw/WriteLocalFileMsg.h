@@ -24,7 +24,7 @@ typedef struct WriteLocalFileMsg WriteLocalFileMsg;
 static inline void WriteLocalFileMsg_init(WriteLocalFileMsg* this);
 static inline void WriteLocalFileMsg_initFromSession(WriteLocalFileMsg* this,
    NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID, PathInfo* pathInfo,
-   unsigned accessFlags, int64_t offset, int64_t count);
+   unsigned accessFlags, int64_t offset, int64_t count, uint64_t writeHint);
 
 // virtual functions
 extern void WriteLocalFileMsg_serializePayload(NetMessage* this, SerializeCtx* ctx);
@@ -51,6 +51,7 @@ struct WriteLocalFileMsg
    PathInfo* pathInfo;
    unsigned userID;
    unsigned groupID;
+   uint64_t writeHint;
 };
 
 extern const struct NetMessageOps WriteLocalFileMsg_Ops;
@@ -67,7 +68,7 @@ void WriteLocalFileMsg_init(WriteLocalFileMsg* this)
 void WriteLocalFileMsg_initFromSession(WriteLocalFileMsg* this,
    NumNodeID clientNumID, const char* fileHandleID, uint16_t targetID, PathInfo* pathInfo,
    unsigned accessFlags,
-   int64_t offset, int64_t count)
+   int64_t offset, int64_t count, uint64_t writeHint)
 {
    WriteLocalFileMsg_init(this);
 
@@ -83,6 +84,7 @@ void WriteLocalFileMsg_initFromSession(WriteLocalFileMsg* this,
 
    this->offset = offset;
    this->count = count;
+   this->writeHint = writeHint;
 }
 
 void WriteLocalFileMsg_setUserdataForQuota(WriteLocalFileMsg* this, unsigned userID,

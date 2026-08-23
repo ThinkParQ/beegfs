@@ -50,7 +50,7 @@ void SessionLocalFile::serializeNodeID(SessionLocalFile* obj, Deserializer& des)
  * @param isWriteOpen if set to true, the file will be created if it didn't exist.
  */
 FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
-   bool isWriteOpen, const SessionQuotaInfo* quotaInfo)
+   bool isWriteOpen, const SessionQuotaInfo* quotaInfo, uint64_t writeHint)
 {
    FhgfsOpsErr retVal = FhgfsOpsErr_SUCCESS;
 
@@ -94,7 +94,7 @@ FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
 
          FhgfsOpsErr openChunkRes = chunkDirStore->openChunkFile(
             targetFD, &chunkDirPath, chunkFilePathStr, hasOrigFeature, openFlags, &fd, quotaInfo,
-            exceededQuotaStore);
+            exceededQuotaStore, writeHint);
 
          // fix chunk path permissions
          if (unlikely(openChunkRes == FhgfsOpsErr_NOTOWNER && quotaInfo->useQuota) )
@@ -104,7 +104,7 @@ FhgfsOpsErr SessionLocalFile::openFile(int targetFD, const PathInfo* pathInfo,
 
             openChunkRes = chunkDirStore->openChunkFile(
                targetFD, &chunkDirPath, chunkFilePathStr, hasOrigFeature, openFlags, &fd,
-               quotaInfo, exceededQuotaStore);
+               quotaInfo, exceededQuotaStore, writeHint);
          }
 
          if (openChunkRes != FhgfsOpsErr_SUCCESS)

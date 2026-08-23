@@ -523,7 +523,8 @@ FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::openFile(const StorageTarg
 
    SessionQuotaInfo quotaInfo(useQuota, enforceQuota, getUserID(), getGroupID() );
 
-   FhgfsOpsErr openChunkRes = sessionLocalFile->openFile(targetFD, getPathInfo(), true, &quotaInfo);
+   FhgfsOpsErr openChunkRes = sessionLocalFile->openFile(targetFD, getPathInfo(), 
+   true, &quotaInfo, getWriteHint());
 
    return openChunkRes;
 }
@@ -638,7 +639,7 @@ FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::prepareMirroring(char* buf
          mirrorToSock = mirrorToNode->getConnPool()->acquireStreamSocket();
 
          WriteLocalFileMsg mirrorWriteMsg(getClientNumID(), getFileHandleID(), getTargetID(),
-            getPathInfo(), getAccessFlags(), getOffset(), getCount());
+            getPathInfo(), getAccessFlags(), getOffset(), getCount(), getWriteHint());
 
          if(doSessionCheck() )
             mirrorWriteMsg.addMsgHeaderFeatureFlag(WRITELOCALFILEMSG_FLAG_SESSION_CHECK);
@@ -733,7 +734,7 @@ FhgfsOpsErr WriteLocalFileMsgExBase<Msg, WriteState>::sendToMirror(const char* b
             mirrorToSock = mirrorToNode->getConnPool()->acquireStreamSocket();
 
             WriteLocalFileMsg mirrorWriteMsg(getClientNumID(), getFileHandleID(),
-               getTargetID(), getPathInfo(), getAccessFlags(), offset, toBeMirrored);
+               getTargetID(), getPathInfo(), getAccessFlags(), offset, toBeMirrored, getWriteHint());
 
             if(doSessionCheck() )
                mirrorWriteMsg.addMsgHeaderFeatureFlag(WRITELOCALFILEMSG_FLAG_SESSION_CHECK);
