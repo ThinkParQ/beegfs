@@ -101,19 +101,24 @@ bool MigrateFile::migrateRegularFile()
    if (fromStatData.st_nlink > 1)
    {
       std::cerr << "Cannot migrate file with hard link (yet): " << this->filePath << std::endl;
+      close(fromFD);
       return false;
    }
 
    auto maybeFromXAttrs(getXAttrs());
    if (!maybeFromXAttrs)
    {
+      close(fromFD);
       return false;
    }
    XAttrMap fromXAttrs (std::move(*maybeFromXAttrs));
 
    int tmpFD = runCreateIoctl(&fromStatData);
    if (tmpFD < 0)
+   {
+      close(fromFD);
       return false; // failed to create new file
+   }
 
    bool metaRes;
    int renameRes;
