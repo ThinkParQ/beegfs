@@ -1918,11 +1918,11 @@ void __IBVSocket_sendCompletionHandler(struct ib_cq *cq, void *cq_context)
    IBVCommContext* commContext = _this->commContext;
    int reqNotifySendRes;
 
-   atomic_inc(&commContext->sendCompEventCount);
-
    reqNotifySendRes = ib_req_notify_cq(commContext->sendCQ, IB_CQ_NEXT_COMP);
    if(unlikely(reqNotifySendRes) )
       ibv_print_info("Couldn't request CQ notification\n");
+
+   atomic_inc(&commContext->sendCompEventCount);
 
    wake_up(&commContext->sendCompWaitQ);
 }
